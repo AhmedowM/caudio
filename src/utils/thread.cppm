@@ -20,7 +20,6 @@ import :result;
 import :error;
 
 #if defined(_WIN32) || defined(_WIN64)
-extern "C" {
   using HANDLE = void*;
   using HMODULE = void*;
   using HRESULT = long;
@@ -31,17 +30,21 @@ extern "C" {
   using UINT = unsigned int;
   using DWORD = unsigned long;
   using FARPROC = long long int (*)();
-  __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
-  __declspec(dllimport) FARPROC __stdcall GetProcAddress(HMODULE, LPCSTR);
-  __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT, DWORD, LPCCH, int, LPWSTR, int);
-  __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
-}
 #ifndef CP_UTF8
 #define CP_UTF8 65001
 #endif
 #ifndef WINAPI
 #define WINAPI __stdcall
 #endif
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+extern "C" {
+  __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
+  __declspec(dllimport) FARPROC __stdcall GetProcAddress(HMODULE, LPCSTR);
+  __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT, DWORD, LPCCH, int, LPWSTR, int);
+  __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
+}
 #endif
 
 export namespace caudio::utils {
@@ -61,11 +64,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 
 [[nodiscard]] inline Expected<void> setThreadName(std::string_view name) noexcept {
   if (name.empty()) {
-    // empty name is allowed on Windows, but treat as InvalidArg? C returned Ok even for empty.
-    // Allow empty -> Ok
-  }
-  if (name.data() == nullptr && !name.empty()) {
-    return std::unexpected(Error{Result::InvalidArg, "null name"});
+    return std::unexpected(Error{Result::InvalidArg, "empty name"});
   }
 #if defined(_WIN32) || defined(_WIN64)
   // Use SetThreadDescription if available (Windows 10 1607+)
@@ -78,21 +77,10 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #pragma GCC diagnostic pop
     if (pSetDesc) {
       int wlen = MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), nullptr, 0);
-      // Need null terminator
-      std::wstring wbuf;
-      wbuf.resize(static_cast<std::size_t>(wlen + 1));
-      MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), wbuf.data(), wlen);
-      wbuf[wlen] = L'\0';
-      // truncate to wlen chars
-      wbuf.resize(static_cast<std::size_t>(wlen));
-      // Need null-terminated buffer for API
-      std::wstring wnull = std::wstring(name.size() * 2 + 4, L'\0');
-      int wlen2 = MultiByteToWideChar(CP_UTF8, 0, std::string(name).c_str(), -1, wnull.data(), static_cast<int>(wnull.size()));
-      if (wlen2 > 0) {
-        wnull.resize(static_cast<std::size_t>(wlen2 - 1));
-        // API expects null-terminated; we pass wnull.c_str()
-        // Use GetCurrentThread
-        HRESULT hr = pSetDesc(GetCurrentThread(), wnull.c_str());
+      if (wlen > 0) {
+        std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()), wbuf.data(), wlen);
+        HRESULT hr = pSetDesc(GetCurrentThread(), wbuf.c_str());
         (void)hr;
         return {};
       }
@@ -139,8 +127,8 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
   if (!jt.joinable()) {
     return std::unexpected(Error{Result::State, "thread not joinable"});
   }
-  if (name.data() == nullptr && !name.empty()) {
-    return std::unexpected(Error{Result::InvalidArg, "null name"});
+  if (name.empty()) {
+    return std::unexpected(Error{Result::InvalidArg, "empty name"});
   }
 #if defined(_WIN32) || defined(_WIN64)
   // std::jthread::native_handle() on MinGW may be HANDLE or integer; use C-style cast via uintptr_t
@@ -194,6 +182,9 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 [[nodiscard]] inline Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
   if (!t.joinable()) {
     return std::unexpected(Error{Result::State, "thread not joinable"});
+  }
+  if (name.empty()) {
+    return std::unexpected(Error{Result::InvalidArg, "empty name"});
   }
 #if defined(_WIN32) || defined(_WIN64)
   HANDLE h = (HANDLE)(uintptr_t)t.native_handle();

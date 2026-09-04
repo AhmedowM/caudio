@@ -31,13 +31,12 @@ class MpscQueue {
   [[nodiscard]] std::size_t capacity() const noexcept { return cap_; }
 
   [[nodiscard]] std::size_t size() const noexcept {
-    std::unique_lock<std::mutex> lk(mutex_);
-    std::size_t wr = wr_.load(std::memory_order_acquire);
-    std::size_t rd = rd_.load(std::memory_order_acquire);
-    return wr - rd;
+    return wr_.load(std::memory_order_acquire) - rd_.load(std::memory_order_acquire);
   }
 
-  [[nodiscard]] bool empty() const noexcept { return size() == 0; }
+  [[nodiscard]] bool empty() const noexcept {
+    return wr_.load(std::memory_order_acquire) == rd_.load(std::memory_order_acquire);
+  }
 
   [[nodiscard]] Expected<void> push(const T& value) {
     std::unique_lock<std::mutex> lk(mutex_);

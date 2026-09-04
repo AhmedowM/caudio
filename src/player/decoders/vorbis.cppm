@@ -39,22 +39,29 @@ public:
     p->vorbis_ = nullptr;
     p->useFallback_ = true;
 
-    // Try real stb_vorbis_open_memory if Reader provides data() via virtual method
-    auto memData = r.data();
-    if (!memData.empty()) {
-      int err = 0;
-      stb_vorbis* v = stb_vorbis_open_memory(
-          reinterpret_cast<const unsigned char*>(memData.data()),
-          static_cast<int>(memData.size()),
-          &err, nullptr);
-      if (v) {
-        stb_vorbis_info info = stb_vorbis_get_info(v);
-        p->sampleRate_ = info.sample_rate ? info.sample_rate : 22050u;
-        p->channels_ = info.channels ? static_cast<uint32_t>(info.channels) : 1u;
-        unsigned int total = stb_vorbis_stream_length_in_samples(v);
-        if (total > 0) p->totalFrames_ = total;
-        p->vorbis_ = v;
-        p->useFallback_ = false;
+// Try real stb_vorbis_open_memory via MemoryReader
+    if (r.size() > 0) {
+      auto dataSize = static_cast<std::size_t>(r.size());
+      std::vector<std::byte> buf(dataSize);
+      auto readResult = r.read(std::span(buf.data(), buf.size()));
+      if (readResult > 0) {
+        auto memResult = MemoryReader::open(std::span<const std::byte>(buf.data(), static_cast<std::size_t>(readResult)));
+        if (memResult) {
+          int err = 0;
+          stb_vorbis* v = stb_vorbis_open_memory(
+              reinterpret_cast<const unsigned char*>(buf.data()),
+              static_cast<int>(buf.size()),
+              &err, nullptr);
+          if (v) {
+            stb_vorbis_info info = stb_vorbis_get_info(v);
+            p->sampleRate_ = info.sample_rate ? info.sample_rate : 22050u;
+            p->channels_ = info.channels ? static_cast<uint32_t>(info.channels) : 1u;
+            unsigned int total = stb_vorbis_stream_length_in_samples(v);
+            if (total > 0) p->totalFrames_ = total;
+            p->vorbis_ = v;
+            p->useFallback_ = false;
+          }
+        }
       }
     }
     return caudio::utils::Expected<std::unique_ptr<IDecoder>>{std::unique_ptr<IDecoder>(std::move(p))};

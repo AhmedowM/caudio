@@ -133,6 +133,7 @@ ca_set_warnings(caudio_utils_shared)
 set(CAUDIO_PLAYER_SOURCES
   src/player/player.cppm
   src/player/reader.cppm
+  src/player/output.cppm
   src/player/decoder.cppm
   src/player/decoders/decoder_common.cppm
   src/player/decoders/decoder_interface.cppm
@@ -180,7 +181,7 @@ ca_set_warnings(caudio_player_shared)
 # caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
 add_library(caudio_db STATIC)
 add_library(caudio::db ALIAS caudio_db)
-target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm)
+target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm src/db/types.cppm src/db/schema.cppm)
 target_include_directories(caudio_db PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -194,7 +195,7 @@ ca_set_warnings(caudio_db)
 add_library(caudio_db_shared SHARED)
 set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
 add_library(caudio::db_shared ALIAS caudio_db_shared)
-target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm)
+target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm src/db/types.cppm src/db/schema.cppm)
 target_include_directories(caudio_db_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -234,7 +235,7 @@ target_sources(caudio_combined PUBLIC
   FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
     ${CAUDIO_UTILS_SOURCES}
     ${CAUDIO_PLAYER_SOURCES}
-    src/db/db.cppm
+    src/db/db.cppm src/db/types.cppm src/db/schema.cppm
     src/engine/engine.cppm
 )
 target_include_directories(caudio_combined PUBLIC
@@ -345,4 +346,26 @@ if(CAUDIO_BUILD_TESTS)
   caudio_add_player_test(test_decoder tests/test_decoder.cpp)
   caudio_add_player_test(test_ffmpeg tests/test_ffmpeg.cpp)
   target_compile_definitions(test_ffmpeg PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+
+  # DB tests
+  add_executable(test_db tests/test_db.cpp tests/helpers/test_db_impl.cpp)
+  target_link_libraries(test_db PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_compile_features(test_db PRIVATE cxx_std_23)
+  catch_discover_tests(test_db)
+  add_test(NAME test_db COMMAND test_db)
+
+  # Write thread tests
+  add_executable(test_write_thread tests/test_write_thread.cpp)
+  target_link_libraries(test_write_thread PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_include_directories(test_write_thread PRIVATE vendor)
+  target_compile_features(test_write_thread PRIVATE cxx_std_23)
+  catch_discover_tests(test_write_thread)
+  add_test(NAME test_write_thread COMMAND test_write_thread)
+
+  # Output tests
+  add_executable(test_output tests/test_output.cpp)
+  target_link_libraries(test_output PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
+  target_compile_features(test_output PRIVATE cxx_std_23)
+  catch_discover_tests(test_output)
+  add_test(NAME test_output COMMAND test_output)
 endif()
