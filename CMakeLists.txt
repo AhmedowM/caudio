@@ -98,9 +98,19 @@ function(ca_set_warnings tgt)
 endfunction()
 
 # caudio::utils — C++23 named module partitioned, no hpp split
+set(CAUDIO_UTILS_SOURCES
+  src/utils/utils.cppm
+  src/utils/result.cppm
+  src/utils/error.cppm
+  src/utils/log.cppm
+  src/utils/arena.cppm
+  src/utils/ring.cppm
+  src/utils/queue.cppm
+  src/utils/thread.cppm
+)
 add_library(caudio_utils STATIC)
 add_library(caudio::utils ALIAS caudio_utils)
-target_sources(caudio_utils PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/utils/utils.cppm)
+target_sources(caudio_utils PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_UTILS_SOURCES})
 target_include_directories(caudio_utils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -111,7 +121,7 @@ ca_set_warnings(caudio_utils)
 add_library(caudio_utils_shared SHARED)
 set_target_properties(caudio_utils_shared PROPERTIES OUTPUT_NAME caudio_utils)
 add_library(caudio::utils_shared ALIAS caudio_utils_shared)
-target_sources(caudio_utils_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/utils/utils.cppm)
+target_sources(caudio_utils_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_UTILS_SOURCES})
 target_include_directories(caudio_utils_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -208,7 +218,7 @@ add_library(caudio_combined SHARED)
 set_target_properties(caudio_combined PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_combined PUBLIC
   FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-    src/utils/utils.cppm
+    ${CAUDIO_UTILS_SOURCES}
     src/player/player.cppm
     src/db/db.cppm
     src/engine/engine.cppm
@@ -277,3 +287,32 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
   set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 endif()
 include(CPack)
+
+# Tests — Catch2 via FetchContent, ports of test_utils_*
+if(CAUDIO_BUILD_TESTS)
+  include(FetchContent)
+  FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.7.1
+  )
+  FetchContent_MakeAvailable(Catch2)
+  include(CTest)
+  include(Catch)
+  enable_testing()
+
+  function(caudio_add_test name src impl)
+    add_executable(${name} ${src} ${impl})
+    target_link_libraries(${name} PRIVATE caudio::utils Catch2::Catch2WithMain)
+    target_compile_features(${name} PRIVATE cxx_std_23)
+    catch_discover_tests(${name})
+    add_test(NAME ${name} COMMAND ${name})
+  endfunction()
+
+  caudio_add_test(test_utils_result tests/test_utils_result.cpp tests/helpers/test_utils_result_impl.cpp)
+  caudio_add_test(test_utils_ring tests/test_utils_ring.cpp tests/helpers/test_utils_ring_impl.cpp)
+  caudio_add_test(test_utils_queue tests/test_utils_queue.cpp tests/helpers/test_utils_queue_impl.cpp)
+  caudio_add_test(test_utils_thread tests/test_utils_thread.cpp tests/helpers/test_utils_thread_impl.cpp)
+  caudio_add_test(test_utils_arena tests/test_utils_arena.cpp tests/helpers/test_utils_arena_impl.cpp)
+  caudio_add_test(test_utils_log tests/test_utils_log.cpp tests/helpers/test_utils_log_impl.cpp)
+endif()
