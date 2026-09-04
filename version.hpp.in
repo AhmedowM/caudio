@@ -1,0 +1,17 @@
+#pragma once
+
+#define CAUDIO_VERSION "@PROJECT_VERSION@"
+#define CAUDIO_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define CAUDIO_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define CAUDIO_VERSION_PATCH @PROJECT_VERSION_PATCH@
+#define CAUDIO_VERSION_TWEAK "@CAUDIO_GIT_HASH@"
+#define CAUDIO_VERSION_FULL "@CAUDIO_VERSION_FULL@"
+
+namespace caudio {
+inline constexpr const char* kVersion = CAUDIO_VERSION;
+inline constexpr const char* kVersionFull = CAUDIO_VERSION_FULL;
+inline constexpr const char* kVersionCommit = CAUDIO_VERSION_TWEAK;
+constexpr int kVersionMajor = @PROJECT_VERSION_MAJOR@;
+constexpr int kVersionMinor = @PROJECT_VERSION_MINOR@;
+constexpr int kVersionPatch = @PROJECT_VERSION_PATCH@;
+}

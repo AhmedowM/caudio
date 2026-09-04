@@ -1,0 +1,31 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+if(@CAUDIO_WITH_FFMPEG@)
+  # FFmpeg is optional — primary when found, fallback to dr_* otherwise
+  find_package(FFmpeg QUIET)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/caudioTargets.cmake")
+
+# Provide short alias targets caudio::utils etc. for compatibility with spec
+if(NOT TARGET caudio::utils)
+  add_library(caudio::utils INTERFACE IMPORTED)
+  set_target_properties(caudio::utils PROPERTIES INTERFACE_LINK_LIBRARIES "caudio::caudio_utils")
+endif()
+if(NOT TARGET caudio::player)
+  add_library(caudio::player INTERFACE IMPORTED)
+  set_target_properties(caudio::player PROPERTIES INTERFACE_LINK_LIBRARIES "caudio::caudio_player")
+endif()
+if(NOT TARGET caudio::db)
+  add_library(caudio::db INTERFACE IMPORTED)
+  set_target_properties(caudio::db PROPERTIES INTERFACE_LINK_LIBRARIES "caudio::caudio_db")
+endif()
+if(NOT TARGET caudio::engine)
+  add_library(caudio::engine INTERFACE IMPORTED)
+  set_target_properties(caudio::engine PROPERTIES INTERFACE_LINK_LIBRARIES "caudio::caudio_engine")
+endif()
+
+check_required_components(caudio)
