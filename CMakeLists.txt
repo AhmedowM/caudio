@@ -129,7 +129,7 @@ target_include_directories(caudio_utils_shared PUBLIC
 target_link_libraries(caudio_utils_shared PUBLIC Threads::Threads)
 ca_set_warnings(caudio_utils_shared)
 
-# caudio::player — partitioned modules + decoders (Task 3)
+# caudio::player — partitioned modules + decoders (Task 3/4)
 set(CAUDIO_PLAYER_SOURCES
   src/player/player.cppm
   src/player/reader.cppm
@@ -141,6 +141,9 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/decoders/mp3.cppm
   src/player/decoders/vorbis.cppm
 )
+if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
+  list(APPEND CAUDIO_PLAYER_SOURCES src/player/decoders/ffmpeg.cppm)
+endif()
 add_library(caudio_player STATIC)
 add_library(caudio::player ALIAS caudio_player)
 target_sources(caudio_player PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_PLAYER_SOURCES})
@@ -151,7 +154,7 @@ target_include_directories(caudio_player PUBLIC
 target_include_directories(caudio_player PRIVATE vendor)
 target_link_libraries(caudio_player PUBLIC caudio::utils)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil)
+  target_link_libraries(caudio_player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_player PUBLIC CAUDIO_WITH_FFMPEG=1)
 endif()
 target_sources(caudio_player PRIVATE $<TARGET_OBJECTS:caudio_rtaudio>)
@@ -168,7 +171,7 @@ target_include_directories(caudio_player_shared PUBLIC
 target_include_directories(caudio_player_shared PRIVATE vendor)
 target_link_libraries(caudio_player_shared PUBLIC caudio::utils_shared)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil)
+  target_link_libraries(caudio_player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_player_shared PUBLIC CAUDIO_WITH_FFMPEG=1)
 endif()
 target_sources(caudio_player_shared PRIVATE $<TARGET_OBJECTS:caudio_rtaudio>)
@@ -243,7 +246,7 @@ target_link_libraries(caudio_combined PUBLIC Threads::Threads)
 target_sources(caudio_combined PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:caudio_rtaudio>)
 target_compile_definitions(caudio_combined PUBLIC SQLITE_ENABLE_FTS5=1)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil)
+  target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_combined PUBLIC CAUDIO_WITH_FFMPEG=1)
 endif()
 ca_set_warnings(caudio_combined)
@@ -340,4 +343,6 @@ if(CAUDIO_BUILD_TESTS)
   endfunction()
   caudio_add_player_test(test_reader tests/test_reader.cpp)
   caudio_add_player_test(test_decoder tests/test_decoder.cpp)
+  caudio_add_player_test(test_ffmpeg tests/test_ffmpeg.cpp)
+  target_compile_definitions(test_ffmpeg PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 endif()

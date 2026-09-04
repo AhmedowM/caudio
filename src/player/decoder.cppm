@@ -21,9 +21,14 @@ import :flac;
 import :mp3;
 import :vorbis;
 
+#ifdef CAUDIO_WITH_FFMPEG
+import :ffmpeg;
+#endif
+
 export namespace caudio::player {
 
-// DecoderRegistry — probe 32B then restore offset like ca_decode.c:48, order wav→flac→mp3→vorbis→ffmpeg
+// DecoderRegistry — probe 32B then restore offset like ca_decode.c:48
+// Priority: FFmpeg first (when available), then wav→flac→mp3→vorbis
 class DecoderRegistry {
 public:
   [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader) {
@@ -39,10 +44,25 @@ public:
 
     std::span<const std::byte> probeSpan(buf.data(), n);
 
-    // order wav→flac→mp3→vorbis→ffmpeg like ca_decode_register_builtins
+    // Try FFmpeg first when available (ASF/WMA and other formats)
     caudio::utils::Expected<std::unique_ptr<IDecoder>> result =
         std::unexpected(caudio::utils::Error{caudio::utils::Result::Unsupported, "no decoder matched"});
 
+#ifdef CAUDIO_WITH_FFMPEG
+    if (FfmpegDecoder::probe(probeSpan)) {
+      result = FfmpegDecoder::create(reader);
+      if (result.has_value()) {
+        // restore offset after create (which may read more) — ca_decode.c:60-72
+        auto sr = reader.seek(orig, SEEK_SET);
+        if (!sr.has_value()) {
+          (void)reader.seek(0, SEEK_SET);
+        }
+        return result;
+      }
+    }
+#endif
+
+    // Fallback to dr_* decoders
     if (WavDecoder::probe(probeSpan)) {
       result = WavDecoder::create(reader);
     } else if (FlacDecoder::probe(probeSpan)) {

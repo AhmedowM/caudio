@@ -10,6 +10,10 @@ export import :flac;
 export import :mp3;
 export import :vorbis;
 
+#ifdef CAUDIO_WITH_FFMPEG
+export import :ffmpeg;
+#endif
+
 import caudio.utils;
 
 export namespace caudio::player {
