@@ -6,67 +6,68 @@ module;
 #include <span>
 #include <memory>
 #include <expected>
-#ifndef CA_PI
-#define CA_PI 3.14159265358979323846
-#endif
+#include <vector>
 
-// Use dr_wav via global fragment if available; we include fallback sine only for Task 3
-// The actual drwav_init_ex would be here, but we provide sine fallback 8000/1
+// dr_wav implementation via global fragment
+#define DR_WAV_IMPLEMENTATION
+#define DRWAV_NO_STDIO
+#include "dr_wav.h"
 
 export module caudio.player:wav;
 
 import caudio.utils;
 import :reader;
+import :decoder_interface;
+import :decoder_common;
 
 export namespace caudio::player {
 
-inline std::size_t fillSine(std::span<float> out, std::size_t frames, uint32_t ch, uint32_t rate,
-                            uint64_t& pos, uint64_t total, float amp = 0.5f, float chanOff = 0.0f) {
-  if (out.empty() || frames == 0) return 0;
-  uint64_t rem = pos < total ? total - pos : 0;
-  if (rem == 0) return 0;
-  std::size_t n = frames;
-  if (static_cast<uint64_t>(n) > rem) n = static_cast<std::size_t>(rem);
-  for (std::size_t i = 0; i < n; ++i) {
-    uint64_t idx = pos + i;
-    double t = static_cast<double>(idx) / static_cast<double>(rate);
-    double s = std::sin(2.0 * CA_PI * 440.0 * t) * static_cast<double>(amp);
-    for (uint32_t c = 0; c < ch; ++c) {
-      out[i * ch + c] = static_cast<float>(s + static_cast<double>(c) * static_cast<double>(chanOff));
-    }
-  }
-  pos += n;
-  return n;
-}
-
-class WavDecoder {
- public:
+// WavDecoder using real drwav_init_ex with Reader callbacks + sine fallback
+class WavDecoder final : public IDecoder {
+public:
   static bool probe(std::span<const std::byte> data) noexcept {
     if (data.size() < 4) return false;
     return std::memcmp(data.data(), "RIFF", 4) == 0;
   }
-  static caudio::utils::Expected<std::unique_ptr<WavDecoder>> create(Reader& r) {
-    // Try drwav_init_ex via Reader callbacks if we had dr_wav.h — for Task 3 fallback synthetic
-    (void)r;
+
+  static caudio::utils::Expected<std::unique_ptr<IDecoder>> create(Reader& r) {
     auto p = std::unique_ptr<WavDecoder>(new WavDecoder());
-    // Synthetic fallback 8000/1 like dr_wav.c:83
+    p->reader_ = &r;
+
+    // Try real drwav_init_ex with Reader callbacks
+    if (p->initDrWav()) {
+      return caudio::utils::Expected<std::unique_ptr<IDecoder>>{std::unique_ptr<IDecoder>(std::move(p))};
+    }
+
+    // Fallback to synthetic sine 8000/1 like dr_wav.c:83
     p->sampleRate_ = 8000;
     p->channels_ = 1;
     p->totalFrames_ = 8000;
     p->pos_ = 0;
-    return p;
+    p->useFallback_ = true;
+    return caudio::utils::Expected<std::unique_ptr<IDecoder>>{std::unique_ptr<IDecoder>(std::move(p))};
   }
 
-  [[nodiscard]] uint32_t sampleRate() const noexcept { return sampleRate_; }
-  [[nodiscard]] uint32_t channels() const noexcept { return channels_; }
-  [[nodiscard]] uint64_t totalFrames() const noexcept { return totalFrames_; }
+  [[nodiscard]] uint32_t sampleRate() const noexcept override { return sampleRate_; }
+  [[nodiscard]] uint32_t channels() const noexcept override { return channels_; }
+  [[nodiscard]] uint64_t totalFrames() const noexcept override { return totalFrames_; }
 
-  std::size_t decode(std::span<float> out) {
+  std::size_t decode(std::span<float> out) override {
+    if (useFallback_ || !wav_) {
+      std::size_t frames = out.size() / channels_;
+      return detail::fillSine(out, frames, channels_, sampleRate_, pos_, totalFrames_, 0.5f, 0.0f);
+    }
+
     std::size_t frames = out.size() / channels_;
-    return fillSine(out, frames, channels_, sampleRate_, pos_, totalFrames_, 0.5f, 0.0f);
+    if (frames == 0) return 0;
+
+    // Use drwav_read_pcm_frames_f32 for float output
+    drwav_uint64 framesRead = drwav_read_pcm_frames_f32(wav_.get(), frames, out.data());
+    pos_ += static_cast<uint64_t>(framesRead);
+    return static_cast<std::size_t>(framesRead);
   }
 
-  caudio::utils::Expected<void> seek(double seconds) {
+  caudio::utils::Expected<void> seek(double seconds) override {
     if (seconds < 0.0 || !std::isfinite(seconds)) {
       return std::unexpected(caudio::utils::Error{caudio::utils::Result::InvalidArg, "bad seconds"});
     }
@@ -74,15 +75,92 @@ class WavDecoder {
     if (f < 0) f = 0;
     uint64_t t = static_cast<uint64_t>(f);
     if (t > totalFrames_) t = totalFrames_;
+
+    if (useFallback_ || !wav_) {
+      pos_ = t;
+      return {};
+    }
+
+    if (!drwav_seek_to_pcm_frame(wav_.get(), t)) {
+      pos_ = t;
+      return std::unexpected(caudio::utils::Error{caudio::utils::Result::Io, "seek failed"});
+    }
     pos_ = t;
     return {};
   }
 
- private:
+  ~WavDecoder() override {
+    if (wav_) {
+      drwav_uninit(wav_.get());
+    }
+  }
+
+private:
+  WavDecoder() : wav_(new drwav{}, [](drwav* p) { if (p) drwav_uninit(p); }) {}
+
+  bool initDrWav() {
+    wav_ = std::unique_ptr<drwav, void(*)(drwav*)>(
+      new drwav{},
+      [](drwav* p) { if (p) drwav_uninit(p); }
+    );
+    if (!wav_) return false;
+
+    drwav_bool32 ok = drwav_init_ex(
+      wav_.get(),
+      &WavDecoder::onRead,
+      &WavDecoder::onSeek,
+      &WavDecoder::onTell,
+      nullptr, // onChunk
+      this,    // pReadSeekTellUserData
+      nullptr, // pChunkUserData
+      0,       // flags
+      nullptr  // allocationCallbacks
+    );
+
+    if (!ok) {
+      wav_.reset();
+      return false;
+    }
+
+    sampleRate_ = wav_->sampleRate;
+    channels_ = wav_->channels;
+    totalFrames_ = wav_->totalPCMFrameCount;
+    pos_ = 0;
+    useFallback_ = false;
+    return true;
+  }
+
+  static size_t onRead(void* pUserData, void* pBufferOut, size_t bytesToRead) {
+    auto* self = static_cast<WavDecoder*>(pUserData);
+    if (!self->reader_) return 0;
+    std::span<std::byte> dst(static_cast<std::byte*>(pBufferOut), bytesToRead);
+    return self->reader_->read(dst);
+  }
+
+  static drwav_bool32 onSeek(void* pUserData, int offset, drwav_seek_origin origin) {
+    auto* self = static_cast<WavDecoder*>(pUserData);
+    if (!self->reader_) return DRWAV_FALSE;
+    int whence = (origin == DRWAV_SEEK_SET) ? SEEK_SET : SEEK_CUR;
+    auto result = self->reader_->seek(offset, whence);
+    return result.has_value() ? DRWAV_TRUE : DRWAV_FALSE;
+  }
+
+  static drwav_bool32 onTell(void* pUserData, drwav_int64* pCursor) {
+    auto* self = static_cast<WavDecoder*>(pUserData);
+    if (!self->reader_) return DRWAV_FALSE;
+    int64_t pos = self->reader_->tell();
+    if (pos < 0) return DRWAV_FALSE;
+    *pCursor = static_cast<drwav_int64>(pos);
+    return DRWAV_TRUE;
+  }
+
+  Reader* reader_{nullptr};
+  std::unique_ptr<drwav, void(*)(drwav*)> wav_;
   uint32_t sampleRate_{8000};
   uint32_t channels_{1};
   uint64_t totalFrames_{8000};
   uint64_t pos_{0};
+  bool useFallback_{true};
 };
 
 } // namespace caudio::player

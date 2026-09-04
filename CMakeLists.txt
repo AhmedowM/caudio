@@ -134,6 +134,8 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/player.cppm
   src/player/reader.cppm
   src/player/decoder.cppm
+  src/player/decoders/decoder_common.cppm
+  src/player/decoders/decoder_interface.cppm
   src/player/decoders/wav.cppm
   src/player/decoders/flac.cppm
   src/player/decoders/mp3.cppm

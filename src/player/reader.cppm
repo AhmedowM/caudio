@@ -30,6 +30,8 @@ class Reader {
   [[nodiscard]] virtual caudio::utils::Expected<void> seek(int64_t offset, int whence) = 0;
   [[nodiscard]] virtual int64_t tell() noexcept = 0;
   [[nodiscard]] virtual int64_t size() noexcept = 0;
+  // For decoders needing direct memory access (e.g., Vorbis)
+  [[nodiscard]] virtual std::span<const std::byte> data() const noexcept { return {}; }
 };
 
 // 64-bit helpers like ca_reader.c:28
@@ -193,7 +195,7 @@ class MemoryReader final : public Reader {
   [[nodiscard]] int64_t size() noexcept override { return static_cast<int64_t>(buf_.size()); }
 
   // For vorbis real path: expose underlying bytes
-  [[nodiscard]] std::span<const std::byte> data() const noexcept { return {buf_.data(), buf_.size()}; }
+  [[nodiscard]] std::span<const std::byte> data() const noexcept override { return {buf_.data(), buf_.size()}; }
 
  private:
   explicit MemoryReader(std::span<const std::byte> src) : buf_(src.begin(), src.end()), pos_(0) {}
