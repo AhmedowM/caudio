@@ -214,3 +214,20 @@ TEST_CASE("decoder FileReader probe 32B", "[decoder]") {
   }
   std::filesystem::remove(path);
 }
+
+TEST_CASE("vorbis real decoder", "[decoder]") {
+  auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.ogg");
+  auto r = FileReader::open(path);
+  REQUIRE(r.has_value());
+  auto dec = DecoderRegistry::open(**r);
+  REQUIRE(dec.has_value());
+  REQUIRE((*dec)->sampleRate() > 0);
+  REQUIRE((*dec)->channels() > 0);
+  std::array<float, 1024> out{};
+  std::size_t got = (*dec)->decode(out);
+  REQUIRE(got > 0);
+  bool nonZero = false;
+  for (float f : out) if (std::abs(f) > 1e-6f) nonZero = true;
+  REQUIRE(nonZero);
+  REQUIRE((*dec)->seek(0.1).has_value());
+}
