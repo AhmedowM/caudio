@@ -9,6 +9,7 @@ export import :wav;
 export import :flac;
 export import :mp3;
 export import :vorbis;
+export import :output;
 
 #ifdef CAUDIO_WITH_FFMPEG
 export import :ffmpeg;
