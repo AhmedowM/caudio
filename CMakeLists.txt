@@ -129,10 +129,19 @@ target_include_directories(caudio_utils_shared PUBLIC
 target_link_libraries(caudio_utils_shared PUBLIC Threads::Threads)
 ca_set_warnings(caudio_utils_shared)
 
-# caudio::player
+# caudio::player — partitioned modules + decoders (Task 3)
+set(CAUDIO_PLAYER_SOURCES
+  src/player/player.cppm
+  src/player/reader.cppm
+  src/player/decoder.cppm
+  src/player/decoders/wav.cppm
+  src/player/decoders/flac.cppm
+  src/player/decoders/mp3.cppm
+  src/player/decoders/vorbis.cppm
+)
 add_library(caudio_player STATIC)
 add_library(caudio::player ALIAS caudio_player)
-target_sources(caudio_player PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/player/player.cppm)
+target_sources(caudio_player PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_PLAYER_SOURCES})
 target_include_directories(caudio_player PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -149,7 +158,7 @@ ca_set_warnings(caudio_player)
 add_library(caudio_player_shared SHARED)
 set_target_properties(caudio_player_shared PROPERTIES OUTPUT_NAME caudio_player)
 add_library(caudio::player_shared ALIAS caudio_player_shared)
-target_sources(caudio_player_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/player/player.cppm)
+target_sources(caudio_player_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_PLAYER_SOURCES})
 target_include_directories(caudio_player_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -219,7 +228,7 @@ set_target_properties(caudio_combined PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_combined PUBLIC
   FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
     ${CAUDIO_UTILS_SOURCES}
-    src/player/player.cppm
+    ${CAUDIO_PLAYER_SOURCES}
     src/db/db.cppm
     src/engine/engine.cppm
 )
@@ -315,4 +324,15 @@ if(CAUDIO_BUILD_TESTS)
   caudio_add_test(test_utils_thread tests/test_utils_thread.cpp tests/helpers/test_utils_thread_impl.cpp)
   caudio_add_test(test_utils_arena tests/test_utils_arena.cpp tests/helpers/test_utils_arena_impl.cpp)
   caudio_add_test(test_utils_log tests/test_utils_log.cpp tests/helpers/test_utils_log_impl.cpp)
+
+  # Task 3: Reader + DecoderRegistry
+  function(caudio_add_player_test name src)
+    add_executable(${name} ${src})
+    target_link_libraries(${name} PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
+    target_compile_features(${name} PRIVATE cxx_std_23)
+    catch_discover_tests(${name})
+    add_test(NAME ${name} COMMAND ${name})
+  endfunction()
+  caudio_add_player_test(test_reader tests/test_reader.cpp)
+  caudio_add_player_test(test_decoder tests/test_decoder.cpp)
 endif()
