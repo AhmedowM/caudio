@@ -1,0 +1,45 @@
+# Build
+build/
+build-*/
+out/
+cmake-build-*/
+Testing/
+compile_commands.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+CPack*.cmake
+_deps/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Superpowers / AI working dirs
+.superpowers/
+.cache/
+.claude/
+.opencode/
+
+# Vendored build artefacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Keep source md on disk but not required in repo history (AI docs)
+# Uncomment to ignore all markdown if desired:
+# *.md
+# But keep real docs if you add README.md — currently ignoring AI artefacts:
+CPP_PORT_REPORT.md
+docs/specs/
+docs/superpowers/
