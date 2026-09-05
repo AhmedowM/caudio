@@ -98,15 +98,12 @@ public:
     }
     initialized_.store(true, std::memory_order_release);
 
-    res = ma_device_start(&device_);
-    if (res != MA_SUCCESS) {
-      shutdown();
-      return false;
-    }
-    running_.store(true, std::memory_order_release);
+    // Do not auto-start: caller must call start() after preroll to avoid initial underrun
+    running_.store(false, std::memory_order_release);
+    initialized_.store(true, std::memory_order_release);
 
     // Debug: print device info (non-RT, init only)
-    std::printf("Audio device started: format=%d, channels=%d, sampleRate=%d\n",
+    std::printf("Audio device ready: format=%d, channels=%d, sampleRate=%d\n",
            device_.playback.format, device_.playback.channels, device_.sampleRate);
     std::fflush(stdout);
 
@@ -127,20 +124,9 @@ public:
       generated = self->cfg_.ring->read(std::span<float>(output, totalSamples));
     }
 
-    // Fallback: generate 440Hz sine wave when ring buffer empty (for testing)
-    // RT-safe: phase is per-instance, only touched on audio thread.
+    // Underrun: fill remainder with silence (no beep)
     if (generated < totalSamples) {
-      double phase = self->phase_;
-      const double freq = 440.0;
-      const double sampleRate = static_cast<double>(pDevice->sampleRate);
-      const double phaseInc = 2.0 * 3.141592653589793 * freq / sampleRate;
-
-      for (std::size_t i = generated; i < totalSamples; ++i) {
-        output[i] = static_cast<float>(std::sin(phase) * 0.3f);
-        phase += phaseInc;
-        if (phase >= 2.0 * 3.141592653589793) phase -= 2.0 * 3.141592653589793;
-      }
-      self->phase_ = phase;
+      for (std::size_t i = generated; i < totalSamples; ++i) output[i] = 0.0f;
     }
 
     // Apply volume

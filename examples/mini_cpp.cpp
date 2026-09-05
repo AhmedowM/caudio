@@ -47,15 +47,27 @@ public:
     if (!outResult) return std::unexpected(outResult.error());
     auto output = std::move(outResult.value());
 
-    // Start playback - begins audio device
-    output->start();
-    std::cout << "Playing...\n";
-
-    // Decode loop - feed ring buffer
+    // Preroll: fill ring with ~100ms of audio before starting device to avoid initial underrun beep
     constexpr std::size_t kBufferFrames = 1024;
     std::vector<float> buffer(kBufferFrames * decoder->channels());
-
     std::size_t totalFramesPlayed = 0;
+    {
+      std::size_t prerollFrames = decoder->sampleRate() / 10; // ~100ms
+      std::size_t filled = 0;
+      while (filled < prerollFrames) {
+        std::size_t frames = decoder->decode(std::span<float>(buffer.data(), buffer.size()));
+        if (frames == 0) break;
+        std::size_t samples = frames * decoder->channels();
+        ring.write(std::span<float>(buffer.data(), samples));
+        filled += frames;
+        totalFramesPlayed += frames;
+        if (ring.availableWrite() < buffer.size()) break;
+      }
+    }
+
+    // Start playback - begins audio device after preroll
+    output->start();
+    std::cout << "Playing...\n";
     bool decodingFinished = false;
 
     while (output->isPlaying() && !decodingFinished) {

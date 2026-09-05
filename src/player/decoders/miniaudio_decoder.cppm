@@ -191,18 +191,6 @@ private:
       );
     }
 
-    if (res != MA_SUCCESS) {
-      // Fallback to callback-based decoder for non-MP3 or if memory decoder failed
-      res = caudio_miniaudio_decoder_init_with_tell(
-        &MiniaudioDecoder::read_cb,
-        &MiniaudioDecoder::seek_cb,
-        &MiniaudioDecoder::tell_cb,
-        this,
-        &cfg,
-        &decoder_
-      );
-    }
-
     if (res == MA_SUCCESS && decoder_.outputChannels > 0 && decoder_.outputSampleRate > 0) {
       // Success - use miniaudio decoder
       decoder_.pUserData = this;
@@ -227,28 +215,23 @@ private:
     }
   }
 
-  static ma_result read_cb(ma_decoder* pDecoder, void* pBufferOut, ma_uint64 framesToRead, ma_uint64* pFramesRead) {
+  static ma_result read_cb(ma_decoder* pDecoder, void* pBufferOut, size_t bytesToRead, size_t* pBytesRead) {
     auto* self = static_cast<MiniaudioDecoder*>(pDecoder->pUserData);
-    if (!self || !self->reader_ || self->config_.channels == 0) {
-      *pFramesRead = 0;
+    if (!self || !self->reader_ || !pBytesRead) {
+      if (pBytesRead) *pBytesRead = 0;
       return MA_SUCCESS;
     }
-    std::size_t bytesToRead = static_cast<std::size_t>(framesToRead) * self->config_.channels * sizeof(float);
     std::span<std::byte> dst(static_cast<std::byte*>(pBufferOut), bytesToRead);
     std::size_t bytesRead = self->reader_->read(dst);
-    *pFramesRead = bytesRead / (self->config_.channels * sizeof(float));
+    *pBytesRead = bytesRead;
     return MA_SUCCESS;
   }
 
-  static ma_result seek_cb(ma_decoder* pDecoder, ma_int64 frameIndex, ma_seek_origin origin) {
+  static ma_result seek_cb(ma_decoder* pDecoder, ma_int64 byteOffset, ma_seek_origin origin) {
     auto* self = static_cast<MiniaudioDecoder*>(pDecoder->pUserData);
     if (!self || !self->reader_) return MA_INVALID_ARGS;
     int whence = (origin == ma_seek_origin_start) ? SEEK_SET : SEEK_CUR;
-    // MP3 backend passes byte offsets, other formats pass frame indices
-    int64_t offset = (self->fallbackFormat_ == detail::DecoderFormat::Mp3)
-      ? frameIndex  // byte offset for MP3
-      : frameIndex * static_cast<int64_t>(self->config_.channels) * sizeof(float);  // frame index -> byte offset
-    auto result = self->reader_->seek(offset, whence);
+    auto result = self->reader_->seek(static_cast<int64_t>(byteOffset), whence);
     return result.has_value() ? MA_SUCCESS : MA_INVALID_ARGS;
   }
 
