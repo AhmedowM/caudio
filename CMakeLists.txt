@@ -301,6 +301,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 endif()
 include(CPack)
 
+# Examples
+if(CAUDIO_BUILD_EXAMPLES)
+  add_executable(caudio_mini examples/mini_cpp.cpp)
+  target_link_libraries(caudio_mini PRIVATE caudio::player caudio::utils)
+  target_compile_features(caudio_mini PRIVATE cxx_std_23)
+endif()
+
 # Tests — Catch2 via FetchContent, ports of test_utils_*
 if(CAUDIO_BUILD_TESTS)
   include(FetchContent)
