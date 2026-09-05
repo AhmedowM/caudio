@@ -154,19 +154,11 @@ private:
     );
 
     ma_result res = MA_INVALID_FILE;
-    // Threshold that separates memory vs streaming decode path for MP3.
-    // Below this we load file into RAM for simpler byte-accurate seeking;
-    // above it we use callback streaming with tell_cb to avoid OOM on large files.
-    constexpr int64_t kMemoryThresholdBytes = 50LL * 1024 * 1024;  // 50 MiB
-    static_assert(kMemoryThresholdBytes > 0, "threshold must be positive");
-
-    // Hybrid: use memory decoder for small files (<50MiB) for reliability; streaming for large files
+    constexpr int64_t kMemoryThresholdBytes = 50LL * 1024 * 1024;
     int64_t fileSize = reader_ ? reader_->size() : -1;
-    bool useMemoryDecoder = (fileSize > 0 && fileSize < kMemoryThresholdBytes);
+    bool useMemory = (fileSize > 0 && fileSize < kMemoryThresholdBytes);
 
-    if (useMemoryDecoder && reader_) {
-      // Small file: read entire file into memory and use ma_decoder_init_memory
-      // More reliable, avoids any callback edge cases
+    if (useMemory && reader_) {
       std::vector<std::byte> fileData;
       fileData.resize(static_cast<std::size_t>(fileSize));
       (void)reader_->seek(0, SEEK_SET);
@@ -178,11 +170,10 @@ private:
       }
       if (totalRead == fileData.size()) {
         res = ma_decoder_init_memory(fileData.data(), fileData.size(), &cfg, &decoder_);
-        fileData_.swap(fileData);  // Keep data alive for decoder
+        if (res == MA_SUCCESS) fileData_.swap(fileData);
       }
-    } else if (reader_) {
-      // Large MP3 (>50MB) or non-MP3: use callback-based decoder with tell_cb
-      // tell_cb is required for MP3 streaming (dr_mp3 needs tell for frame sync)
+    }
+    if (res != MA_SUCCESS && reader_) {
       res = caudio_miniaudio_decoder_init_with_tell(
         &MiniaudioDecoder::read_cb,
         &MiniaudioDecoder::seek_cb,
@@ -253,7 +244,7 @@ private:
   ma_uint64 pos_{0};
   bool useFallback_{true};
   detail::DecoderFormat fallbackFormat_{detail::DecoderFormat::Unknown};
-  std::vector<std::byte> fileData_;  // For memory-based MP3 decoding
+  std::vector<std::byte> fileData_;
 };
 
 } // namespace caudio::player
