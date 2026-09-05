@@ -89,10 +89,12 @@ public:
   [[nodiscard]] uint64_t totalFrames() const noexcept override { return totalFrames_; }
 
   std::size_t decode(std::span<float> out) override {
-    if (useFallback_ || totalFrames_ == 0 || config_.channels == 0 || config_.sampleRate == 0) {
+    if (useFallback_ || config_.channels == 0 || config_.sampleRate == 0) {
       std::size_t frames = out.size() / channels();
       return detail::fillSine(out, frames, channels(), sampleRate(), pos_, totalFrames_, 0.5f, 0.0f);
     }
+    // If totalFrames unknown (0), just decode until EOF
+    if (totalFrames_ == 0 && out.empty()) return 0;
     ma_uint64 framesToRead = out.size() / config_.channels;
     if (framesToRead == 0) return 0;
     ma_uint64 framesRead = 0;
@@ -158,13 +160,13 @@ private:
     constexpr int64_t kMemoryThresholdBytes = 50LL * 1024 * 1024;  // 50 MiB
     static_assert(kMemoryThresholdBytes > 0, "threshold must be positive");
 
-    // For MP3: use memory decoder for small files, streaming with tell_cb for large files
-    bool useMemoryDecoder = (fallbackFormat_ == detail::DecoderFormat::Mp3);
+    // Hybrid: use memory decoder for small files (<50MiB) for reliability; streaming for large files
     int64_t fileSize = reader_ ? reader_->size() : -1;
+    bool useMemoryDecoder = (fileSize > 0 && fileSize < kMemoryThresholdBytes);
 
-    if (useMemoryDecoder && reader_ && fileSize > 0 && fileSize < kMemoryThresholdBytes) {
-      // Small MP3: read entire file into memory and use ma_decoder_init_memory
-      // Simpler, avoids callback frame/byte mismatch with MP3 backend
+    if (useMemoryDecoder && reader_) {
+      // Small file: read entire file into memory and use ma_decoder_init_memory
+      // More reliable, avoids any callback edge cases
       std::vector<std::byte> fileData;
       fileData.resize(static_cast<std::size_t>(fileSize));
       (void)reader_->seek(0, SEEK_SET);
