@@ -9,6 +9,7 @@ module;
 #include <expected>
 #include <string_view>
 #include <array>
+#include <vector>
 
 export module caudio.player:miniaudio_decoder;
 
@@ -16,6 +17,13 @@ import caudio.utils;
 import :reader;
 import :decoder_interface;
 import :decoder_common;
+
+extern ma_result caudio_miniaudio_decoder_init_with_tell(ma_decoder_read_proc onRead,
+                                                         ma_decoder_seek_proc onSeek,
+                                                         ma_decoder_tell_proc onTell,
+                                                         void* pUserData,
+                                                         const ma_decoder_config* pConfig,
+                                                         ma_decoder* pDecoder);
 
 namespace caudio::player::detail {
 
@@ -142,17 +150,61 @@ private:
       0,              // channels: 0 = auto
       0               // sampleRate: 0 = auto
     );
-    ma_result res = ma_decoder_init(
-      &MiniaudioDecoder::read_cb,
-      &MiniaudioDecoder::seek_cb,
-      this,
-      &cfg,
-      &decoder_);
 
-    if (res == MA_SUCCESS && cfg.channels > 0 && cfg.sampleRate > 0) {
+    ma_result res = MA_INVALID_FILE;
+    constexpr int64_t kMemoryThreshold = 50 * 1024 * 1024;  // 50 MB threshold
+
+    // For MP3: use memory decoder for small files, streaming with tell_cb for large files
+    bool useMemoryDecoder = (fallbackFormat_ == detail::DecoderFormat::Mp3);
+    int64_t fileSize = reader_ ? reader_->size() : -1;
+
+    if (useMemoryDecoder && reader_ && fileSize > 0 && fileSize < kMemoryThreshold) {
+      // Small MP3: read entire file into memory and use ma_decoder_init_memory
+      // Simpler, avoids callback frame/byte mismatch with MP3 backend
+      std::vector<std::byte> fileData;
+      fileData.resize(static_cast<std::size_t>(fileSize));
+      (void)reader_->seek(0, SEEK_SET);
+      std::size_t totalRead = 0;
+      while (totalRead < fileData.size()) {
+        std::size_t n = reader_->read(std::span<std::byte>(fileData.data() + totalRead, fileData.size() - totalRead));
+        if (n == 0) break;
+        totalRead += n;
+      }
+      if (totalRead == fileData.size()) {
+        res = ma_decoder_init_memory(fileData.data(), fileData.size(), &cfg, &decoder_);
+        fileData_.swap(fileData);  // Keep data alive for decoder
+      }
+    } else if (reader_) {
+      // Large MP3 (>50MB) or non-MP3: use callback-based decoder with tell_cb
+      // tell_cb is required for MP3 streaming (dr_mp3 needs tell for frame sync)
+      res = caudio_miniaudio_decoder_init_with_tell(
+        &MiniaudioDecoder::read_cb,
+        &MiniaudioDecoder::seek_cb,
+        &MiniaudioDecoder::tell_cb,
+        this,
+        &cfg,
+        &decoder_
+      );
+    }
+
+    if (res != MA_SUCCESS) {
+      // Fallback to callback-based decoder for non-MP3 or if memory decoder failed
+      res = caudio_miniaudio_decoder_init_with_tell(
+        &MiniaudioDecoder::read_cb,
+        &MiniaudioDecoder::seek_cb,
+        &MiniaudioDecoder::tell_cb,
+        this,
+        &cfg,
+        &decoder_
+      );
+    }
+
+    if (res == MA_SUCCESS && decoder_.outputChannels > 0 && decoder_.outputSampleRate > 0) {
       // Success - use miniaudio decoder
       decoder_.pUserData = this;
-      config_ = cfg;
+      config_.channels = decoder_.outputChannels;
+      config_.sampleRate = decoder_.outputSampleRate;
+      config_.format = decoder_.outputFormat;
       totalFrames_ = 0;
       ma_decoder_get_length_in_pcm_frames(&decoder_, &totalFrames_);
       pos_ = 0;
@@ -188,8 +240,21 @@ private:
     auto* self = static_cast<MiniaudioDecoder*>(pDecoder->pUserData);
     if (!self || !self->reader_) return MA_INVALID_ARGS;
     int whence = (origin == ma_seek_origin_start) ? SEEK_SET : SEEK_CUR;
-    auto result = self->reader_->seek(static_cast<int64_t>(frameIndex), whence);
+    // MP3 backend passes byte offsets, other formats pass frame indices
+    int64_t offset = (self->fallbackFormat_ == detail::DecoderFormat::Mp3)
+      ? frameIndex  // byte offset for MP3
+      : frameIndex * static_cast<int64_t>(self->config_.channels) * sizeof(float);  // frame index -> byte offset
+    auto result = self->reader_->seek(offset, whence);
     return result.has_value() ? MA_SUCCESS : MA_INVALID_ARGS;
+  }
+
+  static ma_result tell_cb(ma_decoder* pDecoder, ma_int64* pCursor) {
+    auto* self = static_cast<MiniaudioDecoder*>(pDecoder->pUserData);
+    if (!self || !self->reader_ || !pCursor) return MA_INVALID_ARGS;
+    int64_t pos = self->reader_->tell();
+    if (pos < 0) return MA_INVALID_ARGS;
+    *pCursor = pos;
+    return MA_SUCCESS;
   }
 
   Reader* reader_{nullptr};
@@ -199,6 +264,7 @@ private:
   ma_uint64 pos_{0};
   bool useFallback_{true};
   detail::DecoderFormat fallbackFormat_{detail::DecoderFormat::Unknown};
+  std::vector<std::byte> fileData_;  // For memory-based MP3 decoding
 };
 
 } // namespace caudio::player
