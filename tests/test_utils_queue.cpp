@@ -11,21 +11,21 @@ bool queue_10k_loop();
 using namespace caudio::utils::test;
 
 TEST_CASE("MpscQueue busy on full", "[utils][queue]") {
-  REQUIRE(queue_busy_on_full());
+    REQUIRE(queue_busy_on_full());
 }
 
 TEST_CASE("MpscQueue push/pop FIFO and empty State", "[utils][queue]") {
-  REQUIRE(queue_push_pop_fifo());
+    REQUIRE(queue_push_pop_fifo());
 }
 
 TEST_CASE("MpscQueue wrap-around", "[utils][queue]") {
-  REQUIRE(queue_wrap());
+    REQUIRE(queue_wrap());
 }
 
 TEST_CASE("MpscQueue MPSC thread producers", "[utils][queue]") {
-  REQUIRE(queue_mpsc_thread());
+    REQUIRE(queue_mpsc_thread());
 }
 
 TEST_CASE("MpscQueue 10k loop stress", "[utils][queue]") {
-  REQUIRE(queue_10k_loop());
+    REQUIRE(queue_10k_loop());
 }

@@ -13,29 +13,29 @@ bool thread_sleepForMs();
 using namespace caudio::utils::test;
 
 TEST_CASE("Thread sleepFor timing", "[utils][thread]") {
-  REQUIRE(thread_sleep_timing());
+    REQUIRE(thread_sleep_timing());
 }
 
 TEST_CASE("Thread jthread creation and join", "[utils][thread]") {
-  REQUIRE(thread_jthread_basic());
+    REQUIRE(thread_jthread_basic());
 }
 
 TEST_CASE("Thread parallel 10 jthreads", "[utils][thread]") {
-  REQUIRE(thread_parallel_10());
+    REQUIRE(thread_parallel_10());
 }
 
 TEST_CASE("Thread setThreadName current", "[utils][thread]") {
-  REQUIRE(thread_setname_current());
+    REQUIRE(thread_setname_current());
 }
 
 TEST_CASE("Thread setThreadName via jthread", "[utils][thread]") {
-  REQUIRE(thread_setname_jthread());
+    REQUIRE(thread_setname_jthread());
 }
 
 TEST_CASE("Thread 100 stress", "[utils][thread]") {
-  REQUIRE(thread_100_stress());
+    REQUIRE(thread_100_stress());
 }
 
 TEST_CASE("Thread sleepForMs wrapper", "[utils][thread]") {
-  REQUIRE(thread_sleepForMs());
+    REQUIRE(thread_sleepForMs());
 }

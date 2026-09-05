@@ -14,33 +14,33 @@ bool ring_concurrent_spsc();
 using namespace caudio::utils::test;
 
 TEST_CASE("SpscRing write/read wrap", "[utils][ring]") {
-  REQUIRE(ring_write_read_wrap());
+    REQUIRE(ring_write_read_wrap());
 }
 
 TEST_CASE("SpscRing basic SPSC mono", "[utils][ring]") {
-  REQUIRE(ring_basic_mono());
+    REQUIRE(ring_basic_mono());
 }
 
 TEST_CASE("SpscRing channel counts stereo/quad", "[utils][ring]") {
-  REQUIRE(ring_channels());
+    REQUIRE(ring_channels());
 }
 
 TEST_CASE("SpscRing wrap-around", "[utils][ring]") {
-  REQUIRE(ring_wrap());
+    REQUIRE(ring_wrap());
 }
 
 TEST_CASE("SpscRing truncation over-read/write", "[utils][ring]") {
-  REQUIRE(ring_truncation());
+    REQUIRE(ring_truncation());
 }
 
 TEST_CASE("SpscRing available and reset", "[utils][ring]") {
-  REQUIRE(ring_available_reset());
+    REQUIRE(ring_available_reset());
 }
 
 TEST_CASE("SpscRing 10k loop stress", "[utils][ring]") {
-  REQUIRE(ring_10k_loop());
+    REQUIRE(ring_10k_loop());
 }
 
 TEST_CASE("SpscRing concurrent SPSC", "[utils][ring]") {
-  REQUIRE(ring_concurrent_spsc());
+    REQUIRE(ring_concurrent_spsc());
 }

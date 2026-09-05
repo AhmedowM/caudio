@@ -1,12 +1,12 @@
-#include <iostream>
-#include <thread>
 #include <chrono>
-#include <filesystem>
-#include <string>
-#include <vector>
 #include <cstdlib>
 #include <expected>
+#include <filesystem>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 
 import caudio.utils;
 import caudio.player;
@@ -20,41 +20,61 @@ namespace {
 
 std::string findSample() {
     auto toAbs = [](std::string s) -> std::string {
-        try { return std::filesystem::absolute(s).string(); } catch (...) { return s; }
+        try {
+            return std::filesystem::absolute(s).string();
+        } catch (...) {
+            return s;
+        }
     };
-    if (auto* env = std::getenv("CAUDIO_SAMPLE")) {
-        if (std::filesystem::exists(env)) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_SAMPLE")) {
+        if (std::filesystem::exists(env))
+            return toAbs(env);
     }
-    if (auto* env = std::getenv("CAUDIO_FIXTURE")) {
-        if (std::filesystem::exists(env)) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_FIXTURE")) {
+        if (std::filesystem::exists(env))
+            return toAbs(env);
     }
-    for (auto* c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav", "../tests/fixtures/sample.wav",
+    for (auto *c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
+                    "../tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio/tests/fixtures/sample.wav"}) {
-        if (std::filesystem::exists(c)) return toAbs(c);
+        if (std::filesystem::exists(c))
+            return toAbs(c);
     }
-    if (auto* env = std::getenv("CAUDIO_SAMPLE")) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_SAMPLE"))
+        return toAbs(env);
     if (std::filesystem::exists("C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav"))
         return "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav";
     return "tests/fixtures/sample.wav";
 }
 
-std::expected<std::unique_ptr<Database>, caudio::utils::Error> openDbWithFallback(const std::string& path, std::string& used) {
+std::expected<std::unique_ptr<Database>, caudio::utils::Error>
+openDbWithFallback(const std::string &path, std::string &used) {
     auto r = Database::open(path);
-    if (r) { used = path; return r; }
-    std::cerr << "[engine_demo] Database::open('" << path << "') failed: " << r.error().message << ", fallback :memory:\n";
+    if (r) {
+        used = path;
+        return r;
+    }
+    std::cerr << "[engine_demo] Database::open('" << path << "') failed: " << r.error().message
+              << ", fallback :memory:\n";
     auto m = Database::open(":memory:");
-    if (m) { used = ":memory:"; std::cout << "[engine_demo] using :memory: DB\n"; }
+    if (m) {
+        used = ":memory:";
+        std::cout << "[engine_demo] using :memory: DB\n";
+    }
     return m;
 }
 
-void ensureQueueHasTracks(Database& db, const std::string& samplePath) {
+void ensureQueueHasTracks(Database &db, const std::string &samplePath) {
     auto q = db.queueList(1);
-    if (q && !q->empty()) return;
-    std::cout << "[engine_demo] queue empty, populating 2 demo tracks sample='" << samplePath << "'\n";
+    if (q && !q->empty())
+        return;
+    std::cout << "[engine_demo] queue empty, populating 2 demo tracks sample='" << samplePath
+              << "'\n";
     for (int i = 0; i < 2; ++i) {
         Track t;
-        for (int b = 0; b < 32; ++b) t.fingerprint[b] = static_cast<uint8_t>(0xC0 + i * 32 + b);
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = static_cast<uint8_t>(0xC0 + i * 32 + b);
         t.path = samplePath;
         t.size = 176444;
         t.mtime = 1700000000 + i;
@@ -74,24 +94,33 @@ void ensureQueueHasTracks(Database& db, const std::string& samplePath) {
         if (!ins) {
             if (ins.error().code == caudio::utils::Result::AlreadyExists) {
                 auto ex = db.findByFingerprint(t.fingerprint);
-                if (ex) tid = ex->id;
-                else { std::cerr << "[engine_demo] duplicate but find failed\n"; continue; }
+                if (ex)
+                    tid = ex->id;
+                else {
+                    std::cerr << "[engine_demo] duplicate but find failed\n";
+                    continue;
+                }
             } else {
                 std::cerr << "[engine_demo] insert failed: " << ins.error().message << "\n";
                 continue;
             }
-        } else tid = *ins;
+        } else
+            tid = *ins;
         auto eq = db.queueEnqueue(1, tid, -1);
-        if (!eq) std::cerr << "[engine_demo] enqueue tid=" << tid << " failed: " << eq.error().message << "\n";
-        else std::cout << "[engine_demo] enqueued tid=" << tid << "\n";
+        if (!eq)
+            std::cerr << "[engine_demo] enqueue tid=" << tid << " failed: " << eq.error().message
+                      << "\n";
+        else
+            std::cout << "[engine_demo] enqueued tid=" << tid << "\n";
     }
 }
 
 } // namespace
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     std::string dbPath = "build/engine_demo.db";
-    if (argc > 1 && argv[1] && argv[1][0] != '\0') dbPath = argv[1];
+    if (argc > 1 && argv[1] && argv[1][0] != '\0')
+        dbPath = argv[1];
 
     std::string used;
     auto dbRes = openDbWithFallback(dbPath, used);
@@ -155,7 +184,8 @@ int main(int argc, char** argv) {
 
     auto pr = engine->play(1);
     if (!pr) {
-        std::cerr << "[engine_demo] play failed: " << pr.error().message << " (" << static_cast<int>(pr.error().code) << ")\n";
+        std::cerr << "[engine_demo] play failed: " << pr.error().message << " ("
+                  << static_cast<int>(pr.error().code) << ")\n";
     } else {
         std::cout << "[engine_demo] playing queue 1, track " << engine->currentTrackId() << "\n";
     }
@@ -164,11 +194,11 @@ int main(int argc, char** argv) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         while (true) {
             auto ev = engine->pollEvent();
-            if (!ev) break;
-            std::cout << "[engine_demo] event type=" << static_cast<int>(ev->type)
-                      << " track " << ev->trackId << " queue " << ev->queueId
-                      << " pos=" << ev->position << " dur=" << ev->duration
-                      << " msg='" << ev->msg << "'\n";
+            if (!ev)
+                break;
+            std::cout << "[engine_demo] event type=" << static_cast<int>(ev->type) << " track "
+                      << ev->trackId << " queue " << ev->queueId << " pos=" << ev->position
+                      << " dur=" << ev->duration << " msg='" << ev->msg << "'\n";
         }
         if (i == 10) {
             EngineEvent buf[64];
@@ -188,12 +218,11 @@ int main(int argc, char** argv) {
     (void)engine->drainEvents(buf, 64, &n);
     std::cout << "[engine_demo] final drain " << n << " events\n";
     for (size_t k = 0; k < n; ++k) {
-        std::cout << "  final[" << k << "] type=" << static_cast<int>(buf[k].type)
-                  << " track " << buf[k].trackId << " queue " << buf[k].queueId << "\n";
+        std::cout << "  final[" << k << "] type=" << static_cast<int>(buf[k].type) << " track "
+                  << buf[k].trackId << " queue " << buf[k].queueId << "\n";
     }
-    std::cout << "[engine_demo] current track " << engine->currentTrackId()
-              << " state " << static_cast<int>(engine->state())
-              << " pos " << engine->position() << "\n";
+    std::cout << "[engine_demo] current track " << engine->currentTrackId() << " state "
+              << static_cast<int>(engine->state()) << " pos " << engine->position() << "\n";
     engine->shutdown();
     std::cout << "[engine_demo] done\n";
     return 0;

@@ -1,12 +1,12 @@
-#include <iostream>
-#include <thread>
 #include <chrono>
-#include <filesystem>
-#include <string>
-#include <vector>
 #include <cstdlib>
 #include <expected>
+#include <filesystem>
+#include <iostream>
 #include <memory>
+#include <string>
+#include <thread>
+#include <vector>
 
 import caudio.utils;
 import caudio.player;
@@ -20,41 +20,61 @@ namespace {
 
 std::string findSample() {
     auto toAbs = [](std::string s) -> std::string {
-        try { return std::filesystem::absolute(s).string(); } catch (...) { return s; }
+        try {
+            return std::filesystem::absolute(s).string();
+        } catch (...) {
+            return s;
+        }
     };
-    if (auto* env = std::getenv("CAUDIO_SAMPLE")) {
-        if (std::filesystem::exists(env)) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_SAMPLE")) {
+        if (std::filesystem::exists(env))
+            return toAbs(env);
     }
-    if (auto* env = std::getenv("CAUDIO_FIXTURE")) {
-        if (std::filesystem::exists(env)) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_FIXTURE")) {
+        if (std::filesystem::exists(env))
+            return toAbs(env);
     }
-    for (auto* c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav", "../tests/fixtures/sample.wav",
+    for (auto *c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
+                    "../tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio/tests/fixtures/sample.wav"}) {
-        if (std::filesystem::exists(c)) return toAbs(c);
+        if (std::filesystem::exists(c))
+            return toAbs(c);
     }
-    if (auto* env = std::getenv("CAUDIO_SAMPLE")) return toAbs(env);
+    if (auto *env = std::getenv("CAUDIO_SAMPLE"))
+        return toAbs(env);
     if (std::filesystem::exists("C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav"))
         return "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav";
     return "tests/fixtures/sample.wav";
 }
 
-std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::string& path, std::string& usedPath) {
+std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::string &path,
+                                                                   std::string &usedPath) {
     auto r = Database::open(path);
-    if (r) { usedPath = path; return r; }
-    std::cerr << "[demo] Database::open('" << path << "') failed: " << r.error().message << ", fallback :memory:\n";
+    if (r) {
+        usedPath = path;
+        return r;
+    }
+    std::cerr << "[demo] Database::open('" << path << "') failed: " << r.error().message
+              << ", fallback :memory:\n";
     auto m = Database::open(":memory:");
-    if (m) { usedPath = ":memory:"; std::cout << "[demo] using :memory: DB\n"; }
+    if (m) {
+        usedPath = ":memory:";
+        std::cout << "[demo] using :memory: DB\n";
+    }
     return m;
 }
 
-void ensureQueueHasTracks(Database& db, const std::string& samplePath, const std::string& prefix, uint8_t fpBase) {
+void ensureQueueHasTracks(Database &db, const std::string &samplePath, const std::string &prefix,
+                          uint8_t fpBase) {
     auto q = db.queueList(1);
-    if (q && !q->empty()) return;
+    if (q && !q->empty())
+        return;
     std::cout << "[demo] queue empty, populating 2 demo tracks sample='" << samplePath << "'\n";
     for (int i = 0; i < 2; ++i) {
         Track t;
-        for (int b = 0; b < 32; ++b) t.fingerprint[b] = static_cast<uint8_t>(fpBase + i * 32 + b);
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = static_cast<uint8_t>(fpBase + i * 32 + b);
         t.path = samplePath;
         t.size = 176444;
         t.mtime = 1700000000 + i;
@@ -74,28 +94,39 @@ void ensureQueueHasTracks(Database& db, const std::string& samplePath, const std
         if (!ins) {
             if (ins.error().code == Result::AlreadyExists) {
                 auto ex = db.findByFingerprint(t.fingerprint);
-                if (ex) tid = ex->id;
-                else { std::cerr << "[demo] duplicate but find failed\n"; continue; }
+                if (ex)
+                    tid = ex->id;
+                else {
+                    std::cerr << "[demo] duplicate but find failed\n";
+                    continue;
+                }
             } else {
-                std::cerr << "[demo] insertTrack " << i << " failed: " << ins.error().message << "\n";
+                std::cerr << "[demo] insertTrack " << i << " failed: " << ins.error().message
+                          << "\n";
                 continue;
             }
         } else {
             tid = *ins;
         }
         auto eq = db.queueEnqueue(1, tid, -1);
-        if (!eq) std::cerr << "[demo] queueEnqueue tid=" << tid << " failed: " << eq.error().message << "\n";
-        else std::cout << "[demo] enqueued tid=" << tid << "\n";
+        if (!eq)
+            std::cerr << "[demo] queueEnqueue tid=" << tid << " failed: " << eq.error().message
+                      << "\n";
+        else
+            std::cout << "[demo] enqueued tid=" << tid << "\n";
     }
 }
 
-bool playTrackViaPlayer(const Track& track) {
-    std::cout << "[demo] queue track " << track.id << ": '" << (track.title.empty() ? "(untitled)" : track.title)
-              << "' by '" << (track.artist.empty() ? "(unknown)" : track.artist) << "' path='" << track.path << "'\n";
+bool playTrackViaPlayer(const Track &track) {
+    std::cout << "[demo] queue track " << track.id << ": '"
+              << (track.title.empty() ? "(untitled)" : track.title) << "' by '"
+              << (track.artist.empty() ? "(unknown)" : track.artist) << "' path='" << track.path
+              << "'\n";
 
     auto readerResult = FileReader::open(track.path);
     if (!readerResult) {
-        std::cerr << "[demo] FileReader::open('" << track.path << "') failed: " << readerResult.error().message
+        std::cerr << "[demo] FileReader::open('" << track.path
+                  << "') failed: " << readerResult.error().message
                   << " — using synthetic fallback\n";
         // Fallback: still exercise decoder with MemoryReader empty data via synthetic path
         // Create a tiny in-memory wav header synthetic fallback: just use decoder fallback directly
@@ -133,22 +164,26 @@ bool playTrackViaPlayer(const Track& track) {
     while (ticks < maxTicks) {
         if (!decodingDone && ring.availableWrite() * decoder->channels() >= tmp.size()) {
             std::size_t frames = decoder->decode(std::span<float>(tmp.data(), tmp.size()));
-            if (frames == 0) decodingDone = true;
+            if (frames == 0)
+                decodingDone = true;
             else {
                 ring.write(std::span<const float>(tmp.data(), frames * decoder->channels()));
                 framesPlayed += static_cast<int>(frames);
             }
         }
         // If decoding done and ring drained, we're finished
-        if (decodingDone && ring.availableRead() == 0) break;
-        // If output stopped? ring empty but decoder reached EOF; AudioOutput will be draining fallback sine
+        if (decodingDone && ring.availableRead() == 0)
+            break;
+        // If output stopped? ring empty but decoder reached EOF; AudioOutput will be draining
+        // fallback sine
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         ++ticks;
     }
     if (ticks >= maxTicks) {
         std::cerr << "[demo] playback timeout for '" << track.path << "', stopping\n";
     } else {
-        std::cout << "[demo] finished '" << (track.title.empty() ? track.path : track.title) << "' in " << ticks << " ticks\n";
+        std::cout << "[demo] finished '" << (track.title.empty() ? track.path : track.title)
+                  << "' in " << ticks << " ticks\n";
     }
     output->stop();
     return true;
@@ -156,14 +191,16 @@ bool playTrackViaPlayer(const Track& track) {
 
 } // namespace
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     std::string dbPath = "library.db";
-    if (argc > 1 && argv[1] && argv[1][0] != '\0') dbPath = argv[1];
+    if (argc > 1 && argv[1] && argv[1][0] != '\0')
+        dbPath = argv[1];
 
     std::string usedPath;
     auto dbRes = openDbWithFallback(dbPath, usedPath);
     if (!dbRes) {
-        std::cerr << "[demo] open failed: " << dbRes.error().message << " code=" << static_cast<int>(dbRes.error().code) << "\n";
+        std::cerr << "[demo] open failed: " << dbRes.error().message
+                  << " code=" << static_cast<int>(dbRes.error().code) << "\n";
         return 1;
     }
     auto db = std::move(dbRes.value());
@@ -192,17 +229,20 @@ int main(int argc, char** argv) {
     }
 
     int played = 0, errors = 0;
-    for (auto& qi : *itemsRes) {
+    for (auto &qi : *itemsRes) {
         auto tr = db->getTrack(qi.trackId);
         if (!tr) {
-            std::cerr << "[demo] getTrack(" << qi.trackId << ") failed: " << tr.error().message << "\n";
+            std::cerr << "[demo] getTrack(" << qi.trackId << ") failed: " << tr.error().message
+                      << "\n";
             ++errors;
             continue;
         }
         Track track = tr.value();
         std::cout << "[demo] queue pos " << qi.position << " -> track " << track.id << "\n";
-        if (playTrackViaPlayer(track)) ++played;
-        else ++errors;
+        if (playTrackViaPlayer(track))
+            ++played;
+        else
+            ++errors;
     }
     std::cout << "[demo] done: played=" << played << " errors=" << errors << "\n";
     return 0;

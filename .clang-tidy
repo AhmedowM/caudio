@@ -6,3 +6,9 @@ CheckOptions:
     value: 0
   - key: cppcoreguidelines-avoid-magic-numbers
     value: 0
+  - key: readability-braces-around-statements
+    value: 0
+  - key: readability-indentation
+    value: 4
+  - key: readability-brace-placement
+    value: 4
