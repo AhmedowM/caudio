@@ -47,6 +47,8 @@ public:
     if (!outResult) return std::unexpected(outResult.error());
     auto output = std::move(outResult.value());
 
+    // Start playback - begins audio device
+    output->start();
     std::cout << "Playing...\n";
 
     // Decode loop - feed ring buffer
