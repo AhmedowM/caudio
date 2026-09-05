@@ -34,37 +34,63 @@ public:
     std::cout << "Total frames: " << decoder->totalFrames() << "\n";
     std::cout << "Duration: " << static_cast<double>(decoder->totalFrames()) / decoder->sampleRate() << " seconds\n\n";
 
+    // Create ring buffer for audio data
+    constexpr std::size_t kRingCapacity = 8192;
+    SpscRing<float> ring(kRingCapacity);
+
     // Create audio output
     AudioOutput::Config cfg;
     cfg.sampleRate = decoder->sampleRate();
     cfg.channels = decoder->channels();
+    cfg.ring = &ring;
     auto outResult = AudioOutput::create(cfg);
     if (!outResult) return std::unexpected(outResult.error());
     auto output = std::move(outResult.value());
 
-    // Decode and play
+    std::cout << "Playing...\n";
+
+    // Decode loop - feed ring buffer
     constexpr std::size_t kBufferFrames = 1024;
     std::vector<float> buffer(kBufferFrames * decoder->channels());
 
     std::size_t totalFramesPlayed = 0;
-    auto startTime = std::chrono::steady_clock::now();
+    bool decodingFinished = false;
 
-    while (true) {
-      std::size_t frames = decoder->decode(std::span<float>(buffer.data(), buffer.size()));
-      if (frames == 0) break;
+    while (output->isPlaying() && !decodingFinished) {
+      // Check available space in ring buffer
+      std::size_t available = ring.availableWrite();
+      if (available >= buffer.size()) {
+        // Decode directly into ring buffer
+        std::size_t frames = decoder->decode(std::span<float>(buffer.data(), buffer.size()));
+        if (frames == 0) {
+          decodingFinished = true;
+          break;
+        }
+        std::size_t samples = frames * decoder->channels();
+        std::size_t written = ring.write(std::span<float>(buffer.data(), samples));
+        totalFramesPlayed += frames;
+        if (written < samples) {
+          std::cout << "\nWarning: ring buffer overflow, " << (samples - written) << " samples lost\n";
+        }
+      } else {
+        // Ring buffer full, wait a bit
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+      }
 
-      // Fill output ring buffer (simplified - just print for now)
-      // In real implementation, this would feed to miniaudio device callback
-      totalFramesPlayed += frames;
-
-      // Simple progress
-      if (totalFramesPlayed % (decoder->sampleRate() * 2) == 0) {
+      // Progress
+      if (totalFramesPlayed % (decoder->sampleRate() * 2) == 0 && totalFramesPlayed > 0) {
         double elapsed = static_cast<double>(totalFramesPlayed) / decoder->sampleRate();
         std::cout << "\rPlayed: " << elapsed << "s / "
                   << static_cast<double>(decoder->totalFrames()) / decoder->sampleRate() << "s" << std::flush;
       }
     }
 
+    // Wait for playback to finish draining
+    while (output->isPlaying() && ring.availableRead() > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds{50});
+    }
+
+    output->stop();
     std::cout << "\nDecoded " << totalFramesPlayed << " frames\n";
     std::cout << "Duration: " << static_cast<double>(totalFramesPlayed) / decoder->sampleRate() << "s\n";
 
