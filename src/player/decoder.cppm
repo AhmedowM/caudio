@@ -41,22 +41,13 @@ public:
 
     std::span<const std::byte> probeSpan(buf.data(), n);
 
-    // Try miniaudio first for WAV/FLAC/MP3/Vorbis
+    // Try FFmpeg first (handles M4A/AAC/Opus/WMA/OGG/FLAC/MP3/WAV when miniaudio streaming would fail)
     caudio::utils::Expected<std::unique_ptr<IDecoder>> result =
         std::unexpected(caudio::utils::Error{caudio::utils::Result::Unsupported, "no decoder matched"});
 
-    if (MiniaudioDecoder::probe(probeSpan)) {
-      result = MiniaudioDecoder::create(reader);
-      if (result.has_value()) {
-        auto sr = reader.seek(orig, SEEK_SET);
-        if (!sr.has_value()) (void)reader.seek(0, SEEK_SET);
-        return result;
-      }
-    }
-
-    // Try FFmpeg for M4A/AAC/Opus/WMA and other formats
 #ifdef CAUDIO_WITH_FFMPEG
     if (FfmpegDecoder::probe(probeSpan)) {
+      (void)reader.seek(0, SEEK_SET);
       result = FfmpegDecoder::create(reader);
       if (result.has_value()) {
         auto sr = reader.seek(orig, SEEK_SET);
@@ -65,6 +56,17 @@ public:
       }
     }
 #endif
+
+    // Fallback to miniaudio for WAV/FLAC/MP3/Vorbis
+    if (MiniaudioDecoder::probe(probeSpan)) {
+      (void)reader.seek(0, SEEK_SET);
+      result = MiniaudioDecoder::create(reader);
+      if (result.has_value()) {
+        auto sr = reader.seek(orig, SEEK_SET);
+        if (!sr.has_value()) (void)reader.seek(0, SEEK_SET);
+        return result;
+      }
+    }
 
     // dr_* + stb_vorbis fallback only if FFmpeg absent
 #ifndef CAUDIO_WITH_FFMPEG
