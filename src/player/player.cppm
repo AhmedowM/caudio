@@ -6,11 +6,8 @@ export module caudio.player;
 export import :reader;
 export import :decoder_common;
 export import :decoder_interface;
+export import :miniaudio_decoder;
 export import :decoder;
-export import :wav;
-export import :flac;
-export import :mp3;
-export import :vorbis;
 export import :output;
 
 #ifdef CAUDIO_WITH_FFMPEG

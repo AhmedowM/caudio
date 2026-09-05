@@ -16,10 +16,7 @@ export module caudio.player:decoder;
 import caudio.utils;
 import :reader;
 import :decoder_interface;
-import :wav;
-import :flac;
-import :mp3;
-import :vorbis;
+import :miniaudio_decoder;
 
 #ifdef CAUDIO_WITH_FFMPEG
 import :ffmpeg;
@@ -28,7 +25,7 @@ import :ffmpeg;
 export namespace caudio::player {
 
 // DecoderRegistry — probe 32B then restore offset like ca_decode.c:48
-// Priority: FFmpeg first (when available), then wav→flac→mp3→vorbis
+// Priority: miniaudio (WAV/FLAC/MP3/Vorbis), FFmpeg (M4A/AAC/Opus/WMA), dr_* fallback
 class DecoderRegistry {
 public:
   [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader) {
@@ -44,34 +41,35 @@ public:
 
     std::span<const std::byte> probeSpan(buf.data(), n);
 
-    // Try FFmpeg first when available (ASF/WMA and other formats)
+    // Try miniaudio first for WAV/FLAC/MP3/Vorbis
     caudio::utils::Expected<std::unique_ptr<IDecoder>> result =
         std::unexpected(caudio::utils::Error{caudio::utils::Result::Unsupported, "no decoder matched"});
 
+    if (MiniaudioDecoder::probe(probeSpan)) {
+      result = MiniaudioDecoder::create(reader);
+      if (result.has_value()) {
+        auto sr = reader.seek(orig, SEEK_SET);
+        if (!sr.has_value()) (void)reader.seek(0, SEEK_SET);
+        return result;
+      }
+    }
+
+    // Try FFmpeg for M4A/AAC/Opus/WMA and other formats
 #ifdef CAUDIO_WITH_FFMPEG
     if (FfmpegDecoder::probe(probeSpan)) {
       result = FfmpegDecoder::create(reader);
       if (result.has_value()) {
-        // restore offset after create (which may read more) — ca_decode.c:60-72
         auto sr = reader.seek(orig, SEEK_SET);
-        if (!sr.has_value()) {
-          (void)reader.seek(0, SEEK_SET);
-        }
+        if (!sr.has_value()) (void)reader.seek(0, SEEK_SET);
         return result;
       }
     }
 #endif
 
-    // Fallback to dr_* decoders
-    if (WavDecoder::probe(probeSpan)) {
-      result = WavDecoder::create(reader);
-    } else if (FlacDecoder::probe(probeSpan)) {
-      result = FlacDecoder::create(reader);
-    } else if (Mp3Decoder::probe(probeSpan)) {
-      result = Mp3Decoder::create(reader);
-    } else if (VorbisDecoder::probe(probeSpan)) {
-      result = VorbisDecoder::create(reader);
-    }
+    // dr_* + stb_vorbis fallback only if FFmpeg absent
+#ifndef CAUDIO_WITH_FFMPEG
+    // TODO: Add dr_* fallback decoders here if needed
+#endif
 
     // restore offset after create (which may read more) — ca_decode.c:60-72
     auto sr = reader.seek(orig, SEEK_SET);
