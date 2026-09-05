@@ -47,6 +47,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CAUDIO_WITH_FFMPEG "use FFmpeg as primary decoder" ON)
 option(CAUDIO_BUILD_TESTS "build tests" OFF)
 option(CAUDIO_BUILD_EXAMPLES "build examples" OFF)
+option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
 
 # Module path for FindFFmpeg
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -59,6 +60,19 @@ if(CAUDIO_WITH_FFMPEG)
     message(STATUS "FFmpeg found: ${FFmpeg_AVCODEC_LIBRARY}")
   else()
     message(STATUS "FFmpeg not found — falling back to dr_* decoders")
+  endif()
+endif()
+
+if(CAUDIO_ENABLE_SANITIZERS)
+  if(WIN32)
+    message(WARNING "CAUDIO_ENABLE_SANITIZERS not supported on Windows/MinGW — sanitizers require Clang/GCC on Linux. Option ignored.")
+  elseif(MSVC)
+    message(WARNING "CAUDIO_ENABLE_SANITIZERS: MSVC sanitizers limited; using /fsanitize=address")
+    add_compile_options(/fsanitize=address)
+  else()
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+    add_link_options(-fsanitize=address,undefined)
+    message(STATUS "Sanitizers enabled: ASan+UBSan")
   endif()
 endif()
 
@@ -176,16 +190,33 @@ endif()
 target_sources(caudio_player_shared PRIVATE $<TARGET_OBJECTS:caudio_rtaudio>)
 ca_set_warnings(caudio_player_shared)
 
+# nlohmann json for ordered_json
+include(FetchContent)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
 add_library(caudio_db STATIC)
 add_library(caudio::db ALIAS caudio_db)
-target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm src/db/types.cppm src/db/schema.cppm)
+target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm
+  src/db/types.cppm
+  src/db/schema.cppm
+  src/db/database.cppm
+  src/db/scan.cppm
+  src/db/search.cppm
+  src/db/json.cppm
+  src/db/write_thread.cppm)
 target_include_directories(caudio_db PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(caudio_db PRIVATE vendor)
 target_link_libraries(caudio_db PUBLIC caudio::utils Threads::Threads)
+  target_include_directories(caudio_db PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 target_sources(caudio_db PRIVATE $<TARGET_OBJECTS:caudio_sqlite>)
 target_compile_definitions(caudio_db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db)
@@ -193,13 +224,21 @@ ca_set_warnings(caudio_db)
 add_library(caudio_db_shared SHARED)
 set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
 add_library(caudio::db_shared ALIAS caudio_db_shared)
-target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm src/db/types.cppm src/db/schema.cppm)
+target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm
+  src/db/types.cppm
+  src/db/schema.cppm
+  src/db/database.cppm
+  src/db/scan.cppm
+  src/db/search.cppm
+  src/db/json.cppm
+  src/db/write_thread.cppm)
 target_include_directories(caudio_db_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(caudio_db_shared PRIVATE vendor)
 target_link_libraries(caudio_db_shared PUBLIC caudio::utils_shared Threads::Threads)
+  target_include_directories(caudio_db_shared PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 target_sources(caudio_db_shared PRIVATE $<TARGET_OBJECTS:caudio_sqlite>)
 target_compile_definitions(caudio_db_shared PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db_shared)
@@ -233,7 +272,14 @@ target_sources(caudio_combined PUBLIC
   FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
     ${CAUDIO_UTILS_SOURCES}
     ${CAUDIO_PLAYER_SOURCES}
-    src/db/db.cppm src/db/types.cppm src/db/schema.cppm
+    src/db/db.cppm
+  src/db/types.cppm
+  src/db/schema.cppm
+  src/db/database.cppm
+  src/db/scan.cppm
+  src/db/search.cppm
+  src/db/json.cppm
+  src/db/write_thread.cppm
     src/engine/engine.cppm
 )
 target_include_directories(caudio_combined PUBLIC
@@ -242,6 +288,7 @@ target_include_directories(caudio_combined PUBLIC
 )
 target_include_directories(caudio_combined PRIVATE vendor)
 target_link_libraries(caudio_combined PUBLIC Threads::Threads)
+  target_include_directories(caudio_combined PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 target_sources(caudio_combined PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:caudio_rtaudio>)
 target_compile_definitions(caudio_combined PUBLIC SQLITE_ENABLE_FTS5=1)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
@@ -301,11 +348,19 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 endif()
 include(CPack)
 
-# Examples
+# Examples (C parity: mini + player_db_demo + engine_demo)
 if(CAUDIO_BUILD_EXAMPLES)
   add_executable(caudio_mini examples/mini_cpp.cpp)
   target_link_libraries(caudio_mini PRIVATE caudio::player caudio::utils)
   target_compile_features(caudio_mini PRIVATE cxx_std_23)
+
+  add_executable(caudio_player_db_demo examples/player_db_demo.cpp)
+  target_link_libraries(caudio_player_db_demo PRIVATE caudio::player caudio::db caudio::utils)
+  target_compile_features(caudio_player_db_demo PRIVATE cxx_std_23)
+
+  add_executable(caudio_engine_demo examples/engine_demo.cpp)
+  target_link_libraries(caudio_engine_demo PRIVATE caudio::engine caudio::db caudio::player caudio::utils)
+  target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
 # Tests — Catch2 via FetchContent, ports of test_utils_*

@@ -152,13 +152,17 @@ private:
     );
 
     ma_result res = MA_INVALID_FILE;
-    constexpr int64_t kMemoryThreshold = 50 * 1024 * 1024;  // 50 MB threshold
+    // Threshold that separates memory vs streaming decode path for MP3.
+    // Below this we load file into RAM for simpler byte-accurate seeking;
+    // above it we use callback streaming with tell_cb to avoid OOM on large files.
+    constexpr int64_t kMemoryThresholdBytes = 50LL * 1024 * 1024;  // 50 MiB
+    static_assert(kMemoryThresholdBytes > 0, "threshold must be positive");
 
     // For MP3: use memory decoder for small files, streaming with tell_cb for large files
     bool useMemoryDecoder = (fallbackFormat_ == detail::DecoderFormat::Mp3);
     int64_t fileSize = reader_ ? reader_->size() : -1;
 
-    if (useMemoryDecoder && reader_ && fileSize > 0 && fileSize < kMemoryThreshold) {
+    if (useMemoryDecoder && reader_ && fileSize > 0 && fileSize < kMemoryThresholdBytes) {
       // Small MP3: read entire file into memory and use ma_decoder_init_memory
       // Simpler, avoids callback frame/byte mismatch with MP3 backend
       std::vector<std::byte> fileData;

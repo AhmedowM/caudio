@@ -1,6 +1,7 @@
 module;
 #include "miniaudio.h"
 #include <cstdint>
+#include <cstdio>
 #include <atomic>
 #include <span>
 #include <expected>
@@ -30,7 +31,7 @@ public:
   AudioOutput() = default;
 
   ~AudioOutput() {
-    stop();
+    shutdown();
   }
 
   static Expected create(const Config& cfg) {
@@ -59,21 +60,29 @@ public:
   }
 
   void start() {
-    if (!running_.load(std::memory_order_acquire)) {
-      running_.store(true, std::memory_order_release);
+    if (!initialized_.load(std::memory_order_acquire)) return;
+    bool expected = false;
+    if (running_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
       ma_device_start(&device_);
     }
   }
 
   void stop() {
-    if (running_.load(std::memory_order_acquire)) {
-      running_.store(false, std::memory_order_release);
+    bool expected = true;
+    if (running_.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
       ma_device_stop(&device_);
     }
-    ma_device_uninit(&device_);
+  }
+
+  void shutdown() noexcept {
+    stop();
+    if (initialized_.exchange(false, std::memory_order_acq_rel)) {
+      ma_device_uninit(&device_);
+    }
   }
 
   bool init(const Config& cfg) {
+    if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0) return false;
     cfg_ = cfg;
 
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
@@ -87,17 +96,19 @@ public:
     if (res != MA_SUCCESS) {
       return false;
     }
+    initialized_.store(true, std::memory_order_release);
 
     res = ma_device_start(&device_);
     if (res != MA_SUCCESS) {
-      ma_device_uninit(&device_);
+      shutdown();
       return false;
     }
+    running_.store(true, std::memory_order_release);
 
-    // Debug: print device info
-    printf("Audio device started: format=%d, channels=%d, sampleRate=%d\n",
+    // Debug: print device info (non-RT, init only)
+    std::printf("Audio device started: format=%d, channels=%d, sampleRate=%d\n",
            device_.playback.format, device_.playback.channels, device_.sampleRate);
-    fflush(stdout);
+    std::fflush(stdout);
 
     return true;
   }
@@ -117,8 +128,9 @@ public:
     }
 
     // Fallback: generate 440Hz sine wave when ring buffer empty (for testing)
+    // RT-safe: phase is per-instance, only touched on audio thread.
     if (generated < totalSamples) {
-      static thread_local double phase = 0.0;
+      double phase = self->phase_;
       const double freq = 440.0;
       const double sampleRate = static_cast<double>(pDevice->sampleRate);
       const double phaseInc = 2.0 * 3.141592653589793 * freq / sampleRate;
@@ -128,6 +140,7 @@ public:
         phase += phaseInc;
         if (phase >= 2.0 * 3.141592653589793) phase -= 2.0 * 3.141592653589793;
       }
+      self->phase_ = phase;
     }
 
     // Apply volume
@@ -143,6 +156,8 @@ public:
   ma_device device_{};
   std::atomic<float> volume_{1.0f};
   std::atomic<bool> running_{false};
+  std::atomic<bool> initialized_{false};
+  double phase_{0.0};
 };
 
 } // namespace caudio::player

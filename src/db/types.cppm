@@ -2,6 +2,7 @@ module;
 #include <cstdint>
 #include <array>
 #include <string>
+#include <vector>
 
 export module caudio.db:types;
 
@@ -11,19 +12,110 @@ struct Track {
   int64_t id{};
   std::array<uint8_t, 32> fingerprint{};
   std::string path;
-  std::string title, artist, album, albumArtist, genre;
+  int64_t size{};
+  int64_t mtime{};
+  double duration{};
+  uint32_t sample_rate{};
+  uint32_t channels{};
+  int32_t bitrate{};
+  std::string title;
+  std::string artist;
+  std::string album;
+  std::string albumArtist;
+  std::string genre;
+  int32_t year{};
+  int32_t track_num{};
+  int32_t disc_num{};
+  std::string cover_art_path;
+  int32_t rating{};
+  int64_t play_count{};
+  int64_t last_played{};
+  int64_t date_added{};
+  int64_t last_scanned{};
+  int dirty{};
+  int64_t deleted_at{};
+  int64_t library_id{1};
 };
 
 struct Playlist {
   int64_t id{};
   std::string name;
-  std::string description;
+  int32_t type{};
+  std::string smart_query;
+  int64_t created{};
+  int64_t modified{};
+  int64_t library_id{1};
 };
 
 struct QueueItem {
   int64_t id{};
+  int64_t queue_id{1};
   int64_t trackId{};
-  int position{};
+  int64_t position{};
+  int64_t added{};
+};
+
+struct HistoryEntry {
+  int64_t id{};
+  int64_t trackId{};
+  int64_t started_at{};
+  int64_t completed_at{};
+  int64_t position_ms{};
+  double completion_pct{};
+  int64_t queue_id{1};
+};
+
+struct Bookmark {
+  int64_t id{};
+  int64_t trackId{};
+  int64_t position_ms{};
+  std::string note;
+  int64_t created{};
+};
+
+struct Library {
+  int64_t id{};
+  std::string path;
+  std::string name;
+  int64_t date_added{};
+  int64_t last_scanned{};
+  int auto_scan{1};
+  int recursive{1};
+  std::string extensions{"mp3,flac,ogg,wav,m4a"};
+};
+
+struct DbStats {
+  int64_t num_tracks{};
+  int64_t num_playlists{};
+  int64_t num_queue_items{};
+  int64_t num_history{};
+  int64_t num_bookmarks{};
+  int64_t num_libraries{};
+  int64_t total_duration_ms{};
+};
+
+struct TrackQuery {
+  std::string artist;
+  std::string album;
+  std::string genre;
+  int32_t year{};
+  bool has_year{false};
+  int64_t library_id{};
+  bool has_library_id{false};
+  int dirty{};
+  bool has_dirty{false};
+  int limit{};
+  int offset{};
+  std::string search;
+};
+
+struct HistoryQuery {
+  int64_t track_id{};
+  bool has_track_id{false};
+  int64_t queue_id{};
+  bool has_queue_id{false};
+  int limit{};
+  int offset{};
 };
 
 } // namespace caudio::db

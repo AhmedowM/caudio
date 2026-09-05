@@ -1,0 +1,8 @@
+Checks: '-*,clang-analyzer-*,modernize-*,bugprone-*,concurrency-*,cppcoreguidelines-*,readability-*,performance-*,portability-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+CheckOptions:
+  - key: modernize-use-auto
+    value: 0
+  - key: cppcoreguidelines-avoid-magic-numbers
+    value: 0
