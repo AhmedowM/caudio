@@ -16,7 +16,6 @@ export module caudio.player:decoder;
 import caudio.utils;
 import :reader;
 import :decoder_interface;
-import :miniaudio_decoder;
 
 #ifdef CAUDIO_WITH_FFMPEG
 import :ffmpeg;
@@ -25,7 +24,7 @@ import :ffmpeg;
 export namespace caudio::player {
 
 // DecoderRegistry — probe 32B then restore offset like ca_decode.c:48
-// Priority: miniaudio (WAV/FLAC/MP3/Vorbis), FFmpeg (M4A/AAC/Opus/WMA), dr_* fallback
+// Priority: FFmpeg (all supported formats)
 class DecoderRegistry {
 public:
   [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader) {
@@ -41,7 +40,7 @@ public:
 
     std::span<const std::byte> probeSpan(buf.data(), n);
 
-    // Try FFmpeg first (handles M4A/AAC/Opus/WMA/OGG/FLAC/MP3/WAV when miniaudio streaming would fail)
+    // Try FFmpeg (handles all supported formats: OGG/FLAC/MP3/WAV/M4A/AAC/Opus/WMA)
     caudio::utils::Expected<std::unique_ptr<IDecoder>> result =
         std::unexpected(caudio::utils::Error{caudio::utils::Result::Unsupported, "no decoder matched"});
 
@@ -55,22 +54,6 @@ public:
         return result;
       }
     }
-#endif
-
-    // Fallback to miniaudio for WAV/FLAC/MP3/Vorbis
-    if (MiniaudioDecoder::probe(probeSpan)) {
-      (void)reader.seek(0, SEEK_SET);
-      result = MiniaudioDecoder::create(reader);
-      if (result.has_value()) {
-        auto sr = reader.seek(orig, SEEK_SET);
-        if (!sr.has_value()) (void)reader.seek(0, SEEK_SET);
-        return result;
-      }
-    }
-
-    // dr_* + stb_vorbis fallback only if FFmpeg absent
-#ifndef CAUDIO_WITH_FFMPEG
-    // TODO: Add dr_* fallback decoders here if needed
 #endif
 
     // restore offset after create (which may read more) — ca_decode.c:60-72

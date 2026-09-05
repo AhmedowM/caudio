@@ -37,22 +37,22 @@ TEST_CASE("ffmpeg decodes real ogg file", "[ffmpeg]") {
 }
 
 TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {
-  // FFmpeg probe should be permissive when available
+  // FFmpeg probe is permissive (returns true for any data >= 4 bytes)
   std::vector<std::byte> probeData(32, std::byte{0});
   probeData[0] = std::byte{'R'}; probeData[1] = std::byte{'I'}; 
   probeData[2] = std::byte{'F'}; probeData[3] = std::byte{'F'};
   
   auto r = MemoryReader::open(probeData);
   REQUIRE(r.has_value());
-  // When FFmpeg is available, probe should return true for RIFF too (permissive)
-  // But WavDecoder will match first in the probe check... 
-  // Actually, the registry checks FFmpeg probe first, so it should try FFmpeg
+  
   #ifdef CAUDIO_WITH_FFMPEG
-  // With fake RIFF data, FFmpeg create will fail and fall back to WavDecoder
+  // With fake data, FFmpeg probe returns true but create fails -> unsupported
   auto dec = DecoderRegistry::open(**r);
-  REQUIRE(dec.has_value()); // Should succeed via fallback to WavDecoder
+  REQUIRE(!dec.has_value());
+  REQUIRE(dec.error().code == Result::Unsupported);
   #else
+  // Without FFmpeg, no decoder available
   auto dec = DecoderRegistry::open(**r);
-  REQUIRE(dec.has_value()); // Should succeed via WavDecoder
+  REQUIRE(!dec.has_value());
   #endif
 }

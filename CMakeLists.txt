@@ -164,7 +164,6 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/decoder.cppm
   src/player/decoders/decoder_common.cppm
   src/player/decoders/decoder_interface.cppm
-  src/player/decoders/miniaudio_decoder.cppm
   src/player/decoders/miniaudio_impl.cppm
 )
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)

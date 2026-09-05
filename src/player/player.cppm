@@ -6,7 +6,6 @@ export module caudio.player;
 export import :reader;
 export import :decoder_common;
 export import :decoder_interface;
-export import :miniaudio_decoder;
 export import :decoder;
 export import :output;
 
