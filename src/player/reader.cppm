@@ -10,6 +10,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
@@ -93,7 +94,24 @@ class FileReader final : public Reader {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::NotFound, "cannot open file"});
         }
+        if (detail::fseek64(f, 0, SEEK_END) != 0) {
+            std::fclose(f);
+            return std::unexpected(
+                caudio::utils::Error{caudio::utils::Result::Internal, "fseek failed"});
+        }
+        int64_t sz = detail::ftell64(f);
+        if (sz < 0) {
+            std::fclose(f);
+            return std::unexpected(
+                caudio::utils::Error{caudio::utils::Result::Internal, "ftell failed"});
+        }
+        if (detail::fseek64(f, 0, SEEK_SET) != 0) {
+            std::fclose(f);
+            return std::unexpected(
+                caudio::utils::Error{caudio::utils::Result::Internal, "fseek failed"});
+        }
         auto* raw = new FileReader(f);
+        raw->fileSize_ = sz;
         return caudio::utils::Expected<std::unique_ptr<Reader>>{std::unique_ptr<Reader>(raw)};
     }
 
@@ -116,14 +134,15 @@ class FileReader final : public Reader {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::InvalidArg, "bad whence"});
         }
+        std::lock_guard<std::mutex> lock(seekMutex_);
         int64_t cur = detail::ftell64(file_);
         if (cur < 0)
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::Internal, "ftell failed"});
-        int64_t sz = detail::fileSizeInner(file_);
+        int64_t sz = fileSize_;
         if (sz < 0)
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::Result::Internal, "size failed"});
+                caudio::utils::Error{caudio::utils::Result::Internal, "size not cached"});
         int64_t base = 0;
         switch (whence) {
         case SEEK_SET:
@@ -154,19 +173,20 @@ class FileReader final : public Reader {
     [[nodiscard]] int64_t tell() noexcept override {
         if (!file_)
             return -1;
+        std::lock_guard<std::mutex> lock(seekMutex_);
         return detail::ftell64(file_);
     }
 
     [[nodiscard]] int64_t size() noexcept override {
-        if (!file_)
-            return -1;
-        return detail::fileSizeInner(file_);
+        return fileSize_;
     }
 
-  private:
+private:
     explicit FileReader(FILE* f) : file_(f) {}
     FILE* file_{nullptr};
-};
+    int64_t fileSize_{-1};
+    mutable std::mutex seekMutex_{};
+  };
 
 class MemoryReader final : public Reader {
   public:
