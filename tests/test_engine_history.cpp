@@ -1,9 +1,11 @@
-#include <catch2/catch_test_macros.hpp>
-#include <filesystem>
-#include <atomic>
 #include <sqlite3.h>
-#include <thread>
+
+#include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <filesystem>
+#include <thread>
+
 #include "helpers/helpers_test.hpp"
 
 import caudio.db;
@@ -43,67 +45,103 @@ TEST_CASE("shouldMarkPlayed default 60 90 wrapper", "[engine_history]") {
 
 TEST_CASE("CAS exactly-once markedPlayed atomic", "[engine_history]") {
     std::atomic<bool> marked{false};
-    bool e=false; REQUIRE(marked.compare_exchange_strong(e,true));
+    bool e = false;
+    REQUIRE(marked.compare_exchange_strong(e, true));
     // second CAS with expected false should fail because already true
-    e=false; REQUIRE(!marked.compare_exchange_strong(e,true));
+    e = false;
+    REQUIRE(!marked.compare_exchange_strong(e, true));
     REQUIRE(marked.load());
     // reset and succeed again
     marked.store(false);
-    e=false; REQUIRE(marked.compare_exchange_strong(e,true));
+    e = false;
+    REQUIRE(marked.compare_exchange_strong(e, true));
 }
 
 TEST_CASE("history insert increments play_count and last_played", "[engine_history]") {
     std::string dbPath = tempDbPath("eng_hist_inc").string();
-    auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t; t.path="hist.wav"; t.duration=10.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x60+b);
-    auto ins=db->insertTrack(t); REQUIRE(ins.has_value());
-    int64_t tid=*ins;
-    auto before=db->getTrack(tid); REQUIRE(before.has_value());
-    REQUIRE(before->play_count==0);
+    Track t;
+    t.path = "hist.wav";
+    t.duration = 10.0;
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0x60 + b);
+    auto ins = db->insertTrack(t);
+    REQUIRE(ins.has_value());
+    int64_t tid = *ins;
+    auto before = db->getTrack(tid);
+    REQUIRE(before.has_value());
+    REQUIRE(before->play_count == 0);
     // ensure queue has track for engine play
-    REQUIRE(db->queueEnqueue(1,tid,-1).has_value());
+    REQUIRE(db->queueEnqueue(1, tid, -1).has_value());
     // engine with small thresholds: 10% and 1 sec, poll 10ms
-    EngineConfig cfg; cfg.enableMonitorThread=true; cfg.pollMs=10; cfg.historyThresholdPct=10; cfg.historyThresholdSecs=1; cfg.gaplessMs=10000;
-    auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-    auto eng=std::move(eRes.value());
+    EngineConfig cfg;
+    cfg.enableMonitorThread = true;
+    cfg.pollMs = 10;
+    cfg.historyThresholdPct = 10;
+    cfg.historyThresholdSecs = 1;
+    cfg.gaplessMs = 10000;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->play(1).has_value());
     // wait deterministically for history to be marked (threshold 1s or 10% of 10s=1s, so ~1s)
     // poll every 50ms with overall timeout 2000ms, breaking early when condition met
     auto checkMarked = [&]() -> bool {
-        sqlite3* h=nullptr;
-        if(sqlite3_open_v2(dbPath.c_str(),&h,SQLITE_OPEN_READONLY,nullptr)!=SQLITE_OK) return false;
-        sqlite3_stmt* st=nullptr;
-        if(sqlite3_prepare_v2(h,"SELECT play_count,last_played FROM tracks WHERE id=?",-1,&st,nullptr)!=SQLITE_OK){ sqlite3_close(h); return false; }
-        sqlite3_bind_int64(st,1,tid);
-        bool ok=false;
-        if(sqlite3_step(st)==SQLITE_ROW){
-            int64_t pc=sqlite3_column_int64(st,0);
-            int64_t lp=sqlite3_column_int64(st,1);
-            if(pc>=1 && lp>0) ok=true;
+        sqlite3* h = nullptr;
+        if (sqlite3_open_v2(dbPath.c_str(), &h, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK)
+            return false;
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(h, "SELECT play_count,last_played FROM tracks WHERE id=?", -1, &st,
+                               nullptr) != SQLITE_OK) {
+            sqlite3_close(h);
+            return false;
         }
-        sqlite3_finalize(st); sqlite3_close(h);
+        sqlite3_bind_int64(st, 1, tid);
+        bool ok = false;
+        if (sqlite3_step(st) == SQLITE_ROW) {
+            int64_t pc = sqlite3_column_int64(st, 0);
+            int64_t lp = sqlite3_column_int64(st, 1);
+            if (pc >= 1 && lp > 0)
+                ok = true;
+        }
+        sqlite3_finalize(st);
+        sqlite3_close(h);
         return ok;
     };
     busyWaitUntil(checkMarked, std::chrono::milliseconds(2000), std::chrono::milliseconds(50));
     REQUIRE(checkMarked());
-    // also check exactly-once: after marking, play_count should stay 1 not 2 (monitor interval 10ms)
-    // poll stability: wait 300ms then verify still 1
+    // also check exactly-once: after marking, play_count should stay 1 not 2 (monitor interval
+    // 10ms) poll stability: wait 300ms then verify still 1
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    sqlite3* h2=nullptr; REQUIRE(sqlite3_open_v2(dbPath.c_str(),&h2,SQLITE_OPEN_READONLY,nullptr)==SQLITE_OK);
-    sqlite3_stmt* st2=nullptr; REQUIRE(sqlite3_prepare_v2(h2,"SELECT play_count FROM tracks WHERE id=?",-1,&st2,nullptr)==SQLITE_OK);
-    sqlite3_bind_int64(st2,1,tid);
-    REQUIRE(sqlite3_step(st2)==SQLITE_ROW);
-    REQUIRE(sqlite3_column_int64(st2,0)==1);
-    sqlite3_finalize(st2); sqlite3_close(h2);
+    sqlite3* h2 = nullptr;
+    REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h2, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    sqlite3_stmt* st2 = nullptr;
+    REQUIRE(sqlite3_prepare_v2(h2, "SELECT play_count FROM tracks WHERE id=?", -1, &st2, nullptr) ==
+            SQLITE_OK);
+    sqlite3_bind_int64(st2, 1, tid);
+    REQUIRE(sqlite3_step(st2) == SQLITE_ROW);
+    REQUIRE(sqlite3_column_int64(st2, 0) == 1);
+    sqlite3_finalize(st2);
+    sqlite3_close(h2);
     // also history row exists
-    sqlite3* h3=nullptr; REQUIRE(sqlite3_open_v2(dbPath.c_str(),&h3,SQLITE_OPEN_READONLY,nullptr)==SQLITE_OK);
-    sqlite3_stmt* st3=nullptr; REQUIRE(sqlite3_prepare_v2(h3,"SELECT COUNT(*) FROM history WHERE track_id=?",-1,&st3,nullptr)==SQLITE_OK);
-    sqlite3_bind_int64(st3,1,tid);
-    REQUIRE(sqlite3_step(st3)==SQLITE_ROW);
-    REQUIRE(sqlite3_column_int64(st3,0)==1);
-    sqlite3_finalize(st3); sqlite3_close(h3);
+    sqlite3* h3 = nullptr;
+    REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h3, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    sqlite3_stmt* st3 = nullptr;
+    REQUIRE(sqlite3_prepare_v2(h3, "SELECT COUNT(*) FROM history WHERE track_id=?", -1, &st3,
+                               nullptr) == SQLITE_OK);
+    sqlite3_bind_int64(st3, 1, tid);
+    REQUIRE(sqlite3_step(st3) == SQLITE_ROW);
+    REQUIRE(sqlite3_column_int64(st3, 0) == 1);
+    sqlite3_finalize(st3);
+    sqlite3_close(h3);
     eng.reset();
-    { std::error_code ec; std::filesystem::remove(dbPath,ec); std::filesystem::remove(dbPath+"-wal",ec); std::filesystem::remove(dbPath+"-shm",ec); }
+    {
+        std::error_code ec;
+        std::filesystem::remove(dbPath, ec);
+        std::filesystem::remove(dbPath + "-wal", ec);
+        std::filesystem::remove(dbPath + "-shm", ec);
+    }
 }

@@ -1,8 +1,10 @@
+#include <sqlite3.h>
+
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
-#include <vector>
 #include <set>
-#include <sqlite3.h>
+#include <vector>
+
 #include "helpers/helpers_test.hpp"
 
 import caudio.db;
@@ -14,7 +16,12 @@ using namespace caudio::engine;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;
 
-static void safeRemoveDb(const std::string& p){ std::error_code ec; std::filesystem::remove(p,ec); std::filesystem::remove(p+"-wal",ec); std::filesystem::remove(p+"-shm",ec); }
+static void safeRemoveDb(const std::string& p) {
+    std::error_code ec;
+    std::filesystem::remove(p, ec);
+    std::filesystem::remove(p + "-wal", ec);
+    std::filesystem::remove(p + "-shm", ec);
+}
 
 TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     std::string dbPath = tempDbPath("eng_q_shuffle").string();
@@ -22,13 +29,17 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 4; ++i) {
-        Track t; t.path = "p" + std::to_string(i) + ".wav"; t.duration = 1.0;
-        for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(i*10 + b);
+        Track t;
+        t.path = "p" + std::to_string(i) + ".wav";
+        t.duration = 1.0;
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(i * 10 + b);
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg; cfg.enableMonitorThread = false;
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
@@ -40,7 +51,8 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     sqlite3* h = nullptr;
     REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
     sqlite3_stmt* st = nullptr;
-    REQUIRE(sqlite3_prepare_v2(h, "SELECT shuffle_perm FROM engine_state WHERE id=1", -1, &st, nullptr) == SQLITE_OK);
+    REQUIRE(sqlite3_prepare_v2(h, "SELECT shuffle_perm FROM engine_state WHERE id=1", -1, &st,
+                               nullptr) == SQLITE_OK);
     REQUIRE(sqlite3_step(st) == SQLITE_ROW);
     int n = sqlite3_column_bytes(st, 0);
     REQUIRE(n == (int)(4 * sizeof(int64_t)));
@@ -48,9 +60,11 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     REQUIRE(blob != nullptr);
     std::set<int64_t> s;
     const int64_t* arr = (const int64_t*)blob;
-    for (int i=0;i<4;++i) s.insert(arr[i]);
+    for (int i = 0; i < 4; ++i)
+        s.insert(arr[i]);
     REQUIRE(s.size() == 4);
-    for (int i=0;i<4;++i) REQUIRE(s.count(i)==1);
+    for (int i = 0; i < 4; ++i)
+        REQUIRE(s.count(i) == 1);
     sqlite3_finalize(st);
     sqlite3_close(h);
     eng.reset();
@@ -63,14 +77,20 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t; t.path = "p" + std::to_string(i) + ".wav"; t.duration = 1.0;
-        for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x10+i*32+b);
-        auto r=db->insertTrack(t); REQUIRE(r.has_value());
-        REQUIRE(db->queueEnqueue(1,*r,-1).has_value());
+        Track t;
+        t.path = "p" + std::to_string(i) + ".wav";
+        t.duration = 1.0;
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0x10 + i * 32 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg; cfg.enableMonitorThread=false;
-    auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-    auto eng=std::move(eRes.value());
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Off).has_value());
     REQUIRE(eng->play(1).has_value());
@@ -84,12 +104,24 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
 
 TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
     std::string dbPath = tempDbPath("eng_q_queue").string();
-    auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    for(int i=0;i<2;++i){Track t; t.path="q"+std::to_string(i)+".wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x20+i*32+b); auto r=db->insertTrack(t); REQUIRE(r.has_value()); REQUIRE(db->queueEnqueue(1,*r,-1).has_value());}
-    EngineConfig cfg; cfg.enableMonitorThread=false;
-    auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-    auto eng=std::move(eRes.value());
+    for (int i = 0; i < 2; ++i) {
+        Track t;
+        t.path = "q" + std::to_string(i) + ".wav";
+        t.duration = 1.0;
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0x20 + i * 32 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+    }
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
     REQUIRE(eng->play(1).has_value());
@@ -103,18 +135,32 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
 
 TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     std::string dbPath = tempDbPath("eng_q_one").string();
-    auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t; t.path="one.wav"; t.duration=5.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x30+b);
-    auto r=db->insertTrack(t); REQUIRE(r.has_value());
-    REQUIRE(db->queueEnqueue(1,*r,-1).has_value());
-    // add second track to have queue non-empty for non-shuffle One path? But One with !shuffle uses seek path, not queue
-    Track t2; t2.path="two.wav"; t2.duration=5.0; for(int b=0;b<32;++b) t2.fingerprint[b]=(uint8_t)(0x40+b);
-    auto r2=db->insertTrack(t2); REQUIRE(r2.has_value());
-    REQUIRE(db->queueEnqueue(1,*r2,-1).has_value());
-    EngineConfig cfg; cfg.enableMonitorThread=false;
-    auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-    auto eng=std::move(eRes.value());
+    Track t;
+    t.path = "one.wav";
+    t.duration = 5.0;
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0x30 + b);
+    auto r = db->insertTrack(t);
+    REQUIRE(r.has_value());
+    REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+    // add second track to have queue non-empty for non-shuffle One path? But One with !shuffle uses
+    // seek path, not queue
+    Track t2;
+    t2.path = "two.wav";
+    t2.duration = 5.0;
+    for (int b = 0; b < 32; ++b)
+        t2.fingerprint[b] = (uint8_t)(0x40 + b);
+    auto r2 = db->insertTrack(t2);
+    REQUIRE(r2.has_value());
+    REQUIRE(db->queueEnqueue(1, *r2, -1).has_value());
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::One).has_value());
     REQUIRE(eng->play(1).has_value());
@@ -129,12 +175,24 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
 TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
     std::string dbPath = tempDbPath("eng_q_persist").string();
     {
-        auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
+        auto dbRes = Database::open(dbPath);
+        REQUIRE(dbRes.has_value());
         auto db = std::move(dbRes.value());
-        for(int i=0;i<3;++i){Track t; t.path="persist"+std::to_string(i)+".wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x50+i*32+b); auto r=db->insertTrack(t); REQUIRE(r.has_value()); REQUIRE(db->queueEnqueue(1,*r,-1).has_value());}
-        EngineConfig cfg; cfg.enableMonitorThread=false;
-        auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-        auto eng=std::move(eRes.value());
+        for (int i = 0; i < 3; ++i) {
+            Track t;
+            t.path = "persist" + std::to_string(i) + ".wav";
+            t.duration = 1.0;
+            for (int b = 0; b < 32; ++b)
+                t.fingerprint[b] = (uint8_t)(0x50 + i * 32 + b);
+            auto r = db->insertTrack(t);
+            REQUIRE(r.has_value());
+            REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+        }
+        EngineConfig cfg;
+        cfg.enableMonitorThread = false;
+        auto eRes = Engine::create(cfg);
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
         REQUIRE(eng->attachDb(std::move(db)).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
         REQUIRE(eng->play(1).has_value());
@@ -142,25 +200,31 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
         eng->shutdown();
     }
     // reopen and verify persisted
-    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread=false});
+    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());
     // after reopen shuffle should still be on (state shuffleEnabled=1)
     // verify via raw sqlite: shuffle_enabled=1 and cursor_pos persisted
-    sqlite3* h=nullptr; REQUIRE(sqlite3_open_v2(dbPath.c_str(),&h,SQLITE_OPEN_READONLY,nullptr)==SQLITE_OK);
-    sqlite3_stmt* st=nullptr; REQUIRE(sqlite3_prepare_v2(h,"SELECT shuffle_enabled,cursor_pos FROM engine_state WHERE id=1",-1,&st,nullptr)==SQLITE_OK);
-    REQUIRE(sqlite3_step(st)==SQLITE_ROW);
-    REQUIRE(sqlite3_column_int(st,0)==1);
-    REQUIRE(sqlite3_column_int64(st,1)>=1);
-    sqlite3_finalize(st); sqlite3_close(h);
+    sqlite3* h = nullptr;
+    REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+    sqlite3_stmt* st = nullptr;
+    REQUIRE(sqlite3_prepare_v2(h, "SELECT shuffle_enabled,cursor_pos FROM engine_state WHERE id=1",
+                               -1, &st, nullptr) == SQLITE_OK);
+    REQUIRE(sqlite3_step(st) == SQLITE_ROW);
+    REQUIRE(sqlite3_column_int(st, 0) == 1);
+    REQUIRE(sqlite3_column_int64(st, 1) >= 1);
+    sqlite3_finalize(st);
+    sqlite3_close(h);
     eng2.reset();
     safeRemoveDb(dbPath);
 }
 
 TEST_CASE("engine queue invalid repeat returns InvalidArg", "[engine_queue]") {
-    EngineConfig cfg; cfg.enableMonitorThread=false;
-    auto eRes=Engine::create(cfg); REQUIRE(eRes.has_value());
-    auto eng=std::move(eRes.value());
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
     // without db should fail State
     REQUIRE(!eng->setRepeat((RepeatMode)99).has_value());
 }

@@ -35,7 +35,7 @@ class Reader {
 
 // 64-bit helpers like ca_reader.c:28
 namespace detail {
-inline int64_t ftell64(FILE *f) noexcept {
+inline int64_t ftell64(FILE* f) noexcept {
 #if defined(_WIN32)
     return _ftelli64(f);
 #else
@@ -45,14 +45,14 @@ inline int64_t ftell64(FILE *f) noexcept {
     return static_cast<int64_t>(o);
 #endif
 }
-inline int fseek64(FILE *f, int64_t off, int whence) noexcept {
+inline int fseek64(FILE* f, int64_t off, int whence) noexcept {
 #if defined(_WIN32)
     return _fseeki64(f, off, whence);
 #else
     return fseeko(f, static_cast<off_t>(off), whence);
 #endif
 }
-inline int64_t fileSizeInner(FILE *f) noexcept {
+inline int64_t fileSizeInner(FILE* f) noexcept {
     int64_t cur = ftell64(f);
     if (cur < 0)
         return -1;
@@ -72,12 +72,12 @@ class FileReader final : public Reader {
     FileReader() = delete;
 
     static caudio::utils::Expected<std::unique_ptr<Reader>>
-    open(const std::filesystem::path &path) {
+    open(const std::filesystem::path& path) {
         if (path.empty()) {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::InvalidArg, "empty path"});
         }
-        FILE *f = nullptr;
+        FILE* f = nullptr;
 #if defined(_WIN32)
         f = _wfopen(path.wstring().c_str(), L"rb");
         if (!f) {
@@ -93,7 +93,7 @@ class FileReader final : public Reader {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::NotFound, "cannot open file"});
         }
-        auto *raw = new FileReader(f);
+        auto* raw = new FileReader(f);
         return caudio::utils::Expected<std::unique_ptr<Reader>>{std::unique_ptr<Reader>(raw)};
     }
 
@@ -164,8 +164,8 @@ class FileReader final : public Reader {
     }
 
   private:
-    explicit FileReader(FILE *f) : file_(f) {}
-    FILE *file_{nullptr};
+    explicit FileReader(FILE* f) : file_(f) {}
+    FILE* file_{nullptr};
 };
 
 class MemoryReader final : public Reader {
@@ -174,16 +174,16 @@ class MemoryReader final : public Reader {
 
     static caudio::utils::Expected<std::unique_ptr<Reader>> open(std::span<const std::byte> data) {
         // copy data to owned buffer
-        auto *raw = new MemoryReader(data);
+        auto* raw = new MemoryReader(data);
         return caudio::utils::Expected<std::unique_ptr<Reader>>{std::unique_ptr<Reader>(raw)};
     }
 
     static caudio::utils::Expected<std::unique_ptr<Reader>>
-    open(const std::vector<std::byte> &data) {
+    open(const std::vector<std::byte>& data) {
         return open(std::span<const std::byte>(data.data(), data.size()));
     }
 
-    static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::byte *data,
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::byte* data,
                                                                  std::size_t len) {
         if (len > 0 && data == nullptr) {
             return std::unexpected(

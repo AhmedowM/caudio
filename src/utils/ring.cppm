@@ -12,7 +12,8 @@ export module caudio.utils:ring;
 
 export namespace caudio::utils {
 
-template <typename T> class SpscRing {
+template <typename T>
+class SpscRing {
   public:
     SpscRing() = delete;
     SpscRing(std::size_t capacityFrames, std::uint32_t channels = 1)
@@ -21,8 +22,8 @@ template <typename T> class SpscRing {
         // If cap==0, buffer empty and all ops no-op.
     }
 
-    SpscRing(const SpscRing &) = delete;
-    SpscRing &operator=(const SpscRing &) = delete;
+    SpscRing(const SpscRing&) = delete;
+    SpscRing& operator=(const SpscRing&) = delete;
 
     [[nodiscard]] std::size_t capacity() const noexcept {
         return cap_;
@@ -40,7 +41,7 @@ template <typename T> class SpscRing {
         return write(data.data(), frames);
     }
 
-    std::size_t write(const T *data, std::size_t frames) noexcept {
+    std::size_t write(const T* data, std::size_t frames) noexcept {
         if (!data || frames == 0 || cap_ == 0)
             return 0;
         std::size_t wr = wr_.load(std::memory_order_acquire);
@@ -76,7 +77,7 @@ template <typename T> class SpscRing {
         return read(out.data(), frames);
     }
 
-    std::size_t read(T *out, std::size_t frames) noexcept {
+    std::size_t read(T* out, std::size_t frames) noexcept {
         if (!out || frames == 0 || cap_ == 0)
             return 0;
         std::size_t wr = wr_.load(std::memory_order_acquire);

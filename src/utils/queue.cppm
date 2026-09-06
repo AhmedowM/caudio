@@ -15,7 +15,8 @@ import :error;
 
 export namespace caudio::utils {
 
-template <typename T> class MpscQueue {
+template <typename T>
+class MpscQueue {
   public:
     explicit MpscQueue(std::size_t capacity = 64) : cap_(capacity), buf_(capacity) {
         if (cap_ == 0)
@@ -24,10 +25,10 @@ template <typename T> class MpscQueue {
             buf_.resize(cap_);
     }
 
-    MpscQueue(const MpscQueue &) = delete;
-    MpscQueue &operator=(const MpscQueue &) = delete;
-    MpscQueue(MpscQueue &&) = delete;
-    MpscQueue &operator=(MpscQueue &&) = delete;
+    MpscQueue(const MpscQueue&) = delete;
+    MpscQueue& operator=(const MpscQueue&) = delete;
+    MpscQueue(MpscQueue&&) = delete;
+    MpscQueue& operator=(MpscQueue&&) = delete;
 
     [[nodiscard]] std::size_t capacity() const noexcept {
         return cap_;
@@ -41,7 +42,7 @@ template <typename T> class MpscQueue {
         return wr_.load(std::memory_order_acquire) == rd_.load(std::memory_order_acquire);
     }
 
-    [[nodiscard]] Expected<void> push(const T &value) {
+    [[nodiscard]] Expected<void> push(const T& value) {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t wr = wr_.load(std::memory_order_acquire);
         std::size_t rd = rd_.load(std::memory_order_acquire);
@@ -56,7 +57,7 @@ template <typename T> class MpscQueue {
         return {};
     }
 
-    [[nodiscard]] Expected<void> push(T &&value) {
+    [[nodiscard]] Expected<void> push(T&& value) {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t wr = wr_.load(std::memory_order_acquire);
         std::size_t rd = rd_.load(std::memory_order_acquire);
@@ -71,7 +72,8 @@ template <typename T> class MpscQueue {
         return {};
     }
 
-    template <typename... Args> [[nodiscard]] Expected<void> emplace(Args &&...args) {
+    template <typename... Args>
+    [[nodiscard]] Expected<void> emplace(Args&&... args) {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t wr = wr_.load(std::memory_order_acquire);
         std::size_t rd = rd_.load(std::memory_order_acquire);

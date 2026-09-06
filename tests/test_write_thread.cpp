@@ -1,7 +1,8 @@
+#include <sqlite3.h>
+
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <expected>
-#include <sqlite3.h>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -10,7 +11,7 @@ import caudio.utils;
 using namespace caudio::utils;
 
 TEST_CASE("WriterThread open/close", "[db][writer_thread]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
 
@@ -28,7 +29,7 @@ TEST_CASE("WriterThread open/close", "[db][writer_thread]") {
 }
 
 TEST_CASE("Queue write and flush", "[db][writer_thread]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
 
@@ -51,7 +52,7 @@ TEST_CASE("Queue write and flush", "[db][writer_thread]") {
 }
 
 TEST_CASE("Callback outside lock", "[db][writer_thread]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
 

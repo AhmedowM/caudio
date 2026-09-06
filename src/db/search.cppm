@@ -1,4 +1,6 @@
 module;
+#include <sqlite3.h>
+
 #include <array>
 #include <cctype>
 #include <cstdint>
@@ -6,7 +8,6 @@ module;
 #include <expected>
 #include <mutex>
 #include <shared_mutex>
-#include <sqlite3.h>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -39,7 +40,7 @@ export std::string sanitizeFtsTerm(std::string_view term) {
     bool first = true;
     while (iss >> tok) {
         std::string up = tok;
-        for (char &ch : up)
+        for (char& ch : up)
             ch = std::toupper((unsigned char)ch);
         if (up == "OR" || up == "AND" || up == "NOT" || up == "NEAR")
             continue;
@@ -69,19 +70,19 @@ inline std::string escapeLike(std::string_view s) {
     return o;
 }
 
-inline void fillTrackSearch(sqlite3_stmt *s, Track &out) {
+inline void fillTrackSearch(sqlite3_stmt* s, Track& out) {
     fillTrackFromStmt(s, out);
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>
-searchFts(Database &db, std::string_view query, int limit = 50) {
+searchFts(Database& db, std::string_view query, int limit = 50) {
     if (query.empty())
         return std::vector<Track>{};
     std::string sanitized = sanitizeFtsTerm(query);
     if (sanitized.empty())
         return std::vector<Track>{};
     std::string ftsQ = sanitized;
-    const char *sql =
+    const char* sql =
         "SELECT t.id, t.fingerprint, t.path, t.deleted_at, t.size, t.mtime, t.duration, "
         "t.sample_rate, t.channels, t.bitrate, t.title, t.artist, t.album, t.album_artist, "
         "t.genre, t.year, t.track_num, t.disc_num, t.cover_art_path, t.rating, t.play_count, "
@@ -91,7 +92,7 @@ searchFts(Database &db, std::string_view query, int limit = 50) {
     // try FTS
     {
         std::shared_lock lock(db.mutex());
-        sqlite3 *h = db.handle();
+        sqlite3* h = db.handle();
         if (!h)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
@@ -127,12 +128,12 @@ searchFts(Database &db, std::string_view query, int limit = 50) {
     }
     // LIKE fallback on 5 cols with COLLATE NOCASE
     std::shared_lock lock(db.mutex());
-    sqlite3 *h = db.handle();
+    sqlite3* h = db.handle();
     if (!h)
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::string esc = escapeLike(sanitized);
     std::string pat = "%" + esc + "%";
-    const char *likeSql =
+    const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
         "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
@@ -159,16 +160,16 @@ searchFts(Database &db, std::string_view query, int limit = 50) {
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>
-searchLike(Database &db, std::string_view term, int limit = 50) {
+searchLike(Database& db, std::string_view term, int limit = 50) {
     if (term.empty())
         return std::vector<Track>{};
     std::string esc = escapeLike(term);
     std::string pat = "%" + esc + "%";
     std::shared_lock lock(db.mutex());
-    sqlite3 *h = db.handle();
+    sqlite3* h = db.handle();
     if (!h)
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-    const char *likeSql =
+    const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
         "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
@@ -196,7 +197,7 @@ searchLike(Database &db, std::string_view term, int limit = 50) {
 
 // Unified search entry
 export std::expected<std::vector<Track>, caudio::utils::Error>
-search(Database &db, std::string_view query, int limit = 50) {
+search(Database& db, std::string_view query, int limit = 50) {
     return searchFts(db, query, limit);
 }
 

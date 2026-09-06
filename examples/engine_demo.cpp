@@ -26,22 +26,22 @@ std::string findSample() {
             return s;
         }
     };
-    if (auto *env = std::getenv("CAUDIO_SAMPLE")) {
+    if (auto* env = std::getenv("CAUDIO_SAMPLE")) {
         if (std::filesystem::exists(env))
             return toAbs(env);
     }
-    if (auto *env = std::getenv("CAUDIO_FIXTURE")) {
+    if (auto* env = std::getenv("CAUDIO_FIXTURE")) {
         if (std::filesystem::exists(env))
             return toAbs(env);
     }
-    for (auto *c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
+    for (auto* c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
                     "../tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio/tests/fixtures/sample.wav"}) {
         if (std::filesystem::exists(c))
             return toAbs(c);
     }
-    if (auto *env = std::getenv("CAUDIO_SAMPLE"))
+    if (auto* env = std::getenv("CAUDIO_SAMPLE"))
         return toAbs(env);
     if (std::filesystem::exists("C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav"))
         return "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav";
@@ -49,7 +49,7 @@ std::string findSample() {
 }
 
 std::expected<std::unique_ptr<Database>, caudio::utils::Error>
-openDbWithFallback(const std::string &path, std::string &used) {
+openDbWithFallback(const std::string& path, std::string& used) {
     auto r = Database::open(path);
     if (r) {
         used = path;
@@ -65,7 +65,7 @@ openDbWithFallback(const std::string &path, std::string &used) {
     return m;
 }
 
-void ensureQueueHasTracks(Database &db, const std::string &samplePath) {
+void ensureQueueHasTracks(Database& db, const std::string& samplePath) {
     auto q = db.queueList(1);
     if (q && !q->empty())
         return;
@@ -117,7 +117,7 @@ void ensureQueueHasTracks(Database &db, const std::string &samplePath) {
 
 } // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     std::string dbPath = "build/engine_demo.db";
     if (argc > 1 && argv[1] && argv[1][0] != '\0')
         dbPath = argv[1];

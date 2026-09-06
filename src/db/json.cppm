@@ -1,4 +1,6 @@
 module;
+#include <sqlite3.h>
+
 #include <array>
 #include <cstdint>
 #include <expected>
@@ -7,7 +9,6 @@ module;
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <shared_mutex>
-#include <sqlite3.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -22,8 +23,8 @@ namespace caudio::db {
 
 using ordered_json = nlohmann::ordered_json;
 
-inline std::string fingerprintToHex(const std::array<uint8_t, 32> &fp) {
-    static const char *hex = "0123456789abcdef";
+inline std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {
+    static const char* hex = "0123456789abcdef";
     std::string s;
     s.reserve(64);
     for (uint8_t b : fp) {
@@ -32,7 +33,7 @@ inline std::string fingerprintToHex(const std::array<uint8_t, 32> &fp) {
     }
     return s;
 }
-inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32> &out) {
+inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out) {
     if (hex.size() != 64)
         return false;
     auto hv = [](char c) -> int {
@@ -54,7 +55,7 @@ inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32> &out)
     return true;
 }
 inline void genFingerprintFallback(std::string_view path, int64_t id, int64_t size, int64_t mtime,
-                                   std::array<uint8_t, 32> &out) {
+                                   std::array<uint8_t, 32>& out) {
     uint64_t h = 1469598103934665603ULL;
     for (char c : path) {
         h ^= (uint8_t)c;
@@ -74,7 +75,7 @@ inline void genFingerprintFallback(std::string_view path, int64_t id, int64_t si
     }
 }
 
-export ordered_json trackToJson(const Track &t) {
+export ordered_json trackToJson(const Track& t) {
     ordered_json j;
     j["id"] = t.id;
     j["size"] = t.size;
@@ -105,10 +106,10 @@ export ordered_json trackToJson(const Track &t) {
     return j;
 }
 
-export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json &j) {
+export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j) {
     try {
         Track t;
-        auto getI64 = [&](const char *k, int64_t &out, int64_t def = 0) {
+        auto getI64 = [&](const char* k, int64_t& out, int64_t def = 0) {
             if (j.contains(k) && !j[k].is_null()) {
                 if (j[k].is_number())
                     out = j[k].get<int64_t>();
@@ -117,18 +118,18 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
             } else
                 out = def;
         };
-        auto getInt = [&](const char *k, int &out, int def = 0) {
+        auto getInt = [&](const char* k, int& out, int def = 0) {
             int64_t v = def;
             getI64(k, v, def);
             out = (int)v;
         };
-        auto getDbl = [&](const char *k, double &out, double def = 0) {
+        auto getDbl = [&](const char* k, double& out, double def = 0) {
             if (j.contains(k) && !j[k].is_null() && j[k].is_number())
                 out = j[k].get<double>();
             else
                 out = def;
         };
-        auto getStr = [&](const char *k, std::string &out) {
+        auto getStr = [&](const char* k, std::string& out) {
             if (j.contains(k) && !j[k].is_null() && j[k].is_string())
                 out = j[k].get<std::string>();
             else
@@ -183,19 +184,19 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
             genFingerprintFallback(t.path, t.id, t.size, t.mtime, t.fingerprint);
         }
         return t;
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
     }
 }
 
-export std::expected<void, caudio::utils::Error> exportJson(Database &db,
-                                                            const std::filesystem::path &outPath) {
+export std::expected<void, caudio::utils::Error> exportJson(Database& db,
+                                                            const std::filesystem::path& outPath) {
     auto tracks = db.listTracks(nullptr);
     if (!tracks)
         return std::unexpected{tracks.error()};
     ordered_json root;
     root["tracks"] = ordered_json::array();
-    for (auto &t : *tracks) {
+    for (auto& t : *tracks) {
         root["tracks"].push_back(trackToJson(t));
     }
     std::ofstream f(outPath, std::ios::binary);
@@ -208,8 +209,8 @@ export std::expected<void, caudio::utils::Error> exportJson(Database &db,
     return {};
 }
 
-export std::expected<void, caudio::utils::Error> importJson(Database &db,
-                                                            const std::filesystem::path &inPath) {
+export std::expected<void, caudio::utils::Error> importJson(Database& db,
+                                                            const std::filesystem::path& inPath) {
     std::ifstream f(inPath, std::ios::binary);
     if (!f)
         return std::unexpected{
@@ -221,7 +222,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
     ordered_json root;
     try {
         root = ordered_json::parse(content);
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
     }
     if (!root.contains("tracks") || !root["tracks"].is_array()) {
@@ -231,11 +232,11 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
     // transaction for bulk
     {
         std::unique_lock lock(db.mutex());
-        sqlite3 *h = db.handle();
+        sqlite3* h = db.handle();
         if (!h)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        char *err = nullptr;
+        char* err = nullptr;
         int rc = sqlite3_exec(h, "BEGIN", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             if (err)
@@ -244,7 +245,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
                 caudio::utils::makeError(caudio::utils::Result::Internal, "begin failed")};
         }
         bool corrupt = false;
-        for (auto &j : root["tracks"]) {
+        for (auto& j : root["tracks"]) {
             auto tr = trackFromJson(j);
             if (!tr) {
                 corrupt = true;
@@ -260,13 +261,13 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
             // transaction? Simpler: close transaction and use db methods with re-lock. We'll
             // implement as: unlock, insert, lock again. For now just do direct sql without using db
             // methods to stay inside transaction.
-            const char *sql =
+            const char* sql =
                 "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, "
                 "channels, bitrate, title, artist, album, album_artist, genre, year, track_num, "
                 "disc_num, cover_art_path, rating, play_count, last_played, date_added, "
                 "last_scanned, dirty, library_id, deleted_at) VALUES "
                 "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-            sqlite3_stmt *stmt = nullptr;
+            sqlite3_stmt* stmt = nullptr;
             rc = sqlite3_prepare_v2(h, sql, -1, &stmt, nullptr);
             if (rc != SQLITE_OK) {
                 corrupt = true;
@@ -309,20 +310,20 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
             sqlite3_finalize(stmt);
             if (rc == SQLITE_CONSTRAINT) {
                 // try update by fingerprint
-                const char *sel = "SELECT id FROM tracks WHERE fingerprint=?";
-                sqlite3_stmt *ss = nullptr;
+                const char* sel = "SELECT id FROM tracks WHERE fingerprint=?";
+                sqlite3_stmt* ss = nullptr;
                 if (sqlite3_prepare_v2(h, sel, -1, &ss, nullptr) == SQLITE_OK) {
                     sqlite3_bind_blob(ss, 1, t.fingerprint.data(), 32, SQLITE_TRANSIENT);
                     if (sqlite3_step(ss) == SQLITE_ROW) {
                         int64_t existing = sqlite3_column_int64(ss, 0);
                         sqlite3_finalize(ss);
-                        const char *upd =
+                        const char* upd =
                             "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, sample_rate=?, "
                             "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, "
                             "genre=?, year=?, track_num=?, disc_num=?, cover_art_path=?, rating=?, "
                             "play_count=?, last_played=?, date_added=?, last_scanned=?, dirty=?, "
                             "library_id=?, deleted_at=? WHERE id=?";
-                        sqlite3_stmt *us = nullptr;
+                        sqlite3_stmt* us = nullptr;
                         if (sqlite3_prepare_v2(h, upd, -1, &us, nullptr) == SQLITE_OK) {
                             sqlite3_bind_text(us, 1, t.path.c_str(), -1, SQLITE_TRANSIENT);
                             sqlite3_bind_int64(us, 2, t.size);
@@ -359,8 +360,8 @@ export std::expected<void, caudio::utils::Error> importJson(Database &db,
                     } else {
                         sqlite3_finalize(ss);
                         // try by path
-                        const char *sel2 = "SELECT id, fingerprint FROM tracks WHERE path=?";
-                        sqlite3_stmt *sp = nullptr;
+                        const char* sel2 = "SELECT id, fingerprint FROM tracks WHERE path=?";
+                        sqlite3_stmt* sp = nullptr;
                         if (sqlite3_prepare_v2(h, sel2, -1, &sp, nullptr) == SQLITE_OK) {
                             sqlite3_bind_text(sp, 1, t.path.c_str(), -1, SQLITE_TRANSIENT);
                             if (sqlite3_step(sp) == SQLITE_ROW) {

@@ -17,7 +17,7 @@ namespace caudio::examples {
 
 class MiniPlayer {
   public:
-    Expected<void> run(const std::string &path) {
+    Expected<void> run(const std::string& path) {
         // Open file
         auto readerResult = FileReader::open(path);
         if (!readerResult)
@@ -129,7 +129,7 @@ class MiniPlayer {
 
 } // namespace caudio::examples
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     using namespace caudio::examples;
 
     bool verifyOnly = false;

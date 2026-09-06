@@ -1,13 +1,14 @@
+#include <sqlite3.h>
+
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
-#include <sqlite3.h>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>
 
 TEST_CASE("SQLite open in-memory", "[db_sqlite]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
     if (db)
@@ -15,17 +16,17 @@ TEST_CASE("SQLite open in-memory", "[db_sqlite]") {
 }
 
 TEST_CASE("SQLite create table and insert", "[db_sqlite]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
     if (db) {
-        const char *sql = "CREATE TABLE tracks (id INTEGER PRIMARY KEY, name TEXT, path TEXT, "
+        const char* sql = "CREATE TABLE tracks (id INTEGER PRIMARY KEY, name TEXT, path TEXT, "
                           "fingerprint BLOB, library_id INTEGER)";
         rc = sqlite3_exec(db, sql, nullptr, nullptr, nullptr);
         REQUIRE(rc == SQLITE_OK);
 
         sql = "INSERT INTO tracks (name, path, fingerprint, library_id) VALUES (?, ?, ?, ?)";
-        sqlite3_stmt *stmt{nullptr};
+        sqlite3_stmt* stmt{nullptr};
         rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
         REQUIRE(rc == SQLITE_OK);
 
@@ -42,15 +43,15 @@ TEST_CASE("SQLite create table and insert", "[db_sqlite]") {
 }
 
 TEST_CASE("SQLite list rows", "[db_sqlite]") {
-    sqlite3 *db{nullptr};
+    sqlite3* db{nullptr};
     int rc = sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr);
     REQUIRE(rc == SQLITE_OK);
     if (db) {
         sqlite3_exec(db, "CREATE TABLE tracks (id INTEGER PRIMARY KEY, name TEXT)", nullptr,
                      nullptr, nullptr);
 
-        sqlite3_stmt *stmt{nullptr};
-        const char *sql = "INSERT INTO tracks (name) VALUES ('Track 1')";
+        sqlite3_stmt* stmt{nullptr};
+        const char* sql = "INSERT INTO tracks (name) VALUES ('Track 1')";
         rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
         REQUIRE(rc == SQLITE_OK);
         rc = sqlite3_step(stmt);
@@ -62,7 +63,7 @@ TEST_CASE("SQLite list rows", "[db_sqlite]") {
         REQUIRE(rc == SQLITE_OK);
         rc = sqlite3_step(stmt);
         REQUIRE(rc == SQLITE_ROW);
-        const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+        const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
         REQUIRE(name != nullptr);
         REQUIRE(std::string(name) == "Track 1");
         sqlite3_finalize(stmt);

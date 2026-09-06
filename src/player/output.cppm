@@ -1,5 +1,4 @@
 module;
-#include "miniaudio.h"
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -10,6 +9,8 @@ module;
 #include <span>
 #include <string>
 #include <thread>
+
+#include "miniaudio.h"
 
 export module caudio.player:output;
 
@@ -24,7 +25,7 @@ class AudioOutput {
     struct Config {
         uint32_t sampleRate = 48000;
         uint32_t channels = 2;
-        caudio::utils::SpscRing<float> *ring = nullptr;
+        caudio::utils::SpscRing<float>* ring = nullptr;
         float volume = 1.0f;
     };
 
@@ -34,8 +35,8 @@ class AudioOutput {
         shutdown();
     }
 
-    static Expected create(const Config &cfg) {
-        auto *out = new AudioOutput();
+    static Expected create(const Config& cfg) {
+        auto* out = new AudioOutput();
         if (!out->init(cfg)) {
             delete out;
             return std::unexpected(caudio::utils::Error{caudio::utils::Result::Device,
@@ -53,7 +54,7 @@ class AudioOutput {
     }
 
     void testFill(std::span<float> buf) const noexcept {
-        for (auto &s : buf)
+        for (auto& s : buf)
             s = 0.0f;
     }
 
@@ -84,7 +85,7 @@ class AudioOutput {
         }
     }
 
-    bool init(const Config &cfg) {
+    bool init(const Config& cfg) {
         if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
             return false;
         cfg_ = cfg;
@@ -114,14 +115,14 @@ class AudioOutput {
         return true;
     }
 
-    static void dataCallback(ma_device *pDevice, void *pOutput, const void *pInput,
+    static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
                              ma_uint32 frameCount) {
         (void)pInput;
-        auto *self = static_cast<AudioOutput *>(pDevice->pUserData);
+        auto* self = static_cast<AudioOutput*>(pDevice->pUserData);
         if (!self)
             return;
 
-        float *output = static_cast<float *>(pOutput);
+        float* output = static_cast<float*>(pOutput);
         ma_uint32 channels = pDevice->playback.channels;
         ma_uint32 totalSamples = frameCount * channels;
 

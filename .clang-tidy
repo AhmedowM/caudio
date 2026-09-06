@@ -1,14 +1,29 @@
-Checks: '-*,clang-analyzer-*,modernize-*,bugprone-*,concurrency-*,cppcoreguidelines-*,readability-*,performance-*,portability-*'
+Checks: '-*,clang-analyzer-*,modernize-*,bugprone-*,concurrency-*,cppcoreguidelines-*,performance-*,readability-*'
 WarningsAsErrors: ''
-HeaderFilterRegex: '.*'
+HeaderFilterRegex: 'src/.*'
 CheckOptions:
   - key: modernize-use-auto
     value: 0
+  - key: modernize-use-trailing-return-type
+    value: 0
   - key: cppcoreguidelines-avoid-magic-numbers
+    value: 0
+  - key: cppcoreguidelines-avoid-do-while
+    value: 0
+  - key: cppcoreguidelines-pro-bounds-pointer-arithmetic
+    value: 0
+  - key: cppcoreguidelines-pro-bounds-array-to-pointer-decay
     value: 0
   - key: readability-braces-around-statements
     value: 0
-  - key: readability-indentation
-    value: 4
-  - key: readability-brace-placement
-    value: 4
+  - key: readability-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;4;8;16;32;64;100;1000;1024;4096;8192;65536'
+  - key: bugprone-easily-swappable-parameters.MinimumLength
+    value: 3
+  - key: concurrency-mt-unsafe.FunctionSet
+    value: 'any'
+# Suppress nlohmann/json TU-local template false positives via HeaderFilterRegex (only src/.*)
+# Known accepted warnings (do not fix upstream):
+# - nlohmann_json TU-local template (-Wtemplate-names-tu-local) — vendored header, suppressed via HeaderFilterRegex
+# - ffmpeg.cppm global-module warning (-Wglobal-module) — import in global module fragment is required
+# - database.cppm [[nodiscard]] stepDone 8 sites — intentional fire-and-forget in writer path

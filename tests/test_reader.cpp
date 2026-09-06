@@ -13,12 +13,12 @@ using namespace caudio::player;
 using namespace caudio::utils;
 
 // Helper to create a temp file with RIFF header
-static std::filesystem::path makeTempFile(const std::string &name, std::vector<std::byte> data) {
+static std::filesystem::path makeTempFile(const std::string& name, std::vector<std::byte> data) {
     auto dir = std::filesystem::temp_directory_path() / "caudio_reader_tests";
     std::filesystem::create_directories(dir);
     auto p = dir / name;
     std::ofstream out(p, std::ios::binary);
-    out.write(reinterpret_cast<const char *>(data.data()),
+    out.write(reinterpret_cast<const char*>(data.data()),
               static_cast<std::streamsize>(data.size()));
     out.close();
     return p;
@@ -43,7 +43,7 @@ TEST_CASE("reader 64-bit seek clamp", "[reader]") {
     {
         auto r = FileReader::open(path);
         REQUIRE(r.has_value());
-        auto &reader = **r;
+        auto& reader = **r;
         // negative seek from start should fail InvalidArg
         auto bad = reader.seek(-1, SEEK_SET);
         REQUIRE(!bad.has_value());
@@ -74,7 +74,7 @@ TEST_CASE("FileReader size save restore", "[reader]") {
     {
         auto r = FileReader::open(path);
         REQUIRE(r.has_value());
-        auto &reader = **r;
+        auto& reader = **r;
         REQUIRE(reader.seek(20, SEEK_SET).has_value());
         int64_t sz = reader.size();
         REQUIRE(sz == 128);
@@ -93,7 +93,7 @@ TEST_CASE("MemoryReader seek clamp and read", "[reader]") {
     std::vector<std::byte> src(32, std::byte{0x11});
     auto r = MemoryReader::open(src);
     REQUIRE(r.has_value());
-    auto &reader = **r;
+    auto& reader = **r;
     REQUIRE(reader.size() == 32);
     REQUIRE(reader.tell() == 0);
     // seek negative
@@ -128,7 +128,7 @@ TEST_CASE("MemoryReader read write boundary", "[reader]") {
                                       std::byte{'F'}};
     auto r = MemoryReader::open(std::span<const std::byte>(srcBytes.data(), srcBytes.size()));
     REQUIRE(r.has_value());
-    auto &reader = **r;
+    auto& reader = **r;
     std::array<std::byte, 2> out{};
     REQUIRE(reader.read(out) == 2);
     REQUIRE(out[0] == std::byte{'R'});
@@ -143,7 +143,7 @@ TEST_CASE("FileReader tell and read", "[reader]") {
     {
         auto r = FileReader::open(path);
         REQUIRE(r.has_value());
-        auto &reader = **r;
+        auto& reader = **r;
         REQUIRE(reader.tell() == 0);
         std::array<std::byte, 4> buf{};
         REQUIRE(reader.read(buf) == 4);

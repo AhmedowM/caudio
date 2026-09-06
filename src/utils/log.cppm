@@ -66,7 +66,7 @@ class Logger {
     }
 
     template <typename... Args>
-    void log(Level lvl, std::format_string<Args...> fmt, Args &&...args) {
+    void log(Level lvl, std::format_string<Args...> fmt, Args&&... args) {
         Callback cbCopy;
         {
             std::lock_guard<std::mutex> lk(mutex_);
@@ -82,16 +82,20 @@ class Logger {
         cbCopy(lvl, s);
     }
 
-    template <typename... Args> void debug(std::format_string<Args...> fmt, Args &&...args) {
+    template <typename... Args>
+    void debug(std::format_string<Args...> fmt, Args&&... args) {
         log(Level::Debug, fmt, std::forward<Args>(args)...);
     }
-    template <typename... Args> void info(std::format_string<Args...> fmt, Args &&...args) {
+    template <typename... Args>
+    void info(std::format_string<Args...> fmt, Args&&... args) {
         log(Level::Info, fmt, std::forward<Args>(args)...);
     }
-    template <typename... Args> void warn(std::format_string<Args...> fmt, Args &&...args) {
+    template <typename... Args>
+    void warn(std::format_string<Args...> fmt, Args&&... args) {
         log(Level::Warn, fmt, std::forward<Args>(args)...);
     }
-    template <typename... Args> void error(std::format_string<Args...> fmt, Args &&...args) {
+    template <typename... Args>
+    void error(std::format_string<Args...> fmt, Args&&... args) {
         log(Level::Error, fmt, std::forward<Args>(args)...);
     }
 

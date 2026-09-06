@@ -35,7 +35,7 @@ class FfmpegDecoder final : public IDecoder {
         return data.size() >= 4;
     }
 
-    static caudio::utils::Expected<std::unique_ptr<IDecoder>> create(Reader &reader) {
+    static caudio::utils::Expected<std::unique_ptr<IDecoder>> create(Reader& reader) {
         auto p = std::unique_ptr<FfmpegDecoder>(new FfmpegDecoder());
         p->reader_ = &reader;
 
@@ -69,7 +69,7 @@ class FfmpegDecoder final : public IDecoder {
         std::size_t totalDecoded = 0;
         bool eofReached = false;
         while (totalDecoded < frames && !eofReached) {
-            AVPacket *pkt = av_packet_alloc();
+            AVPacket* pkt = av_packet_alloc();
             if (!pkt)
                 break;
 
@@ -82,7 +82,7 @@ class FfmpegDecoder final : public IDecoder {
                     (void)avcodec_send_packet(dec_, nullptr);
                     // drain all remaining frames
                     while (totalDecoded < frames) {
-                        AVFrame *frame = av_frame_alloc();
+                        AVFrame* frame = av_frame_alloc();
                         if (!frame)
                             break;
                         ret = avcodec_receive_frame(dec_, frame);
@@ -94,12 +94,12 @@ class FfmpegDecoder final : public IDecoder {
                             av_frame_free(&frame);
                             break;
                         }
-                        uint8_t *outPtrs[1] = {
-                            reinterpret_cast<uint8_t *>(out.data() + totalDecoded * channels_)};
+                        uint8_t* outPtrs[1] = {
+                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
                         int outSamples = static_cast<int>(frames - totalDecoded);
                         int converted = swr_convert(
                             swr_, outPtrs, outSamples,
-                            const_cast<const uint8_t **>(frame->extended_data), frame->nb_samples);
+                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
                         if (converted > 0)
                             totalDecoded += static_cast<std::size_t>(converted);
                         av_frame_free(&frame);
@@ -108,8 +108,8 @@ class FfmpegDecoder final : public IDecoder {
                     }
                     // also flush resampler delay
                     if (totalDecoded < frames) {
-                        uint8_t *outPtrs[1] = {
-                            reinterpret_cast<uint8_t *>(out.data() + totalDecoded * channels_)};
+                        uint8_t* outPtrs[1] = {
+                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
                         int outSamples = static_cast<int>(frames - totalDecoded);
                         int flushed = swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
                         if (flushed > 0)
@@ -129,15 +129,15 @@ class FfmpegDecoder final : public IDecoder {
             av_packet_free(&pkt);
             if (ret == AVERROR(EAGAIN)) {
                 // need to receive before sending again
-                AVFrame *frame = av_frame_alloc();
+                AVFrame* frame = av_frame_alloc();
                 if (frame) {
                     if (avcodec_receive_frame(dec_, frame) == 0) {
-                        uint8_t *outPtrs[1] = {
-                            reinterpret_cast<uint8_t *>(out.data() + totalDecoded * channels_)};
+                        uint8_t* outPtrs[1] = {
+                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
                         int outSamples = static_cast<int>(frames - totalDecoded);
                         int converted = swr_convert(
                             swr_, outPtrs, outSamples,
-                            const_cast<const uint8_t **>(frame->extended_data), frame->nb_samples);
+                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
                         if (converted > 0)
                             totalDecoded += static_cast<std::size_t>(converted);
                     }
@@ -149,7 +149,7 @@ class FfmpegDecoder final : public IDecoder {
                 continue;
 
             while (totalDecoded < frames) {
-                AVFrame *frame = av_frame_alloc();
+                AVFrame* frame = av_frame_alloc();
                 if (!frame)
                     break;
                 ret = avcodec_receive_frame(dec_, frame);
@@ -161,11 +161,11 @@ class FfmpegDecoder final : public IDecoder {
                     av_frame_free(&frame);
                     break;
                 }
-                uint8_t *outPtrs[1] = {
-                    reinterpret_cast<uint8_t *>(out.data() + totalDecoded * channels_)};
+                uint8_t* outPtrs[1] = {
+                    reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
                 int outSamples = static_cast<int>(frames - totalDecoded);
                 int converted = swr_convert(swr_, outPtrs, outSamples,
-                                            const_cast<const uint8_t **>(frame->extended_data),
+                                            const_cast<const uint8_t**>(frame->extended_data),
                                             frame->nb_samples);
                 if (converted > 0)
                     totalDecoded += static_cast<std::size_t>(converted);
@@ -184,7 +184,7 @@ class FfmpegDecoder final : public IDecoder {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::InvalidArg, "bad seconds"});
         }
-        AVStream *stream = fmt_->streams[audioStreamIdx_];
+        AVStream* stream = fmt_->streams[audioStreamIdx_];
         if (!stream)
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::Internal, "no stream"});
@@ -222,17 +222,17 @@ class FfmpegDecoder final : public IDecoder {
   private:
     FfmpegDecoder() = default;
 
-    static int readCallback(void *opaque, uint8_t *buf, int bufSize) {
-        auto *self = static_cast<FfmpegDecoder *>(opaque);
+    static int readCallback(void* opaque, uint8_t* buf, int bufSize) {
+        auto* self = static_cast<FfmpegDecoder*>(opaque);
         if (!self->reader_)
             return AVERROR(EIO);
-        std::span<std::byte> dst(reinterpret_cast<std::byte *>(buf), bufSize);
+        std::span<std::byte> dst(reinterpret_cast<std::byte*>(buf), bufSize);
         std::size_t n = self->reader_->read(dst);
         return n > 0 ? static_cast<int>(n) : AVERROR_EOF;
     }
 
-    static int64_t seekCallback(void *opaque, int64_t offset, int whence) {
-        auto *self = static_cast<FfmpegDecoder *>(opaque);
+    static int64_t seekCallback(void* opaque, int64_t offset, int whence) {
+        auto* self = static_cast<FfmpegDecoder*>(opaque);
         if (!self->reader_)
             return AVERROR(EIO);
         // Handle AVSEEK_SIZE (0x10000) — query file size without seeking
@@ -275,7 +275,7 @@ class FfmpegDecoder final : public IDecoder {
         // Allocate AVIOContext with our callbacks — use larger buffer for high-rate FLAC/WAV
         // probing
         constexpr size_t kBufferSize = 8192;
-        uint8_t *avioBuffer = static_cast<uint8_t *>(av_malloc(kBufferSize));
+        uint8_t* avioBuffer = static_cast<uint8_t*>(av_malloc(kBufferSize));
         if (!avioBuffer) {
             avformat_free_context(fmt_);
             fmt_ = nullptr;
@@ -319,8 +319,8 @@ class FfmpegDecoder final : public IDecoder {
             return false;
         }
 
-        AVStream *stream = fmt_->streams[audioStreamIdx_];
-        const AVCodec *codec = avcodec_find_decoder(stream->codecpar->codec_id);
+        AVStream* stream = fmt_->streams[audioStreamIdx_];
+        const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
         if (!codec) {
             cleanup();
             return false;
@@ -412,7 +412,7 @@ class FfmpegDecoder final : public IDecoder {
         if (fmt_) {
             // prevent avformat_close_input from freeing our custom pb twice
             // it will free fmt but not our avio if AVFMT_FLAG_CUSTOM_IO is set
-            AVIOContext *savedPb = fmt_->pb;
+            AVIOContext* savedPb = fmt_->pb;
             fmt_->pb = nullptr;
             avformat_close_input(&fmt_);
             fmt_ = nullptr;
@@ -429,11 +429,11 @@ class FfmpegDecoder final : public IDecoder {
         }
     }
 
-    Reader *reader_{nullptr};
-    AVFormatContext *fmt_{nullptr};
-    AVCodecContext *dec_{nullptr};
-    AVIOContext *avio_{nullptr};
-    struct SwrContext *swr_{nullptr};
+    Reader* reader_{nullptr};
+    AVFormatContext* fmt_{nullptr};
+    AVCodecContext* dec_{nullptr};
+    AVIOContext* avio_{nullptr};
+    struct SwrContext* swr_{nullptr};
     int audioStreamIdx_{-1};
     uint32_t sampleRate_{0};
     uint32_t channels_{0};

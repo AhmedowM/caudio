@@ -26,30 +26,30 @@ std::string findSample() {
             return s;
         }
     };
-    if (auto *env = std::getenv("CAUDIO_SAMPLE")) {
+    if (auto* env = std::getenv("CAUDIO_SAMPLE")) {
         if (std::filesystem::exists(env))
             return toAbs(env);
     }
-    if (auto *env = std::getenv("CAUDIO_FIXTURE")) {
+    if (auto* env = std::getenv("CAUDIO_FIXTURE")) {
         if (std::filesystem::exists(env))
             return toAbs(env);
     }
-    for (auto *c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
+    for (auto* c : {"tests/fixtures/sample.wav", "./tests/fixtures/sample.wav",
                     "../tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav",
                     "C:/Users/Secondary/Projects/caudio/tests/fixtures/sample.wav"}) {
         if (std::filesystem::exists(c))
             return toAbs(c);
     }
-    if (auto *env = std::getenv("CAUDIO_SAMPLE"))
+    if (auto* env = std::getenv("CAUDIO_SAMPLE"))
         return toAbs(env);
     if (std::filesystem::exists("C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav"))
         return "C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/sample.wav";
     return "tests/fixtures/sample.wav";
 }
 
-std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::string &path,
-                                                                   std::string &usedPath) {
+std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::string& path,
+                                                                   std::string& usedPath) {
     auto r = Database::open(path);
     if (r) {
         usedPath = path;
@@ -65,7 +65,7 @@ std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::st
     return m;
 }
 
-void ensureQueueHasTracks(Database &db, const std::string &samplePath, const std::string &prefix,
+void ensureQueueHasTracks(Database& db, const std::string& samplePath, const std::string& prefix,
                           uint8_t fpBase) {
     auto q = db.queueList(1);
     if (q && !q->empty())
@@ -117,7 +117,7 @@ void ensureQueueHasTracks(Database &db, const std::string &samplePath, const std
     }
 }
 
-bool playTrackViaPlayer(const Track &track) {
+bool playTrackViaPlayer(const Track& track) {
     std::cout << "[demo] queue track " << track.id << ": '"
               << (track.title.empty() ? "(untitled)" : track.title) << "' by '"
               << (track.artist.empty() ? "(unknown)" : track.artist) << "' path='" << track.path
@@ -191,7 +191,7 @@ bool playTrackViaPlayer(const Track &track) {
 
 } // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     std::string dbPath = "library.db";
     if (argc > 1 && argv[1] && argv[1][0] != '\0')
         dbPath = argv[1];
@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
     }
 
     int played = 0, errors = 0;
-    for (auto &qi : *itemsRes) {
+    for (auto& qi : *itemsRes) {
         auto tr = db->getTrack(qi.trackId);
         if (!tr) {
             std::cerr << "[demo] getTrack(" << qi.trackId << ") failed: " << tr.error().message

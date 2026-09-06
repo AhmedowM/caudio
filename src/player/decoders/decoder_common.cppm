@@ -11,7 +11,7 @@ export namespace caudio::player::detail {
 constexpr double kPi = 3.14159265358979323846;
 
 inline std::size_t fillSine(std::span<float> out, std::size_t frames, uint32_t ch, uint32_t rate,
-                            uint64_t &pos, uint64_t total, float amp, float chanOff) {
+                            uint64_t& pos, uint64_t total, float amp, float chanOff) {
     if (out.empty() || frames == 0)
         return 0;
     uint64_t rem = pos < total ? total - pos : 0;

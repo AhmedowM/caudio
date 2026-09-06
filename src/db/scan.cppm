@@ -48,7 +48,7 @@ inline constexpr uint32_t K[64] = {
 #define SIG0(x) (ROTRIGHT(x, 7) ^ ROTRIGHT(x, 18) ^ ((x) >> 3))
 #define SIG1(x) (ROTRIGHT(x, 17) ^ ROTRIGHT(x, 19) ^ ((x) >> 10))
 
-inline void sha256_transform(Sha256Ctx *ctx, const uint8_t data[]) {
+inline void sha256_transform(Sha256Ctx* ctx, const uint8_t data[]) {
     uint32_t m[64];
     for (int i = 0, j = 0; i < 16; ++i, j += 4)
         m[i] = (uint32_t)data[j] << 24 | (uint32_t)data[j + 1] << 16 | (uint32_t)data[j + 2] << 8 |
@@ -78,7 +78,7 @@ inline void sha256_transform(Sha256Ctx *ctx, const uint8_t data[]) {
     ctx->state[6] += g;
     ctx->state[7] += h;
 }
-inline void sha256_init(Sha256Ctx *ctx) {
+inline void sha256_init(Sha256Ctx* ctx) {
     ctx->datalen = 0;
     ctx->bitlen = 0;
     ctx->state[0] = 0x6a09e667;
@@ -90,7 +90,7 @@ inline void sha256_init(Sha256Ctx *ctx) {
     ctx->state[6] = 0x1f83d9ab;
     ctx->state[7] = 0x5be0cd19;
 }
-inline void sha256_update(Sha256Ctx *ctx, const uint8_t *data, size_t len) {
+inline void sha256_update(Sha256Ctx* ctx, const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         ctx->data[ctx->datalen++] = data[i];
         if (ctx->datalen == 64) {
@@ -100,7 +100,7 @@ inline void sha256_update(Sha256Ctx *ctx, const uint8_t *data, size_t len) {
         }
     }
 }
-inline void sha256_final(Sha256Ctx *ctx, uint8_t hash[32]) {
+inline void sha256_final(Sha256Ctx* ctx, uint8_t hash[32]) {
     uint32_t i = ctx->datalen;
     if (ctx->datalen < 56) {
         ctx->data[i++] = 0x80;
@@ -137,7 +137,7 @@ inline void sha256_final(Sha256Ctx *ctx, uint8_t hash[32]) {
 
 export enum class ScanMode { Sampled, Full };
 
-inline bool hasAudioExt(const std::filesystem::path &p) {
+inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
@@ -146,7 +146,7 @@ inline bool hasAudioExt(const std::filesystem::path &p) {
 
 // Sampled fingerprint: 64KB head + tail + fileSize mixed into SHA256
 export std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
-computeFingerprint(const std::filesystem::path &path) {
+computeFingerprint(const std::filesystem::path& path) {
     std::error_code ec;
     auto sz = std::filesystem::file_size(path, ec);
     if (ec)
@@ -165,14 +165,14 @@ computeFingerprint(const std::filesystem::path &path) {
     constexpr size_t kSample = 32 * 1024;
     std::vector<uint8_t> buf(kSample);
     // head
-    f.read(reinterpret_cast<char *>(buf.data()), kSample);
+    f.read(reinterpret_cast<char*>(buf.data()), kSample);
     size_t n = (size_t)f.gcount();
     if (n)
         sha256_update(&ctx, buf.data(), n);
     // tail if file larger than 64K
     if (sz > kSample * 2) {
         f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
-        f.read(reinterpret_cast<char *>(buf.data()), kSample);
+        f.read(reinterpret_cast<char*>(buf.data()), kSample);
         n = (size_t)f.gcount();
         if (n)
             sha256_update(&ctx, buf.data(), n);
@@ -186,7 +186,7 @@ computeFingerprint(const std::filesystem::path &path) {
         f.clear();
         f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
         if (f) {
-            f.read(reinterpret_cast<char *>(buf.data()), kSample);
+            f.read(reinterpret_cast<char*>(buf.data()), kSample);
             n = (size_t)f.gcount();
             if (n)
                 sha256_update(&ctx, buf.data(), n);
@@ -198,7 +198,7 @@ computeFingerprint(const std::filesystem::path &path) {
 }
 
 // Generator-based scan: yields Tracks lazily
-export std::generator<Track> scan(const std::filesystem::path &root,
+export std::generator<Track> scan(const std::filesystem::path& root,
                                   ScanMode mode = ScanMode::Sampled) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
@@ -228,7 +228,7 @@ export std::generator<Track> scan(const std::filesystem::path &root,
                     sha256_init(&ctx);
                     char buf[8192];
                     while (f.read(buf, sizeof(buf)) || f.gcount())
-                        sha256_update(&ctx, reinterpret_cast<uint8_t *>(buf), (size_t)f.gcount());
+                        sha256_update(&ctx, reinterpret_cast<uint8_t*>(buf), (size_t)f.gcount());
                     sha256_final(&ctx, t.fingerprint.data());
                 }
             }
@@ -238,7 +238,7 @@ export std::generator<Track> scan(const std::filesystem::path &root,
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>
-scanDirectory(const std::filesystem::path &root, ScanMode mode = ScanMode::Sampled) {
+scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled) {
     std::vector<Track> out;
     for (auto t : scan(root, mode))
         out.push_back(std::move(t));
@@ -247,7 +247,7 @@ scanDirectory(const std::filesystem::path &root, ScanMode mode = ScanMode::Sampl
 
 // DB-integrated scan: inserts/updates tracks with deduplication & metadata preservation
 export std::expected<void, caudio::utils::Error>
-scanLibrary(Database &db, int64_t libraryId,
+scanLibrary(Database& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {}) {
     if (libraryId == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
@@ -255,7 +255,7 @@ scanLibrary(Database &db, int64_t libraryId,
     if (!libs)
         return std::unexpected{libs.error()};
     std::string libPath;
-    for (auto &l : *libs)
+    for (auto& l : *libs)
         if (l.id == libraryId)
             libPath = l.path;
     if (libPath.empty()) {
@@ -344,7 +344,7 @@ scanLibrary(Database &db, int64_t libraryId,
     // update library last_scanned
     auto libs2 = db.libraryList();
     if (libs2) {
-        for (auto &l : *libs2)
+        for (auto& l : *libs2)
             if (l.id == libraryId) {
                 l.last_scanned = std::chrono::duration_cast<std::chrono::seconds>(
                                      std::chrono::system_clock::now().time_since_epoch())

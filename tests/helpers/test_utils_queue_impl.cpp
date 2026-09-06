@@ -118,7 +118,7 @@ bool queue_mpsc_thread() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     }
-    for (auto &t : threads)
+    for (auto& t : threads)
         t.join();
     while (true) {
         auto r = q.pop();

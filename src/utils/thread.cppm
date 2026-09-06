@@ -20,13 +20,13 @@ import :result;
 import :error;
 
 #if defined(_WIN32) || defined(_WIN64)
-using HANDLE = void *;
-using HMODULE = void *;
+using HANDLE = void*;
+using HMODULE = void*;
 using HRESULT = long;
-using PCWSTR = const wchar_t *;
-using LPCSTR = const char *;
-using LPCCH = const char *;
-using LPWSTR = wchar_t *;
+using PCWSTR = const wchar_t*;
+using LPCSTR = const char*;
+using LPCCH = const char*;
+using LPWSTR = wchar_t*;
 using UINT = unsigned int;
 using DWORD = unsigned long;
 using FARPROC = long long int (*)();
@@ -70,7 +70,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     // Use SetThreadDescription if available (Windows 10 1607+)
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI *)(HANDLE, PCWSTR);
+        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-function-type"
         auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
@@ -128,7 +128,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #endif
 }
 
-[[nodiscard]] inline Expected<void> setThreadName(std::jthread &jt,
+[[nodiscard]] inline Expected<void> setThreadName(std::jthread& jt,
                                                   std::string_view name) noexcept {
     if (!jt.joinable()) {
         return std::unexpected(Error{Result::State, "thread not joinable"});
@@ -142,7 +142,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     HANDLE h = (HANDLE)(uintptr_t)jt.native_handle();
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI *)(HANDLE, PCWSTR);
+        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-function-type"
         auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
@@ -188,7 +188,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 }
 
 // Convenience for std::thread as well
-[[nodiscard]] inline Expected<void> setThreadName(std::thread &t, std::string_view name) noexcept {
+[[nodiscard]] inline Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
     if (!t.joinable()) {
         return std::unexpected(Error{Result::State, "thread not joinable"});
     }
@@ -199,7 +199,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     HANDLE h = (HANDLE)(uintptr_t)t.native_handle();
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI *)(HANDLE, PCWSTR);
+        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-function-type"
         auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");

@@ -27,7 +27,7 @@ export namespace caudio::player {
 // Priority: FFmpeg (all supported formats)
 class DecoderRegistry {
   public:
-    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader &reader) {
+    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader) {
         constexpr std::size_t kProbeBytes = 32;
         std::array<std::byte, kProbeBytes> buf{};
         std::size_t n = 0;

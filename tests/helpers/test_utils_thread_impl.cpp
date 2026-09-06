@@ -43,7 +43,7 @@ bool thread_parallel_10() {
     for (int i = 0; i < 10; ++i) {
         threads.emplace_back([&, i](std::stop_token) { vals[i]++; });
     }
-    for (auto &t : threads)
+    for (auto& t : threads)
         t.join();
     for (int i = 0; i < 10; ++i)
         if (vals[i] != 1)
@@ -91,7 +91,7 @@ bool thread_100_stress() {
     for (int i = 0; i < N; ++i) {
         threads.emplace_back([&, i](std::stop_token) { vals[i]++; });
     }
-    for (auto &t : threads)
+    for (auto& t : threads)
         t.join();
     int sum = 0;
     for (int i = 0; i < N; ++i)

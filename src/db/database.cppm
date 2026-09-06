@@ -1,4 +1,6 @@
 module;
+#include <sqlite3.h>
+
 #include <cstring>
 #include <expected>
 #include <functional>
@@ -6,7 +8,6 @@ module;
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
-#include <sqlite3.h>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -27,12 +28,12 @@ class Statement final {
         if (stmt_)
             sqlite3_finalize(stmt_);
     }
-    Statement(const Statement &) = delete;
-    Statement &operator=(const Statement &) = delete;
-    Statement(Statement &&o) noexcept : stmt_(o.stmt_) {
+    Statement(const Statement&) = delete;
+    Statement& operator=(const Statement&) = delete;
+    Statement(Statement&& o) noexcept : stmt_(o.stmt_) {
         o.stmt_ = nullptr;
     }
-    Statement &operator=(Statement &&o) noexcept {
+    Statement& operator=(Statement&& o) noexcept {
         if (this != &o) {
             if (stmt_)
                 sqlite3_finalize(stmt_);
@@ -41,7 +42,7 @@ class Statement final {
         }
         return *this;
     }
-    [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3 *db,
+    [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3* db,
                                                                     std::string_view sql) {
         if (stmt_)
             sqlite3_finalize(stmt_);
@@ -68,7 +69,7 @@ class Statement final {
             return;
         sqlite3_bind_text(stmt_, idx, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
     }
-    void bindBlob(int idx, const void *data, int n) {
+    void bindBlob(int idx, const void* data, int n) {
         if (stmt_)
             sqlite3_bind_blob(stmt_, idx, data, n, SQLITE_TRANSIENT);
     }
@@ -96,10 +97,10 @@ class Statement final {
     std::string columnText(int idx) const {
         if (!stmt_)
             return {};
-        const char *v = reinterpret_cast<const char *>(sqlite3_column_text(stmt_, idx));
+        const char* v = reinterpret_cast<const char*>(sqlite3_column_text(stmt_, idx));
         return v ? std::string(v) : std::string{};
     }
-    const void *columnBlob(int idx, int &n) const {
+    const void* columnBlob(int idx, int& n) const {
         if (!stmt_) {
             n = 0;
             return nullptr;
@@ -111,7 +112,7 @@ class Statement final {
         if (stmt_)
             sqlite3_reset(stmt_);
     }
-    sqlite3_stmt *get() const {
+    sqlite3_stmt* get() const {
         return stmt_;
     }
     [[nodiscard]] explicit operator bool() const {
@@ -119,14 +120,14 @@ class Statement final {
     }
 
   private:
-    sqlite3_stmt *stmt_{nullptr};
+    sqlite3_stmt* stmt_{nullptr};
 };
 
 class Transaction final {
   public:
-    explicit Transaction(sqlite3 *db) : db_(db) {
+    explicit Transaction(sqlite3* db) : db_(db) {
         if (db_) {
-            char *err = nullptr;
+            char* err = nullptr;
             int rc = sqlite3_exec(db_, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
             if (rc != SQLITE_OK) {
                 if (err)
@@ -141,13 +142,13 @@ class Transaction final {
         if (active_ && db_)
             sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
     }
-    Transaction(const Transaction &) = delete;
-    Transaction &operator=(const Transaction &) = delete;
-    Transaction(Transaction &&o) noexcept : db_(o.db_), active_(o.active_) {
+    Transaction(const Transaction&) = delete;
+    Transaction& operator=(const Transaction&) = delete;
+    Transaction(Transaction&& o) noexcept : db_(o.db_), active_(o.active_) {
         o.db_ = nullptr;
         o.active_ = false;
     }
-    Transaction &operator=(Transaction &&o) noexcept {
+    Transaction& operator=(Transaction&& o) noexcept {
         if (this != &o) {
             if (active_ && db_)
                 sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
@@ -161,7 +162,7 @@ class Transaction final {
     [[nodiscard]] caudio::utils::Error commit() {
         if (!db_ || !active_)
             return caudio::utils::makeError(caudio::utils::Result::Internal, "no transaction");
-        char *err = nullptr;
+        char* err = nullptr;
         int rc = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "commit failed";
@@ -178,15 +179,15 @@ class Transaction final {
     }
 
   private:
-    sqlite3 *db_{nullptr};
+    sqlite3* db_{nullptr};
     bool active_{false};
 };
 
 // forward decl helpers
-inline void fillTrackFromStmt(sqlite3_stmt *s, Track &out) {
+inline void fillTrackFromStmt(sqlite3_stmt* s, Track& out) {
     out.id = sqlite3_column_int64(s, 0);
     int n = 0;
-    const void *fp = sqlite3_column_blob(s, 1);
+    const void* fp = sqlite3_column_blob(s, 1);
     n = sqlite3_column_bytes(s, 1);
     out.fingerprint.fill(0);
     if (fp && n == 32)
@@ -194,8 +195,8 @@ inline void fillTrackFromStmt(sqlite3_stmt *s, Track &out) {
     else if (fp && n > 0)
         std::memcpy(out.fingerprint.data(), fp, n > 32 ? 32 : n);
     auto txt = [&](int c) {
-        const unsigned char *p = sqlite3_column_text(s, c);
-        return p ? std::string((const char *)p) : std::string{};
+        const unsigned char* p = sqlite3_column_text(s, c);
+        return p ? std::string((const char*)p) : std::string{};
     };
     out.path = txt(2);
     out.deleted_at = sqlite3_column_int64(s, 3);
@@ -236,12 +237,12 @@ class Database final {
         if (db_)
             sqlite3_close(db_);
     }
-    Database(const Database &) = delete;
-    Database &operator=(const Database &) = delete;
-    Database(Database &&o) noexcept : db_(o.db_) {
+    Database(const Database&) = delete;
+    Database& operator=(const Database&) = delete;
+    Database(Database&& o) noexcept : db_(o.db_) {
         o.db_ = nullptr;
     }
-    Database &operator=(Database &&o) noexcept {
+    Database& operator=(Database&& o) noexcept {
         if (this != &o) {
             if (db_)
                 sqlite3_close(db_);
@@ -253,7 +254,7 @@ class Database final {
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
     open(std::string_view path) {
         std::string dbPath = path.empty() ? ":memory:" : std::string(path);
-        sqlite3 *raw = nullptr;
+        sqlite3* raw = nullptr;
         int rc =
             sqlite3_open_v2(dbPath.c_str(), &raw,
                             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, nullptr);
@@ -263,7 +264,7 @@ class Database final {
                 sqlite3_close(raw);
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, msg)};
         }
-        char *err = nullptr;
+        char* err = nullptr;
         rc = sqlite3_exec(raw, std::string(kSchema).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
@@ -286,20 +287,20 @@ class Database final {
         db->db_ = raw;
         return db;
     }
-    sqlite3 *handle() const {
+    sqlite3* handle() const {
         return db_;
     }
-    std::shared_mutex &mutex() const {
+    std::shared_mutex& mutex() const {
         return m_;
     }
 
     // Track CRUD
-    std::expected<int64_t, caudio::utils::Error> insertTrack(const Track &t) {
+    std::expected<int64_t, caudio::utils::Error> insertTrack(const Track& t) {
         std::unique_lock lock{m_};
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        const char *sql =
+        const char* sql =
             "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
             "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
             "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
@@ -345,7 +346,7 @@ class Database final {
         }
         return sqlite3_last_insert_rowid(db_);
     }
-    std::expected<void, caudio::utils::Error> updateTrack(const Track &t) {
+    std::expected<void, caudio::utils::Error> updateTrack(const Track& t) {
         if (t.id == 0)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "id 0")};
@@ -353,7 +354,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        const char *sql =
+        const char* sql =
             "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
             "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
             "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
@@ -436,7 +437,7 @@ class Database final {
         return t;
     }
     std::expected<Track, caudio::utils::Error>
-    findByFingerprint(const std::array<uint8_t, 32> &fp) {
+    findByFingerprint(const std::array<uint8_t, 32>& fp) {
         std::shared_lock lock{m_};
         if (!db_)
             return std::unexpected{
@@ -469,7 +470,7 @@ class Database final {
         return t;
     }
     std::expected<std::vector<Track>, caudio::utils::Error>
-    listTracks(const TrackQuery *q = nullptr) {
+    listTracks(const TrackQuery* q = nullptr) {
         std::shared_lock lock{m_};
         if (!db_)
             return std::unexpected{
@@ -591,7 +592,7 @@ class Database final {
         if (!r)
             return std::unexpected{r.error()};
         std::vector<std::tuple<int64_t, std::string>> out;
-        for (auto &t : *r)
+        for (auto& t : *r)
             out.emplace_back(t.id, t.title.empty() ? t.path : t.title);
         return out;
     }
@@ -647,7 +648,7 @@ class Database final {
         p.library_id = st.columnInt(6);
         return p;
     }
-    std::expected<void, caudio::utils::Error> updatePlaylist(const Playlist &p) {
+    std::expected<void, caudio::utils::Error> updatePlaylist(const Playlist& p) {
         if (p.id == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
         std::unique_lock lock{m_};
@@ -1013,7 +1014,7 @@ class Database final {
     }
 
     // History
-    std::expected<void, caudio::utils::Error> historyAdd(const HistoryEntry &e) {
+    std::expected<void, caudio::utils::Error> historyAdd(const HistoryEntry& e) {
         std::unique_lock lock{m_};
         if (!db_)
             return std::unexpected{
@@ -1040,7 +1041,7 @@ class Database final {
         return {};
     }
     std::expected<std::vector<HistoryEntry>, caudio::utils::Error>
-    historyList(const HistoryQuery *q = nullptr) {
+    historyList(const HistoryQuery* q = nullptr) {
         std::shared_lock lock{m_};
         if (!db_)
             return std::unexpected{
@@ -1191,7 +1192,7 @@ class Database final {
         }
         return out;
     }
-    std::expected<void, caudio::utils::Error> libraryUpdate(const Library &l) {
+    std::expected<void, caudio::utils::Error> libraryUpdate(const Library& l) {
         if (l.id == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
         std::unique_lock lock{m_};
@@ -1247,7 +1248,7 @@ class Database final {
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         DbStats s;
-        auto one = [&](std::string_view sql, int64_t &out) {
+        auto one = [&](std::string_view sql, int64_t& out) {
             Statement st;
             if (auto e = st.prepare(db_, sql); !e)
                 return;
@@ -1323,7 +1324,7 @@ class Database final {
     }
 
   private:
-    sqlite3 *db_{nullptr};
+    sqlite3* db_{nullptr};
     mutable std::shared_mutex m_;
 };
 

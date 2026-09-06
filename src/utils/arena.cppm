@@ -24,7 +24,7 @@ class Arena {
         // Ensure base is 64B aligned
         std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(storage_.data());
         std::uintptr_t aligned = (addr + (kAlign - 1)) & ~(std::uintptr_t)(kAlign - 1);
-        base_ = reinterpret_cast<std::byte *>(aligned);
+        base_ = reinterpret_cast<std::byte*>(aligned);
         // Adjust capacity if alignment consumed bytes
         std::size_t offset = static_cast<std::size_t>(base_ - storage_.data());
         if (offset + capacity_ > storage_.size()) {
@@ -36,12 +36,12 @@ class Arena {
         }
     }
 
-    Arena(const Arena &) = delete;
-    Arena &operator=(const Arena &) = delete;
-    Arena(Arena &&) = delete;
-    Arena &operator=(Arena &&) = delete;
+    Arena(const Arena&) = delete;
+    Arena& operator=(const Arena&) = delete;
+    Arena(Arena&&) = delete;
+    Arena& operator=(Arena&&) = delete;
 
-    [[nodiscard]] void *allocate(std::size_t n,
+    [[nodiscard]] void* allocate(std::size_t n,
                                  std::size_t align = alignof(std::max_align_t)) noexcept {
         if (n == 0) {
             if (!base_)
@@ -49,7 +49,7 @@ class Arena {
             std::size_t off = alignUp(offset_, align);
             if (off > capacity_)
                 return nullptr;
-            return static_cast<void *>(base_ + off);
+            return static_cast<void*>(base_ + off);
         }
         if (!base_)
             return nullptr;
@@ -58,14 +58,15 @@ class Arena {
             return nullptr;
         if (n > capacity_ - off)
             return nullptr;
-        void *p = base_ + off;
+        void* p = base_ + off;
         offset_ = off + n;
         return p;
     }
 
-    template <typename T> [[nodiscard]] T *allocateArray(std::size_t count) noexcept {
-        void *p = allocate(count * sizeof(T), alignof(T));
-        return static_cast<T *>(p);
+    template <typename T>
+    [[nodiscard]] T* allocateArray(std::size_t count) noexcept {
+        void* p = allocate(count * sizeof(T), alignof(T));
+        return static_cast<T*>(p);
     }
 
     void reset() noexcept {
@@ -97,7 +98,7 @@ class Arena {
 
     // 64K + 64 for alignment slack
     alignas(kAlign) std::array<std::byte, kDefaultCapacity + kAlign> storage_{};
-    std::byte *base_{nullptr};
+    std::byte* base_{nullptr};
     std::size_t capacity_{0};
     std::size_t offset_{0};
 };
