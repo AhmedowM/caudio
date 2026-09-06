@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <sqlite3.h>
+#include "helpers/helpers_test.hpp"
 
 import caudio.db;
 import caudio.engine;
@@ -9,13 +10,10 @@ import caudio.utils;
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
-
-static std::string spath(const std::string& n){
-    return (std::filesystem::temp_directory_path() / (n + "_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
-}
+using namespace caudio::test_helpers;
 
 TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
-    std::string dbPath = spath("eng_state_rt");
+    std::string dbPath = tempDbPath("eng_state_rt").string();
     {
         auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
         auto db=std::move(dbRes.value());
@@ -65,7 +63,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
 }
 
 TEST_CASE("engine state open without file creates default", "[engine_state]") {
-    std::string dbPath = spath("eng_state_default");
+    std::string dbPath = tempDbPath("eng_state_default").string();
     auto eRes=Engine::open(dbPath, EngineConfig{.enableMonitorThread=false});
     REQUIRE(eRes.has_value());
     auto eng=std::move(eRes.value());
@@ -87,7 +85,7 @@ TEST_CASE("engine state volume clamped 0-1", "[engine_state]") {
 }
 
 TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
-    std::string dbPath=spath("eng_state_toggle");
+    std::string dbPath=tempDbPath("eng_state_toggle").string();
     auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db=std::move(dbRes.value());
     for(int i=0;i<2;++i){Track t; t.path="tog"+std::to_string(i)+".wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xB0+i*16+b); auto r=db->insertTrack(t); REQUIRE(r.has_value()); REQUIRE(db->queueEnqueue(1,*r,-1).has_value());}

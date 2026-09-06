@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <vector>
+#include "helpers/helpers_test.hpp"
 
 import caudio.player;
 import caudio.db;
@@ -13,6 +14,7 @@ using namespace caudio::player;
 using namespace caudio::utils;
 using namespace caudio::db;
 using namespace caudio::engine;
+using namespace caudio::test_helpers;
 
 static std::string fixturePath(const std::string& name){
     for(auto c: {std::string("tests/fixtures/")+name, std::string("../tests/fixtures/")+name, std::string("C:/Users/Secondary/Projects/caudio-cpp/tests/fixtures/")+name}){
@@ -63,7 +65,7 @@ TEST_CASE("player seek and volume", "[player_integration]") {
 }
 
 TEST_CASE("player position time-based via Engine steady_clock", "[player_integration]") {
-    std::string dbPath = (std::filesystem::temp_directory_path() / ("pl_pos_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
+    std::string dbPath = tempDbPath("pl_pos").string();
     {
         auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
         auto db=std::move(dbRes.value());

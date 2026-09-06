@@ -2,12 +2,14 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include "helpers/helpers_test.hpp"
 
 import caudio.db;
 import caudio.utils;
 
 using namespace caudio::db;
 using namespace caudio::utils;
+using namespace caudio::test_helpers;
 
 TEST_CASE("trackToJson and trackFromJson roundtrip ordered", "[db_json]") {
     Track t; t.id=1; t.path="/music/a.mp3"; t.title="Title"; t.artist="Artist"; t.album="Album"; t.albumArtist="AA"; t.genre="Rock"; t.year=2020; t.track_num=3; t.sample_rate=44100; t.channels=2; t.duration=123.4; t.size=9999; t.mtime=1700000000; t.play_count=5; t.rating=4; t.library_id=1;
@@ -35,7 +37,7 @@ TEST_CASE("exportJson and importJson roundtrip", "[db_json]") {
     auto db=std::move(dbRes.value());
     Track t; t.path="/tmp/j.mp3"; t.title="JsonTrack"; t.artist="JsonArtist"; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x11+b);
     auto ins=db->insertTrack(t); REQUIRE(ins.has_value());
-    auto outPath = std::filesystem::temp_directory_path() / ("json_export_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".json");
+    auto outPath = tempDbPath("json_export"); outPath.replace_extension(".json");
     auto er=exportJson(*db,outPath);
     REQUIRE(er.has_value());
     REQUIRE(std::filesystem::exists(outPath));
@@ -58,7 +60,7 @@ TEST_CASE("importJson handles duplicate fingerprint upsert", "[db_json]") {
     auto db=std::move(dbRes.value());
     Track t; t.path="/tmp/dup.mp3"; t.title="Dup"; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x22+b);
     REQUIRE(db->insertTrack(t).has_value());
-    auto outPath = std::filesystem::temp_directory_path() / ("json_dup_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".json");
+    auto outPath = tempDbPath("json_dup"); outPath.replace_extension(".json");
     REQUIRE(exportJson(*db,outPath).has_value());
     // import same file again should not duplicate
     REQUIRE(importJson(*db,outPath).has_value());

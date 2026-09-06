@@ -3,6 +3,7 @@
 #include <vector>
 #include <set>
 #include <sqlite3.h>
+#include "helpers/helpers_test.hpp"
 
 import caudio.db;
 import caudio.engine;
@@ -11,16 +12,12 @@ import caudio.utils;
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
+using namespace caudio::test_helpers;
 
 static void safeRemoveDb(const std::string& p){ std::error_code ec; std::filesystem::remove(p,ec); std::filesystem::remove(p+"-wal",ec); std::filesystem::remove(p+"-shm",ec); }
 
-static std::string tempPath(const std::string &name) {
-    auto dir = std::filesystem::temp_directory_path();
-    return (dir / (name + "_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
-}
-
 TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
-    std::string dbPath = tempPath("eng_q_shuffle");
+    std::string dbPath = tempDbPath("eng_q_shuffle").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
@@ -61,7 +58,7 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
-    std::string dbPath = tempPath("eng_q_off");
+    std::string dbPath = tempDbPath("eng_q_off").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
@@ -86,7 +83,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
-    std::string dbPath = tempPath("eng_q_queue");
+    std::string dbPath = tempDbPath("eng_q_queue").string();
     auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for(int i=0;i<2;++i){Track t; t.path="q"+std::to_string(i)+".wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x20+i*32+b); auto r=db->insertTrack(t); REQUIRE(r.has_value()); REQUIRE(db->queueEnqueue(1,*r,-1).has_value());}
@@ -105,7 +102,7 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
-    std::string dbPath = tempPath("eng_q_one");
+    std::string dbPath = tempDbPath("eng_q_one").string();
     auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     Track t; t.path="one.wav"; t.duration=5.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x30+b);
@@ -130,7 +127,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
-    std::string dbPath = tempPath("eng_q_persist");
+    std::string dbPath = tempDbPath("eng_q_persist").string();
     {
         auto dbRes = Database::open(dbPath); REQUIRE(dbRes.has_value());
         auto db = std::move(dbRes.value());

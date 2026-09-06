@@ -2,15 +2,17 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include "helpers/helpers_test.hpp"
 
 import caudio.db;
 import caudio.utils;
 
 using namespace caudio::db;
 using namespace caudio::utils;
+using namespace caudio::test_helpers;
 
 TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
-    auto root = std::filesystem::temp_directory_path() / ("scan_test_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto root = tempDirPath("scan_test");
     std::filesystem::create_directories(root);
     std::filesystem::create_directories(root / "sub");
     // create dummy audio files
@@ -26,7 +28,7 @@ TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
 }
 
 TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]") {
-    auto dir = std::filesystem::temp_directory_path() / ("fp_test_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto dir = tempDirPath("fp_test");
     std::filesystem::create_directories(dir);
     auto p = dir / "file.wav";
     // create 100K file with known pattern
@@ -59,7 +61,7 @@ TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]"
 }
 
 TEST_CASE("scanLibrary inserts and dedup by fingerprint", "[db_scan]") {
-    auto dir = std::filesystem::temp_directory_path() / ("scanlib_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto dir = tempDirPath("scanlib");
     std::filesystem::create_directories(dir);
     // create two audio files with distinct content
     {

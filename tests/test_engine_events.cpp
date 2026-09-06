@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 #include <atomic>
+#include "helpers/helpers_test.hpp"
 
 import caudio.db;
 import caudio.engine;
@@ -9,6 +10,7 @@ import caudio.utils;
 using namespace caudio::utils;
 using namespace caudio::engine;
 using namespace caudio::db;
+using namespace caudio::test_helpers;
 
 TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
     MpscQueue<EngineEvent> q{64};
@@ -25,7 +27,7 @@ TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
 }
 
 TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
-    std::string dbPath = (std::filesystem::temp_directory_path() / ("eng_ev_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
+    std::string dbPath = tempDbPath("eng_ev").string();
     auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db=std::move(dbRes.value());
     Track t; t.path="ev.wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x70+b);
@@ -53,7 +55,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
 }
 
 TEST_CASE("Engine drainEvents batch", "[engine_events]") {
-    std::string dbPath = (std::filesystem::temp_directory_path() / ("eng_drain_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
+    std::string dbPath = tempDbPath("eng_drain").string();
     auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db=std::move(dbRes.value());
     for(int i=0;i<3;++i){Track t; t.path="drain"+std::to_string(i)+".wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x80+i*10+b); auto ins=db->insertTrack(t); REQUIRE(ins.has_value()); REQUIRE(db->queueEnqueue(1,*ins,-1).has_value());}
@@ -77,7 +79,7 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
 }
 
 TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
-    std::string dbPath = (std::filesystem::temp_directory_path() / ("eng_cb_" + std::to_string((long long)std::chrono::steady_clock::now().time_since_epoch().count()) + ".db")).string();
+    std::string dbPath = tempDbPath("eng_cb").string();
     auto dbRes=Database::open(dbPath); REQUIRE(dbRes.has_value());
     auto db=std::move(dbRes.value());
     Track t; t.path="cb.wav"; t.duration=1.0; for(int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x90+b);
