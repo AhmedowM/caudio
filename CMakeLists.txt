@@ -169,6 +169,7 @@ ca_set_warnings(caudio_utils_shared)
 # caudio::player — partitioned modules + decoders (Task 3/4)
 set(CAUDIO_PLAYER_SOURCES
   src/player/player.cppm
+  src/player/player_core.cppm
   src/player/reader.cppm
   src/player/output.cppm
   src/player/decoder.cppm
