@@ -145,6 +145,9 @@ class AudioOutput {
                 output[i] *= vol;
             }
         }
+
+        // Note: generated is in frames, totalSamples = frameCount * channels
+        // No zero-fill needed here since miniaudio passes pre-zeroed buffer
     }
 
     Config cfg_;

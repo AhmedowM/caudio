@@ -8,7 +8,6 @@ module;
 #include <expected>
 #include <mutex>
 #include <shared_mutex>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,67 +17,19 @@ export module caudio.db:search;
 import caudio.utils;
 import :types;
 import :database;
+import :detail;
 
 namespace caudio::db {
 
-export std::string sanitizeFtsTerm(std::string_view term) {
-    std::string out;
-    out.reserve(term.size() * 2);
-    for (char c : term) {
-        if (c == '"') {
-            out += "\"\"";
-        } else if (c == '\'' || c == '*' || c == '-' || c == '(' || c == ')' || c == ':' ||
-                   c == '\\' || c == '^')
-            out.push_back(' ');
-        else
-            out.push_back(c);
-    }
-    // remove standalone FTS5 operators OR AND NOT NEAR (case-insensitive)
-    std::istringstream iss(out);
-    std::string tok;
-    std::string rebuilt;
-    bool first = true;
-    while (iss >> tok) {
-        std::string up = tok;
-        for (char& ch : up)
-            ch = std::toupper((unsigned char)ch);
-        if (up == "OR" || up == "AND" || up == "NOT" || up == "NEAR")
-            continue;
-        if (!first)
-            rebuilt.push_back(' ');
-        rebuilt += tok;
-        first = false;
-    }
-    // trim
-    size_t s = 0;
-    while (s < rebuilt.size() && std::isspace((unsigned char)rebuilt[s]))
-        s++;
-    size_t e = rebuilt.size();
-    while (e > s && std::isspace((unsigned char)rebuilt[e - 1]))
-        e--;
-    return rebuilt.substr(s, e - s);
-}
-
-inline std::string escapeLike(std::string_view s) {
-    std::string o;
-    o.reserve(s.size() * 2);
-    for (char c : s) {
-        if (c == '%' || c == '_' || c == '\\')
-            o.push_back('\\');
-        o.push_back(c);
-    }
-    return o;
-}
-
 inline void fillTrackSearch(sqlite3_stmt* s, Track& out) {
-    fillTrackFromStmt(s, out);
+    detail::fillTrackFromStmt(s, out);
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>
 searchFts(Database& db, std::string_view query, int limit = 50) {
     if (query.empty())
         return std::vector<Track>{};
-    std::string sanitized = sanitizeFtsTerm(query);
+    std::string sanitized = detail::sanitizeFtsTerm(query);
     if (sanitized.empty())
         return std::vector<Track>{};
     std::string ftsQ = sanitized;
@@ -131,7 +82,7 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     sqlite3* h = db.handle();
     if (!h)
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-    std::string esc = escapeLike(sanitized);
+    std::string esc = detail::escapeLike(sanitized);
     std::string pat = "%" + esc + "%";
     const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
@@ -153,17 +104,17 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     std::vector<Track> out;
     while (st.step()) {
         Track t;
-        fillTrackFromStmt(st.get(), t);
+        detail::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
     return out;
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>
-searchLike(Database& db, std::string_view term, int limit = 50) {
-    if (term.empty())
+searchLike(Database& db, std::string_view query, int limit = 50) {
+    if (query.empty())
         return std::vector<Track>{};
-    std::string esc = escapeLike(term);
+    std::string esc = detail::escapeLike(query);
     std::string pat = "%" + esc + "%";
     std::shared_lock lock(db.mutex());
     sqlite3* h = db.handle();
@@ -189,13 +140,16 @@ searchLike(Database& db, std::string_view term, int limit = 50) {
     std::vector<Track> out;
     while (st.step()) {
         Track t;
-        fillTrackFromStmt(st.get(), t);
+        detail::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
     return out;
 }
 
-// Unified search entry
+export std::string sanitizeFtsTerm(std::string_view term) {
+    return detail::sanitizeFtsTerm(term);
+}
+
 export std::expected<std::vector<Track>, caudio::utils::Error>
 search(Database& db, std::string_view query, int limit = 50) {
     return searchFts(db, query, limit);

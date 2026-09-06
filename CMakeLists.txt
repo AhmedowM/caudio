@@ -232,7 +232,10 @@ target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/
   src/db/scan.cppm
   src/db/search.cppm
   src/db/json.cppm
-  src/db/write_thread.cppm)
+  src/db/write_thread.cppm
+  src/db/statement.cppm
+  src/db/transaction.cppm
+  src/db/detail.cppm)
 target_include_directories(caudio_db PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -254,7 +257,10 @@ target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FIL
   src/db/scan.cppm
   src/db/search.cppm
   src/db/json.cppm
-  src/db/write_thread.cppm)
+  src/db/write_thread.cppm
+  src/db/statement.cppm
+  src/db/transaction.cppm
+  src/db/detail.cppm)
 target_include_directories(caudio_db_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -309,6 +315,9 @@ target_sources(caudio_combined PUBLIC
   src/db/search.cppm
   src/db/json.cppm
   src/db/write_thread.cppm
+  src/db/statement.cppm
+  src/db/transaction.cppm
+  src/db/detail.cppm
     ${CAUDIO_ENGINE_SOURCES}
 )
 target_include_directories(caudio_combined PUBLIC

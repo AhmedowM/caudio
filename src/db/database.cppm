@@ -20,223 +20,15 @@ import caudio.utils;
 import :types;
 import :schema;
 import :write_thread;
+import :statement;
+import :transaction;
+import :detail;
 
 export namespace caudio::db {
 
 struct DbOpts {
     std::size_t writeBatchSize = 256;
 };
-
-class Statement final {
-  public:
-    Statement() = default;
-    ~Statement() {
-        if (stmt_)
-            sqlite3_finalize(stmt_);
-    }
-    Statement(const Statement&) = delete;
-    Statement& operator=(const Statement&) = delete;
-    Statement(Statement&& o) noexcept : stmt_(o.stmt_) {
-        o.stmt_ = nullptr;
-    }
-    Statement& operator=(Statement&& o) noexcept {
-        if (this != &o) {
-            if (stmt_)
-                sqlite3_finalize(stmt_);
-            stmt_ = o.stmt_;
-            o.stmt_ = nullptr;
-        }
-        return *this;
-    }
-    [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3* db,
-                                                                    std::string_view sql) {
-        if (stmt_)
-            sqlite3_finalize(stmt_);
-        stmt_ = nullptr;
-        int rc = sqlite3_prepare_v2(db, sql.data(), static_cast<int>(sql.size()), &stmt_, nullptr);
-        if (rc != SQLITE_OK) {
-            std::string msg = db ? sqlite3_errmsg(db) : "prepare failed";
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, msg)};
-        }
-        return {};
-    }
-    void bindInt(int idx, int64_t v) {
-        if (stmt_)
-            sqlite3_bind_int64(stmt_, idx, v);
-    }
-    void bindDouble(int idx, double v) {
-        if (stmt_)
-            sqlite3_bind_double(stmt_, idx, v);
-    }
-    void bindText(int idx, std::string_view v) {
-        if (!stmt_)
-            return;
-        if (v.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
-            return;
-        sqlite3_bind_text(stmt_, idx, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
-    }
-    void bindBlob(int idx, const void* data, int n) {
-        if (stmt_)
-            sqlite3_bind_blob(stmt_, idx, data, n, SQLITE_TRANSIENT);
-    }
-    void bindNull(int idx) {
-        if (stmt_)
-            sqlite3_bind_null(stmt_, idx);
-    }
-    [[nodiscard]] bool step() {
-        if (!stmt_)
-            return false;
-        int rc = sqlite3_step(stmt_);
-        return rc == SQLITE_ROW;
-    }
-    [[nodiscard]] int stepDone() {
-        if (!stmt_)
-            return SQLITE_ERROR;
-        return sqlite3_step(stmt_);
-    }
-    int64_t columnInt(int idx) const {
-        return stmt_ ? sqlite3_column_int64(stmt_, idx) : 0;
-    }
-    double columnDouble(int idx) const {
-        return stmt_ ? sqlite3_column_double(stmt_, idx) : 0.0;
-    }
-    std::string columnText(int idx) const {
-        if (!stmt_)
-            return {};
-        const char* v = reinterpret_cast<const char*>(sqlite3_column_text(stmt_, idx));
-        return v ? std::string(v) : std::string{};
-    }
-    const void* columnBlob(int idx, int& n) const {
-        if (!stmt_) {
-            n = 0;
-            return nullptr;
-        }
-        n = sqlite3_column_bytes(stmt_, idx);
-        return sqlite3_column_blob(stmt_, idx);
-    }
-    void reset() {
-        if (stmt_) {
-            sqlite3_reset(stmt_);
-            sqlite3_clear_bindings(stmt_);
-        }
-    }
-    sqlite3_stmt* get() const {
-        return stmt_;
-    }
-    [[nodiscard]] explicit operator bool() const {
-        return stmt_ != nullptr;
-    }
-
-  private:
-    sqlite3_stmt* stmt_{nullptr};
-};
-
-class Transaction final {
-  public:
-    explicit Transaction(sqlite3* db) : db_(db) {
-        if (db_) {
-            char* err = nullptr;
-            int rc = sqlite3_exec(db_, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-            if (rc != SQLITE_OK) {
-                if (err)
-                    sqlite3_free(err);
-                db_ = nullptr;
-            } else {
-                active_ = true;
-            }
-        }
-    }
-    ~Transaction() {
-        if (active_ && db_)
-            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
-    }
-    Transaction(const Transaction&) = delete;
-    Transaction& operator=(const Transaction&) = delete;
-    Transaction(Transaction&& o) noexcept : db_(o.db_), active_(o.active_) {
-        o.db_ = nullptr;
-        o.active_ = false;
-    }
-    Transaction& operator=(Transaction&& o) noexcept {
-        if (this != &o) {
-            if (active_ && db_)
-                sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
-            db_ = o.db_;
-            active_ = o.active_;
-            o.db_ = nullptr;
-            o.active_ = false;
-        }
-        return *this;
-    }
-    [[nodiscard]] caudio::utils::Error commit() {
-        if (!db_ || !active_)
-            return caudio::utils::makeError(caudio::utils::Result::Internal, "no transaction");
-        char* err = nullptr;
-        int rc = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
-        if (rc != SQLITE_OK) {
-            std::string msg = err ? err : "commit failed";
-            if (err)
-                sqlite3_free(err);
-            return caudio::utils::makeError(caudio::utils::Result::Internal, msg);
-        }
-        active_ = false;
-        db_ = nullptr;
-        return caudio::utils::Error{};
-    }
-    bool active() const {
-        return active_;
-    }
-
-  private:
-    sqlite3* db_{nullptr};
-    bool active_{false};
-};
-
-// forward decl helpers
-inline void fillTrackFromStmt(sqlite3_stmt* s, Track& out) {
-    out.id = sqlite3_column_int64(s, 0);
-    int n = 0;
-    const void* fp = sqlite3_column_blob(s, 1);
-    n = sqlite3_column_bytes(s, 1);
-    out.fingerprint.fill(0);
-    if (fp && n == 32)
-        std::memcpy(out.fingerprint.data(), fp, 32);
-    else if (fp && n > 0)
-        std::memcpy(out.fingerprint.data(), fp, n > 32 ? 32 : n);
-    auto txt = [&](int c) {
-        const unsigned char* p = sqlite3_column_text(s, c);
-        return p ? std::string((const char*)p) : std::string{};
-    };
-    out.path = txt(2);
-    out.deleted_at = sqlite3_column_int64(s, 3);
-    out.size = sqlite3_column_int64(s, 4);
-    out.mtime = sqlite3_column_int64(s, 5);
-    out.duration = sqlite3_column_double(s, 6);
-    out.sample_rate = (uint32_t)sqlite3_column_int(s, 7);
-    out.channels = (uint32_t)sqlite3_column_int(s, 8);
-    out.bitrate = sqlite3_column_int(s, 9);
-    out.title = txt(10);
-    out.artist = txt(11);
-    out.album = txt(12);
-    out.albumArtist = txt(13);
-    out.genre = txt(14);
-    out.year = sqlite3_column_int(s, 15);
-    out.track_num = sqlite3_column_int(s, 16);
-    out.disc_num = sqlite3_column_int(s, 17);
-    out.cover_art_path = txt(18);
-    out.rating = sqlite3_column_int(s, 19);
-    out.play_count = sqlite3_column_int64(s, 20);
-    out.last_played = sqlite3_column_int64(s, 21);
-    out.date_added = sqlite3_column_int64(s, 22);
-    out.last_scanned = sqlite3_column_int64(s, 23);
-    out.dirty = sqlite3_column_int(s, 24);
-    out.library_id = sqlite3_column_int64(s, 25);
-}
-
-inline constexpr std::string_view kSelectTracksCols =
-    "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
-    "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
-    "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, library_id "
-    "FROM tracks";
 
 class Database final {
   public:
@@ -527,7 +319,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(kSelectTracksCols) + " WHERE id=?";
+        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE id=?";
         std::unique_lock<std::mutex> cacheLk(cacheMutex_);
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -537,7 +329,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            fillTrackFromStmt(st.get(), t);
+            detail::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -549,7 +341,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(kSelectTracksCols) + " WHERE fingerprint=?";
+        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE fingerprint=?";
         std::unique_lock<std::mutex> cacheLk(cacheMutex_);
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -559,7 +351,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            fillTrackFromStmt(st.get(), t);
+            detail::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -570,7 +362,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(kSelectTracksCols) + " WHERE path=?";
+        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE path=?";
         std::unique_lock<std::mutex> cacheLk(cacheMutex_);
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -580,7 +372,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            fillTrackFromStmt(st.get(), t);
+            detail::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -592,7 +384,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(kSelectTracksCols) + " WHERE 1=1";
+        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE 1=1";
         if (q) {
             if (q->has_library_id)
                 sql += " AND library_id=?";
@@ -622,7 +414,7 @@ class Database final {
         Statement st;
         if (auto e = st.prepare(db_, sql); !e)
             return std::unexpected{e.error()};
-        auto escapeLike = [](std::string_view s) {
+        auto escapeLike = [](std::string_view s) -> std::string {
             std::string o;
             o.reserve(s.size() * 2);
             for (char c : s) {
@@ -648,7 +440,7 @@ class Database final {
             if (q->has_dirty)
                 st.bindInt(idx++, q->dirty);
             if (!q->search.empty()) {
-                std::string esc = escapeLike(q->search);
+                std::string esc = detail::escapeLike(q->search);
                 likePat = "%" + esc + "%";
                 st.bindText(idx++, likePat);
                 st.bindText(idx++, likePat);
@@ -665,7 +457,7 @@ class Database final {
         std::vector<Track> out;
         while (st.step()) {
             Track t;
-            fillTrackFromStmt(st.get(), t);
+            detail::fillTrackFromStmt(st.get(), t);
             out.push_back(std::move(t));
         }
         return out;
@@ -965,7 +757,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(kSelectTracksCols) +
+        std::string sql = std::string(detail::kSelectTracksCols) +
                           " JOIN playlist_items pi ON pi.track_id=tracks.id "
                           "WHERE pi.playlist_id=? ORDER BY pi.position";
         Statement st;
@@ -975,7 +767,7 @@ class Database final {
         std::vector<Track> out;
         while (st.step()) {
             Track t;
-            fillTrackFromStmt(st.get(), t);
+            detail::fillTrackFromStmt(st.get(), t);
             out.push_back(std::move(t));
         }
         return out;

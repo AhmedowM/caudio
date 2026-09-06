@@ -342,7 +342,7 @@ class FfmpegDecoder final : public IDecoder {
             return false;
         }
 
-        // Setup resampler to float interleaved
+        // Setup resampler to float interleaved — preserve input channel layout exactly
         swr_ = swr_alloc();
         if (!swr_) {
             cleanup();
@@ -352,8 +352,9 @@ class FfmpegDecoder final : public IDecoder {
         AVChannelLayout inLayout{};
         av_channel_layout_copy(&inLayout, &dec_->ch_layout);
 
+        // Use same channel layout for output to preserve channel order/mapping
         AVChannelLayout outLayout{};
-        av_channel_layout_default(&outLayout, static_cast<int>(dec_->ch_layout.nb_channels));
+        av_channel_layout_copy(&outLayout, &dec_->ch_layout);
 
         av_opt_set_chlayout(swr_, "in_chlayout", &inLayout, 0);
         av_opt_set_int(swr_, "in_sample_rate", dec_->sample_rate, 0);
