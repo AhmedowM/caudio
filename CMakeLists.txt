@@ -115,6 +115,16 @@ add_library(caudio_rtaudio OBJECT vendor/RtAudio.cpp)
 target_include_directories(caudio_rtaudio PUBLIC vendor)
 set_target_properties(caudio_rtaudio PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# Vendor: BLAKE3 C core (portable + dispatch, no AVX/SSE - force portable)
+add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_dispatch.c vendor/blake3_portable.c)
+target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
+target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
+set_target_properties(blake3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# suppress GCC warnings in vendored C
+if(NOT MSVC)
+  target_compile_options(blake3 PRIVATE -w)
+endif()
+
 # Warnings
 set(CAUDIO_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
@@ -229,7 +239,7 @@ target_include_directories(caudio_db PUBLIC
 target_include_directories(caudio_db PRIVATE vendor)
 target_link_libraries(caudio_db PUBLIC caudio::utils Threads::Threads)
   target_include_directories(caudio_db PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-target_sources(caudio_db PRIVATE $<TARGET_OBJECTS:caudio_sqlite>)
+target_sources(caudio_db PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db)
 
@@ -251,7 +261,7 @@ target_include_directories(caudio_db_shared PUBLIC
 target_include_directories(caudio_db_shared PRIVATE vendor)
 target_link_libraries(caudio_db_shared PUBLIC caudio::utils_shared Threads::Threads)
   target_include_directories(caudio_db_shared PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-target_sources(caudio_db_shared PRIVATE $<TARGET_OBJECTS:caudio_sqlite>)
+target_sources(caudio_db_shared PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_db_shared PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db_shared)
 
@@ -307,7 +317,7 @@ target_include_directories(caudio_combined PUBLIC
 target_include_directories(caudio_combined PRIVATE vendor)
 target_link_libraries(caudio_combined PUBLIC Threads::Threads)
   target_include_directories(caudio_combined PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-target_sources(caudio_combined PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:caudio_rtaudio>)
+target_sources(caudio_combined PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:caudio_rtaudio> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_combined PUBLIC SQLITE_ENABLE_FTS5=1)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
