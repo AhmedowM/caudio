@@ -408,19 +408,12 @@ class FfmpegDecoder final : public IDecoder {
             avcodec_free_context(&dec_);
             dec_ = nullptr;
         }
-        // avformat_close_input must come before avio free for custom IO
         if (fmt_) {
-            // prevent avformat_close_input from freeing our custom pb twice
-            // it will free fmt but not our avio if AVFMT_FLAG_CUSTOM_IO is set
-            AVIOContext* savedPb = fmt_->pb;
+            // Prevent avformat_close_input from freeing our custom pb.
+            // With AVFMT_FLAG_CUSTOM_IO, avformat_close_input does NOT free pb.
             fmt_->pb = nullptr;
             avformat_close_input(&fmt_);
             fmt_ = nullptr;
-            // if we saved pb, restore to avio_ for later free (avoid double)
-            if (savedPb && savedPb != avio_) {
-                // shouldn't happen, but free saved if different
-                avio_context_free(&savedPb);
-            }
         }
         if (avio_) {
             // avio_context_free also frees the buffer allocated via av_malloc
