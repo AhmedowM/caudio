@@ -256,9 +256,15 @@ target_compile_definitions(caudio_db_shared PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db_shared)
 
 # caudio::engine
+set(CAUDIO_ENGINE_SOURCES
+  src/engine/engine.cppm
+  src/engine/types.cppm
+  src/engine/history_policy.cppm
+  src/engine/queue_logic.cppm
+)
 add_library(caudio_engine STATIC)
 add_library(caudio::engine ALIAS caudio_engine)
-target_sources(caudio_engine PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/engine/engine.cppm)
+target_sources(caudio_engine PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_ENGINE_SOURCES})
 target_include_directories(caudio_engine PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -269,7 +275,7 @@ ca_set_warnings(caudio_engine)
 add_library(caudio_engine_shared SHARED)
 set_target_properties(caudio_engine_shared PROPERTIES OUTPUT_NAME caudio_engine)
 add_library(caudio::engine_shared ALIAS caudio_engine_shared)
-target_sources(caudio_engine_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/engine/engine.cppm)
+target_sources(caudio_engine_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_ENGINE_SOURCES})
 target_include_directories(caudio_engine_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -292,7 +298,7 @@ target_sources(caudio_combined PUBLIC
   src/db/search.cppm
   src/db/json.cppm
   src/db/write_thread.cppm
-    src/engine/engine.cppm
+    ${CAUDIO_ENGINE_SOURCES}
 )
 target_include_directories(caudio_combined PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

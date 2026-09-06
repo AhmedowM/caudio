@@ -23,6 +23,10 @@ module;
 
 export module caudio.engine;
 
+export import :types;
+export import :history_policy;
+export import :queue_logic;
+
 import caudio.utils;
 import caudio.player;
 import caudio.db;
@@ -32,88 +36,6 @@ export namespace caudio::engine {
 constexpr std::string_view toString(caudio::utils::Result r) noexcept {
     return caudio::utils::toString(r);
 }
-
-enum class RepeatMode : int { Off = 0, Queue = 1, One = 2 };
-
-enum class ShuffleMode : int { Off = 0, On = 1 };
-
-enum class PlaybackState : int { Stopped = 0, Ready = 1, Playing = 2, Paused = 3 };
-
-enum class EngineEventType : int {
-    None = 0,
-    TrackStarted = 1,
-    TrackEnded = 2,
-    QueueChanged = 3,
-    Progress = 4,
-    Error = 5
-};
-
-struct EngineEvent {
-    EngineEventType type{EngineEventType::None};
-    int64_t trackId{0};
-    int64_t queueId{1};
-    double position{0.0};
-    double duration{0.0};
-    std::string msg{};
-};
-
-struct EngineCallbacks {
-    std::function<void(int64_t trackId)> onTrackStarted{};
-    std::function<void(int64_t trackId, double pct)> onTrackEnded{};
-    std::function<void(int64_t queueId)> onQueueChanged{};
-    std::function<void(caudio::utils::Result err, std::string_view msg)> onError{};
-    void* user{nullptr};
-};
-
-struct EngineConfig {
-    bool enableMonitorThread{true};
-    int pollMs{10};
-    int gaplessMs{300};
-    int historyThresholdPct{60};
-    int historyThresholdSecs{90};
-    EngineCallbacks callbacks{};
-};
-
-struct QueueState {
-    bool shuffle{false};
-    RepeatMode repeat{RepeatMode::Off};
-    std::vector<int64_t> perm{};
-    size_t cursor{0};
-    int64_t queueId{1};
-};
-
-struct EngineState {
-    int shuffleEnabled{0};
-    RepeatMode repeatMode{RepeatMode::Off};
-    int64_t cursorPos{0};
-    int64_t currentTrackId{0};
-    float volume{1.0f};
-};
-
-namespace detail {
-
-inline uint64_t nowMs() noexcept {
-    using namespace std::chrono;
-    return (uint64_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
-}
-
-inline bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr,
-                               int secsThr) noexcept {
-    if (marked)
-        return false;
-    double pct = pctThr > 0 ? (double)pctThr / 100.0 : 0.6;
-    double secs = secsThr > 0 ? (double)secsThr : 90.0;
-    if (duration > 0.0 && pos / duration >= pct)
-        return true;
-    if (pos >= secs)
-        return true;
-    return false;
-}
-inline bool shouldMarkPlayed(double duration, double pos, bool marked) noexcept {
-    return shouldMarkPlayedEx(duration, pos, marked, 60, 90);
-}
-
-} // namespace detail
 
 class Engine final {
   public:
@@ -865,19 +787,6 @@ class Engine final {
             if (!tr)
                 return std::unexpected(tr.error());
             return tr.value();
-        }
-    }
-
-    void shufflePerm(std::vector<int64_t>& perm) {
-        if (perm.size() <= 1)
-            return;
-        // Fisher-Yates using random_device
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        for (size_t i = perm.size() - 1; i > 0; --i) {
-            std::uniform_int_distribution<size_t> dist(0, i);
-            size_t j = dist(gen);
-            std::swap(perm[i], perm[j]);
         }
     }
 
