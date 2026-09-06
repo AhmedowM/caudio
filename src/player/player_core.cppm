@@ -418,8 +418,8 @@ class Player {
             }
 
             std::size_t samples = frames * ch;
-            std::size_t written = ring_->write(std::span<float>(buffer.data(), samples));
-            if (written < samples) {
+            std::size_t writtenFrames = ring_->write(std::span<float>(buffer.data(), samples));
+            if (writtenFrames < frames) {
                 // Ring full, will retry next iteration
             }
         }

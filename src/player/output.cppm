@@ -126,14 +126,15 @@ class AudioOutput {
         ma_uint32 channels = pDevice->playback.channels;
         ma_uint32 totalSamples = frameCount * channels;
 
-        std::size_t generated = 0;
+        std::size_t generatedFrames = 0;
         if (self->cfg_.ring) {
-            generated = self->cfg_.ring->read(std::span<float>(output, totalSamples));
+            generatedFrames = self->cfg_.ring->read(std::span<float>(output, totalSamples));
         }
+        std::size_t generatedSamples = generatedFrames * channels;
 
         // Underrun: fill remainder with silence (no beep)
-        if (generated < totalSamples) {
-            for (std::size_t i = generated; i < totalSamples; ++i)
+        if (generatedSamples < totalSamples) {
+            for (std::size_t i = generatedSamples; i < totalSamples; ++i)
                 output[i] = 0.0f;
         }
 
