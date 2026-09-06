@@ -9,6 +9,7 @@ module;
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 
 export module caudio.db:write_thread;
 
@@ -27,32 +28,52 @@ struct WriteOp {
         : sql(std::move(s)), stmt(st), cb(std::move(c)) {}
     WriteOp(const WriteOp&) = delete;
     WriteOp& operator=(const WriteOp&) = delete;
-    WriteOp(WriteOp&& o) noexcept : sql(std::move(o.sql)), stmt(o.stmt), cb(std::move(o.cb)) {
-        o.stmt = nullptr;
-    }
+    WriteOp(WriteOp&& o) noexcept
+        : sql(std::move(o.sql)), stmt(std::exchange(o.stmt, nullptr)), cb(std::move(o.cb)) {}
     WriteOp& operator=(WriteOp&& o) noexcept {
         if (this != &o) {
             sql = std::move(o.sql);
             if (stmt)
                 sqlite3_finalize(stmt);
-            stmt = o.stmt;
-            o.stmt = nullptr;
+            stmt = std::exchange(o.stmt, nullptr);
             cb = std::move(o.cb);
         }
         return *this;
     }
-    ~WriteOp() { /* stmt finalized in worker, not here; avoid double finalize */ }
+    ~WriteOp() {
+        if (stmt)
+            sqlite3_finalize(stmt);
+    }
 };
 
 class WriterThread final {
   public:
-    WriterThread() = default;
+    explicit WriterThread(std::size_t writeBatchSize = 256)
+        : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(
+              writeBatchSize > 0 ? writeBatchSize : 256)) {}
     ~WriterThread() {
         close();
     }
 
     WriterThread(const WriterThread&) = delete;
     WriterThread& operator=(const WriterThread&) = delete;
+
+    WriterThread(WriterThread&& o) noexcept
+        : queue_(std::move(o.queue_)),
+          db_(std::exchange(o.db_, nullptr)),
+          thread_(std::move(o.thread_)),
+          in_flight_(o.in_flight_.load(std::memory_order_acquire)) {}
+    WriterThread& operator=(WriterThread&& o) noexcept {
+        if (this != &o) {
+            close();
+            queue_ = std::move(o.queue_);
+            db_ = std::exchange(o.db_, nullptr);
+            thread_ = std::move(o.thread_);
+            in_flight_.store(o.in_flight_.load(std::memory_order_acquire),
+                             std::memory_order_release);
+        }
+        return *this;
+    }
 
     void open(sqlite3* db) {
         if (thread_.joinable())
@@ -67,13 +88,11 @@ class WriterThread final {
             cv_.notify_all();
             thread_.join();
         }
-        // drain remaining stmts
+        // drain remaining stmts - WriteOp destructor handles finalization
         while (true) {
-            auto v = queue_.pop();
+            auto v = queue_->pop();
             if (!v)
                 break;
-            if (v->stmt)
-                sqlite3_finalize(v->stmt);
         }
     }
 
@@ -81,30 +100,17 @@ class WriterThread final {
     push(std::string sql, sqlite3_stmt* stmt,
          std::function<void(std::expected<void, caudio::utils::Error>)> cb) {
         WriteOp op{std::move(sql), stmt, std::move(cb)};
-        auto r = queue_.push(std::move(op));
+        auto r = queue_->push(std::move(op));
         if (!r)
             return std::unexpected{r.error()};
-        {
-            std::lock_guard<std::mutex> lk(mtx_);
-            (void)lk;
-        }
         cv_.notify_one();
-        return {};
-    }
-
-    // compat overload for old stub: push from WriteOp object
-    std::expected<void, caudio::utils::Error>
-    write(std::string sql, std::unique_ptr<void, void (*)(void*)> /*stmt*/,
-          std::function<void(std::expected<void, caudio::utils::Error>)> cb) {
-        (void)sql;
-        (void)cb;
         return {};
     }
 
     std::expected<void, caudio::utils::Error> flush() {
         auto start = std::chrono::steady_clock::now();
         while (true) {
-            std::size_t s = queue_.size();
+            std::size_t s = queue_->size();
             int flight = in_flight_.load(std::memory_order_acquire);
             if (s == 0 && flight == 0)
                 return {};
@@ -112,7 +118,7 @@ class WriterThread final {
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
             if (elapsed.count() >= 200) {
                 // re-check
-                s = queue_.size();
+                s = queue_->size();
                 flight = in_flight_.load(std::memory_order_acquire);
                 if (s == 0 && flight == 0)
                     return {};
@@ -124,10 +130,10 @@ class WriterThread final {
     }
 
     bool empty() const {
-        return queue_.empty();
+        return queue_->empty();
     }
     std::size_t size() const {
-        return queue_.size();
+        return queue_->size();
     }
 
   private:
@@ -135,12 +141,12 @@ class WriterThread final {
         while (!st.stop_requested()) {
             std::unique_lock<std::mutex> lk(mtx_);
             cv_.wait_for(lk, std::chrono::milliseconds{200},
-                         [this, &st] { return !queue_.empty() || st.stop_requested(); });
-            if (st.stop_requested() && queue_.empty())
+                         [this, &st] { return !queue_->empty() || st.stop_requested(); });
+            if (st.stop_requested() && queue_->empty())
                 break;
             // pop all available up to batch? single for now; don't hold lock during exec
             lk.unlock();
-            auto popped = queue_.pop();
+            auto popped = queue_->pop();
             if (!popped.has_value()) {
                 // if empty, continue waiting
                 if (st.stop_requested())
@@ -182,7 +188,7 @@ class WriterThread final {
         }
     }
 
-    caudio::utils::MpscQueue<WriteOp> queue_{256};
+    std::unique_ptr<caudio::utils::MpscQueue<WriteOp>> queue_;
     sqlite3* db_{nullptr};
     std::jthread thread_{};
     std::mutex mtx_;

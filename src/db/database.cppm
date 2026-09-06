@@ -19,8 +19,13 @@ export module caudio.db:database;
 import caudio.utils;
 import :types;
 import :schema;
+import :write_thread;
 
 export namespace caudio::db {
+
+struct DbOpts {
+    std::size_t writeBatchSize = 256;
+};
 
 class Statement final {
   public:
@@ -236,7 +241,9 @@ inline constexpr std::string_view kSelectTracksCols =
 class Database final {
   public:
     Database() = default;
+    explicit Database(const DbOpts& opts) : writer_(opts.writeBatchSize) {}
     ~Database() {
+        writer_.close();
         {
             std::lock_guard<std::mutex> lk(cacheMutex_);
             stmtCache_.clear();
@@ -246,7 +253,7 @@ class Database final {
     }
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
-    Database(Database&& o) noexcept : db_(o.db_) {
+    Database(Database&& o) noexcept : writer_(std::move(o.writer_)), db_(o.db_) {
         o.db_ = nullptr;
         // cache stays empty for moved-from; moved-to starts empty (statements tied to old handle)
         // if o had cached stmts they are cleared (handle moved)
@@ -257,12 +264,14 @@ class Database final {
     }
     Database& operator=(Database&& o) noexcept {
         if (this != &o) {
+            writer_.close();
             {
                 std::lock_guard<std::mutex> lk(cacheMutex_);
                 stmtCache_.clear();
             }
             if (db_)
                 sqlite3_close(db_);
+            writer_ = std::move(o.writer_);
             db_ = o.db_;
             o.db_ = nullptr;
             {
@@ -323,7 +332,7 @@ class Database final {
         return raw;
     }
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
-    open(std::string_view path) {
+    open(std::string_view path, const DbOpts& opts = {}) {
         std::string dbPath = path.empty() ? ":memory:" : std::string(path);
         sqlite3* raw = nullptr;
         int rc =
@@ -354,8 +363,9 @@ class Database final {
         }
         if (err)
             sqlite3_free(err);
-        auto db = std::make_unique<Database>();
+        auto db = std::make_unique<Database>(opts);
         db->db_ = raw;
+        db->writer_.open(raw);
         return db;
     }
     sqlite3* handle() const {
@@ -364,7 +374,18 @@ class Database final {
     std::shared_mutex& mutex() const {
         return m_;
     }
+    std::expected<void, caudio::utils::Error> flush() {
+        return writer_.flush();
+    }
 
+  private:
+    WriterThread writer_;
+    sqlite3* db_{nullptr};
+    mutable std::shared_mutex m_;
+    mutable std::unordered_map<std::string, std::unique_ptr<Statement>> stmtCache_;
+    mutable std::mutex cacheMutex_;
+
+  public:
     // Track CRUD
     std::expected<int64_t, caudio::utils::Error> insertTrack(const Track& t) {
         std::unique_lock lock{m_};
@@ -1436,18 +1457,13 @@ class Database final {
                 t.fingerprint[i] = (uint8_t)(h >> ((i % 8) * 8));
                 h = h * 6364136223846793005ULL + 1;
             }
-        }
+}
         auto r = insertTrack(t);
         if (!r)
             return std::unexpected{r.error()};
         return {};
     }
 
-  private:
-    sqlite3* db_{nullptr};
-    mutable std::shared_mutex m_;
-    mutable std::unordered_map<std::string, std::unique_ptr<Statement>> stmtCache_;
-    mutable std::mutex cacheMutex_;
-};
+}; // class Database
 
 } // namespace caudio::db
