@@ -55,6 +55,13 @@ struct QueueItem {
     int64_t added{};
 };
 
+struct Queue {
+    int64_t id{};
+    std::string name;
+    int32_t repeat_mode{};
+    int64_t library_id{1};
+};
+
 struct HistoryEntry {
     int64_t id{};
     int64_t trackId{};

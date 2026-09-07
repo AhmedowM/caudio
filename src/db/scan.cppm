@@ -20,19 +20,23 @@ export module caudio.db:scan;
 
 import caudio.utils;
 import :types;
-import :database;
 import :detail;
+import :database;
 
 namespace caudio::db {
 
 export enum class ScanMode { Sampled, Full };
 
-export inline bool hasAudioExt(const std::filesystem::path& p) {
+namespace detail {
+
+inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
 }
+
+} // namespace detail
 
 // Generator-based scan: yields Tracks lazily
 export std::generator<Track> scan(const std::filesystem::path& root,
@@ -43,7 +47,7 @@ export std::generator<Track> scan(const std::filesystem::path& root,
     for (auto it = std::filesystem::recursive_directory_iterator(
              root, std::filesystem::directory_options::skip_permission_denied, ec);
          it != std::filesystem::recursive_directory_iterator(); ++it) {
-        if (it->is_regular_file(ec) && hasAudioExt(it->path())) {
+        if (it->is_regular_file(ec) && detail::hasAudioExt(it->path())) {
             Track t;
             t.path = it->path().string();
             std::error_code e2;

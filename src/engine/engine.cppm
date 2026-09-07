@@ -619,27 +619,6 @@ class Engine final {
         });
     }
 
-    // Queue helpers
-    size_t queueCountLocked(int64_t qid) {
-        if (qid == 0)
-            qid = 1;
-        auto* h = dbHandle();
-        auto* m = dbMutex();
-        if (!h || !m)
-            return 0;
-        std::shared_lock<std::shared_mutex> lk(*m);
-        const char* sql = "SELECT COUNT(*) FROM queue WHERE queue_id=?";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(h, sql, -1, &stmt, nullptr) != SQLITE_OK)
-            return 0;
-        sqlite3_bind_int64(stmt, 1, qid);
-        size_t cnt = 0;
-        if (sqlite3_step(stmt) == SQLITE_ROW)
-            cnt = (size_t)sqlite3_column_int64(stmt, 0);
-        sqlite3_finalize(stmt);
-        return cnt;
-    }
-
     std::expected<void, caudio::utils::Error> persistShuffleBlobLocked() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql =
@@ -734,7 +713,7 @@ class Engine final {
         if (want) {
             queue_.perm.clear();
             queue_.cursor = 0;
-            size_t cnt = queueCountLocked(queue_.queueId);
+            size_t cnt = db_->queueCountLocked(queue_.queueId);
             if (cnt == 0) {
                 queue_.shuffle = true;
                 queue_.perm.clear();
@@ -776,7 +755,7 @@ class Engine final {
             queue_.queueId = 1;
         if (queue_.shuffle) {
             if (queue_.perm.empty()) {
-                size_t cnt = queueCountLocked(queue_.queueId);
+                size_t cnt = db_->queueCountLocked(queue_.queueId);
                 if (cnt == 0)
                     return std::unexpected(
                         caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
@@ -815,7 +794,7 @@ class Engine final {
             out = tr.value();
             return {};
         }
-        size_t cnt = queueCountLocked(queue_.queueId);
+        size_t cnt = db_->queueCountLocked(queue_.queueId);
         if (cnt == 0)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));

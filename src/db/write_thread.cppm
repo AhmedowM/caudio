@@ -6,6 +6,7 @@ module;
 #include <condition_variable>
 #include <expected>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -14,36 +15,24 @@ module;
 export module caudio.db:write_thread;
 
 import caudio.utils;
+import :statement;
 
 export namespace caudio::db {
 
 struct WriteOp {
     std::string sql;
-    sqlite3_stmt* stmt{nullptr};
+    std::unique_ptr<Statement> stmt;
     std::function<void(std::expected<void, caudio::utils::Error>)> cb;
 
     WriteOp() = default;
-    WriteOp(std::string s, sqlite3_stmt* st,
+    WriteOp(std::string s, std::unique_ptr<Statement> st,
             std::function<void(std::expected<void, caudio::utils::Error>)> c)
-        : sql(std::move(s)), stmt(st), cb(std::move(c)) {}
+        : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
     WriteOp(const WriteOp&) = delete;
     WriteOp& operator=(const WriteOp&) = delete;
-    WriteOp(WriteOp&& o) noexcept
-        : sql(std::move(o.sql)), stmt(std::exchange(o.stmt, nullptr)), cb(std::move(o.cb)) {}
-    WriteOp& operator=(WriteOp&& o) noexcept {
-        if (this != &o) {
-            sql = std::move(o.sql);
-            if (stmt)
-                sqlite3_finalize(stmt);
-            stmt = std::exchange(o.stmt, nullptr);
-            cb = std::move(o.cb);
-        }
-        return *this;
-    }
-    ~WriteOp() {
-        if (stmt)
-            sqlite3_finalize(stmt);
-    }
+    WriteOp(WriteOp&&) noexcept = default;
+    WriteOp& operator=(WriteOp&&) noexcept = default;
+    ~WriteOp() = default;
 };
 
 class WriterThread final {
@@ -97,9 +86,9 @@ class WriterThread final {
     }
 
     std::expected<void, caudio::utils::Error>
-    push(std::string sql, sqlite3_stmt* stmt,
+    push(std::string sql, std::unique_ptr<Statement> stmt,
          std::function<void(std::expected<void, caudio::utils::Error>)> cb) {
-        WriteOp op{std::move(sql), stmt, std::move(cb)};
+        WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
         auto r = queue_->push(std::move(op));
         if (!r)
             return std::unexpected{r.error()};
@@ -158,14 +147,13 @@ class WriterThread final {
             caudio::utils::Error err{};
             bool ok = true;
             if (op.stmt) {
-                int rc = sqlite3_step(op.stmt);
+                int rc = op.stmt->stepDone();
                 if (rc != SQLITE_DONE && rc != SQLITE_ROW && rc != SQLITE_OK) {
                     err = caudio::utils::makeError(caudio::utils::Result::Corrupt,
                                                    sqlite3_errmsg(db_));
                     ok = false;
                 }
-                sqlite3_finalize(op.stmt);
-                op.stmt = nullptr;
+                // stmt finalized by unique_ptr destructor
             } else if (!op.sql.empty() && db_) {
                 char* e = nullptr;
                 int rc = sqlite3_exec(db_, op.sql.c_str(), nullptr, nullptr, &e);

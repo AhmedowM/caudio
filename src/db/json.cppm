@@ -17,6 +17,7 @@ export module caudio.db:json;
 
 import caudio.utils;
 import :types;
+import :detail;
 import :database;
 
 namespace caudio::db {

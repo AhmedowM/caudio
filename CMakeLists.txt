@@ -227,6 +227,7 @@ set(CAUDIO_DB_SOURCES
   src/db/types.cppm
   src/db/schema.cppm
   src/db/database.cppm
+  src/db/queue.cppm
   src/db/scan.cppm
   src/db/search.cppm
   src/db/json.cppm

@@ -172,17 +172,30 @@ TEST_CASE("scan empty dir returns empty", "[db_scan]") {
     std::filesystem::remove_all(dir, ec);
 }
 
-TEST_CASE("hasAudioExt case-insensitive .MP3 .m4a", "[db_scan]") {
-    REQUIRE(hasAudioExt(std::filesystem::path("song.MP3")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.mp3")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.Mp3")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.m4a")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.M4A")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.FLAC")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.WAV")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.OGG")) == true);
-    REQUIRE(hasAudioExt(std::filesystem::path("song.txt")) == false);
-    REQUIRE(hasAudioExt(std::filesystem::path("song")) == false);
+TEST_CASE("scanDirectory filters by audio extensions case-insensitively", "[db_scan]") {
+    auto dir = tempDirPath("ext_test");
+    // Clean up any existing files
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+    std::filesystem::create_directories(dir);
+    // Create files with various extensions - use unique base names to avoid case-insensitive FS collisions
+    std::ofstream(dir / "a.MP3", std::ios::binary) << "audio";
+    std::ofstream(dir / "b.mp3", std::ios::binary) << "audio";
+    std::ofstream(dir / "c.Mp3", std::ios::binary) << "audio";
+    std::ofstream(dir / "d.m4a", std::ios::binary) << "audio";
+    std::ofstream(dir / "e.M4A", std::ios::binary) << "audio";
+    std::ofstream(dir / "f.FLAC", std::ios::binary) << "audio";
+    std::ofstream(dir / "g.WAV", std::ios::binary) << "audio";
+    std::ofstream(dir / "h.OGG", std::ios::binary) << "audio";
+    std::ofstream(dir / "i.txt", std::ios::binary) << "not audio";
+    std::ofstream(dir / "j", std::ios::binary) << "no ext";
+
+    auto tracks = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks.has_value());
+    // Only 8 audio files should be found
+    REQUIRE(tracks->size() == 8);
+
+    std::filesystem::remove_all(dir, ec);
 }
 
 TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {

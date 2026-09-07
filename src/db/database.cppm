@@ -19,6 +19,7 @@ export module caudio.db:database;
 import caudio.utils;
 import :types;
 import :schema;
+import :queue;
 import :write_thread;
 import :statement;
 import :transaction;
@@ -767,181 +768,93 @@ class Database final {
         return out;
     }
 
-    // Queue
-std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
-                                                            int64_t pos = -1) {
+// Queue (forwarded to queue partition)
+    std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
+                                                             int64_t pos = -1) {
         std::unique_lock lock{m_};
         return queueEnqueueLocked(qid, tid, pos);
     }
 
     std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
-                                                                 int64_t pos = -1) {
-        if (tid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
-        if (qid == 0)
-            qid = 1;
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::unique_lock<std::mutex> cacheLk(cacheMutex_);
-        if (pos < 0) {
-            auto sRes = getCachedForUse("SELECT COALESCE(MAX(position), -1)+1 FROM queue WHERE queue_id=?");
-            if (sRes) {
-                Statement& ms = *(*sRes);
-                ms.bindInt(1, qid);
-                if (ms.step())
-                    pos = ms.columnInt(0);
-                ms.reset();
-            }
-            if (pos < 0)
-                pos = 0;
-        } else {
-            auto sRes = getCachedForUse("UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?");
-            if (sRes) {
-                Statement& ss = *(*sRes);
-                ss.bindInt(1, qid);
-                ss.bindInt(2, pos);
-                (void)ss.stepDone();
-                ss.reset();
-            }
-        }
-        auto sRes = getCachedForUse("INSERT INTO queue (queue_id, track_id, position) VALUES (?,?,?)");
-        if (!sRes)
-            return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
-        st.bindInt(1, qid);
-        st.bindInt(2, tid);
-        st.bindInt(3, pos);
-        int rc = st.stepDone();
-        st.reset();
-        if (rc != SQLITE_DONE)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_))};
-        return {};
+                                                                  int64_t pos = -1) {
+        return caudio::db::queueEnqueueLocked(db_, cacheMutex_, stmtCache_, qid, tid, pos);
     }
+
     std::expected<QueueItem, caudio::utils::Error> queueDequeue(int64_t qid) {
         std::unique_lock lock{m_};
         return queueDequeueLocked(qid);
     }
 
     std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid) {
-        if (qid == 0)
-            qid = 1;
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::unique_lock<std::mutex> cacheLk(cacheMutex_);
-        auto sRes = getCachedForUse("SELECT id, queue_id, track_id, position, added FROM queue "
-                                     "WHERE queue_id=? ORDER BY position LIMIT 1");
-        if (!sRes)
-            return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
-        st.bindInt(1, qid);
-        bool hasRow = st.step();
-        if (!hasRow) {
-            st.reset();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
-        }
-        QueueItem it;
-        it.id = st.columnInt(0);
-        it.queue_id = st.columnInt(1);
-        it.trackId = st.columnInt(2);
-        it.position = st.columnInt(3);
-        it.added = st.columnInt(4);
-        st.reset();
-        if (auto dRes = getCachedForUse("DELETE FROM queue WHERE id=?"); dRes) {
-            Statement& del = *(*dRes);
-            del.bindInt(1, it.id);
-            (void)del.stepDone();
-            del.reset();
-        }
-        if (auto shRes = getCachedForUse("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?");
-            shRes) {
-            Statement& sh = *(*shRes);
-            sh.bindInt(1, qid);
-            sh.bindInt(2, it.position);
-            (void)sh.stepDone();
-            sh.reset();
-        }
-        return it;
+        return caudio::db::queueDequeueLocked(db_, cacheMutex_, stmtCache_, qid);
     }
+
     std::expected<void, caudio::utils::Error> queueRemove(int64_t qid, int64_t pos) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lock{m_};
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::unique_lock<std::mutex> cacheLk(cacheMutex_);
-        auto sRes = getCachedForUse("DELETE FROM queue WHERE queue_id=? AND position=?");
-        if (!sRes)
-            return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
-        st.bindInt(1, qid);
-        st.bindInt(2, pos);
-        int rc = st.stepDone();
-        st.reset();
-        if (rc != SQLITE_DONE)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_))};
-        if (sqlite3_changes(db_) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
-        if (auto shRes = getCachedForUse("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?");
-            shRes) {
-            Statement& sh = *(*shRes);
-            sh.bindInt(1, qid);
-            sh.bindInt(2, pos);
-            (void)sh.stepDone();
-            sh.reset();
-        }
-        return {};
+        return caudio::db::queueRemoveLocked(db_, cacheMutex_, stmtCache_, qid, pos);
     }
+
     std::expected<void, caudio::utils::Error> queueClear(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lock{m_};
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::unique_lock<std::mutex> cacheLk(cacheMutex_);
-        auto sRes = getCachedForUse("DELETE FROM queue WHERE queue_id=?");
-        if (!sRes)
-            return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
-        st.bindInt(1, qid);
-        int rc = st.stepDone();
-        st.reset();
-        if (rc != SQLITE_DONE)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_))};
-        return {};
+        return caudio::db::queueClearLocked(db_, cacheMutex_, stmtCache_, qid);
     }
-    std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid) {
+
+std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lock{m_};
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::unique_lock<std::mutex> cacheLk(cacheMutex_);
-        auto sRes = getCachedForUse("SELECT id, queue_id, track_id, position, added FROM queue "
-                                     "WHERE queue_id=? ORDER BY position");
-        if (!sRes)
-            return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
-        st.bindInt(1, qid);
-        std::vector<QueueItem> out;
-        while (st.step()) {
-            QueueItem it;
-            it.id = st.columnInt(0);
-            it.queue_id = st.columnInt(1);
-            it.trackId = st.columnInt(2);
-            it.position = st.columnInt(3);
-            it.added = st.columnInt(4);
-            out.push_back(it);
-        }
-        st.reset();
-        return out;
+        return caudio::db::queueListLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
+    std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItems(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        std::shared_lock lock{m_};
+        return caudio::db::getQueueItemsLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
+    std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        std::shared_lock lock{m_};
+        return caudio::db::getQueueLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
+    std::expected<std::vector<Queue>, caudio::utils::Error> listQueues() {
+        std::shared_lock lock{m_};
+        return caudio::db::listQueuesLocked(db_, cacheMutex_, stmtCache_);
+    }
+
+    std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name, int64_t library_id = 1) {
+        if (name.empty())
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+        std::unique_lock lock{m_};
+        return caudio::db::createQueueLocked(db_, cacheMutex_, stmtCache_, name, library_id);
+    }
+
+    std::expected<void, caudio::utils::Error> deleteQueue(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        std::unique_lock lock{m_};
+        return caudio::db::deleteQueueLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
+    std::expected<void, caudio::utils::Error> setQueueRepeat(int64_t qid, int repeat_mode) {
+        if (qid == 0)
+            qid = 1;
+        std::unique_lock lock{m_};
+        return caudio::db::setQueueRepeatLocked(db_, cacheMutex_, stmtCache_, qid, repeat_mode);
+    }
+
+    size_t queueCountLocked(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        std::shared_lock lock{m_};
+        return caudio::db::queueCountLocked(db_, cacheMutex_, stmtCache_, qid);
     }
 
     // History

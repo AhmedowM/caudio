@@ -16,8 +16,8 @@ export module caudio.db:search;
 
 import caudio.utils;
 import :types;
-import :database;
 import :detail;
+import :database;
 
 namespace caudio::db {
 

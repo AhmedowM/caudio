@@ -115,11 +115,9 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         REQUIRE(sqlite3_exec(db,"CREATE TABLE t(id INTEGER)",nullptr,nullptr,nullptr)==SQLITE_OK);
         caudio::db::WriterThread wt(4);
         wt.open(db);
-        // push an insert
-        sqlite3_stmt* st=nullptr;
-        REQUIRE(sqlite3_prepare_v2(db,"INSERT INTO t(id) VALUES (1)",-1,&st,nullptr)==SQLITE_OK);
+        // push an insert using SQL string (stmt=nullptr)
         std::atomic<bool> cbCalled{false};
-        auto pr = wt.push("", st, [&](std::expected<void, caudio::utils::Error> e){ cbCalled.store(true); (void)e; });
+        auto pr = wt.push("INSERT INTO t(id) VALUES (1)", nullptr, [&](std::expected<void, caudio::utils::Error> e){ cbCalled.store(true); (void)e; });
         REQUIRE(pr.has_value());
         auto fr = wt.flush();
         REQUIRE(fr.has_value());
