@@ -6,7 +6,7 @@ module;
 
 export module caudio.player:decoder_common;
 
-export namespace caudio::player::detail {
+namespace caudio::player::detail {
 
 constexpr double kPi = 3.14159265358979323846;
 

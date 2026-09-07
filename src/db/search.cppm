@@ -25,6 +25,7 @@ inline void fillTrackSearch(sqlite3_stmt* s, Track& out) {
     detail::fillTrackFromStmt(s, out);
 }
 
+// sanitizeFtsTerm: quoted "…" phrase preserved, FTS5 syntax stripped
 export std::expected<std::vector<Track>, caudio::utils::Error>
 searchFts(Database& db, std::string_view query, int limit = 50) {
     if (query.empty())

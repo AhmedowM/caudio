@@ -8,7 +8,7 @@ export module caudio.engine:queue_logic;
 
 import :types;
 
-export namespace caudio::engine {
+export namespace caudio::engine::detail {
 
 inline void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng) {
     if (perm.size() <= 1)
@@ -26,4 +26,4 @@ inline void shufflePerm(std::vector<int64_t>& perm) {
     shufflePerm(perm, gen);
 }
 
-} // namespace caudio::engine
+} // namespace caudio::engine::detail

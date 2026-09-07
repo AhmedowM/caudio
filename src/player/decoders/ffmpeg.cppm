@@ -7,6 +7,8 @@ module;
 #include <span>
 #include <vector>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wglobal-module"
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -16,6 +18,7 @@ extern "C" {
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 }
+#pragma GCC diagnostic pop
 
 export module caudio.player:ffmpeg;
 
@@ -231,6 +234,7 @@ class FfmpegDecoder final : public IDecoder {
         return n > 0 ? static_cast<int>(n) : AVERROR_EOF;
     }
 
+    // AVIO seek: AVSEEK_SIZE queries size, AVSEEK_FORCE stripped, seekable=1
     static int64_t seekCallback(void* opaque, int64_t offset, int whence) {
         auto* self = static_cast<FfmpegDecoder*>(opaque);
         if (!self->reader_)

@@ -21,6 +21,7 @@ import :types;
 
 namespace caudio::db::detail {
 
+// BLAKE3(head 64K ∥ tail 64K ∥ LE64(size) ∥ LE32(ver=1)) sampled
 inline constexpr size_t kSample = 64 * 1024;
 
 inline std::expected<std::array<uint8_t, 32>, caudio::utils::Error>

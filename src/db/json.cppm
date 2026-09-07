@@ -21,7 +21,7 @@ import :database;
 
 namespace caudio::db {
 
-using ordered_json = nlohmann::ordered_json;
+export using ordered_json = nlohmann::ordered_json;
 
 // DRY: canonical hex helpers live in caudio.db:detail — thin wrappers for backwards compat
 inline std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {

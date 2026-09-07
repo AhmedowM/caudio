@@ -19,7 +19,7 @@ module;
 #include <thread>
 #include <vector>
 
-#include "../../vendor/sqlite3.h"
+#include <sqlite3.h>
 
 export module caudio.engine;
 
@@ -55,13 +55,10 @@ class Engine final {
         if (!dbRes)
             return std::unexpected(dbRes.error());
         auto e = std::unique_ptr<Engine>(new Engine(cfg));
-        e->db_ = std::move(dbRes.value());
-        e->ownsDb_ = true;
+        e->db_ = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
         if (auto err = e->init())
             return std::unexpected(*err);
-        // load state after init so monitor already running but that's ok
         (void)e->loadState();
-        // apply volume to output if any
         if (e->output_)
             e->output_->setVolume(e->state_.volume);
         return e;
@@ -71,27 +68,17 @@ class Engine final {
         if (!db || !db->handle())
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db"));
-        // need to handle unique_ptr vs shared_ptr: we store raw handle via shared ownership wrapper
-        // Create a new Database unique_ptr that wraps same handle is unsafe. Instead store shared.
-        // For compatibility, we keep dbShared_ and use dbShared_->handle()
-        dbShared_ = std::move(db);
-        // also need to keep a non-owning pointer for legacy loadState that expects unique_ptr? we
-        // use dbShared_
-        if (auto ec = loadStateFromShared())
+        db_ = std::move(db);
+        if (auto ec = loadState())
             return std::unexpected(*ec);
         return {};
     }
-
-    // Overload for unique_ptr
     ExpectedVoid attachDb(std::unique_ptr<caudio::db::Database> db) {
         if (!db || !db->handle())
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db"));
-        db_ = std::move(db);
-        ownsDb_ = false;
-        if (auto ec = loadState())
-            return std::unexpected(*ec);
-        return {};
+        auto shared = std::shared_ptr<caudio::db::Database>(std::move(db));
+        return attachDatabase(std::move(shared));
     }
 
     ~Engine() {
@@ -119,9 +106,6 @@ class Engine final {
         if (db_ && db_->handle()) {
             state_.cursorPos = (int64_t)queue_.cursor;
             (void)saveState();
-        } else if (dbShared_ && dbShared_->handle()) {
-            state_.cursorPos = (int64_t)queue_.cursor;
-            (void)saveStateShared();
         }
         if (output_) {
             output_->stop();
@@ -239,10 +223,7 @@ class Engine final {
             output_->setVolume(g);
         if (hasDb()) {
             state_.cursorPos = (int64_t)queue_.cursor;
-            if (db_)
-                (void)saveState();
-            else
-                (void)saveStateShared();
+            (void)saveState();
         }
         return {};
     }
@@ -268,9 +249,7 @@ class Engine final {
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats() {
         if (!hasDb())
             return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
-        if (db_)
-            return db_->getStats();
-        return dbShared_->getStats();
+        return db_->getStats();
     }
 
     std::string lastError() const {
@@ -306,13 +285,8 @@ class Engine final {
         state_.repeatMode = m;
         state_.cursorPos = (int64_t)queue_.cursor;
         std::optional<caudio::utils::Error> err;
-        if (db_) {
-            if (auto e = saveState(); !e)
-                err = e.error();
-        } else {
-            if (auto e = saveStateShared(); !e)
-                err = e.error();
-        }
+        if (auto e = saveState(); !e)
+            err = e.error();
         unlockQueue();
         if (err)
             return std::unexpected(*err);
@@ -464,7 +438,7 @@ class Engine final {
     }
 
     bool hasDb() const noexcept {
-        return (db_ && db_->handle()) || (dbShared_ && dbShared_->handle());
+        return db_ && db_->handle();
     }
 
     bool tryLockQueue() noexcept {
@@ -498,15 +472,11 @@ class Engine final {
     sqlite3* dbHandle() const noexcept {
         if (db_)
             return db_->handle();
-        if (dbShared_)
-            return dbShared_->handle();
         return nullptr;
     }
     std::shared_mutex* dbMutex() const noexcept {
         if (db_)
             return &db_->mutex();
-        if (dbShared_)
-            return &dbShared_->mutex();
         return nullptr;
     }
 
@@ -614,10 +584,6 @@ class Engine final {
         return caudio::utils::makeError(caudio::utils::Result::Internal, "load failed");
     }
 
-    std::optional<caudio::utils::Error> loadStateFromShared() {
-        return loadState();
-    }
-
     std::expected<void, caudio::utils::Error> saveState() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql =
@@ -651,9 +617,6 @@ class Engine final {
                     caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
             return {};
         });
-    }
-    std::expected<void, caudio::utils::Error> saveStateShared() {
-        return saveState();
     }
 
     // Queue helpers
@@ -758,18 +721,10 @@ class Engine final {
             trackId = sqlite3_column_int64(stmt, 0);
             sqlite3_finalize(stmt);
         }
-        // fetch track via db API (which will lock internally but we released lock)
-        if (db_) {
-            auto tr = db_->getTrack(trackId);
-            if (!tr)
-                return std::unexpected(tr.error());
-            return tr.value();
-        } else {
-            auto tr = dbShared_->getTrack(trackId);
-            if (!tr)
-                return std::unexpected(tr.error());
-            return tr.value();
-        }
+        auto tr = db_->getTrack(trackId);
+        if (!tr)
+            return std::unexpected(tr.error());
+        return tr.value();
     }
 
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on) {
@@ -795,7 +750,7 @@ class Engine final {
                 queue_.perm[i] = (int64_t)i;
             {
                 std::mt19937 rng{std::random_device{}()};
-                shufflePerm(queue_.perm, rng);
+                detail::shufflePerm(queue_.perm, rng);
             }
             queue_.shuffle = true;
             queue_.cursor = 0;
@@ -865,35 +820,24 @@ class Engine final {
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
         if (queue_.repeat == RepeatMode::Queue) {
-            return withTransaction([&](sqlite3* h) -> std::expected<void, caudio::utils::Error> {
-                caudio::db::QueueItem qi;
-                std::expected<caudio::db::QueueItem, caudio::utils::Error> dq;
-                if (db_)
-                    dq = db_->queueDequeueLocked(queue_.queueId);
-                else
-                    dq = dbShared_->queueDequeueLocked(queue_.queueId);
+            return withTransaction([&]([[maybe_unused]] sqlite3* h) -> std::expected<void, caudio::utils::Error> {
+                auto dq = db_->queueDequeueLocked(queue_.queueId);
                 if (!dq)
                     return std::unexpected(dq.error());
-                qi = dq.value();
-                if (db_)
-                    (void)db_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
-                else
-                    (void)dbShared_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
-                auto tr = db_ ? db_->getTrackLocked(qi.trackId) : dbShared_->getTrackLocked(qi.trackId);
+                auto qi = dq.value();
+                (void)db_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
+                auto tr = db_->getTrackLocked(qi.trackId);
                 if (!tr)
                     return std::unexpected(tr.error());
                 out = tr.value();
                 return {};
             });
         }
-        // normal: dequeue
         {
-            auto dq =
-                db_ ? db_->queueDequeue(queue_.queueId) : dbShared_->queueDequeue(queue_.queueId);
+            auto dq = db_->queueDequeue(queue_.queueId);
             if (!dq)
                 return std::unexpected(dq.error());
-            auto tr =
-                db_ ? db_->getTrack(dq.value().trackId) : dbShared_->getTrack(dq.value().trackId);
+            auto tr = db_->getTrack(dq.value().trackId);
             if (!tr)
                 return std::unexpected(tr.error());
             out = tr.value();
@@ -999,14 +943,8 @@ class Engine final {
         playbackState_.store(PlaybackState::Playing, std::memory_order_release);
         playStart_ = std::chrono::steady_clock::now();
         pausePos_ = 0;
-        // persist
-        if (hasDb()) {
-            if (db_)
-                (void)saveState();
-            else
-                (void)saveStateShared();
-        }
-        // push event
+        if (hasDb())
+            (void)saveState();
         EngineEvent ev;
         ev.type = EngineEventType::TrackStarted;
         ev.trackId = t.id;
@@ -1014,7 +952,6 @@ class Engine final {
         ev.duration = duration_;
         ev.position = 0;
         pushEvent(ev);
-        // wake decode
         decodeCv_.notify_all();
         monCv_.notify_all();
         return {};
@@ -1217,6 +1154,7 @@ class Engine final {
                 double gapS = (double)cfg_.gaplessMs / 1000.0;
                 if (remaining <= gapS && remaining >= 0.0) {
                     if (hasCurrent_.load(std::memory_order_acquire)) {
+                        // gaplessArmed 0→1 CAS, 300ms preroll
                         bool expected = false;
                         if (gaplessArmed_.compare_exchange_strong(expected, true,
                                                                   std::memory_order_acq_rel,
@@ -1291,9 +1229,7 @@ class Engine final {
     int64_t startedMs_{0};
     std::string lastErr_{};
 
-    std::unique_ptr<caudio::db::Database> db_{};
-    std::shared_ptr<caudio::db::Database> dbShared_{};
-    bool ownsDb_{false};
+    std::shared_ptr<caudio::db::Database> db_{};
 
     // player
     std::unique_ptr<caudio::player::Reader> reader_{};

@@ -36,13 +36,12 @@ class AudioOutput {
     }
 
     static Expected create(const Config& cfg) {
-        auto* out = new AudioOutput();
+        auto out = std::make_unique<AudioOutput>();
         if (!out->init(cfg)) {
-            delete out;
             return std::unexpected(caudio::utils::Error{caudio::utils::Result::Device,
                                                         "miniaudio device init failed"});
         }
-        return std::unique_ptr<AudioOutput>(out);
+        return out;
     }
 
     void setVolume(float vol) {
@@ -65,7 +64,6 @@ class AudioOutput {
             return;
         uint32_t channels = cfg_.channels ? cfg_.channels : 1;
         std::size_t totalSamples = out.size();
-        std::size_t totalFrames = totalSamples / channels;
         std::size_t generatedFrames = 0;
         if (cfg_.ring) {
             generatedFrames = cfg_.ring->read(std::span<float>(out.data(), totalSamples));
@@ -132,7 +130,7 @@ class AudioOutput {
         }
         initialized_.store(true, std::memory_order_release);
 
-        // Do not auto-start: caller must call start() after preroll to avoid initial underrun
+        // @pre caller must start() after preroll, cap/2 frames
         running_.store(false, std::memory_order_release);
 
         return true;
@@ -173,6 +171,7 @@ class AudioOutput {
         // No zero-fill needed here since miniaudio passes pre-zeroed buffer
     }
 
+  private:
     Config cfg_;
     ma_device device_{};
     std::atomic<float> volume_{1.0f};

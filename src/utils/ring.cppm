@@ -12,6 +12,7 @@ export module caudio.utils:ring;
 
 export namespace caudio::utils {
 
+// SPSC: wr release / rd acquire, cache-line padded, reset() requires external sync stopped/paused
 template <typename T>
 class SpscRing {
   public:

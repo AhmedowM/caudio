@@ -66,13 +66,13 @@ if(CAUDIO_WITH_FFMPEG)
     if(FFmpeg_FOUND)
       message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
     else()
-      message(WARNING "FFmpeg fallback failed — building without FFmpeg, using miniaudio fallback")
+      message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
     endif()
   else()
-    message(STATUS "FFmpeg not found — building without FFmpeg (set -DCAUDIO_FETCH_FFMPEG=ON to auto-fetch)")
+    message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
   endif()
   if(NOT FFmpeg_FOUND)
-    message(STATUS "FFmpeg not found — miniaudio decoder will handle WAV/FLAC/MP3/Vorbis, other formats will use synthetic fallback")
+    message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
   endif()
 endif()
 
@@ -110,10 +110,7 @@ target_include_directories(caudio_sqlite_static PUBLIC $<BUILD_INTERFACE:${CMAKE
 target_compile_definitions(caudio_sqlite_static PUBLIC SQLITE_ENABLE_FTS5=1)
 target_compile_definitions(caudio_sqlite_static PRIVATE SQLITE_ENABLE_FTS5=1)
 
-# Vendor: RtAudio OBJECT (will be replaced with real RtAudio in Task 5)
-add_library(caudio_rtaudio OBJECT vendor/RtAudio.cpp)
-target_include_directories(caudio_rtaudio PUBLIC vendor)
-set_target_properties(caudio_rtaudio PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# RtAudio vendored but not compiled — miniaudio is the chosen output (plan)
 
 # Vendor: BLAKE3 C core (portable + dispatch, no AVX/SSE - force portable)
 add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_dispatch.c vendor/blake3_portable.c)
@@ -175,7 +172,6 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/decoder.cppm
   src/player/decoders/decoder_common.cppm
   src/player/decoders/decoder_interface.cppm
-  src/player/decoders/miniaudio_impl.cppm
 )
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   list(APPEND CAUDIO_PLAYER_SOURCES src/player/decoders/ffmpeg.cppm)
@@ -193,8 +189,9 @@ if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   target_link_libraries(caudio_player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_player PUBLIC CAUDIO_WITH_FFMPEG=1)
 endif()
-target_sources(caudio_player PRIVATE $<TARGET_OBJECTS:caudio_rtaudio>)
 ca_set_warnings(caudio_player)
+target_sources(caudio_player PRIVATE src/player/miniaudio_impl.cpp)
+target_compile_options(caudio_player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 
 add_library(caudio_player_shared SHARED)
 set_target_properties(caudio_player_shared PROPERTIES OUTPUT_NAME caudio_player)
@@ -210,8 +207,9 @@ if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   target_link_libraries(caudio_player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_player_shared PUBLIC CAUDIO_WITH_FFMPEG=1)
 endif()
-target_sources(caudio_player_shared PRIVATE $<TARGET_OBJECTS:caudio_rtaudio>)
 ca_set_warnings(caudio_player_shared)
+target_sources(caudio_player_shared PRIVATE src/player/miniaudio_impl.cpp)
+target_compile_options(caudio_player_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 
 # nlohmann json for ordered_json
 include(FetchContent)
@@ -250,6 +248,7 @@ target_link_libraries(caudio_db PUBLIC caudio::utils Threads::Threads)
 target_sources(caudio_db PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db)
+target_compile_options(caudio_db PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local>)
 
 add_library(caudio_db_shared SHARED)
 set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
@@ -265,6 +264,7 @@ target_link_libraries(caudio_db_shared PUBLIC caudio::utils_shared Threads::Thre
 target_sources(caudio_db_shared PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_db_shared PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_warnings(caudio_db_shared)
+target_compile_options(caudio_db_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local>)
 
 # caudio::engine
 set(CAUDIO_ENGINE_SOURCES
@@ -281,6 +281,7 @@ target_include_directories(caudio_engine PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(caudio_engine PUBLIC caudio::db caudio::player caudio::utils Threads::Threads)
+target_include_directories(caudio_engine PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_warnings(caudio_engine)
 
 add_library(caudio_engine_shared SHARED)
@@ -292,6 +293,7 @@ target_include_directories(caudio_engine_shared PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(caudio_engine_shared PUBLIC caudio::db_shared caudio::player_shared caudio::utils_shared Threads::Threads)
+target_include_directories(caudio_engine_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_warnings(caudio_engine_shared)
 
 # Optional combined shared library: caudio (utils+player+db+engine)
@@ -311,8 +313,9 @@ target_include_directories(caudio_combined PUBLIC
 target_include_directories(caudio_combined PRIVATE vendor)
 target_link_libraries(caudio_combined PUBLIC Threads::Threads)
   target_include_directories(caudio_combined PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-target_sources(caudio_combined PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:caudio_rtaudio> $<TARGET_OBJECTS:blake3>)
+target_sources(caudio_combined PRIVATE src/player/miniaudio_impl.cpp $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
 target_compile_definitions(caudio_combined PUBLIC SQLITE_ENABLE_FTS5=1)
+target_compile_options(caudio_combined PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   target_compile_definitions(caudio_combined PUBLIC CAUDIO_WITH_FFMPEG=1)

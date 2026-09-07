@@ -16,7 +16,6 @@ namespace caudio::examples {
 class MiniPlayer {
   public:
     Expected<void> run(const std::string& path) {
-        // Create and use the new Player facade - much simpler!
         auto playerResult = Player::create();
         if (!playerResult) {
             return std::unexpected(playerResult.error());
@@ -31,7 +30,6 @@ class MiniPlayer {
         std::cout << "Opened: " << path << "\n";
         std::cout << "Playing...\n";
 
-        // Start playback - Player handles preroll internally
         auto playResult = player->play();
         if (!playResult) {
             return std::unexpected(playResult.error());
