@@ -44,7 +44,9 @@ class MpscQueue {
     }
 
     template <typename U = T>
-    [[nodiscard]] Expected<void> push(const U& value) requires std::is_copy_constructible_v<U> {
+    [[nodiscard]] Expected<void> push(const U& value)
+        requires std::is_copy_constructible_v<U>
+    {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t used = wr_ - rd_;
         if (used >= cap_) {

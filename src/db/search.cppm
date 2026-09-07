@@ -25,6 +25,30 @@ inline void fillTrackSearch(sqlite3_stmt* s, Track& out) {
     detail::fillTrackFromStmt(s, out);
 }
 
+inline std::expected<std::vector<Track>, caudio::utils::Error>
+tryFtsQuery(sqlite3* h, std::string_view query, int limit) {
+    const char* sql =
+        "SELECT t.id, t.fingerprint, t.path, t.deleted_at, t.size, t.mtime, t.duration, "
+        "t.sample_rate, t.channels, t.bitrate, t.title, t.artist, t.album, t.album_artist, "
+        "t.genre, t.year, t.track_num, t.disc_num, t.cover_art_path, t.rating, t.play_count, "
+        "t.last_played, t.date_added, t.last_scanned, t.dirty, t.library_id "
+        "FROM tracks t JOIN tracks_fts f ON t.id = f.rowid WHERE tracks_fts MATCH ? ORDER BY rank "
+        "LIMIT ?";
+    Statement st;
+    if (auto e = st.prepare(h, sql); !e) {
+        return std::unexpected{e.error()};
+    }
+    st.bindText(1, query);
+    st.bindInt(2, limit > 0 ? limit : 50);
+    std::vector<Track> out;
+    while (st.step()) {
+        Track t;
+        fillTrackSearch(st.get(), t);
+        out.push_back(std::move(t));
+    }
+    return out;
+}
+
 // sanitizeFtsTerm: quoted "…" phrase preserved, FTS5 syntax stripped
 export std::expected<std::vector<Track>, caudio::utils::Error>
 searchFts(Database& db, std::string_view query, int limit = 50) {
@@ -34,49 +58,21 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     if (sanitized.empty())
         return std::vector<Track>{};
     std::string ftsQ = sanitized;
-    const char* sql =
-        "SELECT t.id, t.fingerprint, t.path, t.deleted_at, t.size, t.mtime, t.duration, "
-        "t.sample_rate, t.channels, t.bitrate, t.title, t.artist, t.album, t.album_artist, "
-        "t.genre, t.year, t.track_num, t.disc_num, t.cover_art_path, t.rating, t.play_count, "
-        "t.last_played, t.date_added, t.last_scanned, t.dirty, t.library_id "
-        "FROM tracks t JOIN tracks_fts f ON t.id = f.rowid WHERE tracks_fts MATCH ? ORDER BY rank "
-        "LIMIT ?";
-    // try FTS
     {
         std::shared_lock lock(db.mutex());
         sqlite3* h = db.handle();
         if (!h)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
-        if (auto e = st.prepare(h, sql); !e) {
-            // FTS prepare failed -> fallback to LIKE
-        } else {
-            st.bindText(1, ftsQ);
-            st.bindInt(2, limit > 0 ? limit : 50);
-            std::vector<Track> out;
-            while (st.step()) {
-                Track t;
-                fillTrackSearch(st.get(), t);
-                out.push_back(std::move(t));
-            }
-            if (!out.empty())
-                return out;
-            // try prefix
-            std::string prefix = sanitized + "*";
-            Statement st2;
-            if (auto e2 = st2.prepare(h, sql); e2) {
-                st2.bindText(1, prefix);
-                st2.bindInt(2, limit > 0 ? limit : 50);
-                while (st2.step()) {
-                    Track t;
-                    fillTrackSearch(st2.get(), t);
-                    out.push_back(std::move(t));
-                }
-                if (!out.empty())
-                    return out;
-            }
-        }
+        // try exact FTS query
+        auto r = tryFtsQuery(h, ftsQ, limit);
+        if (r && !r->empty())
+            return r;
+        // try prefix
+        std::string prefix = sanitized + "*";
+        auto r2 = tryFtsQuery(h, prefix, limit);
+        if (r2 && !r2->empty())
+            return r2;
     }
     // LIKE fallback on 5 cols with COLLATE NOCASE
     std::shared_lock lock(db.mutex());

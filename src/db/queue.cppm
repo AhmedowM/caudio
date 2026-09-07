@@ -22,15 +22,14 @@ namespace caudio::db {
 using StmtCache = std::unordered_map<std::string, std::unique_ptr<Statement>>;
 
 export std::expected<void, caudio::utils::Error>
-queueEnqueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache,
-                   int64_t qid, int64_t tid, int64_t pos = -1) {
+queueEnqueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid,
+                   int64_t tid, int64_t pos = -1) {
     if (tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
     if (qid == 0)
         qid = 1;
     if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::unique_lock<std::mutex> cacheLk(cacheMutex);
     auto getCached = [&](std::string_view sql) -> Statement* {
         std::string key(sql);
@@ -47,7 +46,8 @@ queueEnqueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache,
         return raw;
     };
     if (pos < 0) {
-        if (Statement* ms = getCached("SELECT COALESCE(MAX(position), -1)+1 FROM queue WHERE queue_id=?")) {
+        if (Statement* ms =
+                getCached("SELECT COALESCE(MAX(position), -1)+1 FROM queue WHERE queue_id=?")) {
             ms->bindInt(1, qid);
             if (ms->step())
                 pos = ms->columnInt(0);
@@ -56,14 +56,16 @@ queueEnqueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache,
         if (pos < 0)
             pos = 0;
     } else {
-        if (Statement* ss = getCached("UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?")) {
+        if (Statement* ss = getCached(
+                "UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?")) {
             ss->bindInt(1, qid);
             ss->bindInt(2, pos);
             (void)ss->stepDone();
             ss->reset();
         }
     }
-    if (Statement* st = getCached("INSERT INTO queue (queue_id, track_id, position) VALUES (?,?,?)")) {
+    if (Statement* st =
+            getCached("INSERT INTO queue (queue_id, track_id, position) VALUES (?,?,?)")) {
         st->bindInt(1, qid);
         st->bindInt(2, tid);
         st->bindInt(3, pos);
@@ -74,7 +76,8 @@ queueEnqueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache,
                 caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         return {};
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<QueueItem, caudio::utils::Error>
@@ -82,8 +85,7 @@ queueDequeueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, in
     if (qid == 0)
         qid = 1;
     if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::unique_lock<std::mutex> cacheLk(cacheMutex);
     auto getCached = [&](std::string_view sql) -> Statement* {
         std::string key(sql);
@@ -100,7 +102,7 @@ queueDequeueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, in
         return raw;
     };
     if (Statement* st = getCached("SELECT id, queue_id, track_id, position, added FROM queue "
-                                   "WHERE queue_id=? ORDER BY position LIMIT 1")) {
+                                  "WHERE queue_id=? ORDER BY position LIMIT 1")) {
         st->bindInt(1, qid);
         bool hasRow = st->step();
         if (!hasRow) {
@@ -119,7 +121,8 @@ queueDequeueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, in
             (void)del->stepDone();
             del->reset();
         }
-        if (Statement* sh = getCached("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?")) {
+        if (Statement* sh =
+                getCached("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?")) {
             sh->bindInt(1, qid);
             sh->bindInt(2, it.position);
             (void)sh->stepDone();
@@ -127,16 +130,18 @@ queueDequeueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, in
         }
         return it;
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
-export std::expected<void, caudio::utils::Error>
-queueRemoveLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid, int64_t pos) {
+export std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db,
+                                                                   std::mutex& cacheMutex,
+                                                                   StmtCache& stmtCache,
+                                                                   int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;
     if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::unique_lock<std::mutex> cacheLk(cacheMutex);
     auto getCached = [&](std::string_view sql) -> Statement* {
         std::string key(sql);
@@ -162,7 +167,8 @@ queueRemoveLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int
                 caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         if (sqlite3_changes(db) == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
-        if (Statement* sh = getCached("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?")) {
+        if (Statement* sh =
+                getCached("UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?")) {
             sh->bindInt(1, qid);
             sh->bindInt(2, pos);
             (void)sh->stepDone();
@@ -170,7 +176,8 @@ queueRemoveLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int
         }
         return {};
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<void, caudio::utils::Error>
@@ -178,8 +185,7 @@ queueClearLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int6
     if (qid == 0)
         qid = 1;
     if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::unique_lock<std::mutex> cacheLk(cacheMutex);
     auto getCached = [&](std::string_view sql) -> Statement* {
         std::string key(sql);
@@ -204,7 +210,8 @@ queueClearLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int6
                 caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         return {};
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<std::vector<QueueItem>, caudio::utils::Error>
@@ -212,8 +219,7 @@ queueListLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64
     if (qid == 0)
         qid = 1;
     if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
     std::unique_lock<std::mutex> cacheLk(cacheMutex);
     auto getCached = [&](std::string_view sql) -> Statement* {
         std::string key(sql);
@@ -230,7 +236,7 @@ queueListLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64
         return raw;
     };
     if (Statement* st = getCached("SELECT id, queue_id, track_id, position, added FROM queue "
-                                   "WHERE queue_id=? ORDER BY position")) {
+                                  "WHERE queue_id=? ORDER BY position")) {
         st->bindInt(1, qid);
         std::vector<QueueItem> out;
         while (st->step()) {
@@ -245,10 +251,12 @@ queueListLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64
         st->reset();
         return out;
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
-export size_t queueCountLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid) {
+export size_t queueCountLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache,
+                               int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -300,7 +308,8 @@ getQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_
         stmtCache.emplace(std::move(key), std::move(up));
         return raw;
     };
-    if (Statement* st = getCached("SELECT id, name, repeat_mode, library_id FROM queues WHERE id=?")) {
+    if (Statement* st =
+            getCached("SELECT id, name, repeat_mode, library_id FROM queues WHERE id=?")) {
         st->bindInt(1, qid);
         if (!st->step()) {
             st->reset();
@@ -314,7 +323,8 @@ getQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_
         st->reset();
         return q;
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<std::vector<Queue>, caudio::utils::Error>
@@ -336,7 +346,8 @@ listQueuesLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache) {
         stmtCache.emplace(std::move(key), std::move(up));
         return raw;
     };
-    if (Statement* st = getCached("SELECT id, name, repeat_mode, library_id FROM queues ORDER BY id")) {
+    if (Statement* st =
+            getCached("SELECT id, name, repeat_mode, library_id FROM queues ORDER BY id")) {
         std::vector<Queue> out;
         while (st->step()) {
             Queue q;
@@ -349,11 +360,13 @@ listQueuesLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache) {
         st->reset();
         return out;
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<int64_t, caudio::utils::Error>
-createQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, std::string_view name, int64_t library_id = 1) {
+createQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, std::string_view name,
+                  int64_t library_id = 1) {
     if (name.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
     if (!db)
@@ -373,17 +386,20 @@ createQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, std
         stmtCache.emplace(std::move(key), std::move(up));
         return raw;
     };
-    if (Statement* st = getCached("INSERT INTO queues (name, repeat_mode, library_id) VALUES (?,?,?)")) {
+    if (Statement* st =
+            getCached("INSERT INTO queues (name, repeat_mode, library_id) VALUES (?,?,?)")) {
         st->bindText(1, name);
-        st->bindInt(2, 0);  // RepeatMode::Off
+        st->bindInt(2, 0); // RepeatMode::Off
         st->bindInt(3, library_id);
         int rc = st->stepDone();
         st->reset();
         if (rc != SQLITE_DONE)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         return sqlite3_last_insert_rowid(db);
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<void, caudio::utils::Error>
@@ -419,16 +435,19 @@ deleteQueueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int
         int rc = st->stepDone();
         st->reset();
         if (rc != SQLITE_DONE)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         if (sqlite3_changes(db) == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
         return {};
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 export std::expected<void, caudio::utils::Error>
-setQueueRepeatLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid, int repeat_mode) {
+setQueueRepeatLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid,
+                     int repeat_mode) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -454,12 +473,14 @@ setQueueRepeatLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, 
         int rc = st->stepDone();
         st->reset();
         if (rc != SQLITE_DONE)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db))};
         if (sqlite3_changes(db) == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
         return {};
     }
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::Result::Internal, "stmt prepare failed")};
 }
 
 // Alias for queueListLocked

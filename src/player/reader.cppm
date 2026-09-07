@@ -183,12 +183,12 @@ class FileReader final : public Reader {
         return fileSize_;
     }
 
-private:
+  private:
     explicit FileReader(FILE* f) : file_(f) {}
     FILE* file_{nullptr};
     int64_t fileSize_{-1};
     mutable std::mutex seekMutex_{};
-  };
+};
 
 class MemoryReader final : public Reader {
   public:

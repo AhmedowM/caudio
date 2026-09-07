@@ -138,11 +138,10 @@ class Database final {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, msg)};
         }
         char* err = nullptr;
+        detail::SqliteErrGuard errGuard{err};
         rc = sqlite3_exec(raw, std::string(kSchema).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
-            if (err)
-                sqlite3_free(err);
             sqlite3_close(raw);
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::Result::Corrupt, std::string("schema init failed: ") + msg)};
@@ -150,12 +149,8 @@ class Database final {
         rc = sqlite3_exec(raw, std::string(kSchemaDefaultLibrary).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
-            if (err)
-                sqlite3_free(err);
             // not fatal? but log
         }
-        if (err)
-            sqlite3_free(err);
         auto db = std::make_unique<Database>(opts);
         db->db_ = raw;
         db->writer_.open(raw);
@@ -768,15 +763,15 @@ class Database final {
         return out;
     }
 
-// Queue (forwarded to queue partition)
+    // Queue (forwarded to queue partition)
     std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
-                                                             int64_t pos = -1) {
+                                                           int64_t pos = -1) {
         std::unique_lock lock{m_};
         return queueEnqueueLocked(qid, tid, pos);
     }
 
     std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
-                                                                  int64_t pos = -1) {
+                                                                 int64_t pos = -1) {
         return caudio::db::queueEnqueueLocked(db_, cacheMutex_, stmtCache_, qid, tid, pos);
     }
 
@@ -803,7 +798,7 @@ class Database final {
         return caudio::db::queueClearLocked(db_, cacheMutex_, stmtCache_, qid);
     }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid) {
+    std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lock{m_};
@@ -829,7 +824,8 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qi
         return caudio::db::listQueuesLocked(db_, cacheMutex_, stmtCache_);
     }
 
-    std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name, int64_t library_id = 1) {
+    std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
+                                                             int64_t library_id = 1) {
         if (name.empty())
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
         std::unique_lock lock{m_};
@@ -864,7 +860,7 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qi
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         std::string_view sql = "INSERT INTO history (track_id, started_at, completed_at, "
-                                "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
+                               "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
         std::unique_lock<std::mutex> cacheLk(cacheMutex_);
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -1110,7 +1106,8 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qi
         one("SELECT COUNT(*) FROM history", s.num_history);
         one("SELECT COUNT(*) FROM bookmarks", s.num_bookmarks);
         one("SELECT COUNT(*) FROM libraries", s.num_libraries);
-        if (auto sRes = getCachedForUse("SELECT COALESCE(SUM(duration),0) FROM tracks WHERE deleted_at IS NULL");
+        if (auto sRes = getCachedForUse(
+                "SELECT COALESCE(SUM(duration),0) FROM tracks WHERE deleted_at IS NULL");
             sRes) {
             Statement& st = *(*sRes);
             if (st.step())
@@ -1138,16 +1135,8 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qi
             }
         } else {
             // generate fingerprint from path via fnv fallback
-            uint64_t h = 1469598103934665603ULL;
-            for (char c : t.path) {
-                h ^= (uint8_t)c;
-                h *= 1099511628211ULL;
-            }
-            for (int i = 0; i < 32; i++) {
-                t.fingerprint[i] = (uint8_t)(h >> ((i % 8) * 8));
-                h = h * 6364136223846793005ULL + 1;
-            }
-}
+            t.fingerprint = detail::fallbackFingerprint(t.path);
+        }
         auto r = insertTrack(t);
         if (!r)
             return std::unexpected{r.error()};

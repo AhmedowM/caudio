@@ -56,7 +56,7 @@ class Logger {
             std::lock_guard<std::mutex> lk(mutex_);
             if (!callback_)
                 return;
-            if (static_cast<int>(lvl) < static_cast<int>(minLevel_))
+            if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
                 return;
             cbCopy = callback_;
             minCopy = minLevel_;
@@ -72,7 +72,7 @@ class Logger {
             std::lock_guard<std::mutex> lk(mutex_);
             if (!callback_)
                 return;
-            if (static_cast<int>(lvl) < static_cast<int>(minLevel_))
+            if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
                 return;
             cbCopy = callback_;
         }

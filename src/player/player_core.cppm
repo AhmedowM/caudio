@@ -1,8 +1,8 @@
 module;
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -22,12 +22,7 @@ import :output;
 
 export namespace caudio::player {
 
-enum class State : uint8_t {
-    Stopped = 0,
-    Playing = 1,
-    Paused = 2,
-    Error = 3
-};
+enum class State : uint8_t { Stopped = 0, Playing = 1, Paused = 2, Error = 3 };
 
 struct PlayerOpts {
     uint32_t sampleRate = 48000;
@@ -142,8 +137,7 @@ class Player {
         }
 
         State expected = State::Stopped;
-        if (!state_.compare_exchange_strong(expected, State::Playing,
-                                            std::memory_order_acq_rel)) {
+        if (!state_.compare_exchange_strong(expected, State::Playing, std::memory_order_acq_rel)) {
             expected = State::Paused;
             if (!state_.compare_exchange_strong(expected, State::Playing,
                                                 std::memory_order_acq_rel)) {
@@ -170,8 +164,7 @@ class Player {
 
     ExpectedVoid pause() {
         State expected = State::Playing;
-        if (!state_.compare_exchange_strong(expected, State::Paused,
-                                            std::memory_order_acq_rel)) {
+        if (!state_.compare_exchange_strong(expected, State::Paused, std::memory_order_acq_rel)) {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::State, "not playing"});
         }
@@ -194,8 +187,7 @@ class Player {
 
     ExpectedVoid resume() {
         State expected = State::Paused;
-        if (!state_.compare_exchange_strong(expected, State::Playing,
-                                            std::memory_order_acq_rel)) {
+        if (!state_.compare_exchange_strong(expected, State::Playing, std::memory_order_acq_rel)) {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::State, "not paused"});
         }
@@ -284,8 +276,8 @@ class Player {
             if (now > start) {
                 double elapsedSec = static_cast<double>(now - start) / 1000.0;
                 uint64_t elapsedFrames = static_cast<uint64_t>(elapsedSec * sampleRate_);
-                return std::chrono::duration<double>(
-                    static_cast<double>(base + elapsedFrames) / sampleRate_);
+                return std::chrono::duration<double>(static_cast<double>(base + elapsedFrames) /
+                                                     sampleRate_);
             }
         }
         return std::chrono::duration<double>(static_cast<double>(base) / sampleRate_);
@@ -371,9 +363,8 @@ class Player {
             {
                 std::unique_lock<std::mutex> lk(cvMutex_);
                 cv_.wait(lk, [this, &st]() {
-                    return st.stop_requested() ||
-                           (openGate_.load(std::memory_order_acquire) &&
-                            decodeBusy_.load(std::memory_order_acquire));
+                    return st.stop_requested() || (openGate_.load(std::memory_order_acquire) &&
+                                                   decodeBusy_.load(std::memory_order_acquire));
                 });
                 if (st.stop_requested())
                     break;

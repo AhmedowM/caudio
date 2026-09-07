@@ -30,12 +30,8 @@ using LPWSTR = wchar_t*;
 using UINT = unsigned int;
 using DWORD = unsigned long;
 using FARPROC = long long int (*)();
-#ifndef CP_UTF8
-#define CP_UTF8 65001
-#endif
-#ifndef WINAPI
+inline constexpr UINT kCpUtf8 = 65001;
 #define WINAPI __stdcall
-#endif
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -55,16 +51,17 @@ inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view n
         using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-function-type"
-        auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
+        auto pSetDesc =
+            reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(k32, "SetThreadDescription"));
 #pragma GCC diagnostic pop
         if (pSetDesc) {
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, name.data(),
-                                           static_cast<int>(name.size()), nullptr, 0);
+            int wlen = MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
+                                           nullptr, 0);
             if (wlen > 0) {
                 std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, name.data(),
-                                    static_cast<int>(name.size()), wbuf.data(), wlen);
-                HRESULT hr = pSetDesc((HANDLE)nativeHandle, wbuf.c_str());
+                MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
+                                    wbuf.data(), wlen);
+                HRESULT hr = pSetDesc(reinterpret_cast<HANDLE>(nativeHandle), wbuf.c_str());
                 (void)hr;
                 return {};
             }
@@ -147,7 +144,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{Result::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    HANDLE h = (HANDLE)(uintptr_t)jt.native_handle();
+    HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(jt.native_handle()));
     return detail::setNativeHandleName(h, name);
 #else
     pthread_t th = jt.native_handle();
@@ -184,7 +181,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{Result::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    HANDLE h = (HANDLE)(uintptr_t)t.native_handle();
+    HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(t.native_handle()));
     return detail::setNativeHandleName(h, name);
 #else
 #if defined(__linux__) && !defined(__APPLE__)

@@ -31,26 +31,6 @@ inline std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {
 inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out) {
     return detail::fromHex(hex, out);
 }
-inline void genFingerprintFallback(std::string_view path, int64_t id, int64_t size, int64_t mtime,
-                                   std::array<uint8_t, 32>& out) {
-    uint64_t h = 1469598103934665603ULL;
-    for (char c : path) {
-        h ^= (uint8_t)c;
-        h *= 1099511628211ULL;
-    }
-    h ^= (uint64_t)id;
-    h *= 1099511628211ULL;
-    h ^= (uint64_t)size;
-    h *= 1099511628211ULL;
-    h ^= (uint64_t)mtime;
-    h *= 1099511628211ULL;
-    for (int i = 0; i < 32; i++) {
-        out[i] = (uint8_t)(h >> ((i % 8) * 8));
-        h = h * 6364136223846793005ULL + 1;
-        if (i % 8 == 7)
-            h ^= 0x9e3779b97f4a7c15ULL;
-    }
-}
 
 export ordered_json trackToJson(const Track& t) {
     ordered_json j;
@@ -155,10 +135,10 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
         getStr("fingerprint", fpHex);
         if (!fpHex.empty()) {
             if (!hexToFingerprint(fpHex, t.fingerprint)) {
-                genFingerprintFallback(t.path, t.id, t.size, t.mtime, t.fingerprint);
+                t.fingerprint = detail::fallbackFingerprint(t.path);
             }
         } else {
-            genFingerprintFallback(t.path, t.id, t.size, t.mtime, t.fingerprint);
+            t.fingerprint = detail::fallbackFingerprint(t.path);
         }
         return t;
     } catch (const std::exception& e) {
@@ -214,10 +194,9 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         char* err = nullptr;
+        detail::SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
-            if (err)
-                sqlite3_free(err);
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "begin failed")};
         }
@@ -361,8 +340,6 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
         }
         rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
-            if (err)
-                sqlite3_free(err);
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "commit failed")};

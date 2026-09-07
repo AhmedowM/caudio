@@ -1,4 +1,6 @@
 module;
+#include <sqlite3.h>
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -19,8 +21,6 @@ module;
 #include <thread>
 #include <vector>
 
-#include <sqlite3.h>
-
 export module caudio.engine;
 
 export import :types;
@@ -32,6 +32,14 @@ import caudio.player;
 import caudio.db;
 
 export namespace caudio::engine {
+
+struct SqliteErrGuard {
+    char* p;
+    ~SqliteErrGuard() {
+        if (p)
+            sqlite3_free(p);
+    }
+};
 
 constexpr std::string_view toString(caudio::utils::Result r) noexcept {
     return caudio::utils::toString(r);
@@ -489,11 +497,8 @@ class Engine final {
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db"));
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
+        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-        if (err) {
-            sqlite3_free(err);
-            err = nullptr;
-        }
         if (rc != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::Busy, "begin failed"));
@@ -504,8 +509,6 @@ class Engine final {
             return result;
         }
         rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
-        if (err)
-            sqlite3_free(err);
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected(
@@ -621,8 +624,8 @@ class Engine final {
 
     std::expected<void, caudio::utils::Error> persistShuffleBlobLocked() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
-            const char* sql =
-                "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, shuffle_enabled=? WHERE id=1";
+            const char* sql = "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, "
+                              "shuffle_enabled=? WHERE id=1";
             sqlite3_stmt* stmt = nullptr;
             int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
             if (rc != SQLITE_OK)
@@ -799,18 +802,19 @@ class Engine final {
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
         if (queue_.repeat == RepeatMode::Queue) {
-            return withTransaction([&]([[maybe_unused]] sqlite3* h) -> std::expected<void, caudio::utils::Error> {
-                auto dq = db_->queueDequeueLocked(queue_.queueId);
-                if (!dq)
-                    return std::unexpected(dq.error());
-                auto qi = dq.value();
-                (void)db_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
-                auto tr = db_->getTrackLocked(qi.trackId);
-                if (!tr)
-                    return std::unexpected(tr.error());
-                out = tr.value();
-                return {};
-            });
+            return withTransaction(
+                [&]([[maybe_unused]] sqlite3* h) -> std::expected<void, caudio::utils::Error> {
+                    auto dq = db_->queueDequeueLocked(queue_.queueId);
+                    if (!dq)
+                        return std::unexpected(dq.error());
+                    auto qi = dq.value();
+                    (void)db_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
+                    auto tr = db_->getTrackLocked(qi.trackId);
+                    if (!tr)
+                        return std::unexpected(tr.error());
+                    out = tr.value();
+                    return {};
+                });
         }
         {
             auto dq = db_->queueDequeue(queue_.queueId);
@@ -1016,11 +1020,8 @@ class Engine final {
         }
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
+        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-        if (err) {
-            sqlite3_free(err);
-            err = nullptr;
-        }
         if (rc != SQLITE_OK) {
             markedPlayed_.store(false, std::memory_order_release);
             return;
@@ -1100,8 +1101,6 @@ class Engine final {
             return;
         }
         rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
-        if (err)
-            sqlite3_free(err);
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             markedPlayed_.store(false, std::memory_order_release);

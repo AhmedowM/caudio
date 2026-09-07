@@ -40,7 +40,7 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
 
 // Generator-based scan: yields Tracks lazily
 export std::generator<Track> scan(const std::filesystem::path& root,
-                                   ScanMode mode = ScanMode::Sampled) {
+                                  ScanMode mode = ScanMode::Sampled) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         co_return;

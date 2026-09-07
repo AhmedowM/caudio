@@ -15,7 +15,7 @@ import caudio.utils;
 namespace caudio::db {
 
 class Statement final {
-public:
+  public:
     Statement() = default;
     ~Statement() {
         if (stmt_)
@@ -36,7 +36,7 @@ public:
         return *this;
     }
     [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3* db,
-                                                                     std::string_view sql) {
+                                                                    std::string_view sql) {
         if (stmt_)
             sqlite3_finalize(stmt_);
         stmt_ = nullptr;
@@ -103,7 +103,7 @@ public:
         return stmt_;
     }
 
-private:
+  private:
     sqlite3_stmt* stmt_{nullptr};
 };
 

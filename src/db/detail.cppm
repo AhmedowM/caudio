@@ -1,6 +1,6 @@
 module;
-#include <sqlite3.h>
 #include <blake3.h>
+#include <sqlite3.h>
 
 #include <algorithm>
 #include <array>
@@ -123,8 +123,8 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
     std::string cleaned;
     cleaned.reserve(term.size());
     for (char c : term) {
-        if (c == '\'' || c == '*' || c == ':' || c == '-' ||
-            c == '(' || c == ')' || c == '^' || c == '~')
+        if (c == '\'' || c == '*' || c == ':' || c == '-' || c == '(' || c == ')' || c == '^' ||
+            c == '~')
             continue;
         if (c == '"') {
             // Escape quote by doubling it for FTS5
@@ -140,7 +140,7 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
     std::string upper = cleaned;
     std::transform(upper.begin(), upper.end(), upper.begin(),
                    [](unsigned char c) { return std::toupper(c); });
-    
+
     // First handle operators with spaces (middle of string)
     std::string opsWithSpaces[] = {" AND ", " OR ", " NOT ", " NEAR "};
     for (const auto& op : opsWithSpaces) {
@@ -151,7 +151,7 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
             pos += op.size();
         }
     }
-    
+
     // Then handle operators at start (e.g., "NOT foo")
     std::string opsStart[] = {"AND ", "OR ", "NOT ", "NEAR "};
     for (const auto& op : opsStart) {
@@ -160,11 +160,12 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
             cleaned.replace(0, op.size(), std::string(op.size(), ' '));
         }
     }
-    
+
     // Then handle operators at end (e.g., "foo NOT")
     std::string opsEnd[] = {" AND", " OR", " NOT", " NEAR"};
     for (const auto& op : opsEnd) {
-        if (upper.size() >= op.size() && upper.compare(upper.size() - op.size(), op.size(), op) == 0) {
+        if (upper.size() >= op.size() &&
+            upper.compare(upper.size() - op.size(), op.size(), op) == 0) {
             size_t pos = upper.size() - op.size();
             upper.replace(pos, op.size(), std::string(op.size(), ' '));
             cleaned.replace(pos, op.size(), std::string(op.size(), ' '));
@@ -189,9 +190,11 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
 
     // Trim leading/trailing spaces
     size_t start = 0;
-    while (start < result.size() && result[start] == ' ') start++;
+    while (start < result.size() && result[start] == ' ')
+        start++;
     size_t end = result.size();
-    while (end > start && result[end - 1] == ' ') end--;
+    while (end > start && result[end - 1] == ' ')
+        end--;
     if (start >= end)
         return {};
 
@@ -204,13 +207,40 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
     return final;
 }
 
+inline std::string_view columnText(sqlite3_stmt* stmt, int col) noexcept {
+    auto* p = sqlite3_column_text(stmt, col);
+    return p ? reinterpret_cast<const char*>(p) : "";
+}
+
+inline std::array<uint8_t, 32> fallbackFingerprint(std::string_view path) noexcept {
+    uint64_t h = 1469598103934665603ULL;
+    for (char c : path) {
+        h ^= static_cast<uint8_t>(c);
+        h *= 1099511628211ULL;
+    }
+    std::array<uint8_t, 32> out{};
+    for (int i = 0; i < 32; i++) {
+        out[i] = static_cast<uint8_t>(h >> ((i % 8) * 8));
+        h = h * 6364136223846793005ULL + 1;
+    }
+    return out;
+}
+
+struct SqliteErrGuard {
+    char* p;
+    ~SqliteErrGuard() {
+        if (p)
+            sqlite3_free(p);
+    }
+};
+
 inline void fillTrackFromStmt(sqlite3_stmt* stmt, Track& t) {
     t.id = sqlite3_column_int64(stmt, 0);
     t.fingerprint.fill(0);
     if (sqlite3_column_bytes(stmt, 1) == 32) {
         std::memcpy(t.fingerprint.data(), sqlite3_column_blob(stmt, 1), 32);
     }
-    t.path = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) : "";
+    t.path = columnText(stmt, 2);
     t.deleted_at = sqlite3_column_int64(stmt, 3);
     t.size = sqlite3_column_int64(stmt, 4);
     t.mtime = sqlite3_column_int64(stmt, 5);
@@ -218,15 +248,15 @@ inline void fillTrackFromStmt(sqlite3_stmt* stmt, Track& t) {
     t.sample_rate = static_cast<uint32_t>(sqlite3_column_int(stmt, 7));
     t.channels = static_cast<uint32_t>(sqlite3_column_int(stmt, 8));
     t.bitrate = static_cast<int>(sqlite3_column_int(stmt, 9));
-    t.title = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 10)) : "";
-    t.artist = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 11)) : "";
-    t.album = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 12)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 12)) : "";
-    t.albumArtist = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 13)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 13)) : "";
-    t.genre = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 14)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 14)) : "";
+    t.title = columnText(stmt, 10);
+    t.artist = columnText(stmt, 11);
+    t.album = columnText(stmt, 12);
+    t.albumArtist = columnText(stmt, 13);
+    t.genre = columnText(stmt, 14);
     t.year = static_cast<int>(sqlite3_column_int(stmt, 15));
     t.track_num = static_cast<int>(sqlite3_column_int(stmt, 16));
     t.disc_num = static_cast<int>(sqlite3_column_int(stmt, 17));
-    t.cover_art_path = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 18)) ? reinterpret_cast<const char*>(sqlite3_column_text(stmt, 18)) : "";
+    t.cover_art_path = columnText(stmt, 18);
     t.rating = static_cast<int>(sqlite3_column_int(stmt, 19));
     t.play_count = sqlite3_column_int64(stmt, 20);
     t.last_played = sqlite3_column_int64(stmt, 21);

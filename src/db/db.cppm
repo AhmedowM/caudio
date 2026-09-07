@@ -13,6 +13,7 @@ export import :json;
 export import :write_thread;
 export import :statement;
 export import :transaction;
+export import :detail;
 
 import caudio.utils;
 

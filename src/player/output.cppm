@@ -112,9 +112,12 @@ class AudioOutput {
             return false;
         cfg_ = cfg;
         float v = cfg.volume;
-        if (!std::isfinite(v)) v = 0.0f;
-        if (v < 0.0f) v = 0.0f;
-        if (v > 1.0f) v = 1.0f;
+        if (!std::isfinite(v))
+            v = 0.0f;
+        if (v < 0.0f)
+            v = 0.0f;
+        if (v > 1.0f)
+            v = 1.0f;
         volume_.store(v, std::memory_order_relaxed);
 
         ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
