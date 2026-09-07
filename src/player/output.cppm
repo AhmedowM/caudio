@@ -105,12 +105,6 @@ class AudioOutput {
 
         // Do not auto-start: caller must call start() after preroll to avoid initial underrun
         running_.store(false, std::memory_order_release);
-        initialized_.store(true, std::memory_order_release);
-
-        // Debug: print device info (non-RT, init only)
-        std::printf("Audio device ready: format=%d, channels=%d, sampleRate=%d\n",
-                    device_.playback.format, device_.playback.channels, device_.sampleRate);
-        std::fflush(stdout);
 
         return true;
     }

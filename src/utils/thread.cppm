@@ -47,6 +47,37 @@ __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
 }
 #endif
 
+namespace caudio::utils::detail {
+#if defined(_WIN32) || defined(_WIN64)
+inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept {
+    HMODULE k32 = GetModuleHandleA("kernel32.dll");
+    if (k32) {
+        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-function-type"
+        auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
+#pragma GCC diagnostic pop
+        if (pSetDesc) {
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, name.data(),
+                                           static_cast<int>(name.size()), nullptr, 0);
+            if (wlen > 0) {
+                std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
+                MultiByteToWideChar(CP_UTF8, 0, name.data(),
+                                    static_cast<int>(name.size()), wbuf.data(), wlen);
+                HRESULT hr = pSetDesc((HANDLE)nativeHandle, wbuf.c_str());
+                (void)hr;
+                return {};
+            }
+        }
+    }
+    return {};
+}
+inline Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept {
+    return setNativeHandleName(GetCurrentThread(), name);
+}
+#endif
+} // namespace caudio::utils::detail
+
 export namespace caudio::utils {
 
 inline void sleepFor(std::chrono::milliseconds ms) noexcept {
@@ -67,28 +98,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{Result::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    // Use SetThreadDescription if available (Windows 10 1607+)
-    HMODULE k32 = GetModuleHandleA("kernel32.dll");
-    if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
-#pragma GCC diagnostic pop
-        if (pSetDesc) {
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()),
-                                           nullptr, 0);
-            if (wlen > 0) {
-                std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, name.data(), static_cast<int>(name.size()),
-                                    wbuf.data(), wlen);
-                HRESULT hr = pSetDesc(GetCurrentThread(), wbuf.c_str());
-                (void)hr;
-                return {};
-            }
-        }
-    }
-    return {};
+    return detail::setCurrentThreadNameImpl(name);
 #else
     // POSIX
 #if defined(__APPLE__) && defined(__MACH__)
@@ -137,30 +147,8 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{Result::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    // std::jthread::native_handle() on MinGW may be HANDLE or integer; use C-style cast via
-    // uintptr_t
     HANDLE h = (HANDLE)(uintptr_t)jt.native_handle();
-    HMODULE k32 = GetModuleHandleA("kernel32.dll");
-    if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
-#pragma GCC diagnostic pop
-        if (pSetDesc) {
-            std::string s(name);
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
-            if (wlen > 0) {
-                std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, wbuf.data(), wlen);
-                // wbuf includes null terminator; pass c_str
-                HRESULT hr = pSetDesc(h, wbuf.c_str());
-                (void)hr;
-                return {};
-            }
-        }
-    }
-    return {};
+    return detail::setNativeHandleName(h, name);
 #else
     pthread_t th = jt.native_handle();
     // pthread_setname_np with pthread_t variant (Linux has pthread_setname_np(pthread_t, const
@@ -197,26 +185,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     }
 #if defined(_WIN32) || defined(_WIN64)
     HANDLE h = (HANDLE)(uintptr_t)t.native_handle();
-    HMODULE k32 = GetModuleHandleA("kernel32.dll");
-    if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        auto pSetDesc = (SetThreadDescriptionFn)GetProcAddress(k32, "SetThreadDescription");
-#pragma GCC diagnostic pop
-        if (pSetDesc) {
-            std::string s(name);
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
-            if (wlen > 0) {
-                std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, wbuf.data(), wlen);
-                HRESULT hr = pSetDesc(h, wbuf.c_str());
-                (void)hr;
-                return {};
-            }
-        }
-    }
-    return {};
+    return detail::setNativeHandleName(h, name);
 #else
 #if defined(__linux__) && !defined(__APPLE__)
     pthread_t th = t.native_handle();

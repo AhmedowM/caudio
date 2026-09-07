@@ -418,16 +418,6 @@ class Database final {
         Statement st;
         if (auto e = st.prepare(db_, sql); !e)
             return std::unexpected{e.error()};
-        auto escapeLike = [](std::string_view s) -> std::string {
-            std::string o;
-            o.reserve(s.size() * 2);
-            for (char c : s) {
-                if (c == '%' || c == '_' || c == '\\')
-                    o.push_back('\\');
-                o.push_back(c);
-            }
-            return o;
-        };
         int idx = 1;
         std::string likePat;
         if (q) {
@@ -1227,26 +1217,8 @@ std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
         t.title = std::string(name);
         t.path = std::string(path);
         if (!fpHex.empty()) {
-            // hex to bytes if 64 char
-            if (fpHex.size() == 64) {
-                auto hv = [](char c) -> int {
-                    if (c >= '0' && c <= '9')
-                        return c - '0';
-                    if (c >= 'a' && c <= 'f')
-                        return c - 'a' + 10;
-                    if (c >= 'A' && c <= 'F')
-                        return c - 'A' + 10;
-                    return -1;
-                };
-                for (int i = 0; i < 32; i++) {
-                    int hi = hv(fpHex[i * 2]);
-                    int lo = hv(fpHex[i * 2 + 1]);
-                    if (hi < 0 || lo < 0)
-                        break;
-                    t.fingerprint[i] = (uint8_t)((hi << 4) | lo);
-                }
-            } else {
-                // fallback random-ish
+            if (!detail::fromHex(fpHex, t.fingerprint)) {
+                // fallback for non-hex or wrong length: raw copy
                 std::memset(t.fingerprint.data(), 0, 32);
                 for (size_t i = 0; i < fpHex.size() && i < 32; i++)
                     t.fingerprint[i] = (uint8_t)fpHex[i];

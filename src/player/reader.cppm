@@ -110,9 +110,11 @@ class FileReader final : public Reader {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::Internal, "fseek failed"});
         }
-        auto* raw = new FileReader(f);
-        raw->fileSize_ = sz;
-        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::unique_ptr<Reader>(raw)};
+        // Wrap immediately in unique_ptr so FILE* is owned even if Expected construction throws
+        auto holder = std::unique_ptr<FileReader>(new FileReader(f));
+        holder->fileSize_ = sz;
+        std::unique_ptr<Reader> base = std::move(holder);
+        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
     }
 
     ~FileReader() override {
@@ -193,9 +195,10 @@ class MemoryReader final : public Reader {
     MemoryReader() = delete;
 
     static caudio::utils::Expected<std::unique_ptr<Reader>> open(std::span<const std::byte> data) {
-        // copy data to owned buffer
-        auto* raw = new MemoryReader(data);
-        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::unique_ptr<Reader>(raw)};
+        // copy data to owned buffer — wrap immediately for exception safety
+        auto holder = std::unique_ptr<MemoryReader>(new MemoryReader(data));
+        std::unique_ptr<Reader> base = std::move(holder);
+        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
     }
 
     static caudio::utils::Expected<std::unique_ptr<Reader>>

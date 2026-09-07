@@ -23,36 +23,12 @@ namespace caudio::db {
 
 using ordered_json = nlohmann::ordered_json;
 
+// DRY: canonical hex helpers live in caudio.db:detail — thin wrappers for backwards compat
 inline std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {
-    static const char* hex = "0123456789abcdef";
-    std::string s;
-    s.reserve(64);
-    for (uint8_t b : fp) {
-        s.push_back(hex[b >> 4]);
-        s.push_back(hex[b & 0xf]);
-    }
-    return s;
+    return detail::toHex(fp);
 }
 inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out) {
-    if (hex.size() != 64)
-        return false;
-    auto hv = [](char c) -> int {
-        if (c >= '0' && c <= '9')
-            return c - '0';
-        if (c >= 'a' && c <= 'f')
-            return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F')
-            return c - 'A' + 10;
-        return -1;
-    };
-    for (int i = 0; i < 32; i++) {
-        int hi = hv(hex[i * 2]);
-        int lo = hv(hex[i * 2 + 1]);
-        if (hi < 0 || lo < 0)
-            return false;
-        out[i] = (uint8_t)((hi << 4) | lo);
-    }
-    return true;
+    return detail::fromHex(hex, out);
 }
 inline void genFingerprintFallback(std::string_view path, int64_t id, int64_t size, int64_t mtime,
                                    std::array<uint8_t, 32>& out) {

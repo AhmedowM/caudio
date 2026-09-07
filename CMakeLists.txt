@@ -223,9 +223,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json)
 
 # caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
-add_library(caudio_db STATIC)
-add_library(caudio::db ALIAS caudio_db)
-target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm
+# P3-6: centralize DB module list to avoid quartet duplication (static/shared/combined)
+set(CAUDIO_DB_SOURCES
+  src/db/db.cppm
   src/db/types.cppm
   src/db/schema.cppm
   src/db/database.cppm
@@ -235,7 +235,11 @@ target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/
   src/db/write_thread.cppm
   src/db/statement.cppm
   src/db/transaction.cppm
-  src/db/detail.cppm)
+  src/db/detail.cppm
+)
+add_library(caudio_db STATIC)
+add_library(caudio::db ALIAS caudio_db)
+target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_DB_SOURCES})
 target_include_directories(caudio_db PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -250,17 +254,7 @@ ca_set_warnings(caudio_db)
 add_library(caudio_db_shared SHARED)
 set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
 add_library(caudio::db_shared ALIAS caudio_db_shared)
-target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/db/db.cppm
-  src/db/types.cppm
-  src/db/schema.cppm
-  src/db/database.cppm
-  src/db/scan.cppm
-  src/db/search.cppm
-  src/db/json.cppm
-  src/db/write_thread.cppm
-  src/db/statement.cppm
-  src/db/transaction.cppm
-  src/db/detail.cppm)
+target_sources(caudio_db_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_DB_SOURCES})
 target_include_directories(caudio_db_shared PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -307,17 +301,7 @@ target_sources(caudio_combined PUBLIC
   FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
     ${CAUDIO_UTILS_SOURCES}
     ${CAUDIO_PLAYER_SOURCES}
-    src/db/db.cppm
-  src/db/types.cppm
-  src/db/schema.cppm
-  src/db/database.cppm
-  src/db/scan.cppm
-  src/db/search.cppm
-  src/db/json.cppm
-  src/db/write_thread.cppm
-  src/db/statement.cppm
-  src/db/transaction.cppm
-  src/db/detail.cppm
+    ${CAUDIO_DB_SOURCES}
     ${CAUDIO_ENGINE_SOURCES}
 )
 target_include_directories(caudio_combined PUBLIC

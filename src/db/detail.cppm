@@ -79,6 +79,39 @@ inline std::string escapeLike(std::string_view term) {
     return result;
 }
 
+inline std::string toHex(const std::array<uint8_t, 32>& fp) {
+    static const char* hex = "0123456789abcdef";
+    std::string s;
+    s.reserve(64);
+    for (uint8_t b : fp) {
+        s.push_back(hex[b >> 4]);
+        s.push_back(hex[b & 0xf]);
+    }
+    return s;
+}
+
+inline bool fromHex(std::string_view hexStr, std::array<uint8_t, 32>& out) {
+    if (hexStr.size() != 64)
+        return false;
+    auto hv = [](char c) -> int {
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
+        return -1;
+    };
+    for (int i = 0; i < 32; i++) {
+        int hi = hv(hexStr[i * 2]);
+        int lo = hv(hexStr[i * 2 + 1]);
+        if (hi < 0 || lo < 0)
+            return false;
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return true;
+}
+
 inline std::string sanitizeFtsTerm(std::string_view term) {
     // Empty term → return empty to match everything
     if (term.empty())
