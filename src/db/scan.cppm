@@ -21,6 +21,7 @@ export module caudio.db:scan;
 import caudio.utils;
 import :types;
 import :database;
+import :detail;
 
 namespace caudio::db {
 
@@ -31,46 +32,6 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
     return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
-}
-
-export constexpr size_t kSample = 64 * 1024;
-
-export std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
-computeFingerprint(const std::filesystem::path& path) {
-    std::error_code ec;
-    auto sz = std::filesystem::file_size(path, ec);
-    if (ec)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
-    std::ifstream f(path, std::ios::binary);
-    if (!f)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-    std::vector<uint8_t> buf(kSample);
-    // head
-    f.read(reinterpret_cast<char*>(buf.data()), kSample);
-    size_t n = (size_t)f.gcount();
-    if (n)
-        blake3_hasher_update(&hasher, buf.data(), n);
-    // tail if file larger than kSample
-    if (sz > kSample) {
-        f.clear();
-        f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
-        if (f) {
-            f.read(reinterpret_cast<char*>(buf.data()), kSample);
-            n = (size_t)f.gcount();
-            if (n)
-                blake3_hasher_update(&hasher, buf.data(), n);
-        }
-    }
-    uint64_t sz64 = (uint64_t)sz;
-    blake3_hasher_update(&hasher, &sz64, sizeof(sz64));
-    uint32_t ver = 1;
-    blake3_hasher_update(&hasher, &ver, sizeof(ver));
-    std::array<uint8_t, 32> out{};
-    blake3_hasher_finalize(&hasher, out.data(), out.size());
-    return out;
 }
 
 // Generator-based scan: yields Tracks lazily
@@ -93,7 +54,7 @@ export std::generator<Track> scan(const std::filesystem::path& root,
             if (!e2)
                 t.mtime = (int64_t)ftime.time_since_epoch().count();
             if (mode == ScanMode::Sampled) {
-                auto fp = computeFingerprint(it->path());
+                auto fp = detail::computeFingerprint(it->path());
                 if (fp)
                     t.fingerprint = *fp;
             } else {

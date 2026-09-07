@@ -1,13 +1,18 @@
 module;
 #include <sqlite3.h>
+#include <blake3.h>
 
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstdint>
 #include <cstring>
+#include <expected>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 module caudio.db:detail;
 
@@ -15,6 +20,46 @@ import caudio.utils;
 import :types;
 
 namespace caudio::db::detail {
+
+inline constexpr size_t kSample = 64 * 1024;
+
+inline std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
+computeFingerprint(const std::filesystem::path& path) {
+    std::error_code ec;
+    auto sz = std::filesystem::file_size(path, ec);
+    if (ec)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+    std::ifstream f(path, std::ios::binary);
+    if (!f)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
+    blake3_hasher hasher;
+    blake3_hasher_init(&hasher);
+    std::vector<uint8_t> buf(kSample);
+    // head
+    f.read(reinterpret_cast<char*>(buf.data()), kSample);
+    size_t n = (size_t)f.gcount();
+    if (n)
+        blake3_hasher_update(&hasher, buf.data(), n);
+    // tail if file larger than kSample
+    if (sz > kSample) {
+        f.clear();
+        f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
+        if (f) {
+            f.read(reinterpret_cast<char*>(buf.data()), kSample);
+            n = (size_t)f.gcount();
+            if (n)
+                blake3_hasher_update(&hasher, buf.data(), n);
+        }
+    }
+    uint64_t sz64 = (uint64_t)sz;
+    blake3_hasher_update(&hasher, &sz64, sizeof(sz64));
+    uint32_t ver = 1;
+    blake3_hasher_update(&hasher, &ver, sizeof(ver));
+    std::array<uint8_t, 32> out{};
+    blake3_hasher_finalize(&hasher, out.data(), out.size());
+    return out;
+}
 
 inline constexpr std::string_view kSelectTracksCols =
     "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "

@@ -35,10 +35,12 @@ class MpscQueue {
     }
 
     [[nodiscard]] std::size_t size() const noexcept {
+        std::lock_guard<std::mutex> lk(mutex_);
         return wr_.load(std::memory_order_acquire) - rd_.load(std::memory_order_acquire);
     }
 
     [[nodiscard]] bool empty() const noexcept {
+        std::lock_guard<std::mutex> lk(mutex_);
         return wr_.load(std::memory_order_acquire) == rd_.load(std::memory_order_acquire);
     }
 
@@ -99,10 +101,6 @@ class MpscQueue {
         T val = std::move(buf_[idx]);
         rd_.store(rd + 1, std::memory_order_release);
         return val;
-    }
-
-    [[nodiscard]] Expected<T> tryPop() {
-        return pop();
     }
 
     // Blocking pop with stop support (optional, not used in tests)

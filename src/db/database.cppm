@@ -313,9 +313,13 @@ class Database final {
         return {};
     }
     std::expected<Track, caudio::utils::Error> getTrack(int64_t id) {
+        std::shared_lock lock{m_};
+        return getTrackLocked(id);
+    }
+
+    std::expected<Track, caudio::utils::Error> getTrackLocked(int64_t id) {
         if (id == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
-        std::shared_lock lock{m_};
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
@@ -774,13 +778,18 @@ class Database final {
     }
 
     // Queue
-    std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
-                                                           int64_t pos = -1) {
+std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
+                                                            int64_t pos = -1) {
+        std::unique_lock lock{m_};
+        return queueEnqueueLocked(qid, tid, pos);
+    }
+
+    std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
+                                                                 int64_t pos = -1) {
         if (tid == 0)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
         if (qid == 0)
             qid = 1;
-        std::unique_lock lock{m_};
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
@@ -821,9 +830,13 @@ class Database final {
         return {};
     }
     std::expected<QueueItem, caudio::utils::Error> queueDequeue(int64_t qid) {
+        std::unique_lock lock{m_};
+        return queueDequeueLocked(qid);
+    }
+
+    std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid) {
         if (qid == 0)
             qid = 1;
-        std::unique_lock lock{m_};
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};

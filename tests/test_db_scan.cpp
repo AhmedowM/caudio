@@ -32,7 +32,7 @@ TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
     }
 }
 
-TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]") {
+TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") {
     auto dir = tempDirPath("fp_test");
     std::filesystem::create_directories(dir);
     auto p = dir / "file.wav";
@@ -44,11 +44,19 @@ TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]"
         std::ofstream f(p, std::ios::binary);
         f.write((char*)data.data(), data.size());
     }
-    auto fp1 = computeFingerprint(p);
-    REQUIRE(fp1.has_value());
-    auto fp2 = computeFingerprint(p);
-    REQUIRE(fp2.has_value());
-    REQUIRE(*fp1 == *fp2);
+    // Test via public API: scanDirectory returns tracks with fingerprints
+    auto tracks1 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks1.has_value());
+    REQUIRE(tracks1->size() == 1);
+    auto fp1 = tracks1->front().fingerprint;
+
+    // Re-scan same file -> same fingerprint
+    auto tracks2 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks2.has_value());
+    REQUIRE(tracks2->size() == 1);
+    auto fp2 = tracks2->front().fingerprint;
+    REQUIRE(fp1 == fp2);
+
     // same head different tail -> different fingerprint
     std::vector<uint8_t> data2 = data;
     // modify tail last 1K
@@ -59,9 +67,18 @@ TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]"
         std::ofstream f(p2, std::ios::binary);
         f.write((char*)data2.data(), data2.size());
     }
-    auto fp3 = computeFingerprint(p2);
-    REQUIRE(fp3.has_value());
-    REQUIRE(*fp1 != *fp3);
+    auto tracks3 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks3.has_value());
+    REQUIRE(tracks3->size() == 2);
+    bool foundDifferent = false;
+    for (auto& t : *tracks3) {
+        if (t.fingerprint != fp1) {
+            foundDifferent = true;
+            break;
+        }
+    }
+    REQUIRE(foundDifferent);
+
     // size included: same head+tail but different size -> different
     auto p3 = dir / "file3.wav";
     std::vector<uint8_t> data3(data.begin(), data.begin() + 50 * 1024);
@@ -69,10 +86,19 @@ TEST_CASE("computeFingerprint head+tail+size sampled deterministic", "[db_scan]"
         std::ofstream f(p3, std::ios::binary);
         f.write((char*)data3.data(), data3.size());
     }
-    auto fp4 = computeFingerprint(p3);
-    REQUIRE(fp4.has_value());
-    REQUIRE(*fp1 != *fp4);
-    REQUIRE(fp1->size() == 32);
+    auto tracks4 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks4.has_value());
+    REQUIRE(tracks4->size() == 3);
+    foundDifferent = false;
+    for (auto& t : *tracks4) {
+        if (t.fingerprint != fp1) {
+            foundDifferent = true;
+            break;
+        }
+    }
+    REQUIRE(foundDifferent);
+    // fingerprint size is 32 bytes
+    REQUIRE(fp1.size() == 32);
     {
         std::error_code ec;
         std::filesystem::remove_all(dir, ec);
