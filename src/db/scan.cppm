@@ -27,7 +27,7 @@ namespace caudio::db {
 
 export enum class ScanMode { Sampled, Full };
 
-inline bool hasAudioExt(const std::filesystem::path& p) {
+export inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });

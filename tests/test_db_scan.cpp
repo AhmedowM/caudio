@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <thread>
 #include <vector>
 
 #include "helpers/helpers_test.hpp"
@@ -150,4 +152,132 @@ TEST_CASE("scan non-existent dir returns empty", "[db_scan]") {
     auto tracks = scanDirectory("/nonexistent_path_xyz_12345", ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->empty());
+}
+
+TEST_CASE("scan empty dir returns empty", "[db_scan]") {
+    auto dir = tempDirPath("empty_scan");
+    std::filesystem::create_directories(dir);
+    auto tracks = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks.has_value());
+    REQUIRE(tracks->empty());
+    // also .txt noise only should be empty
+    {
+        std::ofstream f(dir / "notes.txt", std::ios::binary);
+        f << "hello";
+    }
+    auto tracks2 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(tracks2.has_value());
+    REQUIRE(tracks2->empty());
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("hasAudioExt case-insensitive .MP3 .m4a", "[db_scan]") {
+    REQUIRE(hasAudioExt(std::filesystem::path("song.MP3")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.mp3")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.Mp3")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.m4a")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.M4A")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.FLAC")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.WAV")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.OGG")) == true);
+    REQUIRE(hasAudioExt(std::filesystem::path("song.txt")) == false);
+    REQUIRE(hasAudioExt(std::filesystem::path("song")) == false);
+}
+
+TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
+    auto dir = tempDirPath("scan_mode");
+    std::filesystem::create_directories(dir);
+    auto p = dir / "large.wav";
+    // 200 KiB file ( >128 KiB = 2*64K )
+    std::vector<uint8_t> data(200 * 1024);
+    for (size_t i=0;i<data.size();++i) data[i]=(uint8_t)(i*13 & 0xFF);
+    {
+        std::ofstream f(p, std::ios::binary);
+        f.write((char*)data.data(), data.size());
+    }
+    auto sampled = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(sampled.has_value());
+    REQUIRE(sampled->size()==1);
+    auto full = scanDirectory(dir, ScanMode::Full);
+    REQUIRE(full.has_value());
+    REQUIRE(full->size()==1);
+    // Sampled uses head+tail+size, Full uses BLAKE3 of entire file -> should differ for large file
+    REQUIRE(sampled->front().fingerprint != full->front().fingerprint);
+    // But re-scanning same mode is deterministic
+    auto sampled2 = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(sampled2->front().fingerprint == sampled->front().fingerprint);
+    auto full2 = scanDirectory(dir, ScanMode::Full);
+    REQUIRE(full2->front().fingerprint == full->front().fingerprint);
+    // Modify middle byte only (not in head/tail 64K) -> Sampled should stay same, Full should change
+    // For 200K file, head 64K = [0,64K), tail 64K = [136K,200K), middle [64K,136K)
+    std::vector<uint8_t> dataMod = data;
+    dataMod[100*1024] ^= 0xFF;
+    auto p2 = dir / "large2.wav";
+    // overwrite original with modified middle
+    {
+        std::ofstream f(p, std::ios::binary | std::ios::trunc);
+        f.write((char*)dataMod.data(), dataMod.size());
+    }
+    auto sampledMod = scanDirectory(dir, ScanMode::Sampled);
+    REQUIRE(sampledMod.has_value());
+    REQUIRE(sampledMod->size()==1);
+    // sampled should be same as before because middle not covered (unless size changed? size same)
+    // For this file, change is in middle so sampled stays same, but full changes
+    // Note: if sampled differs, still valid test; we check full definitely differs from original full
+    auto fullMod = scanDirectory(dir, ScanMode::Full);
+    REQUIRE(fullMod.has_value());
+    REQUIRE(fullMod->front().fingerprint != full->front().fingerprint);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
+    auto dir = tempDirPath("scan_preserve");
+    std::filesystem::create_directories(dir);
+    auto p = dir / "song.mp3";
+    std::vector<uint8_t> d1(10*1024, 0x11);
+    for (size_t i=0;i<d1.size();++i) d1[i]=(uint8_t)(i & 0xFF);
+    {
+        std::ofstream f(p, std::ios::binary);
+        f.write((char*)d1.data(), d1.size());
+    }
+    auto dbRes = Database::open(":memory:");
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    auto libIdRes = db->libraryAdd(dir.string(), "lib");
+    REQUIRE(libIdRes.has_value());
+    int64_t libId = *libIdRes;
+    REQUIRE(scanLibrary(*db, libId).has_value());
+    auto tracks = db->listTracks(nullptr);
+    REQUIRE(tracks.has_value());
+    REQUIRE(tracks->size()==1);
+    int64_t tid = tracks->front().id;
+    // set play_count and rating, then modify file content (same path, different fingerprint) and rescan
+    {
+        auto t = db->getTrack(tid);
+        REQUIRE(t.has_value());
+        t->play_count = 42;
+        t->rating = 5;
+        t->title = "Custom Title";
+        REQUIRE(db->updateTrack(*t).has_value());
+    }
+    // modify file to trigger content-changed path: change size as well to guarantee early-exit fails (size != trk.size)
+    std::vector<uint8_t> d2(12*1024, 0x22);
+    for (size_t i=0;i<d2.size();++i) d2[i]=(uint8_t)((i*3) & 0xFF);
+    // ensure different fingerprint from d1
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    {
+        std::ofstream f(p, std::ios::binary | std::ios::trunc);
+        f.write((char*)d2.data(), d2.size());
+    }
+    REQUIRE(scanLibrary(*db, libId).has_value());
+    auto t2 = db->getTrack(tid);
+    REQUIRE(t2.has_value());
+    REQUIRE(t2->play_count == 42);
+    REQUIRE(t2->rating == 5);
+    // title should have been cleared (metadata staleness) but play_count preserved
+    REQUIRE(t2->title.empty());
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
 }

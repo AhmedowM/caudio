@@ -10,16 +10,20 @@ import :types;
 
 export namespace caudio::engine {
 
-inline void shufflePerm(std::vector<int64_t>& perm) {
+inline void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng) {
     if (perm.size() <= 1)
         return;
-    std::random_device rd;
-    std::mt19937 gen(rd());
     for (size_t i = perm.size() - 1; i > 0; --i) {
         std::uniform_int_distribution<size_t> dist(0, i);
-        size_t j = dist(gen);
+        size_t j = dist(rng);
         std::swap(perm[i], perm[j]);
     }
+}
+
+inline void shufflePerm(std::vector<int64_t>& perm) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    shufflePerm(perm, gen);
 }
 
 } // namespace caudio::engine

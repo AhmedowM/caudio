@@ -58,6 +58,30 @@ class AudioOutput {
             s = 0.0f;
     }
 
+    // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
+    // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
+    void fillForTest(std::span<float> out) noexcept {
+        if (out.empty())
+            return;
+        uint32_t channels = cfg_.channels ? cfg_.channels : 1;
+        std::size_t totalSamples = out.size();
+        std::size_t totalFrames = totalSamples / channels;
+        std::size_t generatedFrames = 0;
+        if (cfg_.ring) {
+            generatedFrames = cfg_.ring->read(std::span<float>(out.data(), totalSamples));
+        }
+        std::size_t generatedSamples = generatedFrames * channels;
+        if (generatedSamples < totalSamples) {
+            for (std::size_t i = generatedSamples; i < totalSamples; ++i)
+                out[i] = 0.0f;
+        }
+        float vol = volume_.load(std::memory_order_relaxed);
+        if (vol != 1.0f) {
+            for (std::size_t i = 0; i < totalSamples; ++i)
+                out[i] *= vol;
+        }
+    }
+
     bool isPlaying() const noexcept {
         return running_.load(std::memory_order_acquire);
     }
@@ -89,6 +113,11 @@ class AudioOutput {
         if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
             return false;
         cfg_ = cfg;
+        float v = cfg.volume;
+        if (!std::isfinite(v)) v = 0.0f;
+        if (v < 0.0f) v = 0.0f;
+        if (v > 1.0f) v = 1.0f;
+        volume_.store(v, std::memory_order_relaxed);
 
         ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
         deviceConfig.playback.format = ma_format_f32;

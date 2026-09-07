@@ -793,7 +793,10 @@ class Engine final {
             queue_.perm.resize(cnt);
             for (size_t i = 0; i < cnt; ++i)
                 queue_.perm[i] = (int64_t)i;
-            shufflePerm(queue_.perm);
+            {
+                std::mt19937 rng{std::random_device{}()};
+                shufflePerm(queue_.perm, rng);
+            }
             queue_.shuffle = true;
             queue_.cursor = 0;
             auto r = persistShuffleBlobLocked();

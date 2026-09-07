@@ -228,3 +228,39 @@ TEST_CASE("engine queue invalid repeat returns InvalidArg", "[engine_queue]") {
     // without db should fail State
     REQUIRE(!eng->setRepeat((RepeatMode)99).has_value());
 }
+
+TEST_CASE("shufflePerm deterministic with mt19937 seed 42", "[engine_queue][shuffle]") {
+    std::vector<int64_t> a{0,1,2,3,4,5,6,7,8,9};
+    std::vector<int64_t> b{0,1,2,3,4,5,6,7,8,9};
+    std::mt19937 rng1{42};
+    std::mt19937 rng2{42};
+    shufflePerm(a, rng1);
+    shufflePerm(b, rng2);
+    REQUIRE(a == b);
+    // ensure it's a permutation
+    std::set<int64_t> s(a.begin(), a.end());
+    REQUIRE(s.size()==10);
+    for (int i=0;i<10;++i) REQUIRE(s.count(i)==1);
+    // different seed should give different perm (with high probability)
+    std::vector<int64_t> c{0,1,2,3,4,5,6,7,8,9};
+    std::mt19937 rng3{43};
+    shufflePerm(c, rng3);
+    REQUIRE(c != a);
+    // size 0 and 1 are no-ops
+    std::vector<int64_t> empty;
+    std::mt19937 rng4{42};
+    shufflePerm(empty, rng4);
+    REQUIRE(empty.empty());
+    std::vector<int64_t> one{42};
+    shufflePerm(one, rng4);
+    REQUIRE(one.size()==1);
+    REQUIRE(one[0]==42);
+}
+
+TEST_CASE("shufflePerm production overload non-deterministic but valid perm", "[engine_queue][shuffle]") {
+    std::vector<int64_t> v{0,1,2,3,4};
+    shufflePerm(v); // calls random_device overload
+    std::set<int64_t> s(v.begin(), v.end());
+    REQUIRE(s.size()==5);
+    for (int i=0;i<5;++i) REQUIRE(s.count(i)==1);
+}

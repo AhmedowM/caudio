@@ -144,3 +144,119 @@ TEST_CASE("player decode ogg via ffmpeg", "[player_integration]") {
     REQUIRE((*dec)->seek(0.0).has_value());
     REQUIRE((*dec)->decode(out) > 0);
 }
+
+TEST_CASE("player seek-while-playing race via Engine", "[player_integration][seek]") {
+    std::string dbPath = tempDbPath("seek_race").string();
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    Track t;
+    t.path = fixturePath("sample.wav");
+    t.duration = 5.0;
+    for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x60+b);
+    auto ins = db->insertTrack(t);
+    REQUIRE(ins.has_value());
+    REQUIRE(db->queueEnqueue(1,*ins,-1).has_value());
+    EngineConfig cfg;
+    cfg.enableMonitorThread = true;
+    cfg.pollMs = 10;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
+    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->play(1).has_value());
+    // sequential seeks while playing (decode thread races with seek's ring reset)
+    // we do small delays to let decode thread interleave but avoid true concurrent seeks which cause data race
+    int okCount = 0;
+    for (int j=0;j<10;++j) {
+        double sec = j*0.3;
+        if (eng->seek(sec).has_value()) okCount++;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        // also verify position after seek
+        double pos = eng->position();
+        REQUIRE(pos >= 0.0);
+        REQUIRE(pos <= 5.0);
+    }
+    REQUIRE(okCount > 5);
+    // ensure engine still playing and position is valid
+    REQUIRE(eng->state() == PlaybackState::Playing);
+    // seek to invalid -> should fail InvalidArg
+    REQUIRE(!eng->seek(-1.0).has_value());
+    REQUIRE(eng->seek(-1.0).error().code == Result::InvalidArg);
+    REQUIRE(!eng->seek(std::numeric_limits<double>::quiet_NaN()).has_value());
+    eng.reset();
+    std::error_code ec;
+    std::filesystem::remove(dbPath, ec);
+    std::filesystem::remove(dbPath+"-wal", ec);
+    std::filesystem::remove(dbPath+"-shm", ec);
+}
+
+TEST_CASE("race player open concurrent", "[player_integration][race]") {
+    // concurrent FileReader::open on same file should not crash and at least some succeed
+    std::string path = fixturePath("sample.wav");
+    const int N=8;
+    std::vector<std::thread> ths;
+    std::atomic<int> success{0};
+    std::atomic<int> fail{0};
+    for (int i=0;i<N;++i) {
+        ths.emplace_back([&](){
+            auto r = FileReader::open(path);
+            if (r.has_value()) {
+                auto dec = DecoderRegistry::open(**r);
+                if (dec.has_value()) {
+                    std::array<float,256> out{};
+                    if ((*dec)->decode(out) >0) success.fetch_add(1);
+                    else fail.fetch_add(1);
+                } else fail.fetch_add(1);
+            } else fail.fetch_add(1);
+        });
+    }
+    for (auto& th: ths) th.join();
+    REQUIRE(success.load() > 0);
+    REQUIRE(success.load() + fail.load() == N);
+    // concurrent open of nonexistent should all return NotFound without crash
+    std::atomic<int> notFound{0};
+    ths.clear();
+    for (int i=0;i<4;++i) {
+        ths.emplace_back([&](){
+            auto r = FileReader::open("/nonexistent_race_xyz.wav");
+            if (!r.has_value() && r.error().code == Result::NotFound) notFound.fetch_add(1);
+        });
+    }
+    for (auto& th: ths) th.join();
+    REQUIRE(notFound.load()==4);
+}
+
+TEST_CASE("gapless via Player Engine 300ms lookahead", "[player_integration][gapless]") {
+    std::string dbPath = tempDbPath("gapless_player").string();
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    for (int i=0;i<2;++i) {
+        Track t;
+        t.path = fixturePath("sample.wav");
+        t.duration = 0.9;
+        for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0x70+i*16+b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1,*r,-1).has_value());
+    }
+    EngineConfig cfg;
+    cfg.enableMonitorThread = true;
+    cfg.pollMs = 10;
+    cfg.gaplessMs = 300;
+    cfg.historyThresholdPct = 100;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
+    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->play(1).has_value());
+    int64_t first = eng->currentTrackId();
+    busyWaitUntil([&]{ return eng->currentTrackId()!=first; }, std::chrono::milliseconds(3000), std::chrono::milliseconds(20));
+    REQUIRE(eng->currentTrackId() != first);
+    eng.reset();
+    std::error_code ec;
+    std::filesystem::remove(dbPath, ec);
+    std::filesystem::remove(dbPath+"-wal", ec);
+    std::filesystem::remove(dbPath+"-shm", ec);
+}
