@@ -196,24 +196,31 @@ class Engine final {
         if (!std::isfinite(seconds) || seconds < 0)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "bad seconds"));
+
+        // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
+        std::unique_lock<std::mutex> lk(decodeMtx_);
+        playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+
         if (decoder_) {
             auto res = decoder_->seek(seconds);
-            if (!res)
+            if (!res) {
+                playbackState_.store(PlaybackState::Playing, std::memory_order_release);
                 return std::unexpected(res.error());
+            }
         }
+
         // adjust position tracking
         double dur = duration_;
         if (seconds > dur)
             seconds = dur;
         pausePos_ = seconds;
         playStart_ = std::chrono::steady_clock::now();
-        // if paused, keep paused pos
-        auto s = playbackState_.load(std::memory_order_acquire);
-        if (s == PlaybackState::Paused) {
-            pausePos_ = seconds;
-        }
+        pausePos_ = seconds;
         if (ring_)
             ring_->reset();
+
+        // Resume decode thread
+        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
         decodeCv_.notify_all();
         return {};
     }
@@ -1179,15 +1186,30 @@ class Engine final {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 continue;
             }
+
             std::vector<float> buf(1024 * (decoder_->channels() ? decoder_->channels() : 2));
-            size_t frames = decoder_->decode(std::span<float>(buf.data(), buf.size()));
+            size_t frames;
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                // Re-check state under lock to avoid race with seek()
+                if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+                    continue;
+                frames = decoder_->decode(std::span<float>(buf.data(), buf.size()));
+            }
             if (frames == 0) {
                 // EOF reached - wait a bit, let monitor handle next (gapless) or stop
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
             size_t samples = frames * (decoder_->channels() ? decoder_->channels() : 2);
-            size_t written = ring_->write(std::span<const float>(buf.data(), samples));
+            size_t written;
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                // Re-check state under lock to avoid race with seek() ring reset
+                if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+                    continue;
+                written = ring_->write(std::span<const float>(buf.data(), samples));
+            }
             (void)written;
         }
     }
