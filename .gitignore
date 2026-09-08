@@ -25,6 +25,7 @@ Thumbs.db
 .cache/
 .claude/
 .opencode/
+.worktrees/
 
 # Vendored build artefacts
 *.o
