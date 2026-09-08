@@ -1,5 +1,6 @@
 module;
 #include <nlohmann/json.hpp>
+// Service owns Engine/DB/Config/Logger/IpcServer and dispatches commands
 
 #include <algorithm>
 #include <atomic>
