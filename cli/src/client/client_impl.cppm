@@ -21,6 +21,7 @@ export module caudio.client:impl;
 
 import caudio.utils;
 import caudio.cli;
+import caudio.engine;
 import :ipc_client;
 import caudio.service;
 
@@ -118,6 +119,35 @@ public:
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Io, "timeout")};
         }
+    }
+
+    // Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
+    caudio::utils::Expected<caudio::cli::Result> snapshotStatus() {
+        // Try to connect to shared memory status block
+        // Derive hash from dbPath for shm name
+        std::string dbStr = config_.dbPath.generic_string();
+        std::size_t hash = std::hash<std::string>{}(dbStr);
+        std::string shmName = std::to_string(hash);
+
+        auto shmRes = caudio::service::ShmStatusHandle::openReadOnly(shmName);
+        if (shmRes) {
+            auto snapshot = shmRes->snapshot();
+            caudio::cli::Status s{};
+            s.state = static_cast<caudio::engine::PlaybackState>(snapshot.state);
+            s.pos = snapshot.position;
+            s.dur = snapshot.duration;
+            s.vol = snapshot.volume;
+            s.muted = snapshot.muted;
+            s.trackId = snapshot.trackId;
+            s.qSize = snapshot.queueSize;
+            s.title = snapshot.title;
+            s.artist = snapshot.artist;
+            // shuffle/repeat not in shm, would need to query via IPC if needed
+            return caudio::cli::Result{s};
+        }
+
+        // Fallback to IPC
+        return send(caudio::cli::Command{caudio::cli::StatusReq{}});
     }
 };
 

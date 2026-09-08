@@ -9,6 +9,7 @@ module;
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <mutex>
 #include <optional>
@@ -245,7 +246,25 @@ inline int App::run(int argc, char** argv) {
         std::cout << libCmd->help() << "\n"; return 0;
     }
     if (previewCmd->parsed()) return handlePreview(previewFile);
-    if (tuiCmd->parsed()) { (void)handleStart(false); std::cout << std::format("tui: not implemented (daemon ensured)\n"); return 0; }
+    if (tuiCmd->parsed()) {
+        (void)handleStart(false);
+        // Prepare shared memory status block for TUI 10fps polling
+        caudio::service::ServiceConfig scfg;
+        scfg.dbPath = config_.dbPath;
+        scfg.socketPath = config_.socketPath;
+        scfg.configPath = config_.configPath;
+        scfg.logLevel = config_.logLevel;
+        // Connect to existing shm (read-only) using the same hash derivation
+        std::string dbStr = config_.dbPath.generic_string();
+        std::size_t hash = std::hash<std::string>{}(dbStr);
+        std::string shmName = std::to_string(hash);
+        auto shmRes = caudio::service::createShmStatus(shmName, false);
+        if (!shmRes) {
+            std::cerr << std::format("tui: failed to connect to shared memory status: {}\n", shmRes.error().message);
+        }
+        std::cout << std::format("tui: not implemented (daemon ensured, shm ready)\n");
+        return 0;
+    }
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed()) { caudio::cli::Command cmd{caudio::cli::ConfigGet{cfgGetKey}}; return sendViaClient(cmd,false); }
         if (cfgSet->parsed()) { caudio::cli::Command cmd{caudio::cli::ConfigSet{cfgSetKey,cfgSetVal}}; return sendViaClient(cmd,false); }

@@ -356,6 +356,7 @@ ca_set_warnings(caudio_cli_shared)
 set(CAUDIO_SERVICE_SOURCES
   cli/src/service/service.cppm
   cli/src/service/service_impl.cppm
+  cli/src/service/shm_status.cppm
   cli/src/service/ipc_channel.cppm
   cli/src/service/ipc_channel_unix.cpp
   cli/src/service/ipc_channel_win.cpp
@@ -431,6 +432,7 @@ ca_set_warnings(caudio_client_shared)
 set(CAUDIO_SERVICE_LIB_SOURCES
   cli/src/service/service.cppm
   cli/src/service/service_impl.cppm
+  cli/src/service/shm_status.cppm
   cli/src/service/ipc_channel.cppm
   cli/src/service/ipc_channel_unix.cpp
   cli/src/service/ipc_channel_win.cpp
@@ -445,6 +447,9 @@ target_include_directories(caudio_service PUBLIC
 )
 target_include_directories(caudio_service PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_service PUBLIC caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads)
+if(NOT WIN32)
+  target_link_libraries(caudio_service PUBLIC rt)
+endif()
 target_compile_options(caudio_service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
 ca_set_warnings(caudio_service)
 
@@ -458,6 +463,9 @@ target_include_directories(caudio_service_shared PUBLIC
 )
 target_include_directories(caudio_service_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_service_shared PUBLIC caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads)
+if(NOT WIN32)
+  target_link_libraries(caudio_service_shared PUBLIC rt)
+endif()
 target_compile_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
 ca_set_warnings(caudio_service_shared)
 

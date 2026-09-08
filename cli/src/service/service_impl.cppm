@@ -29,8 +29,11 @@ module;
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <cstring>
+#include <fcntl.h>
+#include <sys/file.h>
 #else
 #include <process.h>
+#include <windows.h>
 #endif
 
 export module caudio.service:impl;
@@ -41,6 +44,7 @@ import caudio.db;
 import caudio.cli;
 import :ipc_channel;
 import :ipc_server;
+import :shm_status;
 
 export namespace caudio::service {
 
@@ -100,6 +104,23 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
     return pp / "caudio.pid";
 }
 
+inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
+                                               const std::filesystem::path& socketPath) {
+    auto pidPath = pidPathForSocket(dbPath, socketPath);
+    return pidPath.parent_path() / "caudio.lock";
+}
+
+inline std::filesystem::path socketPathForDb(const std::filesystem::path& dbPath) {
+    auto pp = dbPath.parent_path();
+    if (pp.empty()) pp = std::filesystem::current_path();
+    std::error_code ec;
+    std::filesystem::create_directories(pp, ec);
+    // Use a hash of the db path for the socket name
+    std::string dbStr = dbPath.generic_string();
+    std::size_t hash = std::hash<std::string>{}(dbStr);
+    return pp / ("caudio-" + std::to_string(hash) + ".sock");
+}
+
 inline bool probeSocketAlive(const std::string& sp) {
 #ifdef _WIN32
     // For named pipe, try to open it
@@ -127,6 +148,77 @@ inline bool probeSocketAlive(const std::string& sp) {
     ::close(fd);
     return rc == 0;
 #endif
+}
+
+inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
+    std::error_code ec;
+    auto parent = lockPath.parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent, ec);
+    }
+#ifndef _WIN32
+    int fd = ::open(lockPath.c_str(), O_CREAT | O_CLOEXEC | O_RDWR, 0600);
+    if (fd < 0) return false;
+    if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
+        ::close(fd);
+        return false;
+    }
+    outFd = fd;
+    return true;
+#else
+    std::wstring w;
+    w.reserve(lockPath.generic_string().size());
+    for (char c : lockPath.generic_string()) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE,
+                             0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return false;
+    // Try to lock the entire file
+    OVERLAPPED ov{};
+    if (!::LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
+        ::CloseHandle(h);
+        return false;
+    }
+    outFd = reinterpret_cast<intptr_t>(h);
+    return true;
+#endif
+}
+
+inline void releaseLock(int fd) {
+    if (fd < 0) return;
+#ifndef _WIN32
+    ::flock(fd, LOCK_UN);
+    ::close(fd);
+#else
+    HANDLE h = reinterpret_cast<HANDLE>(static_cast<intptr_t>(fd));
+    OVERLAPPED ov{};
+    ::UnlockFileEx(h, 0, 1, 0, &ov);
+    ::CloseHandle(h);
+#endif
+}
+
+inline bool checkPidAlive(int pid) {
+    if (pid <= 0) return false;
+#ifndef _WIN32
+    // kill(pid, 0) checks if process exists
+    return ::kill(pid, 0) == 0;
+#else
+    HANDLE h = ::OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(pid));
+    if (!h) return false;
+    DWORD wait = ::WaitForSingleObject(h, 0);
+    ::CloseHandle(h);
+    return wait == WAIT_TIMEOUT; // timeout means still running
+#endif
+}
+
+inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
+    std::error_code ec;
+    if (!std::filesystem::exists(pidPath, ec)) return std::nullopt;
+    std::ifstream in(pidPath);
+    if (!in) return std::nullopt;
+    int pid = 0;
+    in >> pid;
+    if (in.fail()) return std::nullopt;
+    return pid;
 }
 
 inline std::expected<caudio::cli::Status, caudio::utils::Error>
@@ -330,33 +422,48 @@ public:
     using ExpectedService = std::expected<std::unique_ptr<Service>, caudio::utils::Error>;
 
     static ExpectedService create(const ServiceConfig& cfg) {
-        // stale detection: check socket alive
+        // Determine socket path
         std::string spStr;
         if (!cfg.socketPath.empty()) {
             spStr = cfg.socketPath.generic_string();
         } else {
-            auto sp = socketPathFor(cfg.dbPath);
-            if (sp) spStr = *sp;
+            auto sp = detail_svc::socketPathForDb(cfg.dbPath);
+            if (!sp.empty()) spStr = sp.generic_string();
         }
+
+        // Single-instance enforcement via flock lock file
+        std::filesystem::path lockPath = detail_svc::lockPathForSocket(cfg.dbPath,
+            cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
+        int lockFd = -1;
+        if (!detail_svc::tryAcquireLock(lockPath, lockFd)) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (lock held)")};
+        }
+
+        // Check for stale PID file
+        std::filesystem::path pidPath = detail_svc::pidPathForSocket(cfg.dbPath,
+            cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
+        std::error_code ec;
+        if (std::filesystem::exists(pidPath, ec)) {
+            auto existingPid = detail_svc::readPidFile(pidPath);
+            if (existingPid && detail_svc::checkPidAlive(*existingPid)) {
+                // Process is alive, daemon already running
+                detail_svc::releaseLock(lockFd);
+                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pid alive)")};
+            }
+            // Stale PID - remove it
+            std::filesystem::remove(pidPath, ec);
+        }
+
+        // Check for stale socket
         if (!spStr.empty() && !spStr.starts_with("\\\\")) {
             std::filesystem::path sockP(spStr);
-            std::error_code ec;
             if (std::filesystem::exists(sockP, ec)) {
                 if (detail_svc::probeSocketAlive(spStr)) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running")};
+                    detail_svc::releaseLock(lockFd);
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (socket alive)")};
                 } else {
-                    // stale socket, remove
+                    // Stale socket - remove
                     std::filesystem::remove(sockP, ec);
-                }
-            }
-            // also check pid file
-            auto pidPath = detail_svc::pidPathForSocket(cfg.dbPath, cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
-            if (std::filesystem::exists(pidPath, ec)) {
-                // if socket not alive, pid is stale -> remove
-                if (!detail_svc::probeSocketAlive(spStr)) {
-                    std::filesystem::remove(pidPath, ec);
-                } else {
-                    // check if pid file contains live pid? we already probed socket, so keep
                 }
             }
         }
@@ -368,11 +475,11 @@ public:
 
         // create Engine
         caudio::engine::EngineConfig ecfg{};
-        // map logLevel to logger? EngineConfig doesn't have logLevel directly
         auto engRes = caudio::engine::Engine::create(ecfg);
         if (!engRes) return std::unexpected{engRes.error()};
         std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
         if (auto e = eng->attachDatabase(dbShared); !e) {
+            detail_svc::releaseLock(lockFd);
             return std::unexpected{e.error()};
         }
 
@@ -387,7 +494,10 @@ public:
         // ipc server listen
         auto srvPtr = std::make_unique<IpcServer>();
         auto listenRes = srvPtr->listen(cfg.dbPath);
-        if (!listenRes) return std::unexpected{listenRes.error()};
+        if (!listenRes) {
+            detail_svc::releaseLock(lockFd);
+            return std::unexpected{listenRes.error()};
+        }
 
         auto loggerPtr = std::make_unique<caudio::utils::Logger>(
             [](caudio::utils::Level lvl, std::string_view msg) {
@@ -396,14 +506,11 @@ public:
             },
             static_cast<caudio::utils::Level>(std::clamp(cfg.logLevel, 0, 3)));
 
-        // pid file creation
-        std::filesystem::path pidPath = detail_svc::pidPathForSocket(cfg.dbPath,
-            cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
+        // Create PID file with current PID
         try {
             auto parent = pidPath.parent_path();
             if (!parent.empty()) {
-                std::error_code ec2;
-                std::filesystem::create_directories(parent, ec2);
+                std::filesystem::create_directories(parent, ec);
             }
             std::ofstream pf(pidPath);
             if (pf) {
@@ -416,7 +523,20 @@ public:
             }
         } catch (...) {}
 
-        auto svc = std::unique_ptr<Service>(new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath, std::filesystem::path(spStr)));
+        // Create shared memory status block for TUI 10fps polling
+        // Derive hash from dbPath for shm name
+        std::string dbStr = cfg.dbPath.generic_string();
+        std::size_t hash = std::hash<std::string>{}(dbStr);
+        std::string shmName = std::to_string(hash);
+        auto shmRes = caudio::service::createShmStatus(shmName, true);
+        if (!shmRes) {
+            // Non-fatal: log but continue without shm
+        }
+        std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle;
+        if (shmRes) shmHandle = std::make_unique<caudio::service::ShmStatusHandle>(std::move(*shmRes));
+
+        auto svc = std::unique_ptr<Service>(new Service(cfg, dbShared, std::move(eng), std::move(srvPtr),
+            std::move(loggerPtr), pidPath, std::filesystem::path(spStr), lockFd, std::move(shmHandle), shmName));
         return svc;
     }
 
@@ -466,12 +586,22 @@ public:
                     }
                 }
             }
+            // cleanup lock file
+            if (lockFd_ >= 0) {
+                detail_svc::releaseLock(lockFd_);
+                lockFd_ = -1;
+                auto lockPath = detail_svc::lockPathForSocket(config_.dbPath, socketPath_);
+                std::filesystem::remove(lockPath, ec);
+            }
         } catch (...) {}
+        // shm handle will be cleaned up via RAII
     }
 
     caudio::db::Database& db() noexcept { return *db_; }
     caudio::engine::Engine& engine() noexcept { return *engine_; }
     IpcServer& server() noexcept { return *server_; }
+    const std::string& shmName() const noexcept { return shmName_; }
+    caudio::service::ShmStatusHandle* shmHandle() noexcept { return shmHandle_.get(); }
 
 private:
     Service(const ServiceConfig& cfg,
@@ -480,9 +610,41 @@ private:
             std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger,
             std::filesystem::path pidPath,
-            std::filesystem::path socketPath)
+            std::filesystem::path socketPath,
+            int lockFd,
+            std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle,
+            std::string shmName)
         : config_(cfg), db_(std::move(db)), engine_(std::move(eng)), server_(std::move(srv)), logger_(std::move(logger)),
-          pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)) {}
+          pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)),
+          lockFd_(lockFd), shmHandle_(std::move(shmHandle)), shmName_(std::move(shmName)) {}
+
+    void updateShmStatus() {
+        if (!shmHandle_ || !shmHandle_->valid()) return;
+        auto& eng = *engine_;
+        int64_t trackId = eng.currentTrackId();
+        std::string title, artist;
+        if (trackId != 0) {
+            auto tr = db_->getTrack(trackId);
+            if (tr) {
+                title = tr->title;
+                artist = tr->artist;
+            }
+        }
+        // Get queue size
+        size_t qSize = 0;
+        if (auto items = db_->queueList(1); items) {
+            qSize = items->size();
+        }
+        shmHandle_->updateFromEngine(eng, trackId, title, artist);
+        shmHandle_->setQueueSize(qSize);
+        // duration is not directly available from engine, would need track info
+        if (trackId != 0) {
+            auto tr = db_->getTrack(trackId);
+            if (tr) {
+                shmHandle_->setDuration(tr->duration);
+            }
+        }
+    }
 
     std::expected<caudio::cli::Result, caudio::utils::Error> dispatch(const caudio::cli::Command& cmd) {
         using namespace caudio::cli;
@@ -497,16 +659,19 @@ private:
             [&](const Play&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->play(1);
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Pause&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->pause();
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Resume&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->resume();
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Restart&) -> std::expected<Result, caudio::utils::Error> {
@@ -516,27 +681,32 @@ private:
                     // if no track, try play
                     auto pr = engine_->play(1);
                     if (!pr) return std::unexpected{pr.error()};
+                    updateShmStatus();
                     return statusResult();
                 }
                 // ensure playing
                 if (engine_->state() == caudio::engine::PlaybackState::Paused) {
                     (void)engine_->resume();
                 }
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Stop&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->stop();
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Next&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->next();
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Prev&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->prev();
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const Seek& s) -> std::expected<Result, caudio::utils::Error> {
@@ -545,6 +715,7 @@ private:
                 }
                 auto r = engine_->seek(s.seconds);
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const StatusReq&) -> std::expected<Result, caudio::utils::Error> {
@@ -589,6 +760,7 @@ private:
                     auto r = engine_->setVolume(target);
                     if (!r) return std::unexpected{r.error()};
                 }
+                updateShmStatus();
                 caudio::cli::VolumeInfo vi{engine_->volume(), engine_->volume() == 0.0f};
                 return Result{vi};
             },
@@ -690,6 +862,7 @@ private:
                     auto tr = db_->getTrack(it.trackId);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
+                updateShmStatus();
                 return Result{QueueTracks{std::move(tracks)}};
             },
             [&](const QueueRemove& qr) -> std::expected<Result, caudio::utils::Error> {
@@ -737,6 +910,7 @@ private:
                     auto tr = db_->getTrack(it.trackId);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
+                updateShmStatus();
                 return Result{QueueTracks{std::move(tracks)}};
             },
             [&](const QueueMove& qm) -> std::expected<Result, caudio::utils::Error> {
@@ -767,6 +941,7 @@ private:
                     auto tr = db_->getTrack(it.trackId);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
+                updateShmStatus();
                 return Result{QueueTracks{std::move(tracks)}};
             },
             [&](const QueueClear&) -> std::expected<Result, caudio::utils::Error> {
@@ -775,6 +950,7 @@ private:
                 if (!q) return std::unexpected{q.error()};
                 auto r = db_->queueClear(qid);
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return Result{QueueTracks{{}}};
             },
             [&](const QueueShuffle& qs) -> std::expected<Result, caudio::utils::Error> {
@@ -786,12 +962,14 @@ private:
                 }
                 auto r = engine_->setShuffle(on);
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const QueueRepeat& qr) -> std::expected<Result, caudio::utils::Error> {
                 caudio::engine::RepeatMode m = qr.mode.value_or(caudio::engine::RepeatMode::Off);
                 auto r = engine_->setRepeat(m);
                 if (!r) return std::unexpected{r.error()};
+                updateShmStatus();
                 return statusResult();
             },
             [&](const LibraryScan& cmd) -> std::expected<Result, caudio::utils::Error> {
@@ -918,6 +1096,7 @@ private:
                     auto pr = engine_->play(qid);
                     if (!pr) return std::unexpected{pr.error()};
                 }
+                updateShmStatus();
                 auto st = detail_svc::buildStatus(*engine_, *db_);
                 if (!st) return std::unexpected{st.error()};
                 return Result{*st};
@@ -959,6 +1138,9 @@ private:
     std::unique_ptr<caudio::utils::Logger> logger_{};
     std::filesystem::path pidPath_{};
     std::filesystem::path socketPath_{};
+    int lockFd_{-1};
+    std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle_{};
+    std::string shmName_{};
     std::atomic<bool> running_{false};
     std::atomic<bool> shutdownRequested_{false};
 };
