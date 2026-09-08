@@ -85,6 +85,12 @@ public:
                                           v.tracks, v.queues, v.playlists);
                     } else if constexpr (std::is_same_v<T, caudio::cli::Tracks>) {
                         os << std::format("{{\"type\":\"Tracks\",\"count\":{}}}\n", v.tracks.size());
+                    } else if constexpr (std::is_same_v<T, caudio::cli::Playlists>) {
+                        os << std::format("{{\"type\":\"Playlists\",\"count\":{}}}\n", v.playlists.size());
+                    } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValue>) {
+                        os << std::format("{{\"type\":\"ConfigValue\",\"key\":\"{}\",\"value\":\"{}\"}}\n", v.key, v.value);
+                    } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValues>) {
+                        os << std::format("{{\"type\":\"ConfigValues\",\"count\":{}}}\n", v.values.size());
                     } else if constexpr (std::is_same_v<T, std::monostate>) {
                         os << "{\"type\":\"Empty\"}\n";
                     } else if constexpr (std::is_same_v<T, caudio::utils::Error>) {
@@ -151,6 +157,21 @@ public:
                         const auto& t = span[i];
                         os << std::format("{:3} [{}] {} - {} ({})\n", i, t.id,
                                           t.artist, t.title, formatTime(t.duration));
+                    }
+                } else if constexpr (std::is_same_v<T, caudio::cli::Playlists>) {
+                    std::span<const caudio::db::Playlist> span{v.playlists};
+                    os << std::format("Playlists ({}):\n", span.size());
+                    for (std::size_t i = 0; i < span.size(); ++i) {
+                        const auto& p = span[i];
+                        os << std::format("{:3} [{}] {}\n", i, p.id, p.name);
+                    }
+                } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValue>) {
+                    os << std::format("{} = {}\n", v.key, v.value);
+                    os << std::format("Code value: {}\n", std::to_underlying(caudio::utils::Result::Ok));
+                } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValues>) {
+                    os << std::format("Config ({} entries):\n", v.values.size());
+                    for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values)) {
+                        os << std::format("{} = {}\n", cv.key, cv.value);
                     }
                 } else if constexpr (std::is_same_v<T, std::monostate>) {
                     os << "OK\n";

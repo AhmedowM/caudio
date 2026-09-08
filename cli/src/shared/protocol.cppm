@@ -143,6 +143,35 @@ trackFromJson(const ordered_json& j) {
     }
 }
 
+inline ordered_json playlistToJson(const caudio::db::Playlist& p) {
+    ordered_json j;
+    j["id"] = p.id;
+    j["name"] = p.name;
+    j["type"] = p.type;
+    j["smart_query"] = p.smart_query;
+    j["created"] = p.created;
+    j["modified"] = p.modified;
+    j["library_id"] = p.library_id;
+    return j;
+}
+
+inline std::expected<caudio::db::Playlist, caudio::utils::Error>
+playlistFromJson(const ordered_json& j) {
+    try {
+        caudio::db::Playlist p{};
+        if (j.contains("id") && j["id"].is_number()) p.id = j["id"].get<int64_t>();
+        if (j.contains("name") && j["name"].is_string()) p.name = j["name"].get<std::string>();
+        if (j.contains("type") && j["type"].is_number()) p.type = j["type"].get<int32_t>();
+        if (j.contains("smart_query") && j["smart_query"].is_string()) p.smart_query = j["smart_query"].get<std::string>();
+        if (j.contains("created") && j["created"].is_number()) p.created = j["created"].get<int64_t>();
+        if (j.contains("modified") && j["modified"].is_number()) p.modified = j["modified"].get<int64_t>();
+        if (j.contains("library_id") && j["library_id"].is_number()) p.library_id = j["library_id"].get<int64_t>();
+        return p;
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
 inline ordered_json errorToJson(const caudio::utils::Error& e) {
     ordered_json j;
     j["type"] = "Error";
@@ -504,6 +533,24 @@ ordered_json toJson(const Result& r) {
             j["tracks"] = ordered_json::array();
             for (const auto& t : v.tracks) j["tracks"].push_back(detail::trackToJson(t));
             return j;
+        } else if constexpr (std::is_same_v<T, Playlists>) {
+            ordered_json j;
+            j["type"] = "Playlists";
+            j["playlists"] = ordered_json::array();
+            for (const auto& p : v.playlists) j["playlists"].push_back(detail::playlistToJson(p));
+            return j;
+        } else if constexpr (std::is_same_v<T, ConfigValue>) {
+            ordered_json j;
+            j["type"] = "ConfigValue";
+            j["key"] = v.key;
+            j["value"] = v.value;
+            return j;
+        } else if constexpr (std::is_same_v<T, ConfigValues>) {
+            ordered_json j;
+            j["type"] = "ConfigValues";
+            j["values"] = ordered_json::array();
+            for (const auto& cv : v.values) j["values"].push_back(ordered_json{{"key", cv.key}, {"value", cv.value}});
+            return j;
         } else if constexpr (std::is_same_v<T, Empty>) {
             ordered_json j;
             j["type"] = "Empty";
@@ -589,6 +636,35 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 }
             }
             return Result{std::move(trs)};
+        }
+        if (t == "Playlists") {
+            Playlists pl{};
+            if (j.contains("playlists") && j["playlists"].is_array()) {
+                for (const auto& jp : j["playlists"]) {
+                    auto pr = detail::playlistFromJson(jp);
+                    if (!pr) return std::unexpected{pr.error()};
+                    pl.playlists.push_back(std::move(*pr));
+                }
+            }
+            return Result{std::move(pl)};
+        }
+        if (t == "ConfigValue") {
+            ConfigValue cv{};
+            if (j.contains("key") && j["key"].is_string()) cv.key = j["key"].get<std::string>();
+            if (j.contains("value") && j["value"].is_string()) cv.value = j["value"].get<std::string>();
+            return Result{std::move(cv)};
+        }
+        if (t == "ConfigValues") {
+            ConfigValues cvs{};
+            if (j.contains("values") && j["values"].is_array()) {
+                for (const auto& jv : j["values"]) {
+                    ConfigValue cv{};
+                    if (jv.contains("key") && jv["key"].is_string()) cv.key = jv["key"].get<std::string>();
+                    if (jv.contains("value") && jv["value"].is_string()) cv.value = jv["value"].get<std::string>();
+                    cvs.values.push_back(std::move(cv));
+                }
+            }
+            return Result{std::move(cvs)};
         }
         if (t == "Empty") {
             return Result{Empty{}};

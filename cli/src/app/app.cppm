@@ -114,7 +114,7 @@ private:
 inline int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath);
     if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath.generic_string()); return 0; }
-    caudio::service::ServiceConfig scfg; scfg.dbPath = config_.dbPath; scfg.socketPath = config_.socketPath; scfg.logLevel = config_.logLevel;
+    caudio::service::ServiceConfig scfg; scfg.dbPath = config_.dbPath; scfg.socketPath = config_.socketPath; scfg.configPath = config_.configPath; scfg.logLevel = config_.logLevel;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) { std::cerr << std::format("start failed: {} {}\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message); return 1; }

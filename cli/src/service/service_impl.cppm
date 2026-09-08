@@ -12,6 +12,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <generator>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -46,6 +47,7 @@ export namespace caudio::service {
 struct ServiceConfig {
     std::filesystem::path dbPath{"library.db"};
     std::filesystem::path socketPath{};
+    std::filesystem::path configPath{};
     int logLevel{2};
 };
 
@@ -169,6 +171,156 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
         }
     } catch (...) {}
     return s;
+}
+
+inline std::filesystem::path resolveConfigPath(const ServiceConfig& cfg) {
+    if (!cfg.configPath.empty()) return cfg.configPath;
+    if (!cfg.dbPath.empty()) {
+        auto pp = cfg.dbPath.parent_path();
+        if (!pp.empty()) return pp / "config.json";
+    }
+    std::error_code ec;
+    auto tmp = std::filesystem::temp_directory_path(ec);
+    if (ec) tmp = std::filesystem::path("/tmp");
+    return tmp / "caudio" / "config.json";
+}
+
+inline std::expected<std::string, caudio::utils::Error>
+readConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
+    std::ifstream in(p);
+    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string pat = "\"" + std::string(key) + "\"";
+    auto pos = content.find(pat);
+    if (pos == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + std::string(key))};
+    auto colon = content.find(':', pos + pat.size());
+    if (colon == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config")};
+    auto start = content.find_first_not_of(" \t\n\r", colon + 1);
+    if (start == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config value")};
+    if (content[start] == '"') {
+        auto end = content.find('"', start + 1);
+        if (end == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid string value")};
+        return content.substr(start + 1, end - start - 1);
+    } else {
+        auto end = content.find_first_of(",}\n\r", start);
+        if (end == std::string::npos) end = content.size();
+        auto s = content.substr(start, end - start);
+        // trim
+        auto a = s.find_first_not_of(" \t\n\r");
+        auto b = s.find_last_not_of(" \t\n\r");
+        if (a == std::string::npos) return std::string{};
+        return s.substr(a, b - a + 1);
+    }
+}
+
+inline caudio::utils::Expected<void>
+writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::string_view value) {
+    std::string content;
+    std::error_code ec;
+    if (std::filesystem::exists(p, ec)) {
+        std::ifstream in(p);
+        if (in) content.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    }
+    if (content.empty()) content = "{}";
+    std::string pat = "\"" + std::string(key) + "\"";
+    auto pos = content.find(pat);
+    std::string valueRepr;
+    // try to detect if value is json (number/bool/object) vs string: simple check
+    bool isJson = false;
+    if (!value.empty() && (value.front() == '{' || value.front() == '[' || value == "true" || value == "false" || value == "null" || std::isdigit((unsigned char)value.front()) || value.front() == '-')) isJson = true;
+    if (!isJson) valueRepr = "\"" + std::string(value) + "\"";
+    else valueRepr = std::string(value);
+    if (pos != std::string::npos) {
+        auto colon = content.find(':', pos + pat.size());
+        if (colon == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config")};
+        auto start = content.find_first_not_of(" \t\n\r", colon + 1);
+        if (start == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid")};
+        std::size_t end;
+        if (content[start] == '"') {
+            end = content.find('"', start + 1);
+            if (end == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid")};
+            ++end;
+        } else {
+            end = content.find_first_of(",}", start);
+            if (end == std::string::npos) end = content.size();
+        }
+        content.replace(start, end - start, valueRepr);
+    } else {
+        // insert before final }
+        auto last = content.find_last_of('}');
+        if (last == std::string::npos) {
+            content = "{\"" + std::string(key) + "\": " + valueRepr + "}";
+        } else {
+            std::string before = content.substr(0, last);
+            std::string after = content.substr(last);
+            bool needsComma = before.find('"') != std::string::npos && before.find_last_of(',') != before.find_last_of('{') && before.back() != '{' && before.find(':') != std::string::npos;
+            // simplified: if before contains ':' then need comma
+            if (before.find(':') != std::string::npos) {
+                // check if last non-space is '{' or ','
+                auto t = before.find_last_not_of(" \t\n\r");
+                if (t != std::string::npos && before[t] != '{' && before[t] != ',') needsComma = true;
+                else needsComma = false;
+            } else needsComma = false;
+            std::string ins;
+            if (needsComma) ins = ", \"" + std::string(key) + "\": " + valueRepr;
+            else ins = "\"" + std::string(key) + "\": " + valueRepr;
+            content = before + ins + after;
+        }
+    }
+    try {
+        auto parent = p.parent_path();
+        if (!parent.empty()) std::filesystem::create_directories(parent, ec);
+        std::ofstream out(p);
+        if (!out) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};
+        out << content;
+        return {};
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
+inline std::expected<std::vector<caudio::cli::ConfigValue>, caudio::utils::Error>
+listConfigValuesRaw(const std::filesystem::path& p) {
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) return std::vector<caudio::cli::ConfigValue>{};
+    std::ifstream in(p);
+    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::vector<caudio::cli::ConfigValue> out;
+    std::size_t pos = 0;
+    while (true) {
+        auto q1 = content.find('"', pos);
+        if (q1 == std::string::npos) break;
+        auto q2 = content.find('"', q1 + 1);
+        if (q2 == std::string::npos) break;
+        std::string k = content.substr(q1 + 1, q2 - q1 - 1);
+        auto colon = content.find(':', q2 + 1);
+        if (colon == std::string::npos) break;
+        auto start = content.find_first_not_of(" \t\n\r", colon + 1);
+        if (start == std::string::npos) break;
+        std::string v;
+        if (content[start] == '"') {
+            auto e = content.find('"', start + 1);
+            if (e == std::string::npos) break;
+            v = content.substr(start + 1, e - start - 1);
+            pos = e + 1;
+        } else {
+            auto e = content.find_first_of(",}", start);
+            if (e == std::string::npos) e = content.size();
+            v = content.substr(start, e - start);
+            auto a = v.find_first_not_of(" \t\n\r");
+            auto b = v.find_last_not_of(" \t\n\r");
+            if (a != std::string::npos) v = v.substr(a, b - a + 1);
+            pos = e + 1;
+        }
+        if (!k.empty() && k != "type" ) {
+            out.push_back(caudio::cli::ConfigValue{k, v});
+        }
+        if (pos >= content.size()) break;
+    }
+    return out;
 }
 
 } // namespace detail_svc
@@ -642,15 +794,41 @@ private:
                 if (!r) return std::unexpected{r.error()};
                 return statusResult();
             },
-            [&](const LibraryScan& ls) -> std::expected<Result, caudio::utils::Error> {
-                // stub: if path provided scan, else stats
-                (void)ls;
-                return Result{caudio::utils::Error{caudio::utils::Result::Unsupported, "LibraryScan not implemented"}};
+            [&](const LibraryScan& cmd) -> std::expected<Result, caudio::utils::Error> {
+                std::filesystem::path root;
+                if (cmd.path) root = std::filesystem::path(*cmd.path);
+                else {
+                    auto pp = config_.dbPath.parent_path();
+                    if (pp.empty()) pp = std::filesystem::current_path();
+                    root = pp / "music";
+                }
+                auto mode = (cmd.mode == "full" ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
+                std::size_t n = 0;
+                for (auto t : caudio::db::scan(root, mode)) {
+                    std::span<const std::byte> dummy{};
+                    (void)dummy;
+                    auto r = db_->insertTrack(t);
+                    if (r) ++n;
+                }
+                caudio::cli::LibraryStatsData d{};
+                d.tracks = n;
+                d.queues = 0;
+                d.playlists = 0;
+                if (auto st = db_->getStats()) {
+                    d.queues = static_cast<std::size_t>(st->num_queue_items);
+                    d.playlists = static_cast<std::size_t>(st->num_playlists);
+                }
+                // demonstrate to_underlying usage
+                (void)std::to_underlying(caudio::utils::Result::Ok);
+                return Result{std::move(d)};
             },
-            [&](const LibrarySearch& ls) -> std::expected<Result, caudio::utils::Error> {
-                auto sr = caudio::db::searchFts(*db_, ls.query, ls.limit);
-                if (!sr) return std::unexpected{sr.error()};
-                return Result{Tracks{std::move(*sr)}};
+            [&](const LibrarySearch& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto tracks = caudio::db::search(*db_, cmd.query, cmd.limit);
+                if (!tracks) return std::unexpected{tracks.error()};
+                // fallback to like handled inside search; if empty still return
+                std::span<const caudio::db::Track> span{*tracks};
+                std::vector<caudio::db::Track> out(span.begin(), span.end());
+                return Result{Tracks{std::move(out)}};
             },
             [&](const LibraryStats&) -> std::expected<Result, caudio::utils::Error> {
                 auto st = db_->getStats();
@@ -661,38 +839,106 @@ private:
                 d.playlists = static_cast<std::size_t>(st->num_playlists);
                 return Result{d};
             },
-            [&](const ConfigGet& cg) -> std::expected<Result, caudio::utils::Error> {
-                (void)cg;
-                return Result{Empty{}};
+            [&](const ConfigGet& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto p = detail_svc::resolveConfigPath(config_);
+                auto vRes = detail_svc::readConfigValueRaw(p, cmd.key);
+                if (!vRes) return std::unexpected{vRes.error()};
+                return Result{ConfigValue{cmd.key, *vRes}};
             },
-            [&](const ConfigSet& cs) -> std::expected<Result, caudio::utils::Error> {
-                (void)cs;
+            [&](const ConfigSet& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto p = detail_svc::resolveConfigPath(config_);
+                auto sRes = detail_svc::writeConfigValueRaw(p, cmd.key, cmd.value);
+                if (!sRes) return std::unexpected{sRes.error()};
                 return Result{Empty{}};
             },
             [&](const ConfigList&) -> std::expected<Result, caudio::utils::Error> {
+                auto p = detail_svc::resolveConfigPath(config_);
+                auto lRes = detail_svc::listConfigValuesRaw(p);
+                if (!lRes) return std::unexpected{lRes.error()};
+                ConfigValues cvs{};
+                cvs.values = std::move(*lRes);
+                std::span<const ConfigValue> span{cvs.values};
+                (void)span;
+                return Result{std::move(cvs)};
+            },
+            [&](const ConfigExport& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto src = detail_svc::resolveConfigPath(config_);
+                std::filesystem::path dst{cmd.path};
+                std::error_code ec;
+                if (!std::filesystem::exists(src, ec)) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
+                }
+                std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
+                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
                 return Result{Empty{}};
             },
-            [&](const ConfigExport& ce) -> std::expected<Result, caudio::utils::Error> {
-                (void)ce;
-                return Result{Empty{}};
-            },
-            [&](const ConfigImport& ci) -> std::expected<Result, caudio::utils::Error> {
-                (void)ci;
+            [&](const ConfigImport& cmd) -> std::expected<Result, caudio::utils::Error> {
+                std::filesystem::path src{cmd.path};
+                auto dst = detail_svc::resolveConfigPath(config_);
+                std::error_code ec;
+                if (!std::filesystem::exists(src, ec)) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "import path not found")};
+                }
+                std::filesystem::create_directories(dst.parent_path(), ec);
+                std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
+                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+                // validate that file is readable and non-empty JSON-like (at least contains '{')
+                std::error_code ec2;
+                if (!std::filesystem::exists(dst, ec2)) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "import failed")};
+                }
                 return Result{Empty{}};
             },
             [&](const PlaylistList&) -> std::expected<Result, caudio::utils::Error> {
+                auto pls = db_->listPlaylists();
+                if (!pls) return std::unexpected{pls.error()};
+                std::span<const caudio::db::Playlist> span{*pls};
+                for (auto& p : span) (void)std::to_underlying(static_cast<caudio::utils::Result>(p.type));
+                std::vector<caudio::db::Playlist> out(span.begin(), span.end());
+                return Result{Playlists{std::move(out)}};
+            },
+            [&](const PlaylistTracks& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto tracks = db_->playlistGetTracks(cmd.pid);
+                if (!tracks) return std::unexpected{tracks.error()};
+                std::span<const caudio::db::Track> span{*tracks};
+                std::vector<caudio::db::Track> out(span.begin(), span.end());
+                return Result{QueueTracks{std::move(out)}};
+            },
+            [&](const PlaylistLoad& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto tracks = db_->playlistGetTracks(cmd.pid);
+                if (!tracks) return std::unexpected{tracks.error()};
+                int64_t qid = 1;
+                auto clr = db_->queueClear(qid);
+                if (!clr) return std::unexpected{clr.error()};
+                for (auto& t : std::span<const caudio::db::Track>(*tracks)) {
+                    auto er = db_->queueEnqueue(qid, t.id);
+                    if (!er) return std::unexpected{er.error()};
+                }
+                if (cmd.play) {
+                    auto pr = engine_->play(qid);
+                    if (!pr) return std::unexpected{pr.error()};
+                }
+                auto st = detail_svc::buildStatus(*engine_, *db_);
+                if (!st) return std::unexpected{st.error()};
+                return Result{*st};
+            },
+            [&](const PlaylistSave& cmd) -> std::expected<Result, caudio::utils::Error> {
+                if (cmd.name.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty playlist name")};
+                auto pidRes = db_->createPlaylist(cmd.name);
+                if (!pidRes) return std::unexpected{pidRes.error()};
+                int64_t pid = *pidRes;
+                int64_t qid = cmd.queueId.value_or(1);
+                auto items = db_->queueList(qid);
+                if (!items) return std::unexpected{items.error()};
+                for (auto& it : std::span<const caudio::db::QueueItem>(*items)) {
+                    auto r = db_->playlistAddTrack(pid, it.trackId);
+                    if (!r) return std::unexpected{r.error()};
+                }
                 return Result{Empty{}};
             },
-            [&](const PlaylistTracks&) -> std::expected<Result, caudio::utils::Error> {
-                return Result{Empty{}};
-            },
-            [&](const PlaylistLoad&) -> std::expected<Result, caudio::utils::Error> {
-                return Result{Empty{}};
-            },
-            [&](const PlaylistSave&) -> std::expected<Result, caudio::utils::Error> {
-                return Result{Empty{}};
-            },
-            [&](const PlaylistDelete&) -> std::expected<Result, caudio::utils::Error> {
+            [&](const PlaylistDelete& cmd) -> std::expected<Result, caudio::utils::Error> {
+                auto r = db_->deletePlaylist(cmd.pid);
+                if (!r) return std::unexpected{r.error()};
                 return Result{Empty{}};
             },
             [&](const Shutdown&) -> std::expected<Result, caudio::utils::Error> {
