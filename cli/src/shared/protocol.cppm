@@ -708,4 +708,12 @@ std::expected<std::string, caudio::utils::Error> deframe(std::span<const std::by
     return s;
 }
 
+inline std::string toJsonString(const Result& r) {
+    return toJson(r).dump(2);
+}
+
+inline std::string toJsonString(const Command& c) {
+    return toJson(c).dump(2);
+}
+
 } // namespace caudio::cli
