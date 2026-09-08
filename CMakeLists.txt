@@ -220,6 +220,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# CLI11 for App dispatch
+FetchContent_Declare(
+  CLI11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+  GIT_TAG v2.4.2
+)
+FetchContent_MakeAvailable(CLI11)
+
 # caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
 # P3-6: centralize DB module list to avoid quartet duplication (static/shared/combined)
 set(CAUDIO_DB_SOURCES
@@ -452,6 +460,21 @@ target_include_directories(caudio_service_shared PRIVATE vendor ${nlohmann_json_
 target_link_libraries(caudio_service_shared PUBLIC caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads)
 target_compile_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
 ca_set_warnings(caudio_service_shared)
+
+# caudio executable — App dispatch (CLI11) + main entry
+add_executable(caudio
+  cli/src/main.cpp
+)
+target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/app_primary.cppm)
+target_link_options(caudio PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
+target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+target_link_libraries(caudio PRIVATE caudio_service caudio_client caudio_cli_shared CLI11::CLI11 Threads::Threads)
+if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
+  target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+endif()
+target_compile_options(caudio PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+ca_set_warnings(caudio)
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
