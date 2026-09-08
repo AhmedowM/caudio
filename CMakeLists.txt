@@ -323,6 +323,26 @@ if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
 endif()
 ca_set_warnings(caudio_combined)
 
+# caudio::cli shared protocol (command/result/protocol)
+set(CAUDIO_CLI_SHARED_SOURCES
+  cli/src/cli.cppm
+  cli/src/shared/command.cppm
+  cli/src/shared/result.cppm
+  cli/src/shared/protocol.cppm
+  cli/src/shared/shared.cppm
+)
+add_library(caudio_cli_shared STATIC)
+add_library(caudio::cli_shared ALIAS caudio_cli_shared)
+target_sources(caudio_cli_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_CLI_SHARED_SOURCES})
+target_include_directories(caudio_cli_shared PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_include_directories(caudio_cli_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio::utils Threads::Threads)
+target_compile_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+ca_set_warnings(caudio_cli_shared)
+
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
 install(
@@ -331,6 +351,7 @@ install(
     caudio_player caudio_player_shared
     caudio_db caudio_db_shared
     caudio_engine caudio_engine_shared
+    caudio_cli_shared
     caudio_combined
     caudio_sqlite_static
   EXPORT caudioTargets
