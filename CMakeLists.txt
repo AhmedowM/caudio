@@ -343,6 +343,47 @@ target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio:
 target_compile_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
 ca_set_warnings(caudio_cli_shared)
 
+# caudio::service / caudio::client — IPC channel abstraction (feat/cli-service)
+set(CAUDIO_SERVICE_SOURCES
+  cli/src/service/service.cppm
+  cli/src/service/ipc_channel.cppm
+  cli/src/service/ipc_channel_unix.cpp
+  cli/src/service/ipc_channel_win.cpp
+  cli/src/service/ipc_server.cppm
+)
+set(CAUDIO_CLIENT_IPC_SOURCES
+  cli/src/client/client.cppm
+  cli/src/client/ipc_client.cppm
+)
+set(CAUDIO_IPC_SOURCES
+  ${CAUDIO_SERVICE_SOURCES}
+  ${CAUDIO_CLIENT_IPC_SOURCES}
+)
+add_library(caudio_ipc STATIC)
+add_library(caudio::ipc ALIAS caudio_ipc)
+target_sources(caudio_ipc PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_IPC_SOURCES})
+target_include_directories(caudio_ipc PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_include_directories(caudio_ipc PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+target_link_libraries(caudio_ipc PUBLIC caudio::cli_shared caudio::utils Threads::Threads)
+target_compile_options(caudio_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+ca_set_warnings(caudio_ipc)
+
+add_library(caudio_ipc_shared SHARED)
+set_target_properties(caudio_ipc_shared PROPERTIES OUTPUT_NAME caudio_ipc)
+add_library(caudio::ipc_shared ALIAS caudio_ipc_shared)
+target_sources(caudio_ipc_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_IPC_SOURCES})
+target_include_directories(caudio_ipc_shared PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_include_directories(caudio_ipc_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+target_link_libraries(caudio_ipc_shared PUBLIC caudio::cli_shared caudio::utils Threads::Threads)
+target_compile_options(caudio_ipc_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+ca_set_warnings(caudio_ipc_shared)
+
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
 install(
@@ -352,6 +393,7 @@ install(
     caudio_db caudio_db_shared
     caudio_engine caudio_engine_shared
     caudio_cli_shared
+    caudio_ipc caudio_ipc_shared
     caudio_combined
     caudio_sqlite_static
   EXPORT caudioTargets
