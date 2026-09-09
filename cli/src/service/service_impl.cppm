@@ -107,7 +107,9 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
 inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
                                                const std::filesystem::path& socketPath) {
     auto pidPath = pidPathForSocket(dbPath, socketPath);
-    return pidPath.parent_path() / "caudio.lock";
+    std::string dbStr = dbPath.generic_string();
+    std::size_t hash = std::hash<std::string>{}(dbStr);
+    return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
 }
 
 inline std::filesystem::path socketPathForDb(const std::filesystem::path& dbPath) {
@@ -151,12 +153,17 @@ inline bool probeSocketAlive(const std::string& sp) {
 }
 
 inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
+    // MVP: disable file flock on Windows — rely on socket bind for single-instance
+    // TODO: fix CreateFileW path handling for flock
+#ifdef _WIN32
+    outFd = -1;
+    return true;
+#else
     std::error_code ec;
     auto parent = lockPath.parent_path();
     if (!parent.empty()) {
         std::filesystem::create_directories(parent, ec);
     }
-#ifndef _WIN32
     int fd = ::open(lockPath.c_str(), O_CREAT | O_CLOEXEC | O_RDWR, 0600);
     if (fd < 0) return false;
     if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
@@ -164,21 +171,6 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
         return false;
     }
     outFd = fd;
-    return true;
-#else
-    std::wstring w;
-    w.reserve(lockPath.generic_string().size());
-    for (char c : lockPath.generic_string()) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE,
-                             0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-    // Try to lock the entire file
-    OVERLAPPED ov{};
-    if (!::LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
-        ::CloseHandle(h);
-        return false;
-    }
-    outFd = reinterpret_cast<intptr_t>(h);
     return true;
 #endif
 }
