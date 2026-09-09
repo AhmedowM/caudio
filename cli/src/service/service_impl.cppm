@@ -118,6 +118,11 @@ inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPa
 }
 
 inline std::filesystem::path socketPathForDb(const std::filesystem::path& dbPath) {
+#ifdef _WIN32
+    std::string dbStr = dbPath.generic_string();
+    std::size_t hash = std::hash<std::string>{}(dbStr);
+    return std::filesystem::path("\\\\.\\pipe\\caudio-" + std::to_string(hash));
+#else
     auto pp = dbPath.parent_path();
     if (pp.empty()) pp = std::filesystem::current_path();
     std::error_code ec;
@@ -126,6 +131,7 @@ inline std::filesystem::path socketPathForDb(const std::filesystem::path& dbPath
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
     return pp / ("caudio-" + std::to_string(hash) + ".sock");
+#endif
 }
 
 inline bool probeSocketAlive(const std::string& sp) {
