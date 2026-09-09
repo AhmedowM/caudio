@@ -75,12 +75,24 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
             // named pipe -> place pid next to db
             std::filesystem::path p = dbPath;
             if (p.empty()) {
-                const char* home = std::getenv("HOME");
-                if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
-                std::filesystem::path base;
-                if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
-                else base = std::filesystem::temp_directory_path() / "caudio";
-                p = base / "caudio.db";
+#ifdef _WIN32
+                const char* localApp = std::getenv("LOCALAPPDATA");
+                if (localApp && localApp[0] != '\0') {
+                    p = std::filesystem::path(localApp) / "caudio" / "library.db";
+                } else
+#endif
+                {
+                    const char* home = std::getenv("HOME");
+                    if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
+                    std::filesystem::path base;
+                    if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
+                    else {
+                        std::error_code ec2;
+                        base = std::filesystem::temp_directory_path(ec2) / "caudio";
+                        if (ec2) base = std::filesystem::path("/tmp/caudio");
+                    }
+                    p = base / "library.db";
+                }
             }
             auto parent = p.parent_path();
             if (parent.empty()) parent = std::filesystem::current_path();
@@ -523,9 +535,19 @@ public:
             }
         }
 
+        // ensure db parent dirs exist before open (fixes "unable to open database file")
+        {
+            std::error_code ec2;
+            auto parent = cfg.dbPath.parent_path();
+            if (!parent.empty()) std::filesystem::create_directories(parent, ec2);
+        }
         // open DB
         auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string());
-        if (!dbRes) return std::unexpected{dbRes.error()};
+        if (!dbRes) {
+            auto err = dbRes.error();
+            std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
+            return std::unexpected{caudio::utils::makeError(err.code, msg)};
+        }
         std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
 
         // create Engine

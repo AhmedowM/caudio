@@ -26,6 +26,12 @@ struct Config {
 namespace detail {
 
 inline std::filesystem::path defaultDbPath() {
+#ifdef _WIN32
+    const char* localApp = std::getenv("LOCALAPPDATA");
+    if (localApp && localApp[0] != '\0') {
+        return std::filesystem::path(localApp) / "caudio" / "library.db";
+    }
+#endif
     const char* xdgData = std::getenv("XDG_DATA_HOME");
     std::filesystem::path base;
     if (xdgData && xdgData[0] != '\0') {
@@ -41,7 +47,7 @@ inline std::filesystem::path defaultDbPath() {
             if (ec) base = std::filesystem::path("/tmp/caudio");
         }
     }
-    return base / "caudio.db";
+    return base / "library.db";
 }
 
 inline std::filesystem::path defaultConfigPath() {

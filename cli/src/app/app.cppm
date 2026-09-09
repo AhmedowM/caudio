@@ -138,12 +138,24 @@ inline std::filesystem::path App::pidPathForConfig() const {
         if (s.rfind("\\\\", 0) == 0 || s.rfind("//", 0) == 0) {
             std::filesystem::path p = dbPath;
             if (p.empty()) {
-                const char* home = std::getenv("HOME");
-                if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
-                std::filesystem::path base;
-                if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
-                else base = std::filesystem::temp_directory_path() / "caudio";
-                p = base / "caudio.db";
+#ifdef _WIN32
+                const char* localApp = std::getenv("LOCALAPPDATA");
+                if (localApp && localApp[0] != '\0') {
+                    p = std::filesystem::path(localApp) / "caudio" / "library.db";
+                } else
+#endif
+                {
+                    const char* home = std::getenv("HOME");
+                    if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
+                    std::filesystem::path base;
+                    if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
+                    else {
+                        std::error_code ec2;
+                        base = std::filesystem::temp_directory_path(ec2) / "caudio";
+                        if (ec2) base = std::filesystem::path("/tmp/caudio");
+                    }
+                    p = base / "library.db";
+                }
             }
             auto parent = p.parent_path();
             if (parent.empty()) parent = std::filesystem::current_path();
@@ -233,17 +245,23 @@ inline bool App::spawnDaemon(const caudio::cli::Config& cfg) {
 inline int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath);
     if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath); return 0; }
+    // Ensure db parent dirs exist before trying to start service (foreground)
+    {
+        std::error_code ec2;
+        auto parent = config_.dbPath.parent_path();
+        if (!parent.empty()) std::filesystem::create_directories(parent, ec2);
+    }
     caudio::service::ServiceConfig scfg; scfg.dbPath = config_.dbPath; scfg.socketPath = config_.socketPath; scfg.configPath = config_.configPath; scfg.logLevel = config_.logLevel;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
-        if (!svc) { std::cerr << std::format("start failed: {} {}\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message); return 1; }
-        std::cout << std::format("starting daemon foreground at {}\n", config_.socketPath);
-        std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {}\n", res.error().message); return 1; } return 0;
+        if (!svc) { std::cerr << std::format("start failed: {} {} (dbPath={})\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message, config_.dbPath.generic_string()); return 1; }
+        std::cout << std::format("starting daemon foreground at {} db={}\n", config_.socketPath, config_.dbPath.generic_string());
+        std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {} (dbPath={})\n", res.error().message, config_.dbPath.generic_string()); return 1; } return 0;
     } else {
-        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {}\n", config_.socketPath); return 1; }
+        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {} db={}\n", config_.socketPath, config_.dbPath.generic_string()); return 1; }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
-        if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {}\n", config_.socketPath); return 1; }
+        if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {} db={}\n", config_.socketPath, config_.dbPath.generic_string()); return 1; }
         std::cout << std::format("daemon started at {}\n", config_.socketPath); return 0;
     }
 }
@@ -344,11 +362,33 @@ inline int App::run(int argc, char** argv) {
         if (loaded) {
             config_ = *loaded;
             if (!configPathStr.empty()) config_.configPath = std::filesystem::path(configPathStr);
+            // If config file didn't exist, persist defaults for next run
+            std::error_code ec2;
+            if (!std::filesystem::exists(config_.configPath, ec2)) {
+                std::error_code ec3;
+                auto parent = config_.configPath.parent_path();
+                if (!parent.empty()) std::filesystem::create_directories(parent, ec3);
+                (void)caudio::cli::saveConfig(config_);
+            }
+        } else {
+            // loadConfig failed (e.g. corrupt); keep current config_ which has robust defaults
+            // ensure directories exist for db and config
+            std::error_code ec2;
+            if (!config_.dbPath.empty()) {
+                auto parent = config_.dbPath.parent_path();
+                if (!parent.empty()) std::filesystem::create_directories(parent, ec2);
+            }
         }
     }
     if (!deviceStr.empty()) config_.device = deviceStr;
     if (!logLevelStr.empty()) { if (logLevelStr=="trace") config_.logLevel=0; else if (logLevelStr=="debug") config_.logLevel=1; else if (logLevelStr=="info") config_.logLevel=2; else if (logLevelStr=="warn") config_.logLevel=3; else if (logLevelStr=="error") config_.logLevel=4; }
     if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::service::socketPathFor(config_.dbPath); if (sp) config_.socketPath = *sp; }
+    // Ensure db parent dir exists before any operation (fixes "unable to open database file")
+    {
+        std::error_code ec2;
+        auto parent = config_.dbPath.parent_path();
+        if (!parent.empty()) std::filesystem::create_directories(parent, ec2);
+    }
     std::span<char> dummySpan; (void)dummySpan; std::error_code ec; (void)std::filesystem::exists(config_.dbPath, ec);
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {
