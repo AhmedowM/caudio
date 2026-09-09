@@ -784,6 +784,17 @@ class Database final {
         return caudio::db::queueDequeueLocked(db_, cacheMutex_, stmtCache_, qid);
     }
 
+    std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(int64_t qid) {
+        return caudio::db::queuePeekLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
+    std::expected<QueueItem, caudio::utils::Error> queuePeek(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        std::shared_lock lock{m_};
+        return caudio::db::queuePeekLocked(db_, cacheMutex_, stmtCache_, qid);
+    }
+
     std::expected<void, caudio::utils::Error> queueRemove(int64_t qid, int64_t pos) {
         if (qid == 0)
             qid = 1;

@@ -991,17 +991,26 @@ class Engine final {
     void preroll() {
         if (!decoder_ || !ring_)
             return;
-        // fill up to half capacity
+        uint32_t ch = decoder_->channels();
+        if (ch == 0)
+            ch = 2;
+        // preroll cap/2 frames like Player (ring capacity is in frames)
         size_t need = ring_->availableWrite() / 2;
         if (need == 0)
             return;
-        std::vector<float> tmp(1024 * std::max<uint32_t>(1, decoder_->channels()));
-        while (need > 0 && ring_->availableWrite() >= tmp.size() / decoder_->channels()) {
+        size_t chunkFrames = 1024;
+        size_t maxChunk = 2048 / ch;
+        if (chunkFrames > maxChunk)
+            chunkFrames = maxChunk;
+        std::vector<float> tmp(chunkFrames * ch);
+        while (need > 0 && ring_->availableWrite() >= tmp.size() / ch) {
             size_t frames = decoder_->decode(std::span<float>(tmp.data(), tmp.size()));
             if (frames == 0)
                 break;
-            size_t samples = frames * decoder_->channels();
-            ring_->write(std::span<const float>(tmp.data(), samples));
+            size_t samples = frames * ch;
+            size_t writtenFrames = ring_->write(std::span<float>(tmp.data(), samples));
+            if (writtenFrames < frames)
+                break;
             if (need > frames)
                 need -= frames;
             else
@@ -1211,6 +1220,7 @@ class Engine final {
     }
 
     void decodeLoop(std::stop_token st) {
+        constexpr std::size_t kMaxChunkFrames = 1024;
         while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
             auto ps = playbackState_.load(std::memory_order_acquire);
             if (ps != PlaybackState::Playing || !decoder_ || !ring_) {
@@ -1222,13 +1232,23 @@ class Engine final {
                 continue;
             }
             size_t avail = ring_->availableWrite();
-            // gate preroll: if not enough space, wait
-            if (avail < 512) {
+            if (avail == 0) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 continue;
             }
+            uint32_t ch = decoder_->channels();
+            if (ch == 0)
+                ch = 2;
+            size_t maxFrames = avail / ch;
+            if (maxFrames > kMaxChunkFrames)
+                maxFrames = kMaxChunkFrames;
+            size_t maxChunkByCh = 2048 / ch;
+            if (maxFrames > maxChunkByCh)
+                maxFrames = maxChunkByCh;
+            if (maxFrames == 0)
+                maxFrames = 1;
 
-            std::vector<float> buf(1024 * (decoder_->channels() ? decoder_->channels() : 2));
+            std::vector<float> buf(maxFrames * ch);
             size_t frames;
             {
                 std::unique_lock<std::mutex> lk(decodeMtx_);
@@ -1242,16 +1262,18 @@ class Engine final {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
-            size_t samples = frames * (decoder_->channels() ? decoder_->channels() : 2);
-            size_t written;
+            size_t samples = frames * ch;
+            size_t writtenFrames;
             {
                 std::unique_lock<std::mutex> lk(decodeMtx_);
                 // Re-check state under lock to avoid race with seek() ring reset
                 if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
                     continue;
-                written = ring_->write(std::span<const float>(buf.data(), samples));
+                writtenFrames = ring_->write(std::span<float>(buf.data(), samples));
             }
-            (void)written;
+            if (writtenFrames < frames) {
+                // Ring full, will retry next iteration
+            }
         }
     }
 
