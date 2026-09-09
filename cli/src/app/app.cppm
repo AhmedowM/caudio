@@ -306,7 +306,7 @@ inline int App::run(int argc, char** argv) {
     bool qJson=false; auto* qList=queueCmd->add_subcommand("list","List queue tracks"); qList->add_flag("--json",qJson,"JSON output");
     auto* qQueues=queueCmd->add_subcommand("queues","List all queues");
     std::int64_t qSwitchId=0; auto* qSwitch=queueCmd->add_subcommand("switch","Switch active queue"); qSwitch->add_option("qid",qSwitchId,"Queue id")->required();
-    std::string qAddQuery; bool qAddSearch=false; auto* qAdd=queueCmd->add_subcommand("add","Add to queue"); qAdd->add_option("query",qAddQuery,"id|path|query")->required(); qAdd->add_flag("--search",qAddSearch,"Force FTS search");
+    std::string qAddQuery; bool qAddSearch=false; auto* qAdd=queueCmd->add_subcommand("add","Add to queue"); qAdd->add_option("query",qAddQuery,"id|path|query")->required(); qAdd->add_flag("--search",qAddSearch,"Force FTS search")->group("");
     std::string qRemoveId; auto* qRemove=queueCmd->add_subcommand("remove","Remove from queue"); qRemove->add_option("id",qRemoveId,"index or id")->required();
     std::size_t qFrom=0,qTo=0; auto* qMove=queueCmd->add_subcommand("move","Move within queue"); qMove->add_option("from",qFrom,"from index")->required(); qMove->add_option("to",qTo,"to index")->required();
     auto* qClear=queueCmd->add_subcommand("clear","Clear queue");

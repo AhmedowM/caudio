@@ -3,7 +3,9 @@ module;
 // Service owns Engine/DB/Config/Logger/IpcServer and dispatches commands
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -24,6 +26,8 @@ module;
 #include <variant>
 #include <vector>
 
+#include "blake3.h"
+
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/socket.h>
@@ -42,6 +46,7 @@ import caudio.utils;
 import caudio.engine;
 import caudio.db;
 import caudio.cli;
+import caudio.player;
 import :ipc_channel;
 import :ipc_server;
 import :shm_status;
@@ -405,6 +410,64 @@ listConfigValuesRaw(const std::filesystem::path& p) {
         if (pos >= content.size()) break;
     }
     return out;
+}
+
+inline bool hasAudioExt(const std::filesystem::path& p) {
+    auto ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
+}
+
+inline std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
+computeFingerprint(const std::filesystem::path& path) {
+    std::error_code ec;
+    auto sz = std::filesystem::file_size(path, ec);
+    if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
+    constexpr std::size_t kSample = 64 * 1024;
+    blake3_hasher hasher;
+    blake3_hasher_init(&hasher);
+    std::vector<std::uint8_t> buf(kSample);
+    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
+    std::size_t n = static_cast<std::size_t>(f.gcount());
+    if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
+    if (sz > kSample) {
+        f.clear();
+        f.seekg(static_cast<std::streamoff>(sz - kSample), std::ios::beg);
+        if (f) {
+            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
+            n = static_cast<std::size_t>(f.gcount());
+            if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
+        }
+    }
+    std::uint64_t sz64 = static_cast<std::uint64_t>(sz);
+    blake3_hasher_update(&hasher, &sz64, sizeof(sz64));
+    std::uint32_t ver = 1;
+    blake3_hasher_update(&hasher, &ver, sizeof(ver));
+    std::array<std::uint8_t, 32> out{};
+    blake3_hasher_finalize(&hasher, out.data(), out.size());
+    return out;
+}
+
+inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
+    try {
+        auto readerRes = caudio::player::FileReader::open(path);
+        if (!readerRes) return 0.0;
+        auto& readerPtr = readerRes.value();
+        auto decRes = caudio::player::DecoderRegistry::open(*readerPtr);
+        if (!decRes) return 0.0;
+        auto& decPtr = decRes.value();
+        std::uint32_t sr = decPtr->sampleRate();
+        std::uint64_t frames = decPtr->totalFrames();
+        if (sr == 0) return 0.0;
+        std::span<const std::uint8_t> dummy{};
+        (void)dummy;
+        return static_cast<double>(frames) / static_cast<double>(sr);
+    } catch (...) {
+        return 0.0;
+    }
 }
 
 } // namespace detail_svc
@@ -797,9 +860,61 @@ private:
                 int64_t qid = 1;
                 auto q = db_->getQueue(qid);
                 if (!q) return std::unexpected{q.error()};
+                if (!qa.search) {
+                    std::filesystem::path p(qa.query);
+                    std::error_code ec;
+                    if (std::filesystem::exists(p, ec) && !ec && detail_svc::hasAudioExt(p)) {
+                        auto fpRes = detail_svc::computeFingerprint(p);
+                        if (!fpRes) return std::unexpected{fpRes.error()};
+                        caudio::db::Track t;
+                        t.path = p.generic_string();
+                        t.fingerprint = *fpRes;
+                        t.duration = detail_svc::durationFromDecoder(p);
+                        {
+                            std::error_code ec2;
+                            auto sz = std::filesystem::file_size(p, ec2);
+                            if (!ec2) t.size = static_cast<int64_t>(sz);
+                            auto ftime = std::filesystem::last_write_time(p, ec2);
+                            if (!ec2) t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
+                        }
+                        int64_t newId = 0;
+                        auto ins = db_->insertTrack(t);
+                        if (ins) {
+                            newId = *ins;
+                            t.id = newId;
+                        } else {
+                            if (ins.error().code == caudio::utils::Result::AlreadyExists) {
+                                auto existing = db_->findByFingerprint(t.fingerprint);
+                                if (existing) {
+                                    t = std::move(*existing);
+                                    newId = t.id;
+                                } else {
+                                    auto byPath = db_->findByPath(t.path);
+                                    if (byPath) {
+                                        t = std::move(*byPath);
+                                        newId = t.id;
+                                    } else {
+                                        return std::unexpected{ins.error()};
+                                    }
+                                }
+                            } else {
+                                return std::unexpected{ins.error()};
+                            }
+                        }
+                        auto eq = db_->queueEnqueue(qid, newId);
+                        if (!eq) return std::unexpected{eq.error()};
+                        updateShmStatus();
+                        std::vector<caudio::db::Track> single;
+                        single.reserve(1);
+                        single.push_back(std::move(t));
+                        std::span<const caudio::db::Track> sp(single);
+                        (void)sp;
+                        return Result{QueueTracks{std::move(single)}};
+                    }
+                }
                 std::vector<caudio::db::Track> toAdd;
                 if (qa.search) {
-                    auto sr = caudio::db::searchFts(*db_, qa.query, 50);
+                    auto sr = caudio::db::search(*db_, qa.query, 50);
                     if (!sr) return std::unexpected{sr.error()};
                     toAdd = std::move(*sr);
                 } else {
@@ -831,8 +946,8 @@ private:
                         if (tr) {
                             toAdd.push_back(std::move(*tr));
                         } else {
-                            // fallback to search LIKE
-                            auto sr = caudio::db::searchLike(*db_, qa.query, 10);
+                            // fallback to search via FTS (covers LIKE)
+                            auto sr = caudio::db::search(*db_, qa.query, 50);
                             if (!sr) return std::unexpected{sr.error()};
                             toAdd = std::move(*sr);
                             if (toAdd.empty()) {
@@ -845,17 +960,10 @@ private:
                     auto er = db_->queueEnqueue(qid, t.id);
                     if (!er) return std::unexpected{er.error()};
                 }
-                // return updated queue
-                auto items = db_->queueList(qid);
-                if (!items) return std::unexpected{items.error()};
-                std::vector<caudio::db::Track> tracks;
-                tracks.reserve(items->size());
-                for (auto& it : *items) {
-                    auto tr = db_->getTrack(it.trackId);
-                    if (tr) tracks.push_back(std::move(*tr));
-                }
+                std::span<const caudio::db::Track> spanAdd(toAdd);
+                (void)spanAdd;
                 updateShmStatus();
-                return Result{QueueTracks{std::move(tracks)}};
+                return Result{QueueTracks{std::move(toAdd)}};
             },
             [&](const QueueRemove& qr) -> std::expected<Result, caudio::utils::Error> {
                 int64_t qid = 1;
