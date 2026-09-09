@@ -659,4 +659,11 @@ if(CAUDIO_BUILD_TESTS)
   target_include_directories(test_player_integration PRIVATE vendor)
   target_compile_features(test_player_integration PRIVATE cxx_std_23)
   catch_discover_tests(test_player_integration)
+
+  # IPC/Cli integration tests
+  add_executable(test_ipc tests/test_ipc.cpp)
+  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::cli_shared caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_include_directories(test_ipc PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+  target_compile_features(test_ipc PRIVATE cxx_std_23)
+  catch_discover_tests(test_ipc)
 endif()
