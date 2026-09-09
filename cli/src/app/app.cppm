@@ -134,7 +134,7 @@ inline std::filesystem::path App::pidPathForConfig() const {
     auto sockPath = config_.socketPath;
 #ifdef _WIN32
     if (!sockPath.empty()) {
-        std::string s = sockPath.generic_string();
+        std::string s = sockPath;
         if (s.rfind("\\\\", 0) == 0 || s.rfind("//", 0) == 0) {
             std::filesystem::path p = dbPath;
             if (p.empty()) {
@@ -153,7 +153,8 @@ inline std::filesystem::path App::pidPathForConfig() const {
 #endif
     if (!sockPath.empty()) {
         try {
-            auto parent = sockPath.parent_path();
+            std::filesystem::path sp(sockPath);
+            auto parent = sp.parent_path();
             if (parent.empty()) {
                 auto pp = dbPath.parent_path();
                 if (pp.empty()) pp = std::filesystem::current_path();
@@ -176,12 +177,15 @@ inline bool App::spawnDaemon(const caudio::cli::Config& cfg) {
     wchar_t exeBuf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
     if (len == 0 || len >= MAX_PATH) return false;
-    std::wstring dbW = cfg.dbPath.wstring();
     std::wstring cmdLine = L"\"";
     cmdLine += exeBuf;
-    cmdLine += L"\" --db-path \"";
-    cmdLine += dbW;
     cmdLine += L"\" --daemon --foreground";
+    if (!cfg.configPath.empty()) {
+        std::wstring cfgW = cfg.configPath.wstring();
+        cmdLine += L" --config \"";
+        cmdLine += cfgW;
+        cmdLine += L"\"";
+    }
     std::vector<wchar_t> buf(cmdLine.size() + 1);
     // copy into mutable buffer for CreateProcessW
     for (size_t i = 0; i < cmdLine.size(); ++i) buf[i] = cmdLine[i];
@@ -216,27 +220,31 @@ inline bool App::spawnDaemon(const caudio::cli::Config& cfg) {
             exePath = "/proc/self/exe";
         }
     }
-    std::string dbStr = cfg.dbPath.generic_string();
-    execl(exePath.c_str(), exePath.c_str(), "--db-path", dbStr.c_str(), "--daemon", "--foreground", nullptr);
+    if (!cfg.configPath.empty()) {
+        std::string cfgStr = cfg.configPath.generic_string();
+        execl(exePath.c_str(), exePath.c_str(), "--config", cfgStr.c_str(), "--daemon", "--foreground", nullptr);
+    } else {
+        execl(exePath.c_str(), exePath.c_str(), "--daemon", "--foreground", nullptr);
+    }
     _exit(1);
 #endif
 }
 
 inline int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath);
-    if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath.generic_string()); return 0; }
+    if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath); return 0; }
     caudio::service::ServiceConfig scfg; scfg.dbPath = config_.dbPath; scfg.socketPath = config_.socketPath; scfg.configPath = config_.configPath; scfg.logLevel = config_.logLevel;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) { std::cerr << std::format("start failed: {} {}\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message); return 1; }
-        std::cout << std::format("starting daemon foreground at {}\n", config_.socketPath.generic_string());
+        std::cout << std::format("starting daemon foreground at {}\n", config_.socketPath);
         std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {}\n", res.error().message); return 1; } return 0;
     } else {
-        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {}\n", config_.socketPath.generic_string()); return 1; }
+        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {}\n", config_.socketPath); return 1; }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
-        if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {}\n", config_.socketPath.generic_string()); return 1; }
-        std::cout << std::format("daemon started at {}\n", config_.socketPath.generic_string()); return 0;
+        if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {}\n", config_.socketPath); return 1; }
+        std::cout << std::format("daemon started at {}\n", config_.socketPath); return 0;
     }
 }
 
@@ -266,7 +274,7 @@ inline int App::handleShutdown() {
         }
     }
     auto conn = caudio::client::IpcClient::connect(config_.dbPath);
-    if (conn) { std::cerr << std::format("shutdown: daemon still running at {}\n", config_.socketPath.generic_string()); return 1; }
+    if (conn) { std::cerr << std::format("shutdown: daemon still running at {}\n", config_.socketPath); return 1; }
     std::cout << std::format("daemon stopped\n");
     return 0;
 }
@@ -281,8 +289,7 @@ inline int App::handlePreview(const std::string& file) {
     std::cout << std::format("preview done\n"); return 0;
 }
 inline int App::run(int argc, char** argv) {
-    std::string dbPathStr; std::string configPathStr; std::string logLevelStr; std::string deviceStr;
-    cli_.add_option("--db-path", dbPathStr, "Database file");
+    std::string configPathStr; std::string logLevelStr; std::string deviceStr;
     cli_.add_option("--config", configPathStr, "Config file");
     cli_.add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
     cli_.add_option("--device", deviceStr, "Audio output device");
@@ -331,11 +338,17 @@ inline int App::run(int argc, char** argv) {
     std::string cfgExportPath; auto* cfgExport=cfgCmd->add_subcommand("export","Export config"); cfgExport->add_option("path",cfgExportPath,"Path")->required();
     std::string cfgImportPath; auto* cfgImport=cfgCmd->add_subcommand("import","Import config"); cfgImport->add_option("path",cfgImportPath,"Path")->required();
     try { cli_.parse(argc, argv); } catch (const CLI::ParseError& e) { return cli_.exit(e); }
-    if (!dbPathStr.empty()) config_.dbPath = std::filesystem::path(dbPathStr);
-    if (!configPathStr.empty()) { config_.configPath = std::filesystem::path(configPathStr); auto loaded = caudio::cli::loadConfig(config_.configPath); if (loaded) { if (dbPathStr.empty()) config_.dbPath = loaded->dbPath; config_.device = loaded->device; config_.logLevel = loaded->logLevel; if (!loaded->socketPath.empty()) config_.socketPath = loaded->socketPath; } }
+    if (!configPathStr.empty()) config_.configPath = std::filesystem::path(configPathStr);
+    {
+        auto loaded = caudio::cli::loadConfig(config_.configPath);
+        if (loaded) {
+            config_ = *loaded;
+            if (!configPathStr.empty()) config_.configPath = std::filesystem::path(configPathStr);
+        }
+    }
     if (!deviceStr.empty()) config_.device = deviceStr;
     if (!logLevelStr.empty()) { if (logLevelStr=="trace") config_.logLevel=0; else if (logLevelStr=="debug") config_.logLevel=1; else if (logLevelStr=="info") config_.logLevel=2; else if (logLevelStr=="warn") config_.logLevel=3; else if (logLevelStr=="error") config_.logLevel=4; }
-    if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::service::socketPathFor(config_.dbPath); if (sp) config_.socketPath = std::filesystem::path(*sp); }
+    if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::service::socketPathFor(config_.dbPath); if (sp) config_.socketPath = *sp; }
     std::span<char> dummySpan; (void)dummySpan; std::error_code ec; (void)std::filesystem::exists(config_.dbPath, ec);
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {

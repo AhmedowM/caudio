@@ -20,7 +20,7 @@ struct Config {
     std::filesystem::path configPath{};
     std::string device{"auto"};
     int logLevel{2};
-    std::filesystem::path socketPath{};
+    std::string socketPath{};
 };
 
 namespace detail {
@@ -104,7 +104,7 @@ inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& p
         }
         if (j.contains("socketPath") && j["socketPath"].is_string()) {
             std::string s = j["socketPath"].get<std::string>();
-            if (!s.empty()) cfg.socketPath = std::filesystem::path(s);
+            if (!s.empty()) cfg.socketPath = s;
         }
         // legacy keys: db_path, log_level
         if (j.contains("db_path") && j["db_path"].is_string()) {
@@ -131,7 +131,7 @@ inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
         j["dbPath"] = cfg.dbPath.generic_string();
         j["device"] = cfg.device;
         j["logLevel"] = cfg.logLevel;
-        if (!cfg.socketPath.empty()) j["socketPath"] = cfg.socketPath.generic_string();
+        if (!cfg.socketPath.empty()) j["socketPath"] = cfg.socketPath;
         std::ofstream out(cfg.configPath);
         if (!out) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};

@@ -86,7 +86,7 @@ public:
             ::CloseHandle(pipeHandle_);
             pipeHandle_ = nullptr;
         }
-        std::string pathStr = socketPath_.string();
+        std::string pathStr = socketPath_;
         std::wstring w;
         w.reserve(pathStr.size());
         for (char c : pathStr) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
@@ -114,7 +114,7 @@ public:
         if (fd < 0) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socket failed")};
         }
-        std::string sockStr = socketPath_.string();
+        std::string sockStr = socketPath_;
         ::unlink(sockStr.c_str());
         sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
@@ -164,7 +164,7 @@ public:
                 }
                 HANDLE clientHandle = pipeHandle_;
                 {
-                    std::string pathStr = socketPath_.string();
+                    std::string pathStr = socketPath_;
                     std::wstring w;
                     w.reserve(pathStr.size());
                     for (char c : pathStr) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
@@ -336,7 +336,7 @@ public:
             pipeHandle_ = nullptr;
         }
         if (!socketPath_.empty()) {
-            std::string pathStr = socketPath_.string();
+            std::string pathStr = socketPath_;
             std::wstring w;
             w.reserve(pathStr.size());
             for (char c : pathStr) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
@@ -348,7 +348,7 @@ public:
             ::close(listenFd_);
             listenFd_ = -1;
             if (!socketPath_.empty()) {
-                std::string s = socketPath_.string();
+                std::string s = socketPath_;
                 ::unlink(s.c_str());
             }
         }
@@ -380,7 +380,7 @@ private:
     std::mutex clientsMtx_;
     std::mutex cvMtx_;
     std::condition_variable cv_;
-    std::filesystem::path socketPath_;
+    std::string socketPath_;
     std::stop_source stopSource_;
 #ifdef _WIN32
     HANDLE pipeHandle_{nullptr};

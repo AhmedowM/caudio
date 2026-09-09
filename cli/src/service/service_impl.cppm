@@ -55,7 +55,7 @@ export namespace caudio::service {
 
 struct ServiceConfig {
     std::filesystem::path dbPath{"library.db"};
-    std::filesystem::path socketPath{};
+    std::string socketPath{};
     std::filesystem::path configPath{};
     int logLevel{2};
 };
@@ -68,11 +68,10 @@ struct overloaded : Ts... {
 };
 
 inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
-                                              const std::filesystem::path& socketPath) {
+                                              const std::string& socketPath) {
     if (!socketPath.empty()) {
 #ifdef _WIN32
-        std::string s = socketPath.generic_string();
-        if (s.rfind("\\\\", 0) == 0 || s.rfind("//", 0) == 0) {
+        if (socketPath.rfind("\\\\", 0) == 0 || socketPath.rfind("//", 0) == 0) {
             // named pipe -> place pid next to db
             std::filesystem::path p = dbPath;
             if (p.empty()) {
@@ -89,10 +88,9 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
         }
 #endif
         try {
-            auto parent = socketPath.parent_path();
+            std::filesystem::path sp(socketPath);
+            auto parent = sp.parent_path();
             if (parent.empty()) {
-                // socketPath may be string like \\.\pipe\caudio-... on Windows - handled above
-                // fallback to db parent
                 auto pp = dbPath.parent_path();
                 if (pp.empty()) pp = std::filesystem::current_path();
                 return pp / "caudio.pid";
@@ -110,42 +108,39 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
 }
 
 inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                               const std::filesystem::path& socketPath) {
+                                               const std::string& socketPath) {
     auto pidPath = pidPathForSocket(dbPath, socketPath);
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
     return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
 }
 
-inline std::filesystem::path socketPathForDb(const std::filesystem::path& dbPath) {
+inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
 #ifdef _WIN32
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
-    return std::filesystem::path("\\\\.\\pipe\\caudio-" + std::to_string(hash));
+    return "\\\\.\\pipe\\caudio-" + std::to_string(hash);
 #else
     auto pp = dbPath.parent_path();
     if (pp.empty()) pp = std::filesystem::current_path();
     std::error_code ec;
     std::filesystem::create_directories(pp, ec);
-    // Use a hash of the db path for the socket name
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
-    return pp / ("caudio-" + std::to_string(hash) + ".sock");
+    return (pp / ("caudio-" + std::to_string(hash) + ".sock")).generic_string();
 #endif
 }
 
 inline bool probeSocketAlive(const std::string& sp) {
 #ifdef _WIN32
-    // For named pipe, try to open it
+    if (sp.empty()) return false;
     std::wstring w;
     w.reserve(sp.size());
     for (char c : sp) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    // Use CreateFileW to probe - if succeeds, someone is listening
-    // Minimal import: use WinAPI via extern declared in ipc_server
-    // We avoid direct WinAPI here to keep minimal C; just return false (stale assumed not alive)
-    // Instead treat existence of file is not applicable for pipe.
-    (void)w;
-    return false;
+    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return false;
+    ::CloseHandle(h);
+    return true;
 #else
     if (sp.empty()) return false;
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -486,15 +481,14 @@ public:
         // Determine socket path
         std::string spStr;
         if (!cfg.socketPath.empty()) {
-            spStr = cfg.socketPath.generic_string();
+            spStr = cfg.socketPath;
         } else {
-            auto sp = detail_svc::socketPathForDb(cfg.dbPath);
-            if (!sp.empty()) spStr = sp.generic_string();
+            spStr = detail_svc::socketPathForDb(cfg.dbPath);
         }
 
         // Single-instance enforcement via flock lock file
         std::filesystem::path lockPath = detail_svc::lockPathForSocket(cfg.dbPath,
-            cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
+            cfg.socketPath.empty() ? spStr : cfg.socketPath);
         int lockFd = -1;
         if (!detail_svc::tryAcquireLock(lockPath, lockFd)) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (lock held)")};
@@ -502,7 +496,7 @@ public:
 
         // Check for stale PID file
         std::filesystem::path pidPath = detail_svc::pidPathForSocket(cfg.dbPath,
-            cfg.socketPath.empty() ? std::filesystem::path(spStr) : cfg.socketPath);
+            cfg.socketPath.empty() ? spStr : cfg.socketPath);
         std::error_code ec;
         if (std::filesystem::exists(pidPath, ec)) {
             auto existingPid = detail_svc::readPidFile(pidPath);
@@ -597,7 +591,7 @@ public:
         if (shmRes) shmHandle = std::make_unique<caudio::service::ShmStatusHandle>(std::move(*shmRes));
 
         auto svc = std::unique_ptr<Service>(new Service(cfg, dbShared, std::move(eng), std::move(srvPtr),
-            std::move(loggerPtr), pidPath, std::filesystem::path(spStr), lockFd, std::move(shmHandle), shmName));
+            std::move(loggerPtr), pidPath, spStr, lockFd, std::move(shmHandle), shmName));
         return svc;
     }
 
@@ -638,7 +632,7 @@ public:
                 std::filesystem::remove(pidPath_, ec);
             }
             if (!socketPath_.empty()) {
-                std::string s = socketPath_.generic_string();
+                std::string s = socketPath_;
                 if (!s.starts_with("\\\\") && !s.empty()) {
                     std::filesystem::path sp(s);
                     if (std::filesystem::exists(sp, ec)) {
@@ -671,7 +665,7 @@ private:
             std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger,
             std::filesystem::path pidPath,
-            std::filesystem::path socketPath,
+            std::string socketPath,
             int lockFd,
             std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle,
             std::string shmName)
@@ -1243,7 +1237,7 @@ private:
     std::unique_ptr<IpcServer> server_{};
     std::unique_ptr<caudio::utils::Logger> logger_{};
     std::filesystem::path pidPath_{};
-    std::filesystem::path socketPath_{};
+    std::string socketPath_{};
     int lockFd_{-1};
     std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle_{};
     std::string shmName_{};
