@@ -22,6 +22,20 @@ module;
 #include <vector>
 #include "caudio/version.hpp"
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
+
 export module caudio.app:core;
 
 import caudio.utils;
@@ -107,10 +121,106 @@ public:
     int run(int argc, char** argv);
 private:
     int handleStart(bool foreground);
+    int handleShutdown();
     int handlePreview(const std::string& file);
+    bool spawnDaemon(const caudio::cli::Config& cfg);
+    std::filesystem::path pidPathForConfig() const;
     caudio::cli::Config config_{};
     CLI::App cli_{"caudio - terminal player"};
 };
+
+inline std::filesystem::path App::pidPathForConfig() const {
+    auto dbPath = config_.dbPath;
+    auto sockPath = config_.socketPath;
+#ifdef _WIN32
+    if (!sockPath.empty()) {
+        std::string s = sockPath.generic_string();
+        if (s.rfind("\\\\", 0) == 0 || s.rfind("//", 0) == 0) {
+            std::filesystem::path p = dbPath;
+            if (p.empty()) {
+                const char* home = std::getenv("HOME");
+                if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
+                std::filesystem::path base;
+                if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
+                else base = std::filesystem::temp_directory_path() / "caudio";
+                p = base / "caudio.db";
+            }
+            auto parent = p.parent_path();
+            if (parent.empty()) parent = std::filesystem::current_path();
+            return parent / "caudio.pid";
+        }
+    }
+#endif
+    if (!sockPath.empty()) {
+        try {
+            auto parent = sockPath.parent_path();
+            if (parent.empty()) {
+                auto pp = dbPath.parent_path();
+                if (pp.empty()) pp = std::filesystem::current_path();
+                return pp / "caudio.pid";
+            }
+            return parent / "caudio.pid";
+        } catch (...) {
+            auto pp = dbPath.parent_path();
+            if (pp.empty()) pp = std::filesystem::current_path();
+            return pp / "caudio.pid";
+        }
+    }
+    auto pp = dbPath.parent_path();
+    if (pp.empty()) pp = std::filesystem::current_path();
+    return pp / "caudio.pid";
+}
+
+inline bool App::spawnDaemon(const caudio::cli::Config& cfg) {
+#ifdef _WIN32
+    wchar_t exeBuf[MAX_PATH]{};
+    DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) return false;
+    std::wstring dbW = cfg.dbPath.wstring();
+    std::wstring cmdLine = L"\"";
+    cmdLine += exeBuf;
+    cmdLine += L"\" --db-path \"";
+    cmdLine += dbW;
+    cmdLine += L"\" --daemon --foreground";
+    std::vector<wchar_t> buf(cmdLine.size() + 1);
+    // copy into mutable buffer for CreateProcessW
+    for (size_t i = 0; i < cmdLine.size(); ++i) buf[i] = cmdLine[i];
+    buf[cmdLine.size()] = L'\0';
+    STARTUPINFOW si{};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi{};
+    BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE | DETACHED_PROCESS, nullptr, nullptr, &si, &pi);
+    if (!ok) return false;
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return true;
+#else
+    pid_t pid = fork();
+    if (pid < 0) return false;
+    if (pid > 0) return true;
+    // child
+    if (setsid() < 0) _exit(1);
+    if (chdir("/") != 0) {}
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    // exec self with --daemon --foreground
+    std::string exePath;
+    {
+        char linkBuf[4096]{};
+        ssize_t n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf)-1);
+        if (n > 0) {
+            linkBuf[n] = '\0';
+            exePath = linkBuf;
+        } else {
+            exePath = "/proc/self/exe";
+        }
+    }
+    std::string dbStr = cfg.dbPath.generic_string();
+    execl(exePath.c_str(), exePath.c_str(), "--db-path", dbStr.c_str(), "--daemon", "--foreground", nullptr);
+    _exit(1);
+#endif
+}
 
 inline int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath);
@@ -122,18 +232,45 @@ inline int App::handleStart(bool foreground) {
         std::cout << std::format("starting daemon foreground at {}\n", config_.socketPath.generic_string());
         std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {}\n", res.error().message); return 1; } return 0;
     } else {
-        auto svc = caudio::service::Service::create(scfg);
-        if (!svc) { std::cerr << std::format("start failed: {} {}\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message); return 1; }
-        auto svcPtr = std::shared_ptr<caudio::service::Service>(std::move(svc.value()));
-        static std::vector<std::shared_ptr<std::jthread>> bg; static std::mutex bgMtx;
-        auto thr = std::make_shared<std::jthread>([svcPtr](std::stop_token st) mutable { (void)svcPtr->run(st); });
-        { std::lock_guard<std::mutex> lk(bgMtx); bg.push_back(thr); }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {}\n", config_.socketPath.generic_string()); return 1; }
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
         if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {}\n", config_.socketPath.generic_string()); return 1; }
         std::cout << std::format("daemon started at {}\n", config_.socketPath.generic_string()); return 0;
     }
 }
+
+inline int App::handleShutdown() {
+    caudio::client::Client client{config_.dbPath};
+    auto cmd = caudio::cli::Command{caudio::cli::Shutdown{}};
+    auto res = client.send(cmd, std::chrono::milliseconds{2000});
+    if (!res) {
+        // if daemon not running, report
+        if (res.error().code == caudio::utils::Result::State) {
+            std::cerr << std::format("shutdown: daemon not running\n");
+            return 1;
+        }
+        // even if send failed, attempt to poll pid file
+    }
+    // poll pid file and socket until daemon exits
+    auto pidPath = pidPathForConfig();
+    for (int i = 0; i < 20; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::error_code ec;
+        bool pidExists = std::filesystem::exists(pidPath, ec);
+        auto conn = caudio::client::IpcClient::connect(config_.dbPath);
+        if (!conn && !pidExists) break;
+        if (!conn) {
+            // socket gone, check pid file stale
+            if (!pidExists) break;
+        }
+    }
+    auto conn = caudio::client::IpcClient::connect(config_.dbPath);
+    if (conn) { std::cerr << std::format("shutdown: daemon still running at {}\n", config_.socketPath.generic_string()); return 1; }
+    std::cout << std::format("daemon stopped\n");
+    return 0;
+}
+
 inline int App::handlePreview(const std::string& file) {
     std::filesystem::path p{file}; std::error_code ec; if (!std::filesystem::exists(p, ec)) { std::cerr << std::format("preview: file not found {}\n", file); return 1; }
     auto playerRes = caudio::player::Player::create(); if (!playerRes) { std::cerr << std::format("preview: player create failed {} {}\n", std::to_string(std::to_underlying(playerRes.error().code)), playerRes.error().message); return 1; }
@@ -149,6 +286,10 @@ inline int App::run(int argc, char** argv) {
     cli_.add_option("--config", configPathStr, "Config file");
     cli_.add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
     cli_.add_option("--device", deviceStr, "Audio output device");
+    bool daemonFlag=false;
+    cli_.add_flag("--daemon", daemonFlag, "Internal daemon flag")->group("");
+    bool globalFg=false;
+    cli_.add_flag("--foreground", globalFg, "")->group("");
     bool fg=false; auto* startCmd=cli_.add_subcommand("start","Start daemon"); startCmd->add_flag("--foreground",fg,"Run in foreground");
     auto* shutdownCmd=cli_.add_subcommand("shutdown","Stop daemon");
     auto* playCmd=cli_.add_subcommand("play","Play current queue");
@@ -196,14 +337,18 @@ inline int App::run(int argc, char** argv) {
     if (!logLevelStr.empty()) { if (logLevelStr=="trace") config_.logLevel=0; else if (logLevelStr=="debug") config_.logLevel=1; else if (logLevelStr=="info") config_.logLevel=2; else if (logLevelStr=="warn") config_.logLevel=3; else if (logLevelStr=="error") config_.logLevel=4; }
     if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::service::socketPathFor(config_.dbPath); if (sp) config_.socketPath = std::filesystem::path(*sp); }
     std::span<char> dummySpan; (void)dummySpan; std::error_code ec; (void)std::filesystem::exists(config_.dbPath, ec);
+    // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
+    if (daemonFlag) {
+        return handleStart(true);
+    }
     auto sendViaClient = [&](const caudio::cli::Command& cmd, bool asJson)->int {
         caudio::client::Client client{config_.dbPath}; auto timeout=std::chrono::milliseconds{2000}; auto res=client.send(cmd, timeout); caudio::client::OutputFormatter fmt{asJson};
         if (!res) { caudio::cli::Result errRes{res.error()}; fmt.print(errRes, std::cerr); return 1; }
         if (std::holds_alternative<caudio::utils::Error>(*res)) { fmt.print(*res, std::cerr); return 1; }
         fmt.print(*res, std::cout); return 0;
     };
-    if (startCmd->parsed()) return handleStart(fg);
-    if (shutdownCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Shutdown{}}; return sendViaClient(cmd,false); }
+    if (startCmd->parsed()) return handleStart(fg || globalFg);
+    if (shutdownCmd->parsed()) return handleShutdown();
     if (playCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Play{}}; return sendViaClient(cmd,false); }
     if (pauseCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Pause{}}; return sendViaClient(cmd,false); }
     if (resumeCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Resume{}}; return sendViaClient(cmd,false); }
