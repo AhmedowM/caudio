@@ -123,7 +123,7 @@ private:
     int handleStart(bool foreground);
     int handleShutdown();
     int handlePreview(const std::string& file);
-    bool spawnDaemon(const caudio::cli::Config& cfg);
+    std::expected<void, std::uint32_t> spawnDaemon(const caudio::cli::Config& cfg);
     std::filesystem::path pidPathForConfig() const;
     caudio::cli::Config config_{};
     CLI::App cli_{"caudio - terminal player"};
@@ -184,43 +184,54 @@ inline std::filesystem::path App::pidPathForConfig() const {
     return pp / "caudio.pid";
 }
 
-inline bool App::spawnDaemon(const caudio::cli::Config& cfg) {
+inline std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::cli::Config& cfg) {
 #ifdef _WIN32
     wchar_t exeBuf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) return false;
-    std::wstring cmdLine = L"\"";
-    cmdLine += exeBuf;
-    cmdLine += L"\" --daemon --foreground";
-    if (!cfg.configPath.empty()) {
-        std::wstring cfgW = cfg.configPath.wstring();
-        cmdLine += L" --config \"";
-        cmdLine += cfgW;
-        cmdLine += L"\"";
+    if (len == 0 || len >= MAX_PATH) {
+        DWORD err = GetLastError();
+        if (err == 0) err = 1;
+        return std::unexpected{static_cast<std::uint32_t>(err)};
     }
-    std::vector<wchar_t> buf(cmdLine.size() + 1);
-    // copy into mutable buffer for CreateProcessW
-    for (size_t i = 0; i < cmdLine.size(); ++i) buf[i] = cmdLine[i];
-    buf[cmdLine.size()] = L'\0';
+    // Build mutable wide command line: "<exePath>" --daemon --foreground [--config "<configPath>"]
+    std::wstring wCmd = L"\"";
+    wCmd += exeBuf;
+    wCmd += L"\" --daemon --foreground";
+    if (!cfg.configPath.empty()) {
+        // configPath may contain forward slashes; quoting protects both slash styles
+        std::wstring cfgW = cfg.configPath.wstring();
+        wCmd += L" --config \"";
+        wCmd += cfgW;
+        wCmd += L"\"";
+    }
+    // CreateProcessW requires mutable, null-terminated buffer
+    std::vector<wchar_t> buf(wCmd.size() + 1, L'\0');
+    for (size_t i = 0; i < wCmd.size(); ++i) buf[i] = wCmd[i];
+    buf[wCmd.size()] = L'\0';
     STARTUPINFOW si{};
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi{};
-    BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE | DETACHED_PROCESS, nullptr, nullptr, &si, &pi);
-    if (!ok) return false;
+    // Use DETACHED_PROCESS only - CREATE_NEW_CONSOLE | DETACHED_PROCESS is invalid (ERROR_INVALID_PARAMETER 87)
+    BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS, nullptr, nullptr, &si, &pi);
+    if (!ok) {
+        DWORD err = GetLastError();
+        return std::unexpected{static_cast<std::uint32_t>(err)};
+    }
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    return true;
+    return {};
 #else
     pid_t pid = fork();
-    if (pid < 0) return false;
-    if (pid > 0) return true;
+    if (pid < 0) {
+        return std::unexpected{static_cast<std::uint32_t>(errno)};
+    }
+    if (pid > 0) return {};
     // child
     if (setsid() < 0) _exit(1);
     if (chdir("/") != 0) {}
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-    // exec self with --daemon --foreground
     std::string exePath;
     {
         char linkBuf[4096]{};
@@ -258,11 +269,23 @@ inline int App::handleStart(bool foreground) {
         std::cout << std::format("starting daemon foreground at {} db={}\n", config_.socketPath, config_.dbPath.generic_string());
         std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {} (dbPath={})\n", res.error().message, config_.dbPath.generic_string()); return 1; } return 0;
     } else {
-        if (!spawnDaemon(config_)) { std::cerr << std::format("daemon spawn failed at {} db={}\n", config_.socketPath, config_.dbPath.generic_string()); return 1; }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
-        if (!conn2) { std::cerr << std::format("daemon start failed, socket not reachable at {} db={}\n", config_.socketPath, config_.dbPath.generic_string()); return 1; }
-        std::cout << std::format("daemon started at {}\n", config_.socketPath); return 0;
+        auto spawnRes = spawnDaemon(config_);
+        if (!spawnRes) {
+            std::uint32_t err = spawnRes.error();
+            std::cerr << std::format("start failed: CreateProcess failed {} at {} db={}\n", err, config_.socketPath, config_.dbPath.generic_string());
+            return 1;
+        }
+        // Poll for pipe readiness: 1500ms total, 100ms interval ×15
+        for (int i = 0; i < 15; ++i) {
+            auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
+            if (conn2) {
+                std::cout << std::format("daemon started at {}\n", config_.socketPath);
+                return 0;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        std::cerr << std::format("daemon start failed, socket not reachable at {} db={}\n", config_.socketPath, config_.dbPath.generic_string());
+        return 1;
     }
 }
 
