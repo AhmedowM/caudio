@@ -760,6 +760,46 @@ class Engine final {
         }
     }
 
+    std::expected<void, caudio::utils::Error> queuePeekLocked(caudio::db::Track& out) {
+        if (queue_.queueId == 0)
+            queue_.queueId = 1;
+        // peek — don't consume, handle shuffle cursor without advancing
+        if (queue_.shuffle) {
+            if (queue_.perm.empty()) {
+                size_t cnt = db_->queueCountLocked(queue_.queueId);
+                if (cnt == 0)
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+                auto sr = setShuffleLocked(true);
+                if (!sr)
+                    return std::unexpected(sr.error());
+            }
+            size_t idx = queue_.cursor;
+            if (idx >= queue_.perm.size()) {
+                if (queue_.repeat == RepeatMode::Queue)
+                    idx = 0;
+                else
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+            }
+            int64_t pos = queue_.perm[idx];
+            auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
+            if (!tr)
+                return std::unexpected(tr.error());
+            out = tr.value();
+            return {};
+        }
+        // non-shuffle: peek first row
+        auto qi = db_->queuePeekLocked(queue_.queueId);
+        if (!qi)
+            return std::unexpected(qi.error());
+        auto tr = db_->getTrack(qi.value().trackId);
+        if (!tr)
+            return std::unexpected(tr.error());
+        out = tr.value();
+        return {};
+    }
+
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out) {
         if (queue_.queueId == 0)
             queue_.queueId = 1;
@@ -907,6 +947,7 @@ class Engine final {
                         output_ = std::move(oRes.value());
                         // preroll: decode some frames before start
                         preroll();
+                        output_->start();
                     } else {
                         lastErr_ = oRes.error().message;
                     }

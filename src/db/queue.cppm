@@ -109,6 +109,33 @@ queueDequeueLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, in
     return it;
 }
 
+export std::expected<QueueItem, caudio::utils::Error>
+queuePeekLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid) {
+    (void)cacheMutex;
+    (void)stmtCache;
+    if (qid == 0)
+        qid = 1;
+    if (!db)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+    Statement st;
+    auto e = st.prepare(db, "SELECT id, queue_id, track_id, position, added FROM queue "
+                             "WHERE queue_id=? ORDER BY position LIMIT 1");
+    if (!e)
+        return std::unexpected{e.error()};
+    st.bindInt(1, qid);
+    bool hasRow = st.step();
+    if (!hasRow) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+    }
+    QueueItem it;
+    it.id = st.columnInt(0);
+    it.queue_id = st.columnInt(1);
+    it.trackId = st.columnInt(2);
+    it.position = st.columnInt(3);
+    it.added = st.columnInt(4);
+    return it;
+}
+
 export std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db,
                                                                    std::mutex& cacheMutex,
                                                                    StmtCache& stmtCache,
@@ -331,7 +358,6 @@ setQueueRepeatLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, 
     return {};
 }
 
-// Alias for queueListLocked
 export std::expected<std::vector<QueueItem>, caudio::utils::Error>
 getQueueItemsLocked(sqlite3* db, std::mutex& cacheMutex, StmtCache& stmtCache, int64_t qid) {
     return queueListLocked(db, cacheMutex, stmtCache, qid);
