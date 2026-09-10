@@ -58,27 +58,22 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     if (sanitized.empty())
         return std::vector<Track>{};
     std::string ftsQ = sanitized;
-    {
-        std::shared_lock lock(db.mutex());
-        sqlite3* h = db.handle();
-        if (!h)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        // try exact FTS query
-        auto r = tryFtsQuery(h, ftsQ, limit);
-        if (r && !r->empty())
-            return r;
-        // try prefix
-        std::string prefix = sanitized + "*";
-        auto r2 = tryFtsQuery(h, prefix, limit);
-        if (r2 && !r2->empty())
-            return r2;
-    }
-    // LIKE fallback on 5 cols with COLLATE NOCASE
+    // Hold single shared_lock across FTS exact + prefix + LIKE fallback to avoid unlock gap
     std::shared_lock lock(db.mutex());
     sqlite3* h = db.handle();
     if (!h)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+    // try exact FTS query
+    auto r = tryFtsQuery(h, ftsQ, limit);
+    if (r && !r->empty())
+        return r;
+    // try prefix
+    std::string prefix = sanitized + "*";
+    auto r2 = tryFtsQuery(h, prefix, limit);
+    if (r2 && !r2->empty())
+        return r2;
+    // LIKE fallback on 5 cols with COLLATE NOCASE — still under same lock
     std::string esc = detail::escapeLike(sanitized);
     std::string pat = "%" + esc + "%";
     const char* likeSql =

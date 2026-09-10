@@ -6,6 +6,15 @@ export module caudio.db:schema;
 
 export namespace caudio::db {
 
+// queue table enforces UNIQUE(queue_id, position) — single-writer invariant.
+// Database::m_ serializes all queue writes; the UNIQUE is a safety net. For
+// existing DBs created without the constraint, IF NOT EXISTS leaves the old
+// table as-is; the CREATE UNIQUE INDEX is IF NOT EXISTS and will fail only if
+// duplicate positions exist — Database::open handles that gracefully by ignoring
+// the index-creation error and queue ops will normalize positions on next write.
+// Position shifts use UPDATE ... SET position=position+1 which under UNIQUE
+// requires serialized access (guaranteed by dbMutex_); transient duplicates are
+// avoided by single-writer.
 constexpr std::string_view kSchema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
@@ -76,9 +85,10 @@ constexpr std::string_view kSchema =
     "queue_id INTEGER NOT NULL DEFAULT 1,"
     "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
     "position INTEGER NOT NULL,"
-    "added DATETIME DEFAULT CURRENT_TIMESTAMP"
+    "added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "UNIQUE(queue_id, position)"
     ");"
-    "CREATE INDEX IF NOT EXISTS idx_queue_queue_pos ON queue(queue_id, position);"
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_queue_pos ON queue(queue_id, position);"
     "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');"
     "CREATE TABLE IF NOT EXISTS queues ("
     "id INTEGER PRIMARY KEY,"

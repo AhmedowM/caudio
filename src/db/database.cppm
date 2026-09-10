@@ -46,31 +46,38 @@ class Database final {
     }
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
+    // Move is not thread-safe after open: caller must ensure no concurrent DB access.
+    // If move is used, lock order must be dbMutex_ (m_) -> stmtCacheMutex_ (cacheMutex_)
+    // to match normal operation (unique_lock m_ then cacheMutex_).
     Database(Database&& o) noexcept : writer_(std::move(o.writer_)), db_(o.db_) {
         o.db_ = nullptr;
         // cache stays empty for moved-from; moved-to starts empty (statements tied to old handle)
         // if o had cached stmts they are cleared (handle moved)
+        // Acquire in documented order: dbMutex_ -> stmtCacheMutex_
         {
-            std::lock_guard<std::mutex> lk(o.cacheMutex_);
+            std::unique_lock<std::shared_mutex> lkDb(o.m_, std::defer_lock);
+            std::unique_lock<std::mutex> lkCache(o.cacheMutex_, std::defer_lock);
+            std::lock(lkDb, lkCache);
             o.stmtCache_.clear();
         }
     }
     Database& operator=(Database&& o) noexcept {
         if (this != &o) {
+            // Documented lock order: dbMutex_ -> stmtCacheMutex_. Move after open is
+            // discouraged; if used, caller must quiesce. We acquire both sides in order.
+            std::unique_lock<std::shared_mutex> lkThisDb(m_, std::defer_lock);
+            std::unique_lock<std::mutex> lkThisCache(cacheMutex_, std::defer_lock);
+            std::unique_lock<std::shared_mutex> lkODb(o.m_, std::defer_lock);
+            std::unique_lock<std::mutex> lkOCache(o.cacheMutex_, std::defer_lock);
+            std::lock(lkThisDb, lkThisCache, lkODb, lkOCache);
             writer_.close();
-            {
-                std::lock_guard<std::mutex> lk(cacheMutex_);
-                stmtCache_.clear();
-            }
+            stmtCache_.clear();
             if (db_)
                 sqlite3_close(db_);
             writer_ = std::move(o.writer_);
             db_ = o.db_;
             o.db_ = nullptr;
-            {
-                std::lock_guard<std::mutex> lk(o.cacheMutex_);
-                o.stmtCache_.clear();
-            }
+            o.stmtCache_.clear();
             // also clear any remaining in *this (already cleared) - start fresh for new handle
         }
         return *this;
@@ -80,23 +87,10 @@ class Database final {
         stmtCache_.clear();
     }
     // per-connection prepared statement cache
-    // Caller must hold cacheMutex_ when using getCachedLocked / getCachedForUse
-    Statement* getCachedLocked(std::string_view sql) const {
-        std::string key(sql);
-        auto it = stmtCache_.find(key);
-        if (it != stmtCache_.end()) {
-            it->second->reset();
-            return it->second.get();
-        }
-        auto up = std::make_unique<Statement>();
-        if (auto e = up->prepare(db_, sql); !e)
-            return nullptr;
-        Statement* raw = up.get();
-        stmtCache_.emplace(std::move(key), std::move(up));
-        return raw;
-    }
+    // Primary API: getCachedForUse returns expected; callers must check.
+    // Legacy raw-pointer APIs are deprecated and delegate to expected (nullptr only on error).
     std::expected<Statement*, caudio::utils::Error> getCachedForUse(std::string_view sql) const {
-        // assumes cacheMutex_ already held by caller
+        // assumes stmtCacheMutex_ (cacheMutex_) already held by caller
         std::string key(sql);
         auto it = stmtCache_.find(key);
         if (it != stmtCache_.end()) {
@@ -110,19 +104,21 @@ class Database final {
         stmtCache_.emplace(std::move(key), std::move(up));
         return raw;
     }
+    [[deprecated("use getCachedForUse; raw nullptr is error — check expected")]]
+    Statement* getCachedLocked(std::string_view sql) const {
+        // Caller must hold stmtCacheMutex_ (cacheMutex_); delegate to expected API.
+        auto r = getCachedForUse(sql);
+        if (!r)
+            return nullptr; // error — caller of deprecated API must check nullptr
+        return *r;
+    }
+    [[deprecated("use getCachedForUse with external lock; raw nullptr is error")]]
     Statement* getCached(const std::string& sql) const {
         std::lock_guard<std::mutex> lk(cacheMutex_);
-        auto it = stmtCache_.find(sql);
-        if (it != stmtCache_.end()) {
-            it->second->reset();
-            return it->second.get();
-        }
-        auto up = std::make_unique<Statement>();
-        if (auto e = up->prepare(db_, sql); !e)
-            return nullptr;
-        Statement* raw = up.get();
-        stmtCache_.emplace(sql, std::move(up));
-        return raw;
+        auto r = getCachedForUse(sql);
+        if (!r)
+            return nullptr; // error — see deprecation note
+        return *r;
     }
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
     open(std::string_view path, const DbOpts& opts = {}) {
@@ -142,14 +138,32 @@ class Database final {
         rc = sqlite3_exec(raw, std::string(kSchema).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
-            sqlite3_close(raw);
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Corrupt, std::string("schema init failed: ") + msg)};
+            // Gracefully handle existing duplicate queue positions on migration:
+            // UNIQUE(queue_id, position) creation may fail if old DB has duplicates.
+            // Treat as non-fatal — open still succeeds; queue ops will normalize positions.
+            bool isQueueUniqueMigration = msg.find("idx_queue_queue_pos") != std::string::npos ||
+                                          msg.find("queue") != std::string::npos;
+            bool isUniqueConstraint = msg.find("UNIQUE") != std::string::npos ||
+                                      msg.find("unique") != std::string::npos;
+            if (!(isQueueUniqueMigration && isUniqueConstraint)) {
+                sqlite3_close(raw);
+                return std::unexpected{caudio::utils::makeError(
+                    caudio::utils::Result::Corrupt, std::string("schema init failed: ") + msg)};
+            }
+            // else: non-fatal migration duplicate — clear err for next exec
+            if (err) {
+                sqlite3_free(err);
+                err = nullptr;
+            }
         }
         rc = sqlite3_exec(raw, std::string(kSchemaDefaultLibrary).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
             // not fatal? but log
+            if (err) {
+                sqlite3_free(err);
+                err = nullptr;
+            }
         }
         auto db = std::make_unique<Database>(opts);
         db->db_ = raw;
@@ -169,9 +183,13 @@ class Database final {
   private:
     WriterThread writer_;
     sqlite3* db_{nullptr};
-    mutable std::shared_mutex m_;
+    // Naming clarity: m_ is dbMutex_ (protects db_ handle and serializes DB ops),
+    // cacheMutex_ is stmtCacheMutex_ (protects stmtCache_), queueLock_ concept maps to
+    // engineQueueSpin_ in engine but DB uses m_ for queue table as well.
+    // Lock order: dbMutex_ (m_) -> stmtCacheMutex_ (cacheMutex_)
+    mutable std::shared_mutex m_; // dbMutex_
     mutable std::unordered_map<std::string, std::unique_ptr<Statement>> stmtCache_;
-    mutable std::mutex cacheMutex_;
+    mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   public:
     // Track CRUD

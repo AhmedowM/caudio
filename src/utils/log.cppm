@@ -51,7 +51,6 @@ class Logger {
 
     void log(Level lvl, std::string_view msg) {
         Callback cbCopy;
-        Level minCopy;
         {
             std::lock_guard<std::mutex> lk(mutex_);
             if (!callback_)
@@ -59,8 +58,6 @@ class Logger {
             if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
                 return;
             cbCopy = callback_;
-            minCopy = minLevel_;
-            (void)minCopy;
         }
         cbCopy(lvl, msg);
     }
