@@ -4,14 +4,10 @@ module;
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <format>
-#include <fstream>
-#include <functional>
 #include <iostream>
-#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -34,6 +30,9 @@ module;
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 
 export module caudio.app:core;
@@ -49,65 +48,149 @@ export namespace caudio::app {
 
 namespace detail {
 inline std::expected<double, caudio::utils::Error> parseTime(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r' || s.front() == '\n')) s.remove_prefix(1);
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n')) s.remove_suffix(1);
-    if (s.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time")};
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r' || s.front() == '\n')) {
+        s.remove_prefix(1);
+    }
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n')) {
+        s.remove_suffix(1);
+    }
+    if (s.empty()) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time")};
+    }
     size_t colonCount = 0;
-    for (char c : s) if (c == ':') ++colonCount;
+    for (char c : s) {
+        if (c == ':') ++colonCount;
+    }
     if (colonCount > 0) {
-        double parts[3] = {0,0,0};
+        double parts[3] = {0, 0, 0};
         std::string_view rem = s;
         int idx = 0;
         while (idx < 3) {
             size_t nxt = rem.find(':');
             std::string_view tok = (nxt == std::string_view::npos) ? rem : rem.substr(0, nxt);
-            if (tok.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time component")};
+            if (tok.empty()) {
+                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time component")};
+            }
             bool isLast = (nxt == std::string_view::npos);
             if (isLast) {
                 double v = 0;
                 auto r = std::from_chars(tok.data(), tok.data() + tok.size(), v);
-                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
+                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
+                }
                 parts[idx++] = v;
                 break;
             } else {
                 int iv = 0;
                 auto r = std::from_chars(tok.data(), tok.data() + tok.size(), iv);
-                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
-                if (iv < 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "negative time component")};
+                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
+                }
+                if (iv < 0) {
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "negative time component")};
+                }
                 parts[idx++] = static_cast<double>(iv);
                 rem.remove_prefix(nxt + 1);
             }
         }
         double total = 0;
-        if (colonCount == 1) total = parts[0]*60.0 + parts[1];
-        else if (colonCount == 2) total = parts[0]*3600.0 + parts[1]*60.0 + parts[2];
+        if (colonCount == 1) total = parts[0] * 60.0 + parts[1];
+        else if (colonCount == 2) total = parts[0] * 3600.0 + parts[1] * 60.0 + parts[2];
         else return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "too many colons")};
-        if (!std::isfinite(total) || total < 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
+        if (!std::isfinite(total) || total < 0) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
+        }
         return total;
     } else {
         double v = 0;
         auto r = std::from_chars(s.data(), s.data() + s.size(), v);
-        if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
-        if (!std::isfinite(v) || v < 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
+        if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
+        }
+        if (!std::isfinite(v) || v < 0) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
+        }
         return v;
     }
 }
 inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
-    if (s.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty seek")};
-    bool relative = false; bool neg = false; std::string_view core = s;
-    if (core.front() == '+' || core.front() == '-') { relative = true; neg = (core.front() == '-'); core.remove_prefix(1); if (core.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing seek value")}; }
-    auto t = parseTime(core); if (!t) return std::unexpected{t.error()}; double v = *t; if (relative) { if (neg) v = -v; return v; } return v;
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
+        s.remove_prefix(1);
+    }
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) {
+        s.remove_suffix(1);
+    }
+    if (s.empty()) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty seek")};
+    }
+    bool relative = false;
+    bool neg = false;
+    std::string_view core = s;
+    if (core.front() == '+' || core.front() == '-') {
+        relative = true;
+        neg = (core.front() == '-');
+        core.remove_prefix(1);
+        if (core.empty()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing seek value")};
+        }
+    }
+    auto t = parseTime(core);
+    if (!t) return std::unexpected{t.error()};
+    double v = *t;
+    if (relative) {
+        if (neg) v = -v;
+        return v;
+    }
+    return v;
 }
 inline std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
-    caudio::cli::VolumeSet vs{}; if (s.empty()) return vs; if (s == "mute") { vs.mute = true; return vs; } if (s == "unmute") { vs.mute = false; return vs; }
-    if (s.front() == '+' || s.front() == '-') { bool n = s.front() == '-'; std::string_view num = s.substr(1); if (num.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")}; int iv=0; auto r=std::from_chars(num.data(), num.data()+num.size(), iv); if (r.ec!=std::errc{}|| r.ptr!=num.data()+num.size()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")}; if (n) iv=-iv; vs.deltaPct=iv; return vs; }
-    int iv=0; auto r=std::from_chars(s.data(), s.data()+s.size(), iv); if (r.ec!=std::errc{}|| r.ptr!=s.data()+s.size()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid volume")}; if (iv<0||iv>100) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg,"volume out of range 0-100")}; vs.level=static_cast<float>(iv); return vs;
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
+        s.remove_prefix(1);
+    }
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) {
+        s.remove_suffix(1);
+    }
+    caudio::cli::VolumeSet vs{};
+    if (s.empty()) return vs;
+    if (s == "mute") {
+        vs.mute = true;
+        return vs;
+    }
+    if (s == "unmute") {
+        vs.mute = false;
+        return vs;
+    }
+    if (s.front() == '+' || s.front() == '-') {
+        bool n = s.front() == '-';
+        std::string_view num = s.substr(1);
+        if (num.empty()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")};
+        }
+        int iv = 0;
+        auto r = std::from_chars(num.data(), num.data() + num.size(), iv);
+        if (r.ec != std::errc{} || r.ptr != num.data() + num.size()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")};
+        }
+        if (n) iv = -iv;
+        vs.deltaPct = iv;
+        return vs;
+    }
+    int iv = 0;
+    auto r = std::from_chars(s.data(), s.data() + s.size(), iv);
+    if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid volume")};
+    }
+    if (iv < 0 || iv > 100) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "volume out of range 0-100")};
+    }
+    vs.level = static_cast<float>(iv);
+    return vs;
 }
-inline std::chrono::duration<double> parseDuration(std::string_view s){ auto t=parseTime(s); if(!t) return std::chrono::duration<double>{0}; return std::chrono::duration<double>{*t}; }
+inline std::chrono::duration<double> parseDuration(std::string_view s) {
+    auto t = parseTime(s);
+    if (!t) return std::chrono::duration<double>{0};
+    return std::chrono::duration<double>{*t};
+}
 } // namespace detail
 using detail::parseTime;
 using detail::parseSeek;
@@ -127,6 +210,7 @@ private:
     std::filesystem::path pidPathForConfig() const;
     caudio::cli::Config config_{};
     CLI::App cli_{"caudio - terminal player"};
+    std::string argv0_{};
 };
 
 inline std::filesystem::path App::pidPathForConfig() const {
@@ -188,16 +272,55 @@ inline std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::cli::Co
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
     std::string exePath;
+#ifdef __linux__
     {
         char linkBuf[4096]{};
-        ssize_t n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf)-1);
+        ssize_t n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf) - 1);
         if (n > 0) {
             linkBuf[n] = '\0';
             exePath = linkBuf;
         } else {
-            exePath = "/proc/self/exe";
+            exePath = argv0_.empty() ? "/proc/self/exe" : argv0_;
         }
     }
+#elif defined(__APPLE__)
+    {
+        char buf[4096]{};
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0) {
+            exePath = buf;
+        } else {
+            std::vector<char> dyn(size);
+            if (_NSGetExecutablePath(dyn.data(), &size) == 0) {
+                exePath = dyn.data();
+            } else if (!argv0_.empty()) {
+                exePath = argv0_;
+            } else {
+                exePath = "./caudio";
+            }
+        }
+    }
+#else
+    // BSD / other POSIX: try /proc/curproc/file then fallback to argv0
+    {
+        char linkBuf[4096]{};
+        ssize_t n = readlink("/proc/curproc/file", linkBuf, sizeof(linkBuf) - 1);
+        if (n > 0) {
+            linkBuf[n] = '\0';
+            exePath = linkBuf;
+        } else {
+            n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf) - 1);
+            if (n > 0) {
+                linkBuf[n] = '\0';
+                exePath = linkBuf;
+            } else if (!argv0_.empty()) {
+                exePath = argv0_;
+            } else {
+                exePath = "./caudio";
+            }
+        }
+    }
+#endif
     if (!cfg.configPath.empty()) {
         std::string cfgStr = cfg.configPath.generic_string();
         execl(exePath.c_str(), exePath.c_str(), "--config", cfgStr.c_str(), "--daemon", "--foreground", nullptr);
@@ -285,6 +408,7 @@ inline int App::handlePreview(const std::string& file) {
     std::cout << std::format("preview done\n"); return 0;
 }
 inline int App::run(int argc, char** argv) {
+    if (argc > 0 && argv && argv[0]) argv0_ = argv[0];
     std::string configPathStr; std::string logLevelStr; std::string deviceStr;
     cli_.add_option("--config", configPathStr, "Config file");
     cli_.add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
@@ -360,7 +484,11 @@ inline int App::run(int argc, char** argv) {
     }
     if (!deviceStr.empty()) config_.device = deviceStr;
     if (!logLevelStr.empty()) { if (logLevelStr=="trace") config_.logLevel=0; else if (logLevelStr=="debug") config_.logLevel=1; else if (logLevelStr=="info") config_.logLevel=2; else if (logLevelStr=="warn") config_.logLevel=3; else if (logLevelStr=="error") config_.logLevel=4; }
-    if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::cli::socketPathFor(config_.dbPath); if (sp) config_.socketPath = *sp; }
+    // Canonical socket path via caudio.cli:config single source (not service::socketPathFor)
+    if (config_.socketPath.empty() && !config_.dbPath.empty()) {
+        auto sp = caudio::cli::socketPathFor(config_.dbPath);
+        if (sp) config_.socketPath = *sp;
+    }
     // Ensure db parent dir exists before any operation (fixes "unable to open database file")
     {
         std::error_code ec2;

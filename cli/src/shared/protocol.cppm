@@ -1,6 +1,4 @@
 module;
-#include <nlohmann/json.hpp>
-
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -18,12 +16,13 @@ export module caudio.cli:protocol;
 import caudio.utils;
 import caudio.engine;
 import caudio.db;
+import caudio.json;
 import :command;
 import :result;
 
 export namespace caudio::cli {
 
-using ordered_json = nlohmann::ordered_json;
+using ordered_json = caudio::json::ordered_json;
 
 struct IpcRequest final {
     uint32_t id{0};

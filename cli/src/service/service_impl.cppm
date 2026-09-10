@@ -1,22 +1,15 @@
 module;
-#include <nlohmann/json.hpp>
 // Service owns Engine/DB/Config/Logger/IpcServer and dispatches commands
 
 #include <algorithm>
-#include <array>
 #include <atomic>
-#include <cctype>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <fstream>
-#include <generator>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -25,20 +18,6 @@ module;
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include "blake3.h"
-
-#ifndef _WIN32
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <cstring>
-#include <fcntl.h>
-#include <sys/file.h>
-#else
-#include <process.h>
-#include <windows.h>
-#endif
 
 export module caudio.service:impl;
 
@@ -50,6 +29,7 @@ import caudio.player;
 import :ipc_channel;
 import :ipc_server;
 import :shm_status;
+import :detail;
 
 export namespace caudio::service {
 
@@ -60,403 +40,9 @@ struct ServiceConfig {
     int logLevel{2};
 };
 
-namespace detail_svc {
+} // namespace caudio::service
 
-template <class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...;
-};
-
-inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
-                                              const std::string& /*socketPath*/) {
-    // Canonical: ignore socketPath, derive from dbPath hash via caudio.cli — ensures single source.
-    auto r = caudio::cli::pidPathFor(dbPath);
-    if (r) return *r;
-    // fallback: legacy parent/caudio.pid
-    auto pp = dbPath.parent_path();
-    if (pp.empty()) pp = std::filesystem::current_path();
-    return pp / "caudio.pid";
-}
-
-inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                               const std::string& /*socketPath*/) {
-    auto r = caudio::cli::lockPathFor(dbPath);
-    if (r) return *r;
-    auto pidPath = pidPathForSocket(dbPath, "");
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
-}
-
-inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
-    auto r = caudio::cli::socketPathFor(dbPath);
-    if (r) return *r;
-#ifdef _WIN32
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return "\\\\.\\pipe\\caudio-" + std::to_string(hash);
-#else
-    auto pp = dbPath.parent_path();
-    if (pp.empty()) pp = std::filesystem::current_path();
-    std::error_code ec;
-    std::filesystem::create_directories(pp, ec);
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return (pp / ("caudio-" + std::to_string(hash) + ".sock")).generic_string();
-#endif
-}
-
-inline bool probeSocketAlive(const std::string& sp) {
-#ifdef _WIN32
-    if (sp.empty()) return false;
-    std::wstring w;
-    w.reserve(sp.size());
-    for (char c : sp) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-    if (h != INVALID_HANDLE_VALUE) {
-        ::CloseHandle(h);
-        return true;
-    }
-    DWORD err = ::GetLastError();
-    if (err == 231 /*ERROR_PIPE_BUSY*/) {
-        // Pipe exists but busy — WaitNamedPipe probes without needing to open.
-        if (::WaitNamedPipeW(w.c_str(), 0)) return true;
-        // Even if Wait fails, busy means a server owns the pipe
-        return true;
-    }
-    // ERROR_FILE_NOT_FOUND (2) / ERROR_PIPE_NOT_CONNECTED etc => not alive
-    return false;
-#else
-    if (sp.empty()) return false;
-    int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) return false;
-    sockaddr_un addr{};
-    addr.sun_family = AF_UNIX;
-    if (sp.size() >= sizeof(addr.sun_path)) {
-        ::close(fd);
-        return false;
-    }
-    std::memcpy(addr.sun_path, sp.c_str(), sp.size() + 1);
-    int rc = ::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-    ::close(fd);
-    return rc == 0;
-#endif
-}
-
-inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
-    // MVP: disable file flock on Windows — rely on socket bind for single-instance
-    // TODO: fix CreateFileW path handling for flock
-#ifdef _WIN32
-    outFd = -1;
-    return true;
-#else
-    std::error_code ec;
-    auto parent = lockPath.parent_path();
-    if (!parent.empty()) {
-        std::filesystem::create_directories(parent, ec);
-    }
-    int fd = ::open(lockPath.c_str(), O_CREAT | O_CLOEXEC | O_RDWR, 0600);
-    if (fd < 0) return false;
-    if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
-        ::close(fd);
-        return false;
-    }
-    outFd = fd;
-    return true;
-#endif
-}
-
-inline void releaseLock(int fd) {
-    if (fd < 0) return;
-#ifndef _WIN32
-    ::flock(fd, LOCK_UN);
-    ::close(fd);
-#else
-    HANDLE h = reinterpret_cast<HANDLE>(static_cast<intptr_t>(fd));
-    OVERLAPPED ov{};
-    ::UnlockFileEx(h, 0, 1, 0, &ov);
-    ::CloseHandle(h);
-#endif
-}
-
-inline bool checkPidAlive(int pid) {
-    if (pid <= 0) return false;
-#ifndef _WIN32
-    // kill(pid, 0) checks if process exists
-    return ::kill(pid, 0) == 0;
-#else
-    HANDLE h = ::OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(pid));
-    if (!h) return false;
-    DWORD wait = ::WaitForSingleObject(h, 0);
-    ::CloseHandle(h);
-    return wait == WAIT_TIMEOUT; // timeout means still running
-#endif
-}
-
-inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
-    std::error_code ec;
-    if (!std::filesystem::exists(pidPath, ec)) return std::nullopt;
-    std::ifstream in(pidPath);
-    if (!in) return std::nullopt;
-    int pid = 0;
-    in >> pid;
-    if (in.fail()) return std::nullopt;
-    return pid;
-}
-
-inline std::expected<caudio::cli::Status, caudio::utils::Error>
-buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
-    caudio::cli::Status s{};
-    s.state = eng.state();
-    s.pos = eng.position();
-    s.dur = eng.duration();
-    s.vol = eng.volume();
-    s.muted = false;
-    s.shuffle = false;
-    s.repeat = caudio::engine::RepeatMode::Off;
-    s.trackId = eng.currentTrackId();
-    // try to fetch shuffle/repeat from DB engine_state if possible
-    // we approximate: query engine_state
-    // but keep defaults if query fails
-    // attempt to enrich track metadata
-    if (s.trackId != 0) {
-        auto tr = db.getTrack(s.trackId);
-        if (tr) {
-            s.title = tr->title;
-            s.artist = tr->artist;
-            s.path = tr->path;
-        }
-    }
-    // queue size / index
-    try {
-        auto items = db.queueList(1);
-        if (items) {
-            s.qSize = items->size();
-            // qIdx: find position of current track in queue? use 0 for now
-            // If shuffle perm, not trivial. Keep 0.
-            s.qIdx = 0;
-            if (s.trackId != 0 && !items->empty()) {
-                for (std::size_t i = 0; i < items->size(); ++i) {
-                    if ((*items)[i].trackId == s.trackId) {
-                        s.qIdx = i;
-                        break;
-                    }
-                }
-            }
-        }
-    } catch (...) {}
-    return s;
-}
-
-inline std::filesystem::path resolveConfigPath(const ServiceConfig& cfg) {
-    if (!cfg.configPath.empty()) return cfg.configPath;
-    if (!cfg.dbPath.empty()) {
-        auto pp = cfg.dbPath.parent_path();
-        if (!pp.empty()) return pp / "config.json";
-    }
-    std::error_code ec;
-    auto tmp = std::filesystem::temp_directory_path(ec);
-    if (ec) tmp = std::filesystem::path("/tmp");
-    return tmp / "caudio" / "config.json";
-}
-
-inline std::expected<std::string, caudio::utils::Error>
-readConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
-    std::error_code ec;
-    if (!std::filesystem::exists(p, ec)) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
-    std::ifstream in(p);
-    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::string pat = "\"" + std::string(key) + "\"";
-    auto pos = content.find(pat);
-    if (pos == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + std::string(key))};
-    auto colon = content.find(':', pos + pat.size());
-    if (colon == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config")};
-    auto start = content.find_first_not_of(" \t\n\r", colon + 1);
-    if (start == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config value")};
-    if (content[start] == '"') {
-        auto end = content.find('"', start + 1);
-        if (end == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid string value")};
-        return content.substr(start + 1, end - start - 1);
-    } else {
-        auto end = content.find_first_of(",}\n\r", start);
-        if (end == std::string::npos) end = content.size();
-        auto s = content.substr(start, end - start);
-        // trim
-        auto a = s.find_first_not_of(" \t\n\r");
-        auto b = s.find_last_not_of(" \t\n\r");
-        if (a == std::string::npos) return std::string{};
-        return s.substr(a, b - a + 1);
-    }
-}
-
-inline caudio::utils::Expected<void>
-writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::string_view value) {
-    std::string content;
-    std::error_code ec;
-    if (std::filesystem::exists(p, ec)) {
-        std::ifstream in(p);
-        if (in) content.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    }
-    if (content.empty()) content = "{}";
-    std::string pat = "\"" + std::string(key) + "\"";
-    auto pos = content.find(pat);
-    std::string valueRepr;
-    // try to detect if value is json (number/bool/object) vs string: simple check
-    bool isJson = false;
-    if (!value.empty() && (value.front() == '{' || value.front() == '[' || value == "true" || value == "false" || value == "null" || std::isdigit((unsigned char)value.front()) || value.front() == '-')) isJson = true;
-    if (!isJson) valueRepr = "\"" + std::string(value) + "\"";
-    else valueRepr = std::string(value);
-    if (pos != std::string::npos) {
-        auto colon = content.find(':', pos + pat.size());
-        if (colon == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid config")};
-        auto start = content.find_first_not_of(" \t\n\r", colon + 1);
-        if (start == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid")};
-        std::size_t end;
-        if (content[start] == '"') {
-            end = content.find('"', start + 1);
-            if (end == std::string::npos) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "invalid")};
-            ++end;
-        } else {
-            end = content.find_first_of(",}", start);
-            if (end == std::string::npos) end = content.size();
-        }
-        content.replace(start, end - start, valueRepr);
-    } else {
-        // insert before final }
-        auto last = content.find_last_of('}');
-        if (last == std::string::npos) {
-            content = "{\"" + std::string(key) + "\": " + valueRepr + "}";
-        } else {
-            std::string before = content.substr(0, last);
-            std::string after = content.substr(last);
-            bool needsComma = before.find('"') != std::string::npos && before.find_last_of(',') != before.find_last_of('{') && before.back() != '{' && before.find(':') != std::string::npos;
-            // simplified: if before contains ':' then need comma
-            if (before.find(':') != std::string::npos) {
-                // check if last non-space is '{' or ','
-                auto t = before.find_last_not_of(" \t\n\r");
-                if (t != std::string::npos && before[t] != '{' && before[t] != ',') needsComma = true;
-                else needsComma = false;
-            } else needsComma = false;
-            std::string ins;
-            if (needsComma) ins = ", \"" + std::string(key) + "\": " + valueRepr;
-            else ins = "\"" + std::string(key) + "\": " + valueRepr;
-            content = before + ins + after;
-        }
-    }
-    try {
-        auto parent = p.parent_path();
-        if (!parent.empty()) std::filesystem::create_directories(parent, ec);
-        std::ofstream out(p);
-        if (!out) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};
-        out << content;
-        return {};
-    } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
-    }
-}
-
-inline std::expected<std::vector<caudio::cli::ConfigValue>, caudio::utils::Error>
-listConfigValuesRaw(const std::filesystem::path& p) {
-    std::error_code ec;
-    if (!std::filesystem::exists(p, ec)) return std::vector<caudio::cli::ConfigValue>{};
-    std::ifstream in(p);
-    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::vector<caudio::cli::ConfigValue> out;
-    std::size_t pos = 0;
-    while (true) {
-        auto q1 = content.find('"', pos);
-        if (q1 == std::string::npos) break;
-        auto q2 = content.find('"', q1 + 1);
-        if (q2 == std::string::npos) break;
-        std::string k = content.substr(q1 + 1, q2 - q1 - 1);
-        auto colon = content.find(':', q2 + 1);
-        if (colon == std::string::npos) break;
-        auto start = content.find_first_not_of(" \t\n\r", colon + 1);
-        if (start == std::string::npos) break;
-        std::string v;
-        if (content[start] == '"') {
-            auto e = content.find('"', start + 1);
-            if (e == std::string::npos) break;
-            v = content.substr(start + 1, e - start - 1);
-            pos = e + 1;
-        } else {
-            auto e = content.find_first_of(",}", start);
-            if (e == std::string::npos) e = content.size();
-            v = content.substr(start, e - start);
-            auto a = v.find_first_not_of(" \t\n\r");
-            auto b = v.find_last_not_of(" \t\n\r");
-            if (a != std::string::npos) v = v.substr(a, b - a + 1);
-            pos = e + 1;
-        }
-        if (!k.empty() && k != "type" ) {
-            out.push_back(caudio::cli::ConfigValue{k, v});
-        }
-        if (pos >= content.size()) break;
-    }
-    return out;
-}
-
-inline bool hasAudioExt(const std::filesystem::path& p) {
-    auto ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
-}
-
-inline std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
-computeFingerprint(const std::filesystem::path& path) {
-    std::error_code ec;
-    auto sz = std::filesystem::file_size(path, ec);
-    if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
-    std::ifstream f(path, std::ios::binary);
-    if (!f) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
-    constexpr std::size_t kSample = 64 * 1024;
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-    std::vector<std::uint8_t> buf(kSample);
-    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
-    std::size_t n = static_cast<std::size_t>(f.gcount());
-    if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
-    if (sz > kSample) {
-        f.clear();
-        f.seekg(static_cast<std::streamoff>(sz - kSample), std::ios::beg);
-        if (f) {
-            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
-            n = static_cast<std::size_t>(f.gcount());
-            if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
-        }
-    }
-    std::uint64_t sz64 = static_cast<std::uint64_t>(sz);
-    blake3_hasher_update(&hasher, &sz64, sizeof(sz64));
-    std::uint32_t ver = 1;
-    blake3_hasher_update(&hasher, &ver, sizeof(ver));
-    std::array<std::uint8_t, 32> out{};
-    blake3_hasher_finalize(&hasher, out.data(), out.size());
-    return out;
-}
-
-inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
-    try {
-        auto readerRes = caudio::player::FileReader::open(path);
-        if (!readerRes) return 0.0;
-        auto& readerPtr = readerRes.value();
-        auto decRes = caudio::player::DecoderRegistry::open(*readerPtr);
-        if (!decRes) return 0.0;
-        auto& decPtr = decRes.value();
-        std::uint32_t sr = decPtr->sampleRate();
-        std::uint64_t frames = decPtr->totalFrames();
-        if (sr == 0) return 0.0;
-        std::span<const std::uint8_t> dummy{};
-        (void)dummy;
-        return static_cast<double>(frames) / static_cast<double>(sr);
-    } catch (...) {
-        return 0.0;
-    }
-}
-
-} // namespace detail_svc
+export namespace caudio::service {
 
 class Service final {
 public:
@@ -468,26 +54,26 @@ public:
         if (!cfg.socketPath.empty()) {
             spStr = cfg.socketPath;
         } else {
-            spStr = detail_svc::socketPathForDb(cfg.dbPath);
+            spStr = detail::socketPathForDb(cfg.dbPath);
         }
 
         // Single-instance enforcement via flock lock file
-        std::filesystem::path lockPath = detail_svc::lockPathForSocket(cfg.dbPath,
+        std::filesystem::path lockPath = detail::lockPathForSocket(cfg.dbPath,
             cfg.socketPath.empty() ? spStr : cfg.socketPath);
         int lockFd = -1;
-        if (!detail_svc::tryAcquireLock(lockPath, lockFd)) {
+        if (!detail::tryAcquireLock(lockPath, lockFd)) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (lock held)")};
         }
 
         // Check for stale PID file
-        std::filesystem::path pidPath = detail_svc::pidPathForSocket(cfg.dbPath,
+        std::filesystem::path pidPath = detail::pidPathForSocket(cfg.dbPath,
             cfg.socketPath.empty() ? spStr : cfg.socketPath);
         std::error_code ec;
         if (std::filesystem::exists(pidPath, ec)) {
-            auto existingPid = detail_svc::readPidFile(pidPath);
-            if (existingPid && detail_svc::checkPidAlive(*existingPid)) {
+            auto existingPid = detail::readPidFile(pidPath);
+            if (existingPid && detail::checkPidAlive(*existingPid)) {
                 // Process is alive, daemon already running
-                detail_svc::releaseLock(lockFd);
+                detail::releaseLock(lockFd);
                 return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pid alive)")};
             }
             // Stale PID - remove it
@@ -497,8 +83,8 @@ public:
         // Check for stale socket
 #ifdef _WIN32
         if (!spStr.empty() && spStr.starts_with("\\\\")) {
-            if (detail_svc::probeSocketAlive(spStr)) {
-                detail_svc::releaseLock(lockFd);
+            if (detail::probeSocketAlive(spStr)) {
+                detail::releaseLock(lockFd);
                 return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pipe alive)")};
             }
         } else
@@ -506,8 +92,8 @@ public:
         if (!spStr.empty() && !spStr.starts_with("\\\\")) {
             std::filesystem::path sockP(spStr);
             if (std::filesystem::exists(sockP, ec)) {
-                if (detail_svc::probeSocketAlive(spStr)) {
-                    detail_svc::releaseLock(lockFd);
+                if (detail::probeSocketAlive(spStr)) {
+                    detail::releaseLock(lockFd);
                     return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (socket alive)")};
                 } else {
                     // Stale socket - remove
@@ -537,23 +123,15 @@ public:
         if (!engRes) return std::unexpected{engRes.error()};
         std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
         if (auto e = eng->attachDatabase(dbShared); !e) {
-            detail_svc::releaseLock(lockFd);
+            detail::releaseLock(lockFd);
             return std::unexpected{e.error()};
         }
-
-        // logger
-        caudio::utils::Logger logger(
-            [](caudio::utils::Level lvl, std::string_view msg) {
-                (void)lvl;
-                (void)msg;
-            },
-            static_cast<caudio::utils::Level>(std::clamp(cfg.logLevel, 0, 3)));
 
         // ipc server listen — honor Config::socketPath if set (canonical override), else derive from dbPath
         auto srvPtr = std::make_unique<IpcServer>();
         auto listenRes = srvPtr->listen(cfg.dbPath, cfg.socketPath);
         if (!listenRes) {
-            detail_svc::releaseLock(lockFd);
+            detail::releaseLock(lockFd);
             return std::unexpected{listenRes.error()};
         }
 
@@ -646,9 +224,9 @@ public:
             }
             // cleanup lock file
             if (lockFd_ >= 0) {
-                detail_svc::releaseLock(lockFd_);
+                detail::releaseLock(lockFd_);
                 lockFd_ = -1;
-                auto lockPath = detail_svc::lockPathForSocket(config_.dbPath, socketPath_);
+                auto lockPath = detail::lockPathForSocket(config_.dbPath, socketPath_);
                 std::filesystem::remove(lockPath, ec);
             }
         } catch (...) {}
@@ -708,12 +286,12 @@ private:
         using namespace caudio::cli;
         // helper to build status
         auto statusResult = [&]() -> std::expected<Result, caudio::utils::Error> {
-            auto st = detail_svc::buildStatus(*engine_, *db_);
+            auto st = detail::buildStatus(*engine_, *db_);
             if (!st) return std::unexpected{st.error()};
             return Result{*st};
         };
 
-        return std::visit(detail_svc::overloaded{
+        return std::visit(detail::overloaded{
             [&](const Play&) -> std::expected<Result, caudio::utils::Error> {
                 auto r = engine_->play(1);
                 if (!r) return std::unexpected{r.error()};
@@ -866,13 +444,13 @@ private:
                 if (!qa.search) {
                     std::filesystem::path p(qa.query);
                     std::error_code ec;
-                    if (std::filesystem::exists(p, ec) && !ec && detail_svc::hasAudioExt(p)) {
-                        auto fpRes = detail_svc::computeFingerprint(p);
+                    if (std::filesystem::exists(p, ec) && !ec && detail::hasAudioExt(p)) {
+                        auto fpRes = detail::computeFingerprint(p);
                         if (!fpRes) return std::unexpected{fpRes.error()};
                         caudio::db::Track t;
                         t.path = p.generic_string();
                         t.fingerprint = *fpRes;
-                        t.duration = detail_svc::durationFromDecoder(p);
+                        t.duration = detail::durationFromDecoder(p);
                         {
                             std::error_code ec2;
                             auto sz = std::filesystem::file_size(p, ec2);
@@ -1143,20 +721,20 @@ private:
                 return Result{d};
             },
             [&](const ConfigGet& cmd) -> std::expected<Result, caudio::utils::Error> {
-                auto p = detail_svc::resolveConfigPath(config_);
-                auto vRes = detail_svc::readConfigValueRaw(p, cmd.key);
+                auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
+                auto vRes = detail::readConfigValueRaw(p, cmd.key);
                 if (!vRes) return std::unexpected{vRes.error()};
                 return Result{ConfigValue{cmd.key, *vRes}};
             },
             [&](const ConfigSet& cmd) -> std::expected<Result, caudio::utils::Error> {
-                auto p = detail_svc::resolveConfigPath(config_);
-                auto sRes = detail_svc::writeConfigValueRaw(p, cmd.key, cmd.value);
+                auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
+                auto sRes = detail::writeConfigValueRaw(p, cmd.key, cmd.value);
                 if (!sRes) return std::unexpected{sRes.error()};
                 return Result{Empty{}};
             },
             [&](const ConfigList&) -> std::expected<Result, caudio::utils::Error> {
-                auto p = detail_svc::resolveConfigPath(config_);
-                auto lRes = detail_svc::listConfigValuesRaw(p);
+                auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
+                auto lRes = detail::listConfigValuesRaw(p);
                 if (!lRes) return std::unexpected{lRes.error()};
                 ConfigValues cvs{};
                 cvs.values = std::move(*lRes);
@@ -1165,7 +743,7 @@ private:
                 return Result{std::move(cvs)};
             },
             [&](const ConfigExport& cmd) -> std::expected<Result, caudio::utils::Error> {
-                auto src = detail_svc::resolveConfigPath(config_);
+                auto src = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 std::filesystem::path dst{cmd.path};
                 std::error_code ec;
                 if (!std::filesystem::exists(src, ec)) {
@@ -1177,7 +755,7 @@ private:
             },
             [&](const ConfigImport& cmd) -> std::expected<Result, caudio::utils::Error> {
                 std::filesystem::path src{cmd.path};
-                auto dst = detail_svc::resolveConfigPath(config_);
+                auto dst = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 std::error_code ec;
                 if (!std::filesystem::exists(src, ec)) {
                     return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "import path not found")};
@@ -1222,7 +800,7 @@ private:
                     if (!pr) return std::unexpected{pr.error()};
                 }
                 updateShmStatus();
-                auto st = detail_svc::buildStatus(*engine_, *db_);
+                auto st = detail::buildStatus(*engine_, *db_);
                 if (!st) return std::unexpected{st.error()};
                 return Result{*st};
             },

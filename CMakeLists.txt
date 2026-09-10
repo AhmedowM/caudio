@@ -131,6 +131,13 @@ function(ca_set_warnings tgt)
   target_compile_options(${tgt} PRIVATE ${CAUDIO_WARNING_FLAGS})
 endfunction()
 
+# MinGW + C++20 modules + nlohmann::json header-only emits duplicate COMDATs (digits_to_99 etc)
+# across translation units that import caudio.json. Allow multiple definition for deduplication;
+# this does not mask the duplicate IPC source issue (which was fixed by de-duplication).
+if(MINGW)
+  add_link_options(-Wl,--allow-multiple-definition)
+endif()
+
 # caudio::utils — C++23 named module partitioned, no hpp split
 set(CAUDIO_UTILS_SOURCES
   src/utils/utils.cppm
@@ -333,6 +340,7 @@ ca_set_warnings(caudio_combined)
 
 # caudio::cli shared protocol (command/result/protocol)
 set(CAUDIO_CLI_SHARED_SOURCES
+  cli/src/shared/json_wrapper.cppm
   cli/src/cli.cppm
   cli/src/shared/command.cppm
   cli/src/shared/result.cppm
@@ -350,11 +358,14 @@ target_include_directories(caudio_cli_shared PUBLIC
 target_include_directories(caudio_cli_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio::utils Threads::Threads)
 target_compile_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+# nlohmann json header-only with C++20 modules emits duplicate COMDATs on MinGW; allow deduplication
+target_link_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_cli_shared)
 
 # caudio::service / caudio::client — IPC channel abstraction (feat/cli-service)
 set(CAUDIO_SERVICE_SOURCES
   cli/src/service/service.cppm
+  cli/src/service/service_detail.cppm
   cli/src/service/service_impl.cppm
   cli/src/service/shm_status.cppm
   cli/src/service/ipc_channel.cppm
@@ -381,6 +392,7 @@ target_include_directories(caudio_ipc PUBLIC
 target_include_directories(caudio_ipc PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_ipc PUBLIC caudio::cli_shared caudio::utils Threads::Threads)
 target_compile_options(caudio_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_ipc)
 
 add_library(caudio_ipc_shared SHARED)
@@ -394,6 +406,7 @@ target_include_directories(caudio_ipc_shared PUBLIC
 target_include_directories(caudio_ipc_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_ipc_shared PUBLIC caudio::cli_shared caudio::utils Threads::Threads)
 target_compile_options(caudio_ipc_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_ipc_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_ipc_shared)
 
 # caudio::client — IpcClient wrapper + output formatter (feat/cli-service)
@@ -413,6 +426,7 @@ target_include_directories(caudio_client PUBLIC
 target_include_directories(caudio_client PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_client PUBLIC caudio::cli_shared caudio::utils caudio::ipc Threads::Threads)
 target_compile_options(caudio_client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_client)
 
 add_library(caudio_client_shared SHARED)
@@ -426,11 +440,13 @@ target_include_directories(caudio_client_shared PUBLIC
 target_include_directories(caudio_client_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(caudio_client_shared PUBLIC caudio::cli_shared caudio::utils caudio::ipc_shared Threads::Threads)
 target_compile_options(caudio_client_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_client_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_client_shared)
 
 # caudio::service owning Engine/DB (feat/service) - single owner for caudio.service module
 set(CAUDIO_SERVICE_LIB_SOURCES
   cli/src/service/service.cppm
+  cli/src/service/service_detail.cppm
   cli/src/service/service_impl.cppm
   cli/src/service/shm_status.cppm
   cli/src/service/ipc_channel.cppm
@@ -451,6 +467,7 @@ if(NOT WIN32)
   target_link_libraries(caudio_service PUBLIC rt)
 endif()
 target_compile_options(caudio_service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_service)
 
 add_library(caudio_service_shared SHARED)
@@ -467,6 +484,7 @@ if(NOT WIN32)
   target_link_libraries(caudio_service_shared PUBLIC rt)
 endif()
 target_compile_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+target_link_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 ca_set_warnings(caudio_service_shared)
 
 # caudio executable — App dispatch (CLI11) + main entry

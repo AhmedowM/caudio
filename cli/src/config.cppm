@@ -1,6 +1,4 @@
 module;
-#include <nlohmann/json.hpp>
-
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -14,6 +12,7 @@ module;
 export module caudio.cli:config;
 
 import caudio.utils;
+import caudio.json;
 
 export namespace caudio::cli {
 
@@ -104,7 +103,7 @@ inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& p
         return cfg;
     }
     try {
-        auto j = nlohmann::ordered_json::parse(content);
+        auto j = caudio::json::ordered_json::parse(content);
         if (j.contains("dbPath") && j["dbPath"].is_string()) {
             std::string s = j["dbPath"].get<std::string>();
             if (!s.empty()) cfg.dbPath = std::filesystem::path(s);
@@ -143,7 +142,7 @@ inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
             std::error_code ec;
             std::filesystem::create_directories(dir, ec);
         }
-        nlohmann::ordered_json j;
+        caudio::json::ordered_json j;
         j["dbPath"] = cfg.dbPath.generic_string();
         j["device"] = cfg.device;
         j["logLevel"] = cfg.logLevel;
@@ -242,4 +241,123 @@ inline caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::fil
     }
 }
 
+// Generic config raw access — used by service for arbitrary key/value pairs.
+// Delegates to caudio::json::ordered_json (single definition here, avoids per-module duplication).
+struct RawConfigValue {
+    std::string key{};
+    std::string value{};
+};
+inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p, std::string_view key);
+inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key, std::string_view value);
+inline caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p);
+
+inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p, std::string_view key) {
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
+    }
+    std::ifstream in(p);
+    if (!in) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+    }
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (content.empty()) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + std::string(key))};
+    }
+    try {
+        auto j = caudio::json::ordered_json::parse(content);
+        if (!j.is_object()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "config is not an object")};
+        }
+        std::string k(key);
+        if (!j.contains(k)) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + k)};
+        }
+        auto& v = j.at(k);
+        if (v.is_string()) return v.get<std::string>();
+        if (v.is_null()) return std::string{"null"};
+        return v.dump();
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
+inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key, std::string_view value) {
+    caudio::json::ordered_json j = caudio::json::ordered_json::object();
+    std::error_code ec;
+    if (std::filesystem::exists(p, ec)) {
+        std::ifstream in(p);
+        if (in) {
+            std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (!content.empty()) {
+                try {
+                    auto parsed = caudio::json::ordered_json::parse(content);
+                    if (parsed.is_object()) j = std::move(parsed);
+                    else j = caudio::json::ordered_json::object();
+                } catch (...) {
+                    j = caudio::json::ordered_json::object();
+                }
+            }
+        }
+    }
+    std::string k(key);
+    caudio::json::ordered_json v;
+    bool parsedAsJson = false;
+    if (!value.empty()) {
+        try {
+            auto tmp = caudio::json::ordered_json::parse(value);
+            v = std::move(tmp);
+            parsedAsJson = true;
+        } catch (...) {
+            parsedAsJson = false;
+        }
+    } else {
+        v = std::string{};
+        parsedAsJson = true;
+    }
+    if (!parsedAsJson) v = std::string(value);
+    j[k] = std::move(v);
+    try {
+        auto parent = p.parent_path();
+        if (!parent.empty()) std::filesystem::create_directories(parent, ec);
+        std::ofstream out(p);
+        if (!out) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};
+        }
+        out << j.dump(2);
+        return {};
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
+inline caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p) {
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) return std::vector<RawConfigValue>{};
+    std::ifstream in(p);
+    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (content.empty()) return std::vector<RawConfigValue>{};
+    try {
+        auto j = caudio::json::ordered_json::parse(content);
+        if (!j.is_object()) return std::vector<RawConfigValue>{};
+        std::vector<RawConfigValue> out;
+        out.reserve(j.size());
+        for (auto& item : j.items()) {
+            const std::string kk = item.key();
+            auto& vv = item.value();
+            if (kk.empty() || kk == "type") continue;
+            std::string vs;
+            if (vv.is_string()) vs = vv.get<std::string>();
+            else if (vv.is_null()) vs = "null";
+            else vs = vv.dump();
+            out.push_back(RawConfigValue{kk, vs});
+        }
+        return out;
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
 } // namespace caudio::cli
+
