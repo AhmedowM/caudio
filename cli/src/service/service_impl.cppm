@@ -978,8 +978,12 @@ private:
                         }
                     }
                 }
-                for (auto& t : toAdd) {
-                    auto er = db_->queueEnqueue(qid, t.id);
+                // Batch enqueue in single transaction: atomic to concurrent queueList, rollback on failure
+                {
+                    std::vector<int64_t> ids;
+                    ids.reserve(toAdd.size());
+                    for (auto& t : toAdd) ids.push_back(t.id);
+                    auto er = db_->queueEnqueueBatch(qid, ids);
                     if (!er) return std::unexpected{er.error()};
                 }
                 std::span<const caudio::db::Track> spanAdd(toAdd);
@@ -1053,9 +1057,11 @@ private:
                 int64_t mv = ids[qm.from];
                 ids.erase(ids.begin() + static_cast<std::ptrdiff_t>(qm.from));
                 ids.insert(ids.begin() + static_cast<std::ptrdiff_t>(qm.to), mv);
-                // clear and re-add
-                (void)db_->queueClear(qid);
-                for (auto id : ids) (void)db_->queueEnqueue(qid, id);
+                // Transactional clear+enqueue: single BEGIN IMMEDIATE/COMMIT so concurrent queueList never sees empty
+                {
+                    auto r = db_->queueReplaceAll(qid, ids);
+                    if (!r) return std::unexpected{r.error()};
+                }
                 auto nitems = db_->queueList(qid);
                 if (!nitems) return std::unexpected{nitems.error()};
                 std::vector<caudio::db::Track> tracks;
@@ -1103,10 +1109,26 @@ private:
                     root = pp / "music";
                 }
                 auto mode = (cmd.mode == "full" ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
+                // Prefer scanLibrary if a library matches root — gives dedup + batched transaction
+                if (auto libs = db_->libraryList(); libs) {
+                    for (auto& l : *libs) {
+                        if (std::filesystem::path(l.path) == root) {
+                            auto sr = caudio::db::scanLibrary(*db_, l.id);
+                            if (!sr) return std::unexpected{sr.error()};
+                            caudio::cli::LibraryStatsData d2{};
+                            if (auto st = db_->getStats()) {
+                                d2.tracks = static_cast<std::size_t>(st->num_tracks);
+                                d2.queues = static_cast<std::size_t>(st->num_queue_items);
+                                d2.playlists = static_cast<std::size_t>(st->num_playlists);
+                            }
+                            (void)std::to_underlying(caudio::utils::Result::Ok);
+                            return Result{std::move(d2)};
+                        }
+                    }
+                }
+                // Fallback: simple insert (batched path uses scanLibrary above which is already per-500 transactional)
                 std::size_t n = 0;
                 for (auto t : caudio::db::scan(root, mode)) {
-                    std::span<const std::byte> dummy{};
-                    (void)dummy;
                     auto r = db_->insertTrack(t);
                     if (r) ++n;
                 }
