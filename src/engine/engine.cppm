@@ -232,10 +232,15 @@ class Engine final {
         // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
         std::unique_lock<std::mutex> lk(decodeMtx_);
         playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+        // snapshot for restore on error (Task 1: seek hardening)
+        double savedPause = pausePos_;
+        auto savedStart = playStart_;
 
         if (decoder_) {
             auto res = decoder_->seek(seconds);
             if (!res) {
+                pausePos_ = savedPause;
+                playStart_ = savedStart;
                 playbackState_.store(PlaybackState::Playing, std::memory_order_release);
                 return std::unexpected(res.error());
             }
@@ -247,7 +252,6 @@ class Engine final {
             seconds = dur;
         pausePos_ = seconds;
         playStart_ = std::chrono::steady_clock::now();
-        pausePos_ = seconds;
         if (ring_)
             ring_->reset();
 
@@ -536,8 +540,8 @@ class Engine final {
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db"));
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
-        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        SqliteErrGuard errGuard{err};
         if (rc != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::Busy, "begin failed"));
@@ -547,7 +551,9 @@ class Engine final {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return result;
         }
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
+        char* commitErr = nullptr;
+        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+        SqliteErrGuard commitGuard{commitErr};
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected(
@@ -748,7 +754,9 @@ class Engine final {
         return tr.value();
     }
 
+    // Requires queueLock_ held (caller must have tryLockQueue()/queueLock_ == 1).
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on) {
+        // assert: queueLock_.load(acquire) == 1  (external sync required)
         bool want = on;
         if (queue_.shuffle == want && !queue_.perm.empty())
             return {};
@@ -1144,8 +1152,8 @@ class Engine final {
         }
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
-        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        SqliteErrGuard errGuard{err};
         if (rc != SQLITE_OK) {
             markedPlayed_.store(false, std::memory_order_release);
             return;
@@ -1224,7 +1232,9 @@ class Engine final {
             markedPlayed_.store(false, std::memory_order_release);
             return;
         }
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
+        char* commitErr = nullptr;
+        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+        SqliteErrGuard commitGuard{commitErr};
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             markedPlayed_.store(false, std::memory_order_release);
@@ -1385,8 +1395,10 @@ class Engine final {
 
     // atomics spec required
     std::atomic<uint64_t> lastProgressMs_{0};
+    // gaplessArmed_: 0→1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
+    // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
-    std::atomic<int> queueLock_{0};
+    std::atomic<int> queueLock_{0}; // spin-lock for queue_ (0=unlocked, 1=locked) — use tryLockQueue()
 };
 
 } // namespace caudio::engine
