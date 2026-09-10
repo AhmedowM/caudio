@@ -68,66 +68,29 @@ struct overloaded : Ts... {
 };
 
 inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
-                                              const std::string& socketPath) {
-    if (!socketPath.empty()) {
-#ifdef _WIN32
-        if (socketPath.rfind("\\\\", 0) == 0 || socketPath.rfind("//", 0) == 0) {
-            // named pipe -> place pid next to db
-            std::filesystem::path p = dbPath;
-            if (p.empty()) {
-#ifdef _WIN32
-                const char* localApp = std::getenv("LOCALAPPDATA");
-                if (localApp && localApp[0] != '\0') {
-                    p = std::filesystem::path(localApp) / "caudio" / "library.db";
-                } else
-#endif
-                {
-                    const char* home = std::getenv("HOME");
-                    if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
-                    std::filesystem::path base;
-                    if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
-                    else {
-                        std::error_code ec2;
-                        base = std::filesystem::temp_directory_path(ec2) / "caudio";
-                        if (ec2) base = std::filesystem::path("/tmp/caudio");
-                    }
-                    p = base / "library.db";
-                }
-            }
-            auto parent = p.parent_path();
-            if (parent.empty()) parent = std::filesystem::current_path();
-            return parent / "caudio.pid";
-        }
-#endif
-        try {
-            std::filesystem::path sp(socketPath);
-            auto parent = sp.parent_path();
-            if (parent.empty()) {
-                auto pp = dbPath.parent_path();
-                if (pp.empty()) pp = std::filesystem::current_path();
-                return pp / "caudio.pid";
-            }
-            return parent / "caudio.pid";
-        } catch (...) {
-            auto pp = dbPath.parent_path();
-            if (pp.empty()) pp = std::filesystem::current_path();
-            return pp / "caudio.pid";
-        }
-    }
+                                              const std::string& /*socketPath*/) {
+    // Canonical: ignore socketPath, derive from dbPath hash via caudio.cli — ensures single source.
+    auto r = caudio::cli::pidPathFor(dbPath);
+    if (r) return *r;
+    // fallback: legacy parent/caudio.pid
     auto pp = dbPath.parent_path();
     if (pp.empty()) pp = std::filesystem::current_path();
     return pp / "caudio.pid";
 }
 
 inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                               const std::string& socketPath) {
-    auto pidPath = pidPathForSocket(dbPath, socketPath);
+                                               const std::string& /*socketPath*/) {
+    auto r = caudio::cli::lockPathFor(dbPath);
+    if (r) return *r;
+    auto pidPath = pidPathForSocket(dbPath, "");
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
     return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
 }
 
 inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
+    auto r = caudio::cli::socketPathFor(dbPath);
+    if (r) return *r;
 #ifdef _WIN32
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
@@ -150,9 +113,19 @@ inline bool probeSocketAlive(const std::string& sp) {
     w.reserve(sp.size());
     for (char c : sp) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
     HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-    ::CloseHandle(h);
-    return true;
+    if (h != INVALID_HANDLE_VALUE) {
+        ::CloseHandle(h);
+        return true;
+    }
+    DWORD err = ::GetLastError();
+    if (err == 231 /*ERROR_PIPE_BUSY*/) {
+        // Pipe exists but busy — WaitNamedPipe probes without needing to open.
+        if (::WaitNamedPipeW(w.c_str(), 0)) return true;
+        // Even if Wait fails, busy means a server owns the pipe
+        return true;
+    }
+    // ERROR_FILE_NOT_FOUND (2) / ERROR_PIPE_NOT_CONNECTED etc => not alive
+    return false;
 #else
     if (sp.empty()) return false;
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -522,6 +495,14 @@ public:
         }
 
         // Check for stale socket
+#ifdef _WIN32
+        if (!spStr.empty() && spStr.starts_with("\\\\")) {
+            if (detail_svc::probeSocketAlive(spStr)) {
+                detail_svc::releaseLock(lockFd);
+                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pipe alive)")};
+            }
+        } else
+#endif
         if (!spStr.empty() && !spStr.starts_with("\\\\")) {
             std::filesystem::path sockP(spStr);
             if (std::filesystem::exists(sockP, ec)) {
@@ -568,9 +549,9 @@ public:
             },
             static_cast<caudio::utils::Level>(std::clamp(cfg.logLevel, 0, 3)));
 
-        // ipc server listen
+        // ipc server listen — honor Config::socketPath if set (canonical override), else derive from dbPath
         auto srvPtr = std::make_unique<IpcServer>();
-        auto listenRes = srvPtr->listen(cfg.dbPath);
+        auto listenRes = srvPtr->listen(cfg.dbPath, cfg.socketPath);
         if (!listenRes) {
             detail_svc::releaseLock(lockFd);
             return std::unexpected{listenRes.error()};

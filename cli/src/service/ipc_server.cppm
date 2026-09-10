@@ -54,6 +54,7 @@ __declspec(dllimport) BOOL __stdcall ConnectNamedPipe(HANDLE, LPVOID);
 __declspec(dllimport) BOOL __stdcall DisconnectNamedPipe(HANDLE);
 __declspec(dllimport) BOOL __stdcall FlushFileBuffers(HANDLE);
 __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
+__declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 }
 #endif
 
@@ -75,8 +76,16 @@ public:
     IpcServer(IpcServer&&) = delete;
     IpcServer& operator=(IpcServer&&) = delete;
 
-    caudio::utils::Expected<void> listen(const std::filesystem::path& dbPath) {
-        auto sp = socketPathFor(dbPath);
+    // listen binds the pipe/socket. If socketPathOverride is non-empty it is honored (Config::socketPath),
+    // otherwise the canonical caudio::cli::socketPathFor(dbPath) is used. Preserves public API via default arg.
+    caudio::utils::Expected<void> listen(const std::filesystem::path& dbPath,
+                                         std::string_view socketPathOverride = {}) {
+        caudio::utils::Expected<std::string> sp;
+        if (!socketPathOverride.empty()) {
+            sp = std::string(socketPathOverride.data(), socketPathOverride.size());
+        } else {
+            sp = caudio::cli::socketPathFor(dbPath);
+        }
         if (!sp) return std::unexpected{sp.error()};
         socketPath_ = *sp;
         running_.store(false);
@@ -136,6 +145,9 @@ public:
 #endif
     }
 
+    // run() stop semantics: accept loop exits when ANY of (external st, internal stopSource_, !running_) is signaled.
+    // running_ is the primary guard (exchange true on entry, false on shutdown); stopSource_ allows shutdown() to
+    // wake the loop without needing the external token; st is the caller's Service::run token. Documented union.
     void run(std::stop_token st,
              std::function<std::expected<caudio::cli::Result, caudio::utils::Error>(const caudio::cli::Command&)> dispatch) {
         if (running_.exchange(true)) {
@@ -151,11 +163,10 @@ public:
                     continue;
                 }
                 BOOL connected = ::ConnectNamedPipe(pipeHandle_, nullptr);
-                DWORD err = ::GetLastError();
-                if (connected == 0 && err != 0) {
-                    // ERROR_PIPE_CONNECTED is 535, but we treat any non-zero as retry
-                    if (err == 535) {
-                        // connected
+                if (connected == 0) {
+                    DWORD err = ::GetLastError();
+                    if (err == 535 /*ERROR_PIPE_CONNECTED*/) {
+                        // client already connected before we called ConnectNamedPipe — treat as success
                     } else {
                         if (st.stop_requested() || stopSource_.get_token().stop_requested()) break;
                         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -201,11 +212,10 @@ public:
                                 return;
                             }
                         }
+                        // payload already unframed by the header+payload read above — construct string directly
                         std::string reqStr;
                         reqStr.reserve(payload.size());
-                        for (auto b : payload) reqStr.push_back(static_cast<char>(b));
-                        auto def = caudio::cli::deframe(std::span<const std::byte>(payload.data(), payload.size()));
-                        if (def) reqStr = *def;
+                        for (auto b : payload) reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
                         auto reqExp = caudio::cli::deserializeRequest(reqStr);
                         caudio::cli::IpcReply reply;
                         if (!reqExp) {
@@ -296,9 +306,7 @@ public:
                         }
                         std::string reqStr;
                         reqStr.reserve(payload.size());
-                        for (auto b : payload) reqStr.push_back(static_cast<char>(b));
-                        auto def = caudio::cli::deframe(std::span<const std::byte>(payload.data(), payload.size()));
-                        if (def) reqStr = *def;
+                        for (auto b : payload) reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
                         auto reqExp = caudio::cli::deserializeRequest(reqStr);
                         caudio::cli::IpcReply reply;
                         if (!reqExp) {

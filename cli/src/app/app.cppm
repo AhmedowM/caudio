@@ -130,56 +130,11 @@ private:
 };
 
 inline std::filesystem::path App::pidPathForConfig() const {
-    auto dbPath = config_.dbPath;
-    auto sockPath = config_.socketPath;
-#ifdef _WIN32
-    if (!sockPath.empty()) {
-        std::string s = sockPath;
-        if (s.rfind("\\\\", 0) == 0 || s.rfind("//", 0) == 0) {
-            std::filesystem::path p = dbPath;
-            if (p.empty()) {
-#ifdef _WIN32
-                const char* localApp = std::getenv("LOCALAPPDATA");
-                if (localApp && localApp[0] != '\0') {
-                    p = std::filesystem::path(localApp) / "caudio" / "library.db";
-                } else
-#endif
-                {
-                    const char* home = std::getenv("HOME");
-                    if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
-                    std::filesystem::path base;
-                    if (home && home[0] != '\0') base = std::filesystem::path(home) / ".local" / "share" / "caudio";
-                    else {
-                        std::error_code ec2;
-                        base = std::filesystem::temp_directory_path(ec2) / "caudio";
-                        if (ec2) base = std::filesystem::path("/tmp/caudio");
-                    }
-                    p = base / "library.db";
-                }
-            }
-            auto parent = p.parent_path();
-            if (parent.empty()) parent = std::filesystem::current_path();
-            return parent / "caudio.pid";
-        }
-    }
-#endif
-    if (!sockPath.empty()) {
-        try {
-            std::filesystem::path sp(sockPath);
-            auto parent = sp.parent_path();
-            if (parent.empty()) {
-                auto pp = dbPath.parent_path();
-                if (pp.empty()) pp = std::filesystem::current_path();
-                return pp / "caudio.pid";
-            }
-            return parent / "caudio.pid";
-        } catch (...) {
-            auto pp = dbPath.parent_path();
-            if (pp.empty()) pp = std::filesystem::current_path();
-            return pp / "caudio.pid";
-        }
-    }
-    auto pp = dbPath.parent_path();
+    // Canonical pid path — single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
+    auto r = caudio::cli::pidPathFor(config_.dbPath);
+    if (r) return *r;
+    // fallback legacy
+    auto pp = config_.dbPath.parent_path();
     if (pp.empty()) pp = std::filesystem::current_path();
     return pp / "caudio.pid";
 }
@@ -254,7 +209,7 @@ inline std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::cli::Co
 }
 
 inline int App::handleStart(bool foreground) {
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath);
+    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath); return 0; }
     // Ensure db parent dirs exist before trying to start service (foreground)
     {
@@ -277,7 +232,7 @@ inline int App::handleStart(bool foreground) {
         }
         // Poll for pipe readiness: 1500ms total, 100ms interval ×15
         for (int i = 0; i < 15; ++i) {
-            auto conn2 = caudio::client::IpcClient::connect(config_.dbPath);
+            auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {
                 std::cout << std::format("daemon started at {}\n", config_.socketPath);
                 return 0;
@@ -290,7 +245,7 @@ inline int App::handleStart(bool foreground) {
 }
 
 inline int App::handleShutdown() {
-    caudio::client::Client client{config_.dbPath};
+    caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto cmd = caudio::cli::Command{caudio::cli::Shutdown{}};
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
     if (!res) {
@@ -307,14 +262,14 @@ inline int App::handleShutdown() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::error_code ec;
         bool pidExists = std::filesystem::exists(pidPath, ec);
-        auto conn = caudio::client::IpcClient::connect(config_.dbPath);
+        auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
         if (!conn && !pidExists) break;
         if (!conn) {
             // socket gone, check pid file stale
             if (!pidExists) break;
         }
     }
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath);
+    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) { std::cerr << std::format("shutdown: daemon still running at {}\n", config_.socketPath); return 1; }
     std::cout << std::format("daemon stopped\n");
     return 0;
@@ -405,7 +360,7 @@ inline int App::run(int argc, char** argv) {
     }
     if (!deviceStr.empty()) config_.device = deviceStr;
     if (!logLevelStr.empty()) { if (logLevelStr=="trace") config_.logLevel=0; else if (logLevelStr=="debug") config_.logLevel=1; else if (logLevelStr=="info") config_.logLevel=2; else if (logLevelStr=="warn") config_.logLevel=3; else if (logLevelStr=="error") config_.logLevel=4; }
-    if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::service::socketPathFor(config_.dbPath); if (sp) config_.socketPath = *sp; }
+    if (config_.socketPath.empty() && !config_.dbPath.empty()) { auto sp = caudio::cli::socketPathFor(config_.dbPath); if (sp) config_.socketPath = *sp; }
     // Ensure db parent dir exists before any operation (fixes "unable to open database file")
     {
         std::error_code ec2;
@@ -418,7 +373,7 @@ inline int App::run(int argc, char** argv) {
         return handleStart(true);
     }
     auto sendViaClient = [&](const caudio::cli::Command& cmd, bool asJson)->int {
-        caudio::client::Client client{config_.dbPath}; auto timeout=std::chrono::milliseconds{2000}; auto res=client.send(cmd, timeout); caudio::client::OutputFormatter fmt{asJson};
+        caudio::client::Client client{config_.dbPath, config_.socketPath}; auto timeout=std::chrono::milliseconds{2000}; auto res=client.send(cmd, timeout); caudio::client::OutputFormatter fmt{asJson};
         if (!res) { caudio::cli::Result errRes{res.error()}; fmt.print(errRes, std::cerr); return 1; }
         if (std::holds_alternative<caudio::utils::Error>(*res)) { fmt.print(*res, std::cerr); return 1; }
         fmt.print(*res, std::cout); return 0;
@@ -435,7 +390,7 @@ inline int App::run(int argc, char** argv) {
     if (seekCmd->parsed()) {
         auto parsed = detail::parseSeek(seekStr); if (!parsed) { std::cerr << std::format("seek: {}\n", parsed.error().message); return 1; }
         double target=*parsed; bool isRelative=!seekStr.empty() && (seekStr.front()=='+'||seekStr.front()=='-');
-        if (isRelative) { caudio::client::Client client{config_.dbPath}; auto sres=client.send(caudio::cli::Command{caudio::cli::StatusReq{}}); double pos=0; bool hasPos=false; if (sres) { if (auto* ps = std::get_if<caudio::cli::Status>(&*sres)) { pos = ps->pos; hasPos=true; } } if (hasPos) { target=pos+target; if(target<0) target=0; } else { if(target<0) target=0; } }
+        if (isRelative) { caudio::client::Client client{config_.dbPath, config_.socketPath}; auto sres=client.send(caudio::cli::Command{caudio::cli::StatusReq{}}); double pos=0; bool hasPos=false; if (sres) { if (auto* ps = std::get_if<caudio::cli::Status>(&*sres)) { pos = ps->pos; hasPos=true; } } if (hasPos) { target=pos+target; if(target<0) target=0; } else { if(target<0) target=0; } }
         caudio::cli::Command cmd{caudio::cli::Seek{target}}; return sendViaClient(cmd,false);
     }
     if (statusCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::StatusReq{}}; return sendViaClient(cmd, jsonFlag); }

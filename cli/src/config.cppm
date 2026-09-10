@@ -1,6 +1,8 @@
 module;
 #include <nlohmann/json.hpp>
 
+#include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
@@ -14,6 +16,14 @@ export module caudio.cli:config;
 import caudio.utils;
 
 export namespace caudio::cli {
+
+// Canonical path helpers: single source for socket/pid/lock derived from dbPath.
+// All three use hash of dbPath.generic_string() + XDG/LOCALAPPDATA base dir.
+// - Windows socket is Named Pipe \\.\pipe\caudio-<hex>, pid/lock are files under %LOCALAPPDATA%\caudio
+// - POSIX socket/pid/lock are under $XDG_RUNTIME_DIR/caudio or $XDG_DATA_HOME/caudio or ~/.local/share/caudio
+inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
+inline caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath);
+inline caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath);
 
 struct Config {
     std::filesystem::path dbPath{};
@@ -146,6 +156,89 @@ inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
         return {};
     } catch (const std::exception& e) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+    }
+}
+
+// Canonical socket/pid/lock path helpers — single source, XDG/LOCALAPPDATA + hash(dbPath.generic_string())
+namespace detail_paths {
+inline std::string hex8ForDb(const std::filesystem::path& dbPath) {
+    std::string input = dbPath.generic_string();
+    if (input.empty()) input = dbPath.string();
+    std::size_t raw = std::hash<std::string>{}(input);
+    std::uint32_t hv = static_cast<std::uint32_t>(raw & 0xFFFFFFFFu);
+    hv ^= static_cast<std::uint32_t>((raw >> 32) & 0xFFFFFFFFu);
+    constexpr char kHex[] = "0123456789abcdef";
+    std::array<char, 9> buf{};
+    for (int i = 7; i >= 0; --i) {
+        buf[static_cast<std::size_t>(i)] = kHex[hv & 0xFu];
+        hv >>= 4;
+    }
+    return std::string(buf.data(), 8);
+}
+inline std::filesystem::path baseDirForSocket() {
+#ifdef _WIN32
+    const char* localApp = std::getenv("LOCALAPPDATA");
+    if (localApp && localApp[0] != '\0') {
+        return std::filesystem::path(localApp) / "caudio";
+    }
+#endif
+    const char* xdgRuntime = std::getenv("XDG_RUNTIME_DIR");
+    if (xdgRuntime && xdgRuntime[0] != '\0') {
+        return std::filesystem::path(xdgRuntime) / "caudio";
+    }
+    const char* xdgData = std::getenv("XDG_DATA_HOME");
+    if (xdgData && xdgData[0] != '\0') {
+        return std::filesystem::path(xdgData) / "caudio";
+    }
+    const char* home = std::getenv("HOME");
+    if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
+    if (home && home[0] != '\0') {
+        return std::filesystem::path(home) / ".local" / "share" / "caudio";
+    }
+    std::error_code ec;
+    auto base = std::filesystem::temp_directory_path(ec) / "caudio";
+    if (ec) base = std::filesystem::path("/tmp/caudio");
+    return base;
+}
+} // namespace detail_paths
+
+inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath) {
+    try {
+        std::string hex = detail_paths::hex8ForDb(dbPath);
+#ifdef _WIN32
+        return std::string("\\\\.\\pipe\\caudio-") + hex;
+#else
+        auto base = detail_paths::baseDirForSocket();
+        return (base / ("caudio-" + hex + ".sock")).generic_string();
+#endif
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+    } catch (...) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socketPathFor failed")};
+    }
+}
+
+inline caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath) {
+    try {
+        std::string hex = detail_paths::hex8ForDb(dbPath);
+        auto base = detail_paths::baseDirForSocket();
+        return base / ("caudio-" + hex + ".pid");
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+    } catch (...) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "pidPathFor failed")};
+    }
+}
+
+inline caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath) {
+    try {
+        std::string hex = detail_paths::hex8ForDb(dbPath);
+        auto base = detail_paths::baseDirForSocket();
+        return base / ("caudio-" + hex + ".lock");
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+    } catch (...) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "lockPathFor failed")};
     }
 }
 

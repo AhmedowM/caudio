@@ -29,6 +29,7 @@ export namespace caudio::client {
 
 struct Config final {
     std::filesystem::path dbPath{"library.db"};
+    std::string socketPath{};
 };
 
 class Client {
@@ -36,8 +37,9 @@ class Client {
 
 public:
     explicit Client(Config cfg) : config_(std::move(cfg)) {}
-    explicit Client(std::filesystem::path dbPath) : config_{std::move(dbPath)} {}
-    explicit Client(const caudio::cli::Config& cfg) : config_{cfg.dbPath} {}
+    explicit Client(std::filesystem::path dbPath) : config_{std::move(dbPath), {}} {}
+    explicit Client(std::filesystem::path dbPath, std::string_view socketPath) : config_{std::move(dbPath), std::string(socketPath.data(), socketPath.size())} {}
+    explicit Client(const caudio::cli::Config& cfg) : config_{cfg.dbPath, cfg.socketPath} {}
 
     const Config& config() const noexcept { return config_; }
     std::filesystem::path dbPath() const noexcept { return config_.dbPath; }
@@ -63,7 +65,7 @@ public:
                     }
                     return;
                 }
-                auto conn = IpcClient::connect(cfgCopy.dbPath);
+                auto conn = IpcClient::connect(cfgCopy.dbPath, cfgCopy.socketPath);
                 if (!conn) {
                     try {
                         prom->set_value(std::unexpected{caudio::utils::Error{

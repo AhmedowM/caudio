@@ -58,8 +58,16 @@ export namespace caudio::client {
 
 class IpcClient {
 public:
-    static caudio::utils::Expected<IpcClient> connect(const std::filesystem::path& dbPath) {
-        auto sp = caudio::service::socketPathFor(dbPath);
+    // connect using canonical socketPathFor(dbPath); if socketPathOverride non-empty it is used verbatim
+    // (honors --socket / Config::socketPath). Default overload preserves existing call sites.
+    static caudio::utils::Expected<IpcClient> connect(const std::filesystem::path& dbPath,
+                                                      std::string_view socketPathOverride = {}) {
+        caudio::utils::Expected<std::string> sp;
+        if (!socketPathOverride.empty()) {
+            sp = std::string(socketPathOverride.data(), socketPathOverride.size());
+        } else {
+            sp = caudio::cli::socketPathFor(dbPath);
+        }
         if (!sp) return std::unexpected{sp.error()};
         std::string path = *sp;
 
@@ -152,14 +160,10 @@ public:
         auto raw = rawRecv();
         if (!raw) return std::unexpected{raw.error()};
 
+        // rawRecv already stripped the 4-byte BE header; construct string directly — do not call deframe
         std::string replyStr;
         replyStr.reserve(raw->size());
-        for (auto b : *raw) replyStr.push_back(static_cast<char>(b));
-
-        auto def = caudio::cli::deframe(std::span<const std::byte>(raw->data(), raw->size()));
-        if (def) {
-            replyStr = *def;
-        }
+        for (auto b : *raw) replyStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
 
         auto repExp = caudio::cli::deserializeReply(replyStr);
         if (!repExp) return std::unexpected{repExp.error()};
