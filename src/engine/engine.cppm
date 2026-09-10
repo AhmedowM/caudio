@@ -147,6 +147,8 @@ class Engine final {
         }
         if (s == PlaybackState::Playing) {
             // already playing, restart current track (seek 0), don't dequeue
+            // serialize with decodeLoop (decoder_->decode / ring_->write) via decodeMtx_
+            std::unique_lock<std::mutex> lk(decodeMtx_);
             if (decoder_) {
                 auto r = decoder_->seek(0);
                 if (!r)
@@ -158,6 +160,7 @@ class Engine final {
             playStart_ = std::chrono::steady_clock::now();
             if (output_)
                 output_->start();
+            lk.unlock();
             decodeCv_.notify_all();
             monCv_.notify_all();
             return {};
@@ -855,10 +858,7 @@ class Engine final {
                         caudio::utils::makeError(caudio::utils::Result::Internal, "no perm"));
             }
             if (queue_.cursor >= queue_.perm.size()) {
-                if (queue_.repeat == RepeatMode::Queue) {
-                    queue_.cursor = 0;
-                    (void)persistCursorLocked();
-                } else if (queue_.repeat == RepeatMode::One) {
+                if (queue_.repeat == RepeatMode::One) {
                     size_t idx = queue_.perm.size() - 1;
                     if (queue_.cursor > 0 && queue_.cursor <= queue_.perm.size())
                         idx = queue_.cursor - 1;
@@ -869,8 +869,12 @@ class Engine final {
                     out = tr.value();
                     return {};
                 } else {
-                    return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+                    // wrap/reshuffle for both Off and Queue (shuffle on => new perm)
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                    (void)persistCursorLocked();
                 }
             }
             int64_t pos = queue_.perm[queue_.cursor];
@@ -887,12 +891,26 @@ class Engine final {
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
         if (queue_.cursor >= cnt) {
-            if (queue_.repeat == RepeatMode::Queue) {
-                queue_.cursor = 0;
-                (void)persistCursorLocked();
+            if (queue_.repeat == RepeatMode::One) {
+                size_t idx = cnt - 1;
+                if (queue_.cursor > 0 && queue_.cursor <= cnt)
+                    idx = queue_.cursor - 1;
+                auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)idx);
+                if (!tr)
+                    return std::unexpected(tr.error());
+                out = tr.value();
+                return {};
             } else {
-                return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+                // wrap for both Off and Queue; reshuffle if shuffle on
+                if (queue_.shuffle) {
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                } else {
+                    queue_.cursor = 0;
+                }
+                (void)persistCursorLocked();
             }
         }
         auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)queue_.cursor);

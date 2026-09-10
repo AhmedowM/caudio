@@ -104,10 +104,13 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
         sqlite3_finalize(stc);
         sqlite3_close(ch);
     }
+    int64_t firstId = eng->currentTrackId();
     REQUIRE(eng->next().has_value());
+    // next at end should wrap to beginning (Musicolet/AIMP) or reshuffle if shuffle on
     auto r = eng->next();
-    REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.has_value());
+    // wrapped to first track
+    REQUIRE(eng->currentTrackId() == firstId);
     // queue still has 2 rows (cursor persisted, not deleted)
     {
         sqlite3* ch = nullptr;
