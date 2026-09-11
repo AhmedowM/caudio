@@ -7,6 +7,7 @@ module;
 #include <time.h>
 #endif
 #include <chrono>
+#include <cstring>
 #include <expected>
 #include <functional>
 #include <string>
@@ -72,14 +73,22 @@ inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view n
 inline Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept {
     return setNativeHandleName(GetCurrentThread(), name);
 }
+#else
+constexpr std::string_view truncate15(std::string_view s) noexcept {
+    return s.substr(0, 15);
+}
+inline int setPthreadName(pthread_t th, std::string_view name) noexcept {
+    std::string_view t = truncate15(name);
+    char buf[16]{};
+    if (!t.empty())
+        std::memcpy(buf, t.data(), t.size());
+    buf[t.size()] = '\0';
+    return pthread_setname_np(th, buf);
+}
 #endif
 } // namespace caudio::utils::detail
 
 export namespace caudio::utils {
-
-inline void sleepFor(std::chrono::milliseconds ms) noexcept {
-    std::this_thread::sleep_for(ms);
-}
 
 template <typename Rep, typename Period>
 inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
@@ -87,7 +96,7 @@ inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
 }
 
 inline void sleepForMs(std::uint32_t ms) noexcept {
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    sleepFor(std::chrono::milliseconds(ms));
 }
 
 [[nodiscard]] inline Expected<void> setThreadName(std::string_view name) noexcept {
@@ -97,32 +106,19 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #if defined(_WIN32) || defined(_WIN64)
     return detail::setCurrentThreadNameImpl(name);
 #else
-    // POSIX
 #if defined(__APPLE__) && defined(__MACH__)
-    // macOS: pthread_setname_np takes only name (16 char limit including NUL)
-    std::string copy(name);
-    if (copy.size() > 15)
-        copy.resize(15);
-    int rc = pthread_setname_np(copy.c_str());
+    std::string_view t = detail::truncate15(name);
+    char buf[16]{};
+    if (!t.empty())
+        std::memcpy(buf, t.data(), t.size());
+    buf[t.size()] = '\0';
+    int rc = pthread_setname_np(buf);
     if (rc != 0) {
         return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
     }
     return {};
-#elif defined(__linux__)
-    std::string copy(name);
-    if (copy.size() > 15)
-        copy.resize(15);
-    int rc = pthread_setname_np(pthread_self(), copy.c_str());
-    if (rc != 0) {
-        return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
-    }
-    return {};
-#else
-#if defined(_GNU_SOURCE) || defined(__GLIBC__)
-    std::string copy(name);
-    if (copy.size() > 15)
-        copy.resize(15);
-    int rc = pthread_setname_np(pthread_self(), copy.c_str());
+#elif defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__)
+    int rc = detail::setPthreadName(pthread_self(), name);
     if (rc != 0) {
         return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
     }
@@ -130,7 +126,6 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #else
     (void)name;
     return std::unexpected(Error{Result::Unsupported, "setThreadName not supported"});
-#endif
 #endif
 #endif
 }
@@ -148,18 +143,13 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     return detail::setNativeHandleName(h, name);
 #else
     pthread_t th = jt.native_handle();
-    // pthread_setname_np with pthread_t variant (Linux has pthread_setname_np(pthread_t, const
-    // char*)) On macOS, pthread_setname_np does not take thread arg; fallback to Unsupported
 #if defined(__APPLE__) && defined(__MACH__)
     (void)th;
     (void)name;
     return std::unexpected(
         Error{Result::Unsupported, "setThreadName with jthread not supported on macOS"});
 #elif defined(__linux__)
-    std::string copy(name);
-    if (copy.size() > 15)
-        copy.resize(15);
-    int rc = pthread_setname_np(th, copy.c_str());
+    int rc = detail::setPthreadName(th, name);
     if (rc != 0) {
         return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
     }
@@ -186,10 +176,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #else
 #if defined(__linux__) && !defined(__APPLE__)
     pthread_t th = t.native_handle();
-    std::string copy(name);
-    if (copy.size() > 15)
-        copy.resize(15);
-    int rc = pthread_setname_np(th, copy.c_str());
+    int rc = detail::setPthreadName(th, name);
     if (rc != 0)
         return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
     return {};

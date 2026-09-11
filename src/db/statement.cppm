@@ -1,10 +1,12 @@
 module;
 #include <sqlite3.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -62,9 +64,15 @@ class Statement final {
             return;
         sqlite3_bind_text(stmt_, idx, v.data(), static_cast<int>(v.size()), SQLITE_TRANSIENT);
     }
-    void bindBlob(int idx, const void* data, int n) {
+    void bindBlob(int idx, std::span<const std::byte> data) {
         if (stmt_)
-            sqlite3_bind_blob(stmt_, idx, data, n, SQLITE_TRANSIENT);
+            sqlite3_bind_blob(stmt_, idx, data.data(), static_cast<int>(data.size()),
+                              SQLITE_TRANSIENT);
+    }
+    [[deprecated("use span overload")]] void bindBlob(int idx, const void* data, int n) {
+        bindBlob(idx,
+                 std::span<const std::byte>{reinterpret_cast<const std::byte*>(data),
+                                            data && n > 0 ? static_cast<std::size_t>(n) : 0});
     }
     void bindNull(int idx) {
         if (stmt_)

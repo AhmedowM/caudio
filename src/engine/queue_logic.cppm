@@ -11,13 +11,7 @@ import :types;
 export namespace caudio::engine::detail {
 
 inline void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng) {
-    if (perm.size() <= 1)
-        return;
-    for (size_t i = perm.size() - 1; i > 0; --i) {
-        std::uniform_int_distribution<size_t> dist(0, i);
-        size_t j = dist(rng);
-        std::swap(perm[i], perm[j]);
-    }
+    std::ranges::shuffle(perm, rng);
 }
 
 inline void shufflePerm(std::vector<int64_t>& perm) {

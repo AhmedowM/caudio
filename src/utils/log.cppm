@@ -51,29 +51,15 @@ class Logger {
 
     void log(Level lvl, std::string_view msg) {
         Callback cbCopy;
-        {
-            std::lock_guard<std::mutex> lk(mutex_);
-            if (!callback_)
-                return;
-            if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
-                return;
-            cbCopy = callback_;
-        }
+        if (bool ok = getCallbackIfNeeded(lvl, cbCopy); !ok)
+            return;
         cbCopy(lvl, msg);
     }
 
     template <typename... Args>
     void log(Level lvl, std::format_string<Args...> fmt, Args&&... args) {
         Callback cbCopy;
-        {
-            std::lock_guard<std::mutex> lk(mutex_);
-            if (!callback_)
-                return;
-            if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
-                return;
-            cbCopy = callback_;
-        }
-        if (!cbCopy)
+        if (bool ok = getCallbackIfNeeded(lvl, cbCopy); !ok)
             return;
         std::string s = std::format(fmt, std::forward<Args>(args)...);
         cbCopy(lvl, s);
@@ -110,6 +96,16 @@ class Logger {
     }
 
   private:
+    bool getCallbackIfNeeded(Level lvl, Callback& out) {
+        std::lock_guard lk(mutex_);
+        if (!callback_)
+            return false;
+        if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
+            return false;
+        out = callback_;
+        return true;
+    }
+
     mutable std::mutex mutex_;
     Callback callback_;
     Level minLevel_{Level::Debug};

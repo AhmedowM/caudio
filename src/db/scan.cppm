@@ -5,6 +5,7 @@ module;
 #include <array>
 #include <cctype>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
@@ -14,6 +15,7 @@ module;
 #include <generator>
 #include <mutex>
 #include <shared_mutex>
+#include <span>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -66,14 +68,16 @@ export std::generator<Track> scan(const std::filesystem::path& root,
                 if (fp)
                     t.fingerprint = *fp;
             } else {
-                // full file hash via BLAKE3
+                // full file hash via BLAKE3 — uses std::array<std::byte,8192> reuse via span
                 std::ifstream f(it->path(), std::ios::binary);
                 if (f) {
                     blake3_hasher hasher;
                     blake3_hasher_init(&hasher);
-                    char buf[8192];
-                    while (f.read(buf, sizeof(buf)) || f.gcount())
-                        blake3_hasher_update(&hasher, buf, (size_t)f.gcount());
+                    std::array<std::byte, 8192> buf{};
+                    while (f.read(reinterpret_cast<char*>(buf.data()),
+                                  static_cast<std::streamsize>(buf.size())) ||
+                           f.gcount())
+                        blake3_hasher_update(&hasher, buf.data(), static_cast<size_t>(f.gcount()));
                     blake3_hasher_finalize(&hasher, t.fingerprint.data(), t.fingerprint.size());
                 }
             }
@@ -202,11 +206,7 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.deleted_at = 0;
             (void)db.updateTrackLocked(upd);
             if (existingPath && existingPath->id != byFp->id) {
-                bool same = true;
-                for (int i = 0; i < 32; i++)
-                    if (existingPath->fingerprint[i] != trk.fingerprint[i])
-                        same = false;
-                if (same)
+                if (existingPath->fingerprint == trk.fingerprint)
                     (void)db.deleteTrackLocked(existingPath->id);
             }
         } else if (existingPath) {
@@ -214,7 +214,6 @@ scanLibrary(Database& db, int64_t libraryId,
             int64_t keepPlay = upd.play_count;
             int keepRating = upd.rating;
             int64_t keepAdded = upd.date_added;
-            [[maybe_unused]] std::array<uint8_t, 32> oldFp = upd.fingerprint;
             upd.fingerprint = trk.fingerprint;
             upd.size = trk.size;
             upd.mtime = trk.mtime;
@@ -233,7 +232,7 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.sample_rate = 0;
             upd.channels = 0;
             upd.bitrate = 0;
-            upd.dirty = 0;
+            upd.dirty = false;
             upd.play_count = keepPlay;
             upd.rating = keepRating;
             upd.date_added = keepAdded;

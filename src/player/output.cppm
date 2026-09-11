@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -6,6 +7,7 @@ module;
 #include <expected>
 #include <memory>
 #include <mutex>
+#include <ranges>
 #include <span>
 #include <string>
 #include <thread>
@@ -44,8 +46,13 @@ class AudioOutput {
         return out;
     }
 
+    static inline float clampVolume(float v) noexcept {
+        if (!std::isfinite(v)) return 0.0f;
+        return std::clamp(v, 0.0f, 1.0f);
+    }
+
     void setVolume(float vol) {
-        volume_.store(vol < 0.0f ? 0.0f : (vol > 1.0f ? 1.0f : vol), std::memory_order_relaxed);
+        volume_.store(clampVolume(vol), std::memory_order_relaxed);
     }
 
     float volume() const noexcept {
@@ -53,31 +60,35 @@ class AudioOutput {
     }
 
     void testFill(std::span<float> buf) const noexcept {
-        for (auto& s : buf)
-            s = 0.0f;
+        std::ranges::fill(buf, 0.0f);
+    }
+
+    // Shared lock-free helper: ring read + zero-fill + volume. No allocation, no format.
+    static void fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
+                             uint32_t channels, float vol) noexcept {
+        if (out.empty())
+            return;
+        std::size_t totalSamples = out.size();
+        std::size_t generatedFrames = 0;
+        if (ring) {
+            generatedFrames = ring->read(std::span<float>(out.data(), totalSamples));
+        }
+        std::size_t generatedSamples = generatedFrames * channels;
+        if (generatedSamples < totalSamples) {
+            std::ranges::fill(out.subspan(generatedSamples), 0.0f);
+        }
+        if (vol != 1.0f) {
+            for (std::size_t i = 0; i < totalSamples; ++i)
+                out[i] *= vol;
+        }
     }
 
     // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
     // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
     void fillForTest(std::span<float> out) noexcept {
-        if (out.empty())
-            return;
         uint32_t channels = cfg_.channels ? cfg_.channels : 1;
-        std::size_t totalSamples = out.size();
-        std::size_t generatedFrames = 0;
-        if (cfg_.ring) {
-            generatedFrames = cfg_.ring->read(std::span<float>(out.data(), totalSamples));
-        }
-        std::size_t generatedSamples = generatedFrames * channels;
-        if (generatedSamples < totalSamples) {
-            for (std::size_t i = generatedSamples; i < totalSamples; ++i)
-                out[i] = 0.0f;
-        }
         float vol = volume_.load(std::memory_order_relaxed);
-        if (vol != 1.0f) {
-            for (std::size_t i = 0; i < totalSamples; ++i)
-                out[i] *= vol;
-        }
+        fillFromRing(out, cfg_.ring, channels, vol);
     }
 
     bool isPlaying() const noexcept {
@@ -111,13 +122,7 @@ class AudioOutput {
         if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
             return false;
         cfg_ = cfg;
-        float v = cfg.volume;
-        if (!std::isfinite(v))
-            v = 0.0f;
-        if (v < 0.0f)
-            v = 0.0f;
-        if (v > 1.0f)
-            v = 1.0f;
+        float v = clampVolume(cfg.volume);
         volume_.store(v, std::memory_order_relaxed);
 
         ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
@@ -149,29 +154,9 @@ class AudioOutput {
         float* output = static_cast<float*>(pOutput);
         ma_uint32 channels = pDevice->playback.channels;
         ma_uint32 totalSamples = frameCount * channels;
-
-        std::size_t generatedFrames = 0;
-        if (self->cfg_.ring) {
-            generatedFrames = self->cfg_.ring->read(std::span<float>(output, totalSamples));
-        }
-        std::size_t generatedSamples = generatedFrames * channels;
-
-        // Underrun: fill remainder with silence (no beep)
-        if (generatedSamples < totalSamples) {
-            for (std::size_t i = generatedSamples; i < totalSamples; ++i)
-                output[i] = 0.0f;
-        }
-
-        // Apply volume
         float vol = self->volume_.load(std::memory_order_relaxed);
-        if (vol != 1.0f) {
-            for (ma_uint32 i = 0; i < totalSamples; ++i) {
-                output[i] *= vol;
-            }
-        }
-
-        // Note: generated is in frames, totalSamples = frameCount * channels
-        // No zero-fill needed here since miniaudio passes pre-zeroed buffer
+        // lock-free, no allocation
+        fillFromRing(std::span<float>(output, totalSamples), self->cfg_.ring, channels, vol);
     }
 
   private:
@@ -180,7 +165,6 @@ class AudioOutput {
     std::atomic<float> volume_{1.0f};
     std::atomic<bool> running_{false};
     std::atomic<bool> initialized_{false};
-    double phase_{0.0};
 };
 
 } // namespace caudio::player

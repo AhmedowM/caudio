@@ -2,6 +2,7 @@ module;
 #include <sqlite3.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -9,6 +10,7 @@ module;
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <shared_mutex>
+#include <span>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -19,6 +21,8 @@ import caudio.utils;
 import :types;
 import :detail;
 import :database;
+import :statement;
+import :transaction;
 
 namespace caudio::db {
 
@@ -119,7 +123,11 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
         getI64("last_played", t.last_played, 0);
         getI64("date_added", t.date_added, 0);
         getI64("last_scanned", t.last_scanned, 0);
-        getInt("dirty", t.dirty, 0);
+        {
+            int dirtyTmp = 0;
+            getInt("dirty", dirtyTmp, 0);
+            t.dirty = dirtyTmp != 0;
+        }
         getI64("library_id", t.library_id, 1);
         if (t.library_id == 0)
             t.library_id = 1;
@@ -186,165 +194,140 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::Result::Corrupt, "missing tracks array")};
     }
-    // transaction for bulk
-    {
-        std::unique_lock lock(db.mutex());
-        sqlite3* h = db.handle();
-        if (!h)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        char* err = nullptr;
-        detail::SqliteErrGuard errGuard{err};
-        int rc = sqlite3_exec(h, "BEGIN", nullptr, nullptr, &err);
-        if (rc != SQLITE_OK) {
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "begin failed")};
+    std::unique_lock lk{db.mutex()};
+    sqlite3* h = db.handleLocked();
+    if (!h)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+    auto txRes = Transaction::begin(h);
+    if (!txRes)
+        return std::unexpected{txRes.error()};
+    Transaction tx = std::move(*txRes);
+    bool corrupt = false;
+    for (auto& j : root["tracks"]) {
+        auto tr = trackFromJson(j);
+        if (!tr) {
+            corrupt = true;
+            break;
         }
-        bool corrupt = false;
-        for (auto& j : root["tracks"]) {
-            auto tr = trackFromJson(j);
-            if (!tr) {
+        Track t = *tr;
+        Statement stmt;
+        if (auto e = stmt.prepare(h,
+                                   "INSERT INTO tracks (fingerprint, path, size, mtime, duration, "
+                                   "sample_rate, channels, bitrate, title, artist, album, "
+                                   "album_artist, genre, year, track_num, disc_num, "
+                                   "cover_art_path, rating, play_count, last_played, date_added, "
+                                   "last_scanned, dirty, library_id, deleted_at) VALUES "
+                                   "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            !e) {
+            corrupt = true;
+            break;
+        }
+        auto fpSpan = std::span<const std::byte>{
+            reinterpret_cast<const std::byte*>(t.fingerprint.data()), t.fingerprint.size()};
+        stmt.bindBlob(1, fpSpan);
+        stmt.bindText(2, t.path);
+        stmt.bindInt(3, t.size);
+        stmt.bindInt(4, t.mtime);
+        stmt.bindDouble(5, t.duration);
+        stmt.bindInt(6, t.sample_rate);
+        stmt.bindInt(7, t.channels);
+        stmt.bindInt(8, t.bitrate);
+        stmt.bindText(9, t.title);
+        stmt.bindText(10, t.artist);
+        stmt.bindText(11, t.album);
+        stmt.bindText(12, t.albumArtist);
+        stmt.bindText(13, t.genre);
+        stmt.bindInt(14, t.year);
+        stmt.bindInt(15, t.track_num);
+        stmt.bindInt(16, t.disc_num);
+        stmt.bindText(17, t.cover_art_path);
+        stmt.bindInt(18, t.rating);
+        stmt.bindInt(19, t.play_count);
+        stmt.bindInt(20, t.last_played);
+        if (t.date_added)
+            stmt.bindInt(21, t.date_added);
+        else
+            stmt.bindNull(21);
+        stmt.bindInt(22, t.last_scanned);
+        stmt.bindInt(23, t.dirty ? 1 : 0);
+        stmt.bindInt(24, t.library_id ? t.library_id : 1);
+        if (t.deleted_at)
+            stmt.bindInt(25, t.deleted_at);
+        else
+            stmt.bindNull(25);
+        int rc = stmt.stepDone();
+        if (rc == SQLITE_CONSTRAINT) {
+            Statement sel;
+            if (auto e = sel.prepare(h, "SELECT id FROM tracks WHERE fingerprint=?"); !e) {
                 corrupt = true;
                 break;
             }
-            Track t = *tr;
-            // try insert, on AlreadyExists update
-            // we need to use db methods without double-locking: we already hold lock, so use raw
-            // sqlite directly? Use insert via manual to avoid deadlock. For simplicity unlock and
-            // use db.insertTrack (which locks) – but we hold unique_lock, would deadlock. So
-            // release lock for each insert. Instead we will commit to using raw sql inside this
-            // transaction. To avoid complexity, unlock here and use db.insertTrack outside
-            // transaction? Simpler: close transaction and use db methods with re-lock. We'll
-            // implement as: unlock, insert, lock again. For now just do direct sql without using db
-            // methods to stay inside transaction.
-            const char* sql =
-                "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, "
-                "channels, bitrate, title, artist, album, album_artist, genre, year, track_num, "
-                "disc_num, cover_art_path, rating, play_count, last_played, date_added, "
-                "last_scanned, dirty, library_id, deleted_at) VALUES "
-                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-            sqlite3_stmt* stmt = nullptr;
-            rc = sqlite3_prepare_v2(h, sql, -1, &stmt, nullptr);
-            if (rc != SQLITE_OK) {
-                corrupt = true;
-                if (stmt)
-                    sqlite3_finalize(stmt);
-                break;
-            }
-            sqlite3_bind_blob(stmt, 1, t.fingerprint.data(), 32, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 2, t.path.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_int64(stmt, 3, t.size);
-            sqlite3_bind_int64(stmt, 4, t.mtime);
-            sqlite3_bind_double(stmt, 5, t.duration);
-            sqlite3_bind_int(stmt, 6, (int)t.sample_rate);
-            sqlite3_bind_int(stmt, 7, (int)t.channels);
-            sqlite3_bind_int(stmt, 8, t.bitrate);
-            sqlite3_bind_text(stmt, 9, t.title.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 10, t.artist.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 11, t.album.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 12, t.albumArtist.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_text(stmt, 13, t.genre.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_int(stmt, 14, t.year);
-            sqlite3_bind_int(stmt, 15, t.track_num);
-            sqlite3_bind_int(stmt, 16, t.disc_num);
-            sqlite3_bind_text(stmt, 17, t.cover_art_path.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_int(stmt, 18, t.rating);
-            sqlite3_bind_int64(stmt, 19, t.play_count);
-            sqlite3_bind_int64(stmt, 20, t.last_played);
-            if (t.date_added)
-                sqlite3_bind_int64(stmt, 21, t.date_added);
-            else
-                sqlite3_bind_null(stmt, 21);
-            sqlite3_bind_int64(stmt, 22, t.last_scanned);
-            sqlite3_bind_int(stmt, 23, t.dirty);
-            sqlite3_bind_int64(stmt, 24, t.library_id ? t.library_id : 1);
-            if (t.deleted_at)
-                sqlite3_bind_int64(stmt, 25, t.deleted_at);
-            else
-                sqlite3_bind_null(stmt, 25);
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
-            if (rc == SQLITE_CONSTRAINT) {
-                // try update by fingerprint
-                const char* sel = "SELECT id FROM tracks WHERE fingerprint=?";
-                sqlite3_stmt* ss = nullptr;
-                if (sqlite3_prepare_v2(h, sel, -1, &ss, nullptr) == SQLITE_OK) {
-                    sqlite3_bind_blob(ss, 1, t.fingerprint.data(), 32, SQLITE_TRANSIENT);
-                    if (sqlite3_step(ss) == SQLITE_ROW) {
-                        int64_t existing = sqlite3_column_int64(ss, 0);
-                        sqlite3_finalize(ss);
-                        const char* upd =
-                            "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, sample_rate=?, "
-                            "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, "
-                            "genre=?, year=?, track_num=?, disc_num=?, cover_art_path=?, rating=?, "
-                            "play_count=?, last_played=?, date_added=?, last_scanned=?, dirty=?, "
-                            "library_id=?, deleted_at=? WHERE id=?";
-                        sqlite3_stmt* us = nullptr;
-                        if (sqlite3_prepare_v2(h, upd, -1, &us, nullptr) == SQLITE_OK) {
-                            sqlite3_bind_text(us, 1, t.path.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_int64(us, 2, t.size);
-                            sqlite3_bind_int64(us, 3, t.mtime);
-                            sqlite3_bind_double(us, 4, t.duration);
-                            sqlite3_bind_int(us, 5, (int)t.sample_rate);
-                            sqlite3_bind_int(us, 6, (int)t.channels);
-                            sqlite3_bind_int(us, 7, t.bitrate);
-                            sqlite3_bind_text(us, 8, t.title.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(us, 9, t.artist.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(us, 10, t.album.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(us, 11, t.albumArtist.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_text(us, 12, t.genre.c_str(), -1, SQLITE_TRANSIENT);
-                            sqlite3_bind_int(us, 13, t.year);
-                            sqlite3_bind_int(us, 14, t.track_num);
-                            sqlite3_bind_int(us, 15, t.disc_num);
-                            sqlite3_bind_text(us, 16, t.cover_art_path.c_str(), -1,
-                                              SQLITE_TRANSIENT);
-                            sqlite3_bind_int(us, 17, t.rating);
-                            sqlite3_bind_int64(us, 18, t.play_count);
-                            sqlite3_bind_int64(us, 19, t.last_played);
-                            sqlite3_bind_int64(us, 20, t.date_added);
-                            sqlite3_bind_int64(us, 21, t.last_scanned);
-                            sqlite3_bind_int(us, 22, t.dirty);
-                            sqlite3_bind_int64(us, 23, t.library_id ? t.library_id : 1);
-                            if (t.deleted_at)
-                                sqlite3_bind_int64(us, 24, t.deleted_at);
-                            else
-                                sqlite3_bind_null(us, 24);
-                            sqlite3_bind_int64(us, 25, existing);
-                            sqlite3_step(us);
-                            sqlite3_finalize(us);
-                        }
-                    } else {
-                        sqlite3_finalize(ss);
-                        // try by path
-                        const char* sel2 = "SELECT id, fingerprint FROM tracks WHERE path=?";
-                        sqlite3_stmt* sp = nullptr;
-                        if (sqlite3_prepare_v2(h, sel2, -1, &sp, nullptr) == SQLITE_OK) {
-                            sqlite3_bind_text(sp, 1, t.path.c_str(), -1, SQLITE_TRANSIENT);
-                            if (sqlite3_step(sp) == SQLITE_ROW) {
-                                // keep existing fingerprint, update rest
-                                // not needed for test
-                            }
-                            sqlite3_finalize(sp);
-                        }
+            sel.bindBlob(1, fpSpan);
+            if (sel.step()) {
+                int64_t existing = sel.columnInt(0);
+                Statement upd;
+                if (auto e = upd.prepare(h,
+                                          "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, "
+                                          "sample_rate=?, channels=?, bitrate=?, title=?, artist=?, "
+                                          "album=?, album_artist=?, genre=?, year=?, track_num=?, "
+                                          "disc_num=?, cover_art_path=?, rating=?, play_count=?, "
+                                          "last_played=?, date_added=?, last_scanned=?, dirty=?, "
+                                          "library_id=?, deleted_at=? WHERE id=?");
+                    !e) {
+                    corrupt = true;
+                    break;
+                }
+                upd.bindText(1, t.path);
+                upd.bindInt(2, t.size);
+                upd.bindInt(3, t.mtime);
+                upd.bindDouble(4, t.duration);
+                upd.bindInt(5, t.sample_rate);
+                upd.bindInt(6, t.channels);
+                upd.bindInt(7, t.bitrate);
+                upd.bindText(8, t.title);
+                upd.bindText(9, t.artist);
+                upd.bindText(10, t.album);
+                upd.bindText(11, t.albumArtist);
+                upd.bindText(12, t.genre);
+                upd.bindInt(13, t.year);
+                upd.bindInt(14, t.track_num);
+                upd.bindInt(15, t.disc_num);
+                upd.bindText(16, t.cover_art_path);
+                upd.bindInt(17, t.rating);
+                upd.bindInt(18, t.play_count);
+                upd.bindInt(19, t.last_played);
+                upd.bindInt(20, t.date_added);
+                upd.bindInt(21, t.last_scanned);
+                upd.bindInt(22, t.dirty ? 1 : 0);
+                upd.bindInt(23, t.library_id ? t.library_id : 1);
+                if (t.deleted_at)
+                    upd.bindInt(24, t.deleted_at);
+                else
+                    upd.bindNull(24);
+                upd.bindInt(25, existing);
+                (void)upd.stepDone();
+            } else {
+                Statement sel2;
+                if (auto e = sel2.prepare(h, "SELECT id FROM tracks WHERE path=?"); e) {
+                    sel2.bindText(1, t.path);
+                    if (sel2.step()) {
+                        // path exists but fingerprint differs — keep existing row, no op for test
                     }
                 }
-            } else if (rc != SQLITE_DONE) {
-                corrupt = true;
-                break;
             }
-        }
-        if (corrupt) {
-            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Corrupt, "import corrupt")};
-        }
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
-        if (rc != SQLITE_OK) {
-            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "commit failed")};
+        } else if (rc != SQLITE_DONE) {
+            corrupt = true;
+            break;
         }
     }
+    if (corrupt) {
+        (void)tx.rollback();
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::Result::Corrupt, "import corrupt")};
+    }
+    if (auto c = tx.commit(); !c)
+        return std::unexpected{c.error()};
     return {};
 }
 

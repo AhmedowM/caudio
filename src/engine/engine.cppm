@@ -41,6 +41,18 @@ struct SqliteErrGuard {
     }
 };
 
+struct StmtGuard {
+    sqlite3_stmt* s = nullptr;
+    explicit StmtGuard(sqlite3_stmt* stmt) : s(stmt) {}
+    ~StmtGuard() {
+        if (s) sqlite3_finalize(s);
+    }
+    StmtGuard(const StmtGuard&) = delete;
+    StmtGuard& operator=(const StmtGuard&) = delete;
+    sqlite3_stmt* get() const noexcept { return s; }
+    sqlite3_stmt* operator->() const noexcept { return s; }
+};
+
 constexpr std::string_view toString(caudio::utils::Result r) noexcept {
     return caudio::utils::toString(r);
 }
@@ -261,13 +273,13 @@ class Engine final {
         return {};
     }
 
+    static inline float clampVolume(float v) noexcept {
+        if (!std::isfinite(v)) return 0.0f;
+        return std::clamp(v, 0.0f, 1.0f);
+    }
+
     ExpectedVoid setVolume(float g) {
-        if (!std::isfinite(g))
-            g = 0.0f;
-        if (g < 0.0f)
-            g = 0.0f;
-        if (g > 1.0f)
-            g = 1.0f;
+        g = clampVolume(g);
         state_.volume = g;
         volume_.store(g, std::memory_order_relaxed);
         if (output_)
@@ -348,12 +360,19 @@ class Engine final {
         if (!hasDb())
             return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
         // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
-        // && hasCurrent => seek 0 and play
+        // && hasCurrent => seek 0 and play - serialize with decodeLoop via decodeMtx_
         if (!queue_.shuffle && queue_.repeat == RepeatMode::One &&
             hasCurrent_.load(std::memory_order_acquire)) {
-            // seek to 0
-            if (decoder_)
-                (void)decoder_->seek(0.0);
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                if (decoder_) {
+                    auto r = decoder_->seek(0);
+                    if (!r)
+                        return std::unexpected(r.error());
+                }
+                if (ring_)
+                    ring_->reset();
+            }
             pausePos_ = 0;
             playStart_ = std::chrono::steady_clock::now();
             playbackState_.store(PlaybackState::Playing, std::memory_order_release);
@@ -471,7 +490,6 @@ class Engine final {
         markedPlayed_.store(false, std::memory_order_release);
         gaplessArmed_.store(false, std::memory_order_release);
         lastProgressMs_.store(0, std::memory_order_release);
-        queueLock_.store(0, std::memory_order_release);
         // callbacks from config
         callbacks_ = cfg.callbacks;
     }
@@ -492,14 +510,8 @@ class Engine final {
         return db_ && db_->handle();
     }
 
-    bool tryLockQueue() noexcept {
-        int expected = 0;
-        return queueLock_.compare_exchange_strong(expected, 1, std::memory_order_acq_rel,
-                                                  std::memory_order_acquire);
-    }
-    void unlockQueue() noexcept {
-        queueLock_.store(0, std::memory_order_release);
-    }
+    bool tryLockQueue() noexcept { return queueMutex_.try_lock(); }
+    void unlockQueue() noexcept { queueMutex_.unlock(); }
 
     double currentPositionLocked() const noexcept {
         if (!hasCurrent_.load(std::memory_order_acquire))
@@ -570,25 +582,25 @@ class Engine final {
         std::unique_lock<std::shared_mutex> lk(*m);
         const char* sql = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
                           "volume, shuffle_perm FROM engine_state WHERE id=1";
-        sqlite3_stmt* stmt = nullptr;
-        int rc = sqlite3_prepare_v2(h, sql, -1, &stmt, nullptr);
+        sqlite3_stmt* raw = nullptr;
+        int rc = sqlite3_prepare_v2(h, sql, -1, &raw, nullptr);
+        StmtGuard stmt(raw);
         if (rc != SQLITE_OK) {
-            if (stmt)
-                sqlite3_finalize(stmt);
             return caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed");
         }
-        rc = sqlite3_step(stmt);
+        raw = stmt.get();
+        rc = sqlite3_step(raw);
         if (rc == SQLITE_ROW) {
-            state_.shuffleEnabled = sqlite3_column_int(stmt, 0);
-            state_.repeatMode = (RepeatMode)sqlite3_column_int(stmt, 1);
-            state_.cursorPos = sqlite3_column_int64(stmt, 2);
-            state_.currentTrackId = sqlite3_column_int64(stmt, 3);
-            state_.volume = (float)sqlite3_column_double(stmt, 4);
+            state_.shuffleEnabled = sqlite3_column_int(raw, 0);
+            state_.repeatMode = (RepeatMode)sqlite3_column_int(raw, 1);
+            state_.cursorPos = sqlite3_column_int64(raw, 2);
+            state_.currentTrackId = sqlite3_column_int64(raw, 3);
+            state_.volume = (float)sqlite3_column_double(raw, 4);
             if (state_.volume < 0 || state_.volume > 1)
                 state_.volume = 1.0f;
             volume_.store(state_.volume, std::memory_order_relaxed);
-            const void* blob = sqlite3_column_blob(stmt, 5);
-            int blobBytes = sqlite3_column_bytes(stmt, 5);
+            const void* blob = sqlite3_column_blob(raw, 5);
+            int blobBytes = sqlite3_column_bytes(raw, 5);
             queue_.perm.clear();
             queue_.perm.shrink_to_fit();
             queue_.cursor = 0;
@@ -611,10 +623,8 @@ class Engine final {
                 // clamp later via queueCount if needed; don't reset to 0
             }
             queue_.queueId = 1;
-            sqlite3_finalize(stmt);
             return std::nullopt;
         }
-        sqlite3_finalize(stmt);
         if (rc == SQLITE_DONE) {
             state_.shuffleEnabled = 0;
             state_.repeatMode = RepeatMode::Off;
@@ -637,29 +647,29 @@ class Engine final {
             const char* sql =
                 "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
                 "cursor_pos=?, current_track_id=?, volume=?, updated=CURRENT_TIMESTAMP WHERE id=1";
-            sqlite3_stmt* stmt = nullptr;
-            int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+            sqlite3_stmt* raw = nullptr;
+            int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
+            StmtGuard stmt(raw);
             if (rc != SQLITE_OK)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
-            sqlite3_bind_int(stmt, 1, state_.shuffleEnabled);
-            sqlite3_bind_int(stmt, 2, (int)state_.repeatMode);
+            raw = stmt.get();
+            sqlite3_bind_int(raw, 1, state_.shuffleEnabled);
+            sqlite3_bind_int(raw, 2, (int)state_.repeatMode);
             if (queue_.shuffle && !queue_.perm.empty()) {
                 if (queue_.perm.size() >
                     (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
-                    sqlite3_finalize(stmt);
                     return std::unexpected(
                         caudio::utils::makeError(caudio::utils::Result::NoMem, "perm too large"));
                 }
-                sqlite3_bind_blob(stmt, 3, queue_.perm.data(),
-                                  (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
+                sqlite3_bind_blob(raw, 3, queue_.perm.data(),
+                                   (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
             } else
-                sqlite3_bind_null(stmt, 3);
-            sqlite3_bind_int64(stmt, 4, state_.cursorPos);
-            sqlite3_bind_int64(stmt, 5, state_.currentTrackId);
-            sqlite3_bind_double(stmt, 6, (double)state_.volume);
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
+                sqlite3_bind_null(raw, 3);
+            sqlite3_bind_int64(raw, 4, state_.cursorPos);
+            sqlite3_bind_int64(raw, 5, state_.currentTrackId);
+            sqlite3_bind_double(raw, 6, (double)state_.volume);
+            rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
@@ -671,26 +681,26 @@ class Engine final {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql = "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, "
                               "shuffle_enabled=? WHERE id=1";
-            sqlite3_stmt* stmt = nullptr;
-            int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+            sqlite3_stmt* raw = nullptr;
+            int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
+            StmtGuard stmt(raw);
             if (rc != SQLITE_OK)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
+            raw = stmt.get();
             if (queue_.shuffle && !queue_.perm.empty()) {
                 if (queue_.perm.size() >
                     (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
-                    sqlite3_finalize(stmt);
                     return std::unexpected(
                         caudio::utils::makeError(caudio::utils::Result::NoMem, "perm large"));
                 }
-                sqlite3_bind_blob(stmt, 1, queue_.perm.data(),
-                                  (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
+                sqlite3_bind_blob(raw, 1, queue_.perm.data(),
+                                   (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
             } else
-                sqlite3_bind_null(stmt, 1);
-            sqlite3_bind_int64(stmt, 2, (int64_t)queue_.cursor);
-            sqlite3_bind_int(stmt, 3, queue_.shuffle ? 1 : 0);
-            rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
+                sqlite3_bind_null(raw, 1);
+            sqlite3_bind_int64(raw, 2, (int64_t)queue_.cursor);
+            sqlite3_bind_int(raw, 3, queue_.shuffle ? 1 : 0);
+            rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
@@ -704,13 +714,14 @@ class Engine final {
     std::expected<void, caudio::utils::Error> persistCursorLocked() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql = "UPDATE engine_state SET cursor_pos=? WHERE id=1";
-            sqlite3_stmt* stmt = nullptr;
-            if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK)
+            sqlite3_stmt* raw = nullptr;
+            if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
-            sqlite3_bind_int64(stmt, 1, (int64_t)queue_.cursor);
-            int rc = sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
+            StmtGuard stmt(raw);
+            raw = stmt.get();
+            sqlite3_bind_int64(raw, 1, (int64_t)queue_.cursor);
+            int rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
@@ -733,20 +744,20 @@ class Engine final {
             std::shared_lock<std::shared_mutex> lk(*m);
             const char* sql =
                 "SELECT track_id FROM queue WHERE queue_id=? ORDER BY position LIMIT 1 OFFSET ?";
-            sqlite3_stmt* stmt = nullptr;
-            if (sqlite3_prepare_v2(h, sql, -1, &stmt, nullptr) != SQLITE_OK)
+            sqlite3_stmt* raw = nullptr;
+            if (sqlite3_prepare_v2(h, sql, -1, &raw, nullptr) != SQLITE_OK)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
-            sqlite3_bind_int64(stmt, 1, qid);
-            sqlite3_bind_int64(stmt, 2, pos);
-            int rc = sqlite3_step(stmt);
+            StmtGuard stmt(raw);
+            raw = stmt.get();
+            sqlite3_bind_int64(raw, 1, qid);
+            sqlite3_bind_int64(raw, 2, pos);
+            int rc = sqlite3_step(raw);
             if (rc != SQLITE_ROW) {
-                sqlite3_finalize(stmt);
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::NotFound, "not found"));
             }
-            trackId = sqlite3_column_int64(stmt, 0);
-            sqlite3_finalize(stmt);
+            trackId = sqlite3_column_int64(raw, 0);
         }
         auto tr = db_->getTrack(trackId);
         if (!tr)
@@ -754,9 +765,9 @@ class Engine final {
         return tr.value();
     }
 
-    // Requires queueLock_ held (caller must have tryLockQueue()/queueLock_ == 1).
+    // Requires queueMutex_ held via tryLockQueue() success.
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on) {
-        // assert: queueLock_.load(acquire) == 1  (external sync required)
+        // assert: queueMutex_ locked by caller
         bool want = on;
         if (queue_.shuffle == want && !queue_.perm.empty())
             return {};
@@ -1159,21 +1170,23 @@ class Engine final {
             return;
         }
         // fetch track
-        sqlite3_stmt* stmt = nullptr;
-        const char* selSql = "SELECT id, play_count FROM tracks WHERE id=?";
         bool ok = true;
         int64_t playCount = 0;
-        rc = sqlite3_prepare_v2(h, selSql, -1, &stmt, nullptr);
-        if (rc != SQLITE_OK)
-            ok = false;
-        else {
-            sqlite3_bind_int64(stmt, 1, currentTrack_.id);
-            if (sqlite3_step(stmt) == SQLITE_ROW)
-                playCount = sqlite3_column_int64(stmt, 1);
-            else
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* selSql = "SELECT id, play_count FROM tracks WHERE id=?";
+            rc = sqlite3_prepare_v2(h, selSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
                 ok = false;
-            sqlite3_finalize(stmt);
-            stmt = nullptr;
+            else {
+                raw = guard.get();
+                sqlite3_bind_int64(raw, 1, currentTrack_.id);
+                if (sqlite3_step(raw) == SQLITE_ROW)
+                    playCount = sqlite3_column_int64(raw, 1);
+                else
+                    ok = false;
+            }
         }
         if (!ok) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
@@ -1181,20 +1194,23 @@ class Engine final {
             return;
         }
         // update track
-        const char* updSql = "UPDATE tracks SET play_count=?, last_played=? WHERE id=?";
-        rc = sqlite3_prepare_v2(h, updSql, -1, &stmt, nullptr);
-        if (rc != SQLITE_OK)
-            ok = false;
-        else {
-            int64_t nowSec = (int64_t)(detail::nowMs() / 1000);
-            sqlite3_bind_int64(stmt, 1, playCount + 1);
-            sqlite3_bind_int64(stmt, 2, nowSec);
-            sqlite3_bind_int64(stmt, 3, currentTrack_.id);
-            rc = sqlite3_step(stmt);
-            if (rc != SQLITE_DONE)
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* updSql = "UPDATE tracks SET play_count=?, last_played=? WHERE id=?";
+            rc = sqlite3_prepare_v2(h, updSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
                 ok = false;
-            sqlite3_finalize(stmt);
-            stmt = nullptr;
+            else {
+                raw = guard.get();
+                int64_t nowSec = (int64_t)(detail::nowMs() / 1000);
+                sqlite3_bind_int64(raw, 1, playCount + 1);
+                sqlite3_bind_int64(raw, 2, nowSec);
+                sqlite3_bind_int64(raw, 3, currentTrack_.id);
+                rc = sqlite3_step(raw);
+                if (rc != SQLITE_DONE)
+                    ok = false;
+            }
         }
         if (!ok) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
@@ -1202,30 +1218,33 @@ class Engine final {
             return;
         }
         // history insert
-        const char* insSql = "INSERT INTO history (track_id, started_at, completed_at, "
-                             "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
-        rc = sqlite3_prepare_v2(h, insSql, -1, &stmt, nullptr);
-        if (rc != SQLITE_OK)
-            ok = false;
-        else {
-            int64_t posMs = (int64_t)(pos * 1000.0);
-            double compPct = 0;
-            if (dur > 0) {
-                compPct = (pos / dur) * 100;
-                if (compPct > 100)
-                    compPct = 100;
-            }
-            sqlite3_bind_int64(stmt, 1, currentTrack_.id);
-            sqlite3_bind_int64(stmt, 2, startedMs_);
-            sqlite3_bind_int64(stmt, 3, (int64_t)detail::nowMs());
-            sqlite3_bind_int64(stmt, 4, posMs);
-            sqlite3_bind_double(stmt, 5, compPct);
-            sqlite3_bind_int64(stmt, 6, queue_.queueId ? queue_.queueId : 1);
-            rc = sqlite3_step(stmt);
-            if (rc != SQLITE_DONE)
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* insSql = "INSERT INTO history (track_id, started_at, completed_at, "
+                                 "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
+            rc = sqlite3_prepare_v2(h, insSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
                 ok = false;
-            sqlite3_finalize(stmt);
-            stmt = nullptr;
+            else {
+                raw = guard.get();
+                int64_t posMs = (int64_t)(pos * 1000.0);
+                double compPct = 0;
+                if (dur > 0) {
+                    compPct = (pos / dur) * 100;
+                    if (compPct > 100)
+                        compPct = 100;
+                }
+                sqlite3_bind_int64(raw, 1, currentTrack_.id);
+                sqlite3_bind_int64(raw, 2, startedMs_);
+                sqlite3_bind_int64(raw, 3, (int64_t)detail::nowMs());
+                sqlite3_bind_int64(raw, 4, posMs);
+                sqlite3_bind_double(raw, 5, compPct);
+                sqlite3_bind_int64(raw, 6, queue_.queueId ? queue_.queueId : 1);
+                rc = sqlite3_step(raw);
+                if (rc != SQLITE_DONE)
+                    ok = false;
+            }
         }
         if (!ok) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
@@ -1398,7 +1417,7 @@ class Engine final {
     // gaplessArmed_: 0→1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
-    std::atomic<int> queueLock_{0}; // spin-lock for queue_ (0=unlocked, 1=locked) — use tryLockQueue()
+    std::mutex queueMutex_;
 };
 
 } // namespace caudio::engine

@@ -4,6 +4,7 @@ module;
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <optional>
 #include <string>
@@ -28,7 +29,7 @@ struct Config {
     std::filesystem::path dbPath{};
     std::filesystem::path configPath{};
     std::string device{"auto"};
-    int logLevel{2};
+    int logLevel{2}; // 0=trace,1=debug,2=info,3=warn,4=error (default: info)
     std::string socketPath{};
 };
 
@@ -78,6 +79,15 @@ inline std::filesystem::path defaultConfigPath() {
     return base / "config.json";
 }
 
+inline caudio::utils::Expected<std::string> readFileString(const std::filesystem::path& p) {
+    std::ifstream in(p);
+    if (!in) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+    }
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    return content;
+}
+
 } // namespace detail
 
 inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
@@ -94,11 +104,9 @@ inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& p
         return cfg;
     }
 
-    std::ifstream in(cfgFile);
-    if (!in) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
-    }
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    auto fileRes = detail::readFileString(cfgFile);
+    if (!fileRes) return std::unexpected{fileRes.error()};
+    std::string content = std::move(*fileRes);
     if (content.empty()) {
         return cfg;
     }
@@ -166,13 +174,7 @@ inline std::string hex8ForDb(const std::filesystem::path& dbPath) {
     std::size_t raw = std::hash<std::string>{}(input);
     std::uint32_t hv = static_cast<std::uint32_t>(raw & 0xFFFFFFFFu);
     hv ^= static_cast<std::uint32_t>((raw >> 32) & 0xFFFFFFFFu);
-    constexpr char kHex[] = "0123456789abcdef";
-    std::array<char, 9> buf{};
-    for (int i = 7; i >= 0; --i) {
-        buf[static_cast<std::size_t>(i)] = kHex[hv & 0xFu];
-        hv >>= 4;
-    }
-    return std::string(buf.data(), 8);
+    return std::format("{:08x}", hv);
 }
 inline std::filesystem::path baseDirForSocket() {
 #ifdef _WIN32
@@ -256,11 +258,9 @@ inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::
     if (!std::filesystem::exists(p, ec)) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
     }
-    std::ifstream in(p);
-    if (!in) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
-    }
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    auto fileRes = detail::readFileString(p);
+    if (!fileRes) return std::unexpected{fileRes.error()};
+    std::string content = std::move(*fileRes);
     if (content.empty()) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + std::string(key))};
     }
@@ -286,9 +286,9 @@ inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p
     caudio::json::ordered_json j = caudio::json::ordered_json::object();
     std::error_code ec;
     if (std::filesystem::exists(p, ec)) {
-        std::ifstream in(p);
-        if (in) {
-            std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        auto fileRes = detail::readFileString(p);
+        if (fileRes) {
+            std::string content = std::move(*fileRes);
             if (!content.empty()) {
                 try {
                     auto parsed = caudio::json::ordered_json::parse(content);
@@ -334,9 +334,9 @@ inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p
 inline caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p) {
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) return std::vector<RawConfigValue>{};
-    std::ifstream in(p);
-    if (!in) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
-    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    auto fileRes = detail::readFileString(p);
+    if (!fileRes) return std::unexpected{fileRes.error()};
+    std::string content = std::move(*fileRes);
     if (content.empty()) return std::vector<RawConfigValue>{};
     try {
         auto j = caudio::json::ordered_json::parse(content);

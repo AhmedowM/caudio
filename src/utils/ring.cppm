@@ -5,12 +5,21 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
 #include <span>
+#include <type_traits>
 #include <vector>
 
 export module caudio.utils:ring;
 
 export namespace caudio::utils {
+
+#ifdef __cpp_lib_hardware_interference_size
+inline constexpr std::size_t kRingCacheLine = std::hardware_destructive_interference_size;
+#else
+inline constexpr std::size_t kRingCacheLine = 64uz;
+static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must be power-of-2");
+#endif
 
 // SPSC ring: single-producer / single-consumer.
 // - wr / rd are cache-line padded atomics (see members below).
@@ -21,6 +30,7 @@ export namespace caudio::utils {
 //   No internal lock; concurrent reset with read/write is a data race.
 //   gaplessArmed_ semantics: 0→1 CAS arms gapless transition 300ms before track end.
 template <typename T>
+    requires std::is_trivially_copyable_v<T>
 class SpscRing {
   public:
     SpscRing() = delete;
@@ -142,8 +152,8 @@ class SpscRing {
     std::size_t cap_{0};
     std::uint32_t channels_{1};
     std::vector<T> buf_{};
-    alignas(64) std::atomic<std::size_t> wr_{0};
-    alignas(64) std::atomic<std::size_t> rd_{0};
+    alignas(kRingCacheLine) std::atomic<std::size_t> wr_{0};
+    alignas(kRingCacheLine) std::atomic<std::size_t> rd_{0};
 };
 
 } // namespace caudio::utils

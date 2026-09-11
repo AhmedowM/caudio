@@ -437,6 +437,15 @@ ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
 # Needed on MinGW for template instantiation deduplication across executable + static libs
 target_link_options(caudio PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+# GCC 14+ <print> requires libstdc++exp on MinGW/GCC
+if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  find_library(STDCXX_EXP_LIB stdc++exp)
+  if(STDCXX_EXP_LIB)
+    target_link_libraries(caudio PRIVATE stdc++exp)
+    target_link_libraries(caudio_client PRIVATE stdc++exp)
+    target_link_libraries(caudio_cli_shared PRIVATE stdc++exp)
+  endif()
+endif()
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)

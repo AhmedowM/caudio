@@ -5,11 +5,13 @@ module;
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,7 +24,7 @@ import :types;
 namespace caudio::db::detail {
 
 // BLAKE3(head 64K ∥ tail 64K ∥ LE64(size) ∥ LE32(ver=1)) sampled
-inline constexpr size_t kSample = 64 * 1024;
+inline constexpr size_t kSample = 64uz * 1024uz;
 
 inline std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path) {
@@ -36,9 +38,9 @@ computeFingerprint(const std::filesystem::path& path) {
             caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
-    std::vector<uint8_t> buf(kSample);
+    thread_local std::array<std::byte, kSample> buf{};
     // head
-    f.read(reinterpret_cast<char*>(buf.data()), kSample);
+    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
     size_t n = (size_t)f.gcount();
     if (n)
         blake3_hasher_update(&hasher, buf.data(), n);
@@ -47,7 +49,7 @@ computeFingerprint(const std::filesystem::path& path) {
         f.clear();
         f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
         if (f) {
-            f.read(reinterpret_cast<char*>(buf.data()), kSample);
+            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
             n = (size_t)f.gcount();
             if (n)
                 blake3_hasher_update(&hasher, buf.data(), n);
@@ -227,10 +229,15 @@ inline std::array<uint8_t, 32> fallbackFingerprint(std::string_view path) noexce
 }
 
 struct SqliteErrGuard {
-    char* p;
+    char*& ref;
+    explicit SqliteErrGuard(char*& r) : ref(r) {}
+    SqliteErrGuard(const SqliteErrGuard&) = delete;
+    SqliteErrGuard& operator=(const SqliteErrGuard&) = delete;
     ~SqliteErrGuard() {
-        if (p)
-            sqlite3_free(p);
+        if (ref) {
+            sqlite3_free(ref);
+            ref = nullptr;
+        }
     }
 };
 

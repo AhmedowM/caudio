@@ -1,4 +1,5 @@
 module;
+#include <format>
 #include <string_view>
 
 export module caudio.utils:result;
@@ -22,32 +23,33 @@ enum class Result : int {
 };
 
 constexpr std::string_view toString(Result r) noexcept {
+    using enum Result;
     switch (r) {
-    case Result::Ok:
+    case Ok:
         return "Ok";
-    case Result::InvalidArg:
+    case InvalidArg:
         return "InvalidArg";
-    case Result::NotFound:
+    case NotFound:
         return "NotFound";
-    case Result::Unsupported:
+    case Unsupported:
         return "Unsupported";
-    case Result::Io:
+    case Io:
         return "Io";
-    case Result::Device:
+    case Device:
         return "Device";
-    case Result::State:
+    case State:
         return "State";
-    case Result::NoMem:
+    case NoMem:
         return "NoMem";
-    case Result::Internal:
+    case Internal:
         return "Internal";
-    case Result::AlreadyExists:
+    case AlreadyExists:
         return "AlreadyExists";
-    case Result::Busy:
+    case Busy:
         return "Busy";
-    case Result::Corrupt:
+    case Corrupt:
         return "Corrupt";
-    case Result::NoSpace:
+    case NoSpace:
         return "NoSpace";
     default:
         return "Unknown";
@@ -55,3 +57,10 @@ constexpr std::string_view toString(Result r) noexcept {
 }
 
 } // namespace caudio::utils
+
+template <>
+struct std::formatter<caudio::utils::Result> : std::formatter<std::string_view> {
+    auto format(caudio::utils::Result r, auto& ctx) const {
+        return std::formatter<std::string_view>::format(caudio::utils::toString(r), ctx);
+    }
+};

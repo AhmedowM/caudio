@@ -70,7 +70,7 @@ public:
                     try {
                         prom->set_value(std::unexpected{caudio::utils::Error{
                             caudio::utils::Result::State,
-                            "daemon not running — run 'caudio start'"}});
+                            std::string_view{"daemon not running — run 'caudio start'"}}});
                     } catch (...) {
                     }
                     return;

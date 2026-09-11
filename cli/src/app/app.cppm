@@ -9,6 +9,7 @@ module;
 #include <format>
 #include <iostream>
 #include <optional>
+#include <print>
 #include <span>
 #include <string>
 #include <string_view>
@@ -17,6 +18,7 @@ module;
 #include <variant>
 #include <vector>
 #include "caudio/version.hpp"
+#include "parse.hpp"
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -47,71 +49,12 @@ import caudio.player;
 export namespace caudio::app {
 
 namespace detail {
+// Single source: delegate to caudio::app::parse::parseTime (parse.hpp) and adapt error type.
+// parse.hpp returns expected<double,string>; app layer wraps string into utils::Error.
 inline std::expected<double, caudio::utils::Error> parseTime(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t' || s.front() == '\r' || s.front() == '\n')) {
-        s.remove_prefix(1);
-    }
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\r' || s.back() == '\n')) {
-        s.remove_suffix(1);
-    }
-    if (s.empty()) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time")};
-    }
-    size_t colonCount = 0;
-    for (char c : s) {
-        if (c == ':') ++colonCount;
-    }
-    if (colonCount > 0) {
-        double parts[3] = {0, 0, 0};
-        std::string_view rem = s;
-        int idx = 0;
-        while (idx < 3) {
-            size_t nxt = rem.find(':');
-            std::string_view tok = (nxt == std::string_view::npos) ? rem : rem.substr(0, nxt);
-            if (tok.empty()) {
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty time component")};
-            }
-            bool isLast = (nxt == std::string_view::npos);
-            if (isLast) {
-                double v = 0;
-                auto r = std::from_chars(tok.data(), tok.data() + tok.size(), v);
-                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
-                }
-                parts[idx++] = v;
-                break;
-            } else {
-                int iv = 0;
-                auto r = std::from_chars(tok.data(), tok.data() + tok.size(), iv);
-                if (r.ec != std::errc{} || r.ptr != tok.data() + tok.size()) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time component")};
-                }
-                if (iv < 0) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "negative time component")};
-                }
-                parts[idx++] = static_cast<double>(iv);
-                rem.remove_prefix(nxt + 1);
-            }
-        }
-        double total = 0;
-        if (colonCount == 1) total = parts[0] * 60.0 + parts[1];
-        else if (colonCount == 2) total = parts[0] * 3600.0 + parts[1] * 60.0 + parts[2];
-        else return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "too many colons")};
-        if (!std::isfinite(total) || total < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
-        }
-        return total;
-    } else {
-        double v = 0;
-        auto r = std::from_chars(s.data(), s.data() + s.size(), v);
-        if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
-        }
-        if (!std::isfinite(v) || v < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid time")};
-        }
-        return v;
-    }
+    auto r = caudio::app::parse::parseTime(s);
+    if (!r) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, r.error())};
+    return *r;
 }
 inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
@@ -333,7 +276,7 @@ inline std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::cli::Co
 
 inline int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-    if (conn) { std::cout << std::format("daemon already running at {}\n", config_.socketPath); return 0; }
+    if (conn) { std::println("daemon already running at {}", config_.socketPath); return 0; }
     // Ensure db parent dirs exist before trying to start service (foreground)
     {
         std::error_code ec2;
@@ -343,26 +286,26 @@ inline int App::handleStart(bool foreground) {
     caudio::service::ServiceConfig scfg; scfg.dbPath = config_.dbPath; scfg.socketPath = config_.socketPath; scfg.configPath = config_.configPath; scfg.logLevel = config_.logLevel;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
-        if (!svc) { std::cerr << std::format("start failed: {} {} (dbPath={})\n", std::to_string(std::to_underlying(svc.error().code)), svc.error().message, config_.dbPath.generic_string()); return 1; }
-        std::cout << std::format("starting daemon foreground at {} db={}\n", config_.socketPath, config_.dbPath.generic_string());
-        std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::cerr << std::format("daemon error: {} (dbPath={})\n", res.error().message, config_.dbPath.generic_string()); return 1; } return 0;
+        if (!svc) { std::println(std::cerr, "start failed: {} {} (dbPath={})", std::to_string(std::to_underlying(svc.error().code)), svc.error().message, config_.dbPath.generic_string()); return 1; }
+        std::println("starting daemon foreground at {} db={}", config_.socketPath, config_.dbPath.generic_string());
+        std::stop_source ss; auto res = svc.value()->run(ss.get_token()); if (!res) { std::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message, config_.dbPath.generic_string()); return 1; } return 0;
     } else {
         auto spawnRes = spawnDaemon(config_);
         if (!spawnRes) {
             std::uint32_t err = spawnRes.error();
-            std::cerr << std::format("start failed: CreateProcess failed {} at {} db={}\n", err, config_.socketPath, config_.dbPath.generic_string());
+            std::println(std::cerr, "start failed: CreateProcess failed {} at {} db={}", err, config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
         // Poll for pipe readiness: 1500ms total, 100ms interval ×15
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {
-                std::cout << std::format("daemon started at {}\n", config_.socketPath);
+                std::println("daemon started at {}", config_.socketPath);
                 return 0;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        std::cerr << std::format("daemon start failed, socket not reachable at {} db={}\n", config_.socketPath, config_.dbPath.generic_string());
+        std::println(std::cerr, "daemon start failed, socket not reachable at {} db={}", config_.socketPath, config_.dbPath.generic_string());
         return 1;
     }
 }
@@ -374,7 +317,7 @@ inline int App::handleShutdown() {
     if (!res) {
         // if daemon not running, report
         if (res.error().code == caudio::utils::Result::State) {
-            std::cerr << std::format("shutdown: daemon not running\n");
+            std::println(std::cerr, "shutdown: daemon not running");
             return 1;
         }
         // even if send failed, attempt to poll pid file
@@ -393,19 +336,19 @@ inline int App::handleShutdown() {
         }
     }
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-    if (conn) { std::cerr << std::format("shutdown: daemon still running at {}\n", config_.socketPath); return 1; }
-    std::cout << std::format("daemon stopped\n");
+    if (conn) { std::println(std::cerr, "shutdown: daemon still running at {}", config_.socketPath); return 1; }
+    std::println("daemon stopped");
     return 0;
 }
 
 inline int App::handlePreview(const std::string& file) {
-    std::filesystem::path p{file}; std::error_code ec; if (!std::filesystem::exists(p, ec)) { std::cerr << std::format("preview: file not found {}\n", file); return 1; }
-    auto playerRes = caudio::player::Player::create(); if (!playerRes) { std::cerr << std::format("preview: player create failed {} {}\n", std::to_string(std::to_underlying(playerRes.error().code)), playerRes.error().message); return 1; }
-    auto& player = *playerRes.value(); auto openRes = player.open(file); if (!openRes) { std::cerr << std::format("preview: open failed {} {}\n", std::to_string(std::to_underlying(openRes.error().code)), openRes.error().message); return 1; }
-    auto playRes = player.play(); if (!playRes) { std::cerr << std::format("preview: play failed {} {}\n", std::to_string(std::to_underlying(playRes.error().code)), playRes.error().message); return 1; }
-    std::cout << std::format("preview playing {}\n", file); std::span<const std::byte> dummy; (void)dummy;
+    std::filesystem::path p{file}; std::error_code ec; if (!std::filesystem::exists(p, ec)) { std::println(std::cerr, "preview: file not found {}", file); return 1; }
+    auto playerRes = caudio::player::Player::create(); if (!playerRes) { std::println(std::cerr, "preview: player create failed {} {}", std::to_string(std::to_underlying(playerRes.error().code)), playerRes.error().message); return 1; }
+    auto& player = *playerRes.value(); auto openRes = player.open(file); if (!openRes) { std::println(std::cerr, "preview: open failed {} {}", std::to_string(std::to_underlying(openRes.error().code)), openRes.error().message); return 1; }
+    auto playRes = player.play(); if (!playRes) { std::println(std::cerr, "preview: play failed {} {}", std::to_string(std::to_underlying(playRes.error().code)), playRes.error().message); return 1; }
+    std::println("preview playing {}", file);
     while (player.state() == caudio::player::State::Playing) { std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
-    std::cout << std::format("preview done\n"); return 0;
+    std::println("preview done"); return 0;
 }
 inline int App::run(int argc, char** argv) {
     if (argc > 0 && argv && argv[0]) argv0_ = argv[0];
@@ -495,7 +438,6 @@ inline int App::run(int argc, char** argv) {
         auto parent = config_.dbPath.parent_path();
         if (!parent.empty()) std::filesystem::create_directories(parent, ec2);
     }
-    std::span<char> dummySpan; (void)dummySpan; std::error_code ec; (void)std::filesystem::exists(config_.dbPath, ec);
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {
         return handleStart(true);
@@ -516,13 +458,13 @@ inline int App::run(int argc, char** argv) {
     if (nextCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Next{}}; return sendViaClient(cmd,false); }
     if (prevCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::Prev{}}; return sendViaClient(cmd,false); }
     if (seekCmd->parsed()) {
-        auto parsed = detail::parseSeek(seekStr); if (!parsed) { std::cerr << std::format("seek: {}\n", parsed.error().message); return 1; }
+        auto parsed = detail::parseSeek(seekStr); if (!parsed) { std::println(std::cerr, "seek: {}", parsed.error().message); return 1; }
         double target=*parsed; bool isRelative=!seekStr.empty() && (seekStr.front()=='+'||seekStr.front()=='-');
         if (isRelative) { caudio::client::Client client{config_.dbPath, config_.socketPath}; auto sres=client.send(caudio::cli::Command{caudio::cli::StatusReq{}}); double pos=0; bool hasPos=false; if (sres) { if (auto* ps = std::get_if<caudio::cli::Status>(&*sres)) { pos = ps->pos; hasPos=true; } } if (hasPos) { target=pos+target; if(target<0) target=0; } else { if(target<0) target=0; } }
         caudio::cli::Command cmd{caudio::cli::Seek{target}}; return sendViaClient(cmd,false);
     }
     if (statusCmd->parsed()) { caudio::cli::Command cmd{caudio::cli::StatusReq{}}; return sendViaClient(cmd, jsonFlag); }
-    if (volumeCmd->parsed()) { auto pv=detail::parseVolume(volumeArg); if(!pv){ std::cerr<<std::format("volume: {}\n",pv.error().message); return 1; } caudio::cli::Command cmd{*pv}; return sendViaClient(cmd,false); }
+    if (volumeCmd->parsed()) { auto pv=detail::parseVolume(volumeArg); if(!pv){ std::println(std::cerr, "volume: {}", pv.error().message); return 1; } caudio::cli::Command cmd{*pv}; return sendViaClient(cmd,false); }
     if (queueCmd->parsed()) {
         if (qList->parsed()) { caudio::cli::Command cmd{caudio::cli::QueueList{}}; return sendViaClient(cmd,qJson); }
         if (qQueues->parsed()) { caudio::cli::Command cmd{caudio::cli::QueueQueues{}}; return sendViaClient(cmd,false); }
@@ -531,8 +473,8 @@ inline int App::run(int argc, char** argv) {
         if (qRemove->parsed()) { caudio::cli::Command cmd{caudio::cli::QueueRemove{qRemoveId}}; return sendViaClient(cmd,false); }
         if (qMove->parsed()) { caudio::cli::Command cmd{caudio::cli::QueueMove{qFrom,qTo}}; return sendViaClient(cmd,false); }
         if (qClear->parsed()) { caudio::cli::Command cmd{caudio::cli::QueueClear{}}; return sendViaClient(cmd,false); }
-        if (qShuffle->parsed()) { std::optional<bool> on; if(qShuffleArg=="on") on=true; else if(qShuffleArg=="off") on=false; else if(!qShuffleArg.empty()){ std::cerr<<std::format("shuffle: invalid mode {}\n",qShuffleArg); return 1; } caudio::cli::Command cmd{caudio::cli::QueueShuffle{on}}; return sendViaClient(cmd,false); }
-        if (qRepeat->parsed()) { std::optional<caudio::engine::RepeatMode> m; if(qRepeatArg=="off") m=caudio::engine::RepeatMode::Off; else if(qRepeatArg=="one") m=caudio::engine::RepeatMode::One; else if(qRepeatArg=="all") m=caudio::engine::RepeatMode::Queue; else if(!qRepeatArg.empty()){ std::cerr<<std::format("repeat: invalid mode {}\n",qRepeatArg); return 1; } caudio::cli::Command cmd{caudio::cli::QueueRepeat{m}}; return sendViaClient(cmd,false); }
+        if (qShuffle->parsed()) { std::optional<bool> on; if(qShuffleArg=="on") on=true; else if(qShuffleArg=="off") on=false; else if(!qShuffleArg.empty()){ std::println(std::cerr, "shuffle: invalid mode {}", qShuffleArg); return 1; } caudio::cli::Command cmd{caudio::cli::QueueShuffle{on}}; return sendViaClient(cmd,false); }
+        if (qRepeat->parsed()) { std::optional<caudio::engine::RepeatMode> m; if(qRepeatArg=="off") m=caudio::engine::RepeatMode::Off; else if(qRepeatArg=="one") m=caudio::engine::RepeatMode::One; else if(qRepeatArg=="all") m=caudio::engine::RepeatMode::Queue; else if(!qRepeatArg.empty()){ std::println(std::cerr, "repeat: invalid mode {}", qRepeatArg); return 1; } caudio::cli::Command cmd{caudio::cli::QueueRepeat{m}}; return sendViaClient(cmd,false); }
         std::cout << queueCmd->help() << "\n"; return 0;
     }
     if (plCmd->parsed()) {
@@ -564,9 +506,9 @@ inline int App::run(int argc, char** argv) {
         std::string shmName = std::to_string(hash);
         auto shmRes = caudio::service::createShmStatus(shmName, false);
         if (!shmRes) {
-            std::cerr << std::format("tui: failed to connect to shared memory status: {}\n", shmRes.error().message);
+            std::println(std::cerr, "tui: failed to connect to shared memory status: {}", shmRes.error().message);
         }
-        std::cout << std::format("tui: not implemented (daemon ensured, shm ready)\n");
+        std::println("tui: not implemented (daemon ensured, shm ready)");
         return 0;
     }
     if (cfgCmd->parsed()) {

@@ -23,11 +23,11 @@ export namespace caudio::db {
 struct WriteOp {
     std::string sql;
     std::unique_ptr<Statement> stmt;
-    std::function<void(std::expected<void, caudio::utils::Error>)> cb;
+    std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb;
 
     WriteOp() = default;
     WriteOp(std::string s, std::unique_ptr<Statement> st,
-            std::function<void(std::expected<void, caudio::utils::Error>)> c)
+            std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c)
         : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
     WriteOp(const WriteOp&) = delete;
     WriteOp& operator=(const WriteOp&) = delete;
@@ -86,7 +86,7 @@ class WriterThread final {
 
     std::expected<void, caudio::utils::Error>
     push(std::string sql, std::unique_ptr<Statement> stmt,
-         std::function<void(std::expected<void, caudio::utils::Error>)> cb) {
+         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
         WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
         auto r = queue_->push(std::move(op));
         if (!r)
@@ -96,25 +96,17 @@ class WriterThread final {
     }
 
     std::expected<void, caudio::utils::Error> flush() {
-        auto start = std::chrono::steady_clock::now();
-        while (true) {
-            std::size_t s = queue_->size();
-            int flight = in_flight_.load(std::memory_order_acquire);
-            if (s == 0 && flight == 0)
-                return {};
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
-            if (elapsed.count() >= 200) {
-                // re-check
-                s = queue_->size();
-                flight = in_flight_.load(std::memory_order_acquire);
-                if (s == 0 && flight == 0)
-                    return {};
-                return std::unexpected{
-                    caudio::utils::makeError(caudio::utils::Result::Busy, "flush timeout")};
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds{1});
-        }
+        std::unique_lock<std::mutex> lk(mtx_);
+        bool done = cv_.wait_for(lk, std::chrono::milliseconds{200}, [this] {
+            return queue_->empty() && in_flight_.load(std::memory_order_acquire) == 0;
+        });
+        if (done)
+            return {};
+        // predicate false after timeout — re-check without race
+        if (queue_->empty() && in_flight_.load(std::memory_order_acquire) == 0)
+            return {};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::Result::Busy, "flush timeout")};
     }
 
     bool empty() const {
@@ -164,7 +156,11 @@ class WriterThread final {
                 }
             }
             in_flight_.fetch_sub(1, std::memory_order_acq_rel);
-            // callback outside lock
+            {
+                std::lock_guard<std::mutex> lk(mtx_);
+                cv_.notify_all();
+            }
+            // callback outside lock (notify already sent)
             if (op.cb) {
                 if (ok)
                     op.cb(std::expected<void, caudio::utils::Error>{});

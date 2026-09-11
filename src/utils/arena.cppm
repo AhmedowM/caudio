@@ -4,6 +4,8 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
+#include <new>
 #include <span>
 
 export module caudio.utils:arena;
@@ -12,8 +14,13 @@ export namespace caudio::utils {
 
 class Arena {
   public:
-    static constexpr std::size_t kDefaultCapacity = 64 * 1024;
-    static constexpr std::size_t kAlign = 64;
+    static constexpr std::size_t kDefaultCapacity = 64uz * 1024uz;
+#ifdef __cpp_lib_hardware_interference_size
+    static constexpr std::size_t kAlign = std::hardware_destructive_interference_size;
+#else
+    static constexpr std::size_t kAlign = 64uz;
+    static_assert((kAlign & (kAlign - 1)) == 0, "kAlign must be power-of-2");
+#endif
 
     explicit Arena(std::size_t capacity = kDefaultCapacity) : capacity_(capacity) {
         if (capacity_ > storage_.size()) {
@@ -65,7 +72,12 @@ class Arena {
 
     template <typename T>
     [[nodiscard]] T* allocateArray(std::size_t count) noexcept {
-        void* p = allocate(count * sizeof(T), alignof(T));
+        if (count > SIZE_MAX / sizeof(T))
+            return nullptr;
+        std::size_t bytes = count * sizeof(T);
+        if (offset_ > capacity_ || bytes > capacity_ - offset_)
+            return nullptr;
+        void* p = allocate(bytes, alignof(T));
         return static_cast<T*>(p);
     }
 

@@ -50,9 +50,9 @@ class MpscQueue {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t used = wr_ - rd_;
         if (used >= cap_) {
-            return std::unexpected(Error{Result::Busy, "queue full"});
+            return std::unexpected(Error{Result::Busy, std::string_view{"queue full"}});
         }
-        buf_[wr_ % cap_] = value;
+        buf_[wr_ % cap_].emplace(value);
         ++wr_;
         cv_.notify_one();
         return {};
@@ -62,9 +62,9 @@ class MpscQueue {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t used = wr_ - rd_;
         if (used >= cap_) {
-            return std::unexpected(Error{Result::Busy, "queue full"});
+            return std::unexpected(Error{Result::Busy, std::string_view{"queue full"}});
         }
-        buf_[wr_ % cap_] = std::move(value);
+        buf_[wr_ % cap_].emplace(std::move(value));
         ++wr_;
         cv_.notify_one();
         return {};
@@ -75,9 +75,9 @@ class MpscQueue {
         std::unique_lock<std::mutex> lk(mutex_);
         std::size_t used = wr_ - rd_;
         if (used >= cap_) {
-            return std::unexpected(Error{Result::Busy, "queue full"});
+            return std::unexpected(Error{Result::Busy, std::string_view{"queue full"}});
         }
-        buf_[wr_ % cap_] = T(std::forward<Args>(args)...);
+        buf_[wr_ % cap_].emplace(std::forward<Args>(args)...);
         ++wr_;
         cv_.notify_one();
         return {};
@@ -86,9 +86,10 @@ class MpscQueue {
     [[nodiscard]] Expected<T> pop() {
         std::unique_lock<std::mutex> lk(mutex_);
         if (wr_ == rd_) {
-            return std::unexpected(Error{Result::State, "queue empty"});
+            return std::unexpected(Error{Result::State, std::string_view{"queue empty"}});
         }
-        T val = std::move(buf_[rd_ % cap_]);
+        T val = std::move(*buf_[rd_ % cap_]);
+        buf_[rd_ % cap_].reset();
         ++rd_;
         return val;
     }
@@ -101,14 +102,15 @@ class MpscQueue {
             return std::nullopt;
         if (wr_ == rd_)
             return std::nullopt;
-        T val = std::move(buf_[rd_ % cap_]);
+        T val = std::move(*buf_[rd_ % cap_]);
+        buf_[rd_ % cap_].reset();
         ++rd_;
         return val;
     }
 
   private:
     std::size_t cap_;
-    std::vector<T> buf_;
+    std::vector<std::optional<T>> buf_;
     std::size_t wr_{0};
     std::size_t rd_{0};
     mutable std::mutex mutex_;

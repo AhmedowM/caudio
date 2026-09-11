@@ -1,6 +1,7 @@
 module;
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ struct Track {
     int64_t last_played{};
     int64_t date_added{};
     int64_t last_scanned{};
-    int dirty{};
+    bool dirty{false};
     int64_t deleted_at{};
     int64_t library_id{1};
 };
@@ -86,8 +87,8 @@ struct Library {
     std::string name;
     int64_t date_added{};
     int64_t last_scanned{};
-    int auto_scan{1};
-    int recursive{1};
+    bool auto_scan{true};
+    bool recursive{true};
     std::string extensions{"mp3,flac,ogg,wav,m4a"};
 };
 
@@ -105,22 +106,17 @@ struct TrackQuery {
     std::string artist;
     std::string album;
     std::string genre;
-    int32_t year{};
-    bool has_year{false};
-    int64_t library_id{};
-    bool has_library_id{false};
-    int dirty{};
-    bool has_dirty{false};
+    std::optional<int32_t> year{};
+    std::optional<int64_t> library_id{};
+    std::optional<bool> dirty{};
     int limit{};
     int offset{};
     std::string search;
 };
 
 struct HistoryQuery {
-    int64_t track_id{};
-    bool has_track_id{false};
-    int64_t queue_id{};
-    bool has_queue_id{false};
+    std::optional<int64_t> track_id{};
+    std::optional<int64_t> queue_id{};
     int limit{};
     int offset{};
 };

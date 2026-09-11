@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -247,12 +248,17 @@ class Player {
         return {};
     }
 
+    static inline float clampVolume(float v) noexcept {
+        if (!std::isfinite(v)) return 0.0f;
+        return std::clamp(v, 0.0f, 1.0f);
+    }
+
     ExpectedVoid setVolume(float volume) {
         if (std::isnan(volume) || std::isinf(volume)) {
             return std::unexpected(
                 caudio::utils::Error{caudio::utils::Result::InvalidArg, "bad volume"});
         }
-        float vol = volume < 0.0f ? 0.0f : (volume > 1.0f ? 1.0f : volume);
+        float vol = clampVolume(volume);
         volume_.store(vol, std::memory_order_relaxed);
         if (output_) {
             output_->setVolume(vol);

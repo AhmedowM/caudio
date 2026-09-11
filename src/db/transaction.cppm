@@ -4,6 +4,7 @@ module;
 #include <expected>
 #include <string>
 #include <string_view>
+#include <utility>
 
 module caudio.db:transaction;
 
@@ -14,17 +15,22 @@ namespace caudio::db {
 
 class Transaction final {
   public:
-    explicit Transaction(sqlite3* db) : db_(db) {
-        if (db_) {
-            char* err = nullptr;
-            detail::SqliteErrGuard guard{err};
-            int rc = sqlite3_exec(db_, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-            if (rc != SQLITE_OK) {
-                std::string msg = err ? err : "BEGIN failed";
-                db_ = nullptr;
-            }
+    static std::expected<Transaction, caudio::utils::Error> begin(sqlite3* db) {
+        if (!db) {
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db")};
         }
+        char* err = nullptr;
+        detail::SqliteErrGuard guard{err};
+        int rc = sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        if (rc != SQLITE_OK) {
+            std::string msg = err ? err : "BEGIN failed";
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::Internal, msg)};
+        }
+        return Transaction{db, false};
     }
+
     ~Transaction() {
         if (db_ && !committed_) {
             char* err = nullptr;
@@ -34,10 +40,8 @@ class Transaction final {
     }
     Transaction(const Transaction&) = delete;
     Transaction& operator=(const Transaction&) = delete;
-    Transaction(Transaction&& o) noexcept : db_(o.db_), committed_(o.committed_) {
-        o.db_ = nullptr;
-        o.committed_ = true;
-    }
+    Transaction(Transaction&& o) noexcept
+        : db_(std::exchange(o.db_, nullptr)), committed_(std::exchange(o.committed_, true)) {}
     Transaction& operator=(Transaction&& o) noexcept {
         if (this != &o) {
             if (db_ && !committed_) {
@@ -45,10 +49,8 @@ class Transaction final {
                 detail::SqliteErrGuard guard{err};
                 sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
             }
-            db_ = o.db_;
-            committed_ = o.committed_;
-            o.db_ = nullptr;
-            o.committed_ = true;
+            db_ = std::exchange(o.db_, nullptr);
+            committed_ = std::exchange(o.committed_, true);
         }
         return *this;
     }
@@ -86,6 +88,8 @@ class Transaction final {
     }
 
   private:
+    explicit Transaction(sqlite3* db, bool committed) : db_(db), committed_(committed) {}
+
     sqlite3* db_{nullptr};
     bool committed_{false};
 };

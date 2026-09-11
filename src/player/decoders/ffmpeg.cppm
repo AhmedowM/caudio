@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -72,49 +73,32 @@ class FfmpegDecoder final : public IDecoder {
         std::size_t totalDecoded = 0;
         bool eofReached = false;
         while (totalDecoded < frames && !eofReached) {
-            AVPacket* pkt = av_packet_alloc();
+            PacketPtr pkt(av_packet_alloc());
             if (!pkt)
                 break;
 
-            int ret = av_read_frame(fmt_, pkt);
+            int ret = av_read_frame(fmt_, pkt.get());
             if (ret < 0) {
-                av_packet_free(&pkt);
                 // EOF: flush decoder internal buffers
                 if (ret == AVERROR_EOF || ret < 0) {
-                    // send flush packet
                     (void)avcodec_send_packet(dec_, nullptr);
-                    // drain all remaining frames
                     while (totalDecoded < frames) {
-                        AVFrame* frame = av_frame_alloc();
+                        FramePtr frame(av_frame_alloc());
                         if (!frame)
                             break;
-                        ret = avcodec_receive_frame(dec_, frame);
-                        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-                            av_frame_free(&frame);
+                        ret = avcodec_receive_frame(dec_, frame.get());
+                        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                             break;
-                        }
-                        if (ret < 0) {
-                            av_frame_free(&frame);
+                        if (ret < 0)
                             break;
-                        }
-                        uint8_t* outPtrs[1] = {
-                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-                        int outSamples = static_cast<int>(frames - totalDecoded);
-                        int converted = swr_convert(
-                            swr_, outPtrs, outSamples,
-                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
+                        int converted = convertFrame(frame.get(), out, totalDecoded, frames);
                         if (converted > 0)
                             totalDecoded += static_cast<std::size_t>(converted);
-                        av_frame_free(&frame);
                         if (converted <= 0)
                             break;
                     }
-                    // also flush resampler delay
                     if (totalDecoded < frames) {
-                        uint8_t* outPtrs[1] = {
-                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-                        int outSamples = static_cast<int>(frames - totalDecoded);
-                        int flushed = swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
+                        int flushed = flushResampler(out, totalDecoded, frames);
                         if (flushed > 0)
                             totalDecoded += static_cast<std::size_t>(flushed);
                     }
@@ -124,27 +108,16 @@ class FfmpegDecoder final : public IDecoder {
             }
 
             if (pkt->stream_index != audioStreamIdx_) {
-                av_packet_free(&pkt);
                 continue;
             }
 
-            ret = avcodec_send_packet(dec_, pkt);
-            av_packet_free(&pkt);
+            ret = avcodec_send_packet(dec_, pkt.get());
             if (ret == AVERROR(EAGAIN)) {
-                // need to receive before sending again
-                AVFrame* frame = av_frame_alloc();
-                if (frame) {
-                    if (avcodec_receive_frame(dec_, frame) == 0) {
-                        uint8_t* outPtrs[1] = {
-                            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-                        int outSamples = static_cast<int>(frames - totalDecoded);
-                        int converted = swr_convert(
-                            swr_, outPtrs, outSamples,
-                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
-                        if (converted > 0)
-                            totalDecoded += static_cast<std::size_t>(converted);
-                    }
-                    av_frame_free(&frame);
+                FramePtr frame(av_frame_alloc());
+                if (frame && avcodec_receive_frame(dec_, frame.get()) == 0) {
+                    int converted = convertFrame(frame.get(), out, totalDecoded, frames);
+                    if (converted > 0)
+                        totalDecoded += static_cast<std::size_t>(converted);
                 }
                 continue;
             }
@@ -152,27 +125,17 @@ class FfmpegDecoder final : public IDecoder {
                 continue;
 
             while (totalDecoded < frames) {
-                AVFrame* frame = av_frame_alloc();
+                FramePtr frame(av_frame_alloc());
                 if (!frame)
                     break;
-                ret = avcodec_receive_frame(dec_, frame);
-                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
-                    av_frame_free(&frame);
+                ret = avcodec_receive_frame(dec_, frame.get());
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                     break;
-                }
-                if (ret < 0) {
-                    av_frame_free(&frame);
+                if (ret < 0)
                     break;
-                }
-                uint8_t* outPtrs[1] = {
-                    reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-                int outSamples = static_cast<int>(frames - totalDecoded);
-                int converted = swr_convert(swr_, outPtrs, outSamples,
-                                            const_cast<const uint8_t**>(frame->extended_data),
-                                            frame->nb_samples);
+                int converted = convertFrame(frame.get(), out, totalDecoded, frames);
                 if (converted > 0)
                     totalDecoded += static_cast<std::size_t>(converted);
-                av_frame_free(&frame);
                 if (converted <= 0)
                     break;
             }
@@ -223,6 +186,42 @@ class FfmpegDecoder final : public IDecoder {
     }
 
   private:
+    struct PacketDeleter {
+        void operator()(AVPacket* p) const noexcept {
+            if (p) av_packet_free(&p);
+        }
+    };
+    struct FrameDeleter {
+        void operator()(AVFrame* p) const noexcept {
+            if (p) av_frame_free(&p);
+        }
+    };
+    using PacketPtr = std::unique_ptr<AVPacket, PacketDeleter>;
+    using FramePtr = std::unique_ptr<AVFrame, FrameDeleter>;
+    struct LayoutGuard {
+        AVChannelLayout l{};
+        LayoutGuard() = default;
+        ~LayoutGuard() { av_channel_layout_uninit(&l); }
+        LayoutGuard(const LayoutGuard&) = delete;
+        LayoutGuard& operator=(const LayoutGuard&) = delete;
+    };
+
+    int convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
+                     std::size_t frames) noexcept {
+        uint8_t* outPtrs[1] = {
+            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
+        int outSamples = static_cast<int>(frames - totalDecoded);
+        return swr_convert(swr_, outPtrs, outSamples,
+                           const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
+    }
+    int flushResampler(std::span<float> out, std::size_t totalDecoded,
+                       std::size_t frames) noexcept {
+        uint8_t* outPtrs[1] = {
+            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
+        int outSamples = static_cast<int>(frames - totalDecoded);
+        return swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
+    }
+
     FfmpegDecoder() = default;
 
     static int readCallback(void* opaque, uint8_t* buf, int bufSize) {
@@ -353,28 +352,22 @@ class FfmpegDecoder final : public IDecoder {
             return false;
         }
 
-        AVChannelLayout inLayout{};
-        av_channel_layout_copy(&inLayout, &dec_->ch_layout);
+        LayoutGuard inLayout;
+        av_channel_layout_copy(&inLayout.l, &dec_->ch_layout);
+        LayoutGuard outLayout;
+        av_channel_layout_copy(&outLayout.l, &dec_->ch_layout);
 
-        // Use same channel layout for output to preserve channel order/mapping
-        AVChannelLayout outLayout{};
-        av_channel_layout_copy(&outLayout, &dec_->ch_layout);
-
-        av_opt_set_chlayout(swr_, "in_chlayout", &inLayout, 0);
+        av_opt_set_chlayout(swr_, "in_chlayout", &inLayout.l, 0);
         av_opt_set_int(swr_, "in_sample_rate", dec_->sample_rate, 0);
         av_opt_set_sample_fmt(swr_, "in_sample_fmt", dec_->sample_fmt, 0);
-        av_opt_set_chlayout(swr_, "out_chlayout", &outLayout, 0);
+        av_opt_set_chlayout(swr_, "out_chlayout", &outLayout.l, 0);
         av_opt_set_int(swr_, "out_sample_rate", dec_->sample_rate, 0);
         av_opt_set_sample_fmt(swr_, "out_sample_fmt", AV_SAMPLE_FMT_FLT, 0);
 
         if (swr_init(swr_) < 0) {
-            av_channel_layout_uninit(&inLayout);
-            av_channel_layout_uninit(&outLayout);
             cleanup();
             return false;
         }
-        av_channel_layout_uninit(&inLayout);
-        av_channel_layout_uninit(&outLayout);
 
         sampleRate_ = static_cast<uint32_t>(dec_->sample_rate);
         channels_ = static_cast<uint32_t>(dec_->ch_layout.nb_channels);
