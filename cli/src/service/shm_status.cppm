@@ -1,5 +1,6 @@
 module;
 #include <atomic>
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -8,6 +9,7 @@ module;
 #include <memory>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -41,11 +43,12 @@ struct ShmStatus {
 };
 
 // Atomic view of ShmStatus in shared memory
+// Uses atomic<uint64_t> with bit_cast for double/float to ensure lock-free on all platforms including MSVC
 struct alignas(64) AtomicShmStatus {
     std::atomic<uint64_t> seq{0};
-    std::atomic<double> position{0.0};
-    std::atomic<double> duration{0.0};
-    std::atomic<float> volume{1.0f};
+    std::atomic<uint64_t> position{0};  // bit_cast<double>
+    std::atomic<uint64_t> duration{0};  // bit_cast<double>
+    std::atomic<uint32_t> volume{0};    // bit_cast<float>
     std::atomic<bool> muted{false};
     std::atomic<int> state{0};
     std::atomic<int64_t> trackId{0};
@@ -56,6 +59,20 @@ struct alignas(64) AtomicShmStatus {
 };
 
 static_assert(sizeof(AtomicShmStatus) <= 4096, "AtomicShmStatus should fit in one page");
+
+// Helpers for bit_cast atomic operations
+inline double atomicLoadDouble(const std::atomic<uint64_t>& a) noexcept {
+    return std::bit_cast<double>(a.load(std::memory_order_acquire));
+}
+inline void atomicStoreDouble(std::atomic<uint64_t>& a, double v) noexcept {
+    a.store(std::bit_cast<uint64_t>(v), std::memory_order_relaxed);
+}
+inline float atomicLoadFloat(const std::atomic<uint32_t>& a) noexcept {
+    return std::bit_cast<float>(a.load(std::memory_order_acquire));
+}
+inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept {
+    a.store(std::bit_cast<uint32_t>(v), std::memory_order_relaxed);
+}
 
 class ShmStatusHandle {
 public:
@@ -197,16 +214,21 @@ public:
         ShmStatus out{};
         if (!map_) return out;
         AtomicShmStatus* s = map_;
+        uint32_t spinCount = 0;
         while (true) {
             uint64_t seq = s->seq.load(std::memory_order_acquire);
             if (seq & 1) {
-                // Writer busy, retry
+                // Writer busy, retry with occasional yield
+                if (++spinCount >= 3) {
+                    std::this_thread::yield();
+                    spinCount = 0;
+                }
                 continue;
             }
             out.seq = seq;
-            out.position = s->position.load(std::memory_order_acquire);
-            out.duration = s->duration.load(std::memory_order_acquire);
-            out.volume = s->volume.load(std::memory_order_acquire);
+            out.position = atomicLoadDouble(s->position);
+            out.duration = atomicLoadDouble(s->duration);
+            out.volume = atomicLoadFloat(s->volume);
             out.muted = s->muted.load(std::memory_order_acquire);
             out.state = s->state.load(std::memory_order_acquire);
             out.trackId = s->trackId.load(std::memory_order_acquire);
@@ -235,8 +257,8 @@ public:
         s->seq.store(old + 1, std::memory_order_release);
         std::atomic_thread_fence(std::memory_order_release);
 
-        s->position.store(eng.position(), std::memory_order_relaxed);
-        s->volume.store(eng.volume(), std::memory_order_relaxed);
+        atomicStoreDouble(s->position, eng.position());
+        atomicStoreFloat(s->volume, eng.volume());
         s->state.store(static_cast<int>(eng.state()), std::memory_order_relaxed);
         s->trackId.store(trackId, std::memory_order_relaxed);
         s->muted.store(eng.volume() == 0.0f, std::memory_order_relaxed);
@@ -259,7 +281,7 @@ public:
 
     void setDuration(double dur) noexcept {
         if (!map_) return;
-        map_->duration.store(dur, std::memory_order_relaxed);
+        atomicStoreDouble(map_->duration, dur);
     }
 
     void setQueueSize(size_t sz) noexcept {

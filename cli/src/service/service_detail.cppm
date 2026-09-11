@@ -103,7 +103,14 @@ inline bool probeSocketAlive(const std::string& sp) {
     }
     DWORD err = ::GetLastError();
     if (err == 231 /*ERROR_PIPE_BUSY*/) {
-        if (::WaitNamedPipeW(w.c_str(), 0)) return true;
+        // Pipe exists but all instances busy - treat as alive
+        return true;
+    }
+    if (err == 2 /*ERROR_FILE_NOT_FOUND*/ || err == 109 /*ERROR_BROKEN_PIPE*/) {
+        return false;
+    }
+    // For other errors, try WaitNamedPipe to confirm pipe exists
+    if (::WaitNamedPipeW(w.c_str(), 0)) {
         return true;
     }
     return false;
@@ -124,9 +131,38 @@ inline bool probeSocketAlive(const std::string& sp) {
 #endif
 }
 
-inline bool tryAcquireLock(const std::filesystem::path& /*lockPath*/, int& outFd) {
+inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
 #ifdef _WIN32
-    outFd = -1;
+    std::error_code ec;
+    auto parent = lockPath.parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent, ec);
+    }
+    std::wstring wpath;
+    wpath.reserve(lockPath.native().size());
+    for (wchar_t c : lockPath.native()) wpath.push_back(c);
+
+    HANDLE h = ::CreateFileW(wpath.c_str(),
+                             GENERIC_READ | GENERIC_WRITE,
+                             FILE_SHARE_READ,  // allow readers, deny writers
+                             nullptr,
+                             OPEN_ALWAYS,
+                             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
+                             nullptr);
+    if (h == INVALID_HANDLE_VALUE) {
+        outFd = -1;
+        return false;
+    }
+    // Try to lock the first byte exclusively, non-blocking
+    OVERLAPPED ov{};
+    ov.Offset = 0;
+    ov.OffsetHigh = 0;
+    if (!::LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
+        ::CloseHandle(h);
+        outFd = -1;
+        return false;  // ERROR_LOCK_VIOLATION (33) or other
+    }
+    outFd = reinterpret_cast<intptr_t>(h);
     return true;
 #else
     std::error_code ec;
@@ -147,14 +183,16 @@ inline bool tryAcquireLock(const std::filesystem::path& /*lockPath*/, int& outFd
 
 inline void releaseLock(int fd) {
     if (fd < 0) return;
-#ifndef _WIN32
-    ::flock(fd, LOCK_UN);
-    ::close(fd);
-#else
+#ifdef _WIN32
     HANDLE h = reinterpret_cast<HANDLE>(static_cast<intptr_t>(fd));
     OVERLAPPED ov{};
+    ov.Offset = 0;
+    ov.OffsetHigh = 0;
     ::UnlockFileEx(h, 0, 1, 0, &ov);
     ::CloseHandle(h);
+#else
+    ::flock(fd, LOCK_UN);
+    ::close(fd);
 #endif
 }
 
