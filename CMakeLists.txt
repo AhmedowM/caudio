@@ -318,10 +318,32 @@ if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
   target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 endif()
 
+# caudio::json — nlohmann ordered_json wrapper module
+set(CAUDIO_JSON_SOURCES
+  src/json/json.cppm
+)
+add_library(caudio_json STATIC)
+add_library(caudio::json ALIAS caudio_json)
+target_sources(caudio_json PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_JSON_SOURCES})
+target_include_directories(caudio_json PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_include_directories(caudio_json PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
+ca_set_warnings(caudio_json)
+ca_set_module_warnings(caudio_json)
+
+add_library(caudio_json_shared SHARED)
+set_target_properties(caudio_json_shared PROPERTIES OUTPUT_NAME caudio_json)
+add_library(caudio::json_shared ALIAS caudio_json_shared)
+target_sources(caudio_json_shared PRIVATE src/_stub/shared_stub.cpp)
+target_link_libraries(caudio_json_shared PUBLIC caudio::json)
+target_link_libraries(caudio_json_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::json>)
+target_link_options(caudio_json_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+
 # caudio::cli shared protocol (command/result/protocol)
 set(CAUDIO_CLI_SHARED_SOURCES
   cli/src/cli.cppm
-  cli/src/shared/json_wrapper.cppm
   cli/src/shared/command.cppm
   cli/src/shared/result.cppm
   cli/src/shared/protocol.cppm
@@ -336,7 +358,7 @@ target_include_directories(caudio_cli_shared PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(caudio_cli_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio::utils Threads::Threads)
+target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio::utils caudio::json Threads::Threads)
 ca_set_warnings(caudio_cli_shared)
 ca_set_module_warnings(caudio_cli_shared)
 target_compile_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
@@ -419,7 +441,7 @@ target_link_options(caudio_client_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--
 add_executable(caudio
   cli/src/main.cpp
 )
-target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/app_primary.cppm)
+target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/core.cppm)
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio_service caudio_client caudio_cli_shared CLI11::CLI11 Threads::Threads)
@@ -448,6 +470,7 @@ install(
     caudio_player caudio_player_shared
     caudio_db caudio_db_shared
     caudio_engine caudio_engine_shared
+    caudio_json caudio_json_shared
     caudio_cli_shared
     caudio_client caudio_client_shared
     caudio_service caudio_service_shared

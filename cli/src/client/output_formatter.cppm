@@ -11,7 +11,7 @@ module;
 #include <variant>
 #include <vector>
 
-export module caudio.client:formatter;
+export module caudio.client:output_formatter;
 
 import caudio.utils;
 import caudio.cli;
