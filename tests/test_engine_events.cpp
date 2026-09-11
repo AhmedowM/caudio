@@ -27,7 +27,7 @@ TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
     extra.track_id = 999;
     auto r = q.push(extra);
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::Busy);
+    REQUIRE(r.error().code == StatusCode::Busy);
     REQUIRE(q.size() == 64);
 }
 
@@ -57,7 +57,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
     // after poll, queue empty -> poll returns NotFound
     auto ev2 = eng->pollEvent();
     REQUIRE(!ev2.has_value());
-    REQUIRE(ev2.error().code == Result::NotFound);
+    REQUIRE(ev2.error().code == StatusCode::NotFound);
     // trigger another event via setShuffle -> QueueChanged
     Track t2;
     t2.path = "ev2.wav";
@@ -176,3 +176,9 @@ TEST_CASE("Engine drainEvents null checks", "[engine_events]") {
     REQUIRE(eng->drainEvents(nullptr, 0, &n).has_value());
     REQUIRE(n == 0);
 }
+
+
+
+
+
+

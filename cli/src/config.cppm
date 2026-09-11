@@ -82,7 +82,7 @@ inline std::filesystem::path defaultConfigPath() {
 inline caudio::utils::Expected<std::string> readFileString(const std::filesystem::path& p) {
     std::ifstream in(p);
     if (!in) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open config")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open config")};
     }
     std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     return content;
@@ -138,7 +138,7 @@ inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& p
             cfg.logLevel = j["log_level"].get<int>();
         }
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
     return cfg;
 }
@@ -157,12 +157,12 @@ inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
         if (!cfg.socketPath.empty()) j["socketPath"] = cfg.socketPath;
         std::ofstream out(cfg.configPath);
         if (!out) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot write config")};
         }
         out << j.dump(2);
         return {};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -213,9 +213,9 @@ inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem:
         return (base / ("caudio-" + hex + ".sock")).generic_string();
 #endif
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
     } catch (...) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socketPathFor failed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "socketPathFor failed")};
     }
 }
 
@@ -225,9 +225,9 @@ inline caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::file
         auto base = detail_paths::baseDirForSocket();
         return base / ("caudio-" + hex + ".pid");
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
     } catch (...) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "pidPathFor failed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "pidPathFor failed")};
     }
 }
 
@@ -237,9 +237,9 @@ inline caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::fil
         auto base = detail_paths::baseDirForSocket();
         return base / ("caudio-" + hex + ".lock");
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
     } catch (...) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "lockPathFor failed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "lockPathFor failed")};
     }
 }
 
@@ -256,29 +256,29 @@ inline caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const 
 inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p, std::string_view key) {
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "config not found")};
     }
     auto fileRes = detail::readFileString(p);
     if (!fileRes) return std::unexpected{fileRes.error()};
     std::string content = std::move(*fileRes);
     if (content.empty()) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + std::string(key))};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "key not found: " + std::string(key))};
     }
     try {
         auto j = caudio::json::ordered_json::parse(content);
         if (!j.is_object()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "config is not an object")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "config is not an object")};
         }
         std::string k(key);
         if (!j.contains(k)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "key not found: " + k)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "key not found: " + k)};
         }
         auto& v = j.at(k);
         if (v.is_string()) return v.get<std::string>();
         if (v.is_null()) return std::string{"null"};
         return v.dump();
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -322,12 +322,12 @@ inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p
         if (!parent.empty()) std::filesystem::create_directories(parent, ec);
         std::ofstream out(p);
         if (!out) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot write config")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot write config")};
         }
         out << j.dump(2);
         return {};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -355,9 +355,13 @@ inline caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const 
         }
         return out;
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
 } // namespace caudio::cli
+
+
+
+
 

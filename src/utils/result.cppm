@@ -6,7 +6,7 @@ export module caudio.utils:result;
 
 export namespace caudio::utils {
 
-enum class Result : int {
+enum class StatusCode : int {
     Ok = 0,
     InvalidArg = 1,
     NotFound = 2,
@@ -22,8 +22,8 @@ enum class Result : int {
     NoSpace = 12
 };
 
-constexpr std::string_view toString(Result r) noexcept {
-    using enum Result;
+constexpr std::string_view toString(StatusCode r) noexcept {
+    using enum StatusCode;
     switch (r) {
     case Ok:
         return "Ok";
@@ -59,8 +59,12 @@ constexpr std::string_view toString(Result r) noexcept {
 } // namespace caudio::utils
 
 template <>
-struct std::formatter<caudio::utils::Result> : std::formatter<std::string_view> {
-    auto format(caudio::utils::Result r, auto& ctx) const {
+struct std::formatter<caudio::utils::StatusCode> : std::formatter<std::string_view> {
+    auto format(caudio::utils::StatusCode r, auto& ctx) const {
         return std::formatter<std::string_view>::format(caudio::utils::toString(r), ctx);
     }
 };
+
+
+
+

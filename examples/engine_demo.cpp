@@ -92,7 +92,7 @@ void ensureQueueHasTracks(Database& db, const std::string& samplePath) {
         auto ins = db.insertTrack(t);
         int64_t tid = 0;
         if (!ins) {
-            if (ins.error().code == caudio::utils::Result::AlreadyExists) {
+            if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {
                 auto ex = db.findByFingerprint(t.fingerprint);
                 if (ex)
                     tid = ex->id;
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
     cbs.onTrackEnded = [](int64_t tid, double pct) {
         std::cout << "[engine_demo] callback onTrackEnded track " << tid << " pct=" << pct << "\n";
     };
-    cbs.onError = [](caudio::utils::Result r, std::string_view msg) {
+    cbs.onError = [](caudio::utils::StatusCode r, std::string_view msg) {
         std::cout << "[engine_demo] callback onError " << static_cast<int>(r) << " " << msg << "\n";
     };
     cfg.callbacks = cbs;
@@ -227,3 +227,8 @@ int main(int argc, char** argv) {
     std::cout << "[engine_demo] done\n";
     return 0;
 }
+
+
+
+
+

@@ -91,7 +91,7 @@ std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}",
                     std::println(os, "Volume: {}% (muted: {})", pct,
                                       v.muted ? "yes" : "no");
                     std::println(os, "Volume code: {}",
-                                      std::to_underlying(caudio::utils::Result::Ok));
+                                      std::to_underlying(caudio::utils::StatusCode::Ok));
                 } else if constexpr (std::is_same_v<T, caudio::cli::LibraryStatsData>) {
                     std::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks,
                                       v.queues, v.playlists);
@@ -112,7 +112,7 @@ std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}",
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValue>) {
                     std::println(os, "{} = {}", v.key, v.value);
-                    std::println(os, "Code value: {}", std::to_underlying(caudio::utils::Result::Ok));
+                    std::println(os, "Code value: {}", std::to_underlying(caudio::utils::StatusCode::Ok));
                 } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValues>) {
                     std::println(os, "Config ({} entries):", v.values.size());
                     for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values)) {
@@ -145,3 +145,7 @@ std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}",
 };
 
 } // namespace caudio::client
+
+
+
+

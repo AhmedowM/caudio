@@ -53,7 +53,7 @@ struct StmtGuard {
     sqlite3_stmt* operator->() const noexcept { return s; }
 };
 
-constexpr std::string_view toString(caudio::utils::Result r) noexcept {
+constexpr std::string_view toString(caudio::utils::StatusCode r) noexcept {
     return caudio::utils::toString(r);
 }
 
@@ -87,7 +87,7 @@ class Engine final {
     ExpectedVoid attachDatabase(std::shared_ptr<caudio::db::Database> db) {
         if (!db || !db->handle())
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
         db_ = std::move(db);
         if (auto ec = loadState())
             return std::unexpected(*ec);
@@ -96,7 +96,7 @@ class Engine final {
     ExpectedVoid attachDb(std::unique_ptr<caudio::db::Database> db) {
         if (!db || !db->handle())
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
         auto shared = std::shared_ptr<caudio::db::Database>(std::move(db));
         return attachDatabase(std::move(shared));
     }
@@ -139,7 +139,7 @@ class Engine final {
     // Playback
     ExpectedVoid play(int64_t queueId = 1) {
         if (!hasDb())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
         if (queueId == 0)
             queueId = 1;
         auto s = playbackState_.load(std::memory_order_acquire);
@@ -176,7 +176,7 @@ class Engine final {
         // Stopped -> start new track via cursor (not dequeue)
         if (!tryLockQueue())
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::Busy, "queue busy"));
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
         queue_.queue_id = queueId;
         caudio::db::Track t;
         auto r = queueNextLocked(t);
@@ -195,7 +195,7 @@ class Engine final {
         auto s = playbackState_.load(std::memory_order_acquire);
         if (s != PlaybackState::Playing)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::State, "not playing"));
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "not playing"));
         // record pause position
         pausePos_ = currentPositionLocked();
         playbackState_.store(PlaybackState::Paused, std::memory_order_release);
@@ -208,7 +208,7 @@ class Engine final {
         auto s = playbackState_.load(std::memory_order_acquire);
         if (s != PlaybackState::Paused)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::State, "not paused"));
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "not paused"));
         playStart_ = std::chrono::steady_clock::now();
         playbackState_.store(PlaybackState::Playing, std::memory_order_release);
         if (output_)
@@ -232,10 +232,10 @@ class Engine final {
     ExpectedVoid seek(double seconds) {
         if (!hasCurrent_.load(std::memory_order_acquire))
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::State, "no track"));
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no track"));
         if (!std::isfinite(seconds) || seconds < 0)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "bad seconds"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad seconds"));
 
         // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
         std::unique_lock<std::mutex> lk(decodeMtx_);
@@ -307,7 +307,7 @@ class Engine final {
 
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats() {
         if (!hasDb())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
         return db_->getStats();
     }
 
@@ -319,9 +319,9 @@ class Engine final {
 
     ExpectedVoid setShuffle(bool on) {
         if (!hasDb())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
         if (!tryLockQueue())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::Busy, "busy"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
         auto r = setShuffleLocked(on);
         unlockQueue();
         if (!r)
@@ -337,9 +337,9 @@ class Engine final {
     ExpectedVoid setRepeat(RepeatMode m) {
         if (m != RepeatMode::Off && m != RepeatMode::Queue && m != RepeatMode::One)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "bad repeat"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
         if (!tryLockQueue())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::Busy, "busy"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
         queue_.repeat = m;
         state_.repeatMode = m;
         state_.cursorPos = (int64_t)queue_.cursor;
@@ -354,7 +354,7 @@ class Engine final {
 
     ExpectedVoid next() {
         if (!hasDb())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
         // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
         // && hasCurrent => seek 0 and play - serialize with decodeLoop via decodeMtx_
         if (!queue_.shuffle && queue_.repeat == RepeatMode::One &&
@@ -385,7 +385,7 @@ class Engine final {
             return {};
         }
         if (!tryLockQueue())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::Busy, "busy"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
         caudio::db::Track t;
         auto r = queueNextLocked(t);
         if (!r) {
@@ -401,9 +401,9 @@ class Engine final {
 
     ExpectedVoid prev() {
         if (!hasDb())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
         if (!tryLockQueue())
-            return std::unexpected(caudio::utils::makeError(caudio::utils::Result::Busy, "busy"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
         caudio::db::Track t;
         auto r = queuePrevLocked(t);
         if (!r) {
@@ -428,18 +428,18 @@ class Engine final {
         auto r = eventQueue_.pop();
         if (!r)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::NotFound, "no event"));
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no event"));
         return r.value();
     }
 
     ExpectedVoid drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
         if (!n)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null n"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null n"));
         *n = 0;
         if (!buf && cap != 0)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null buf"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null buf"));
         size_t got = 0;
         while (got < cap) {
             auto r = eventQueue_.pop();
@@ -546,14 +546,14 @@ class Engine final {
         auto* m = dbMutex();
         if (!h || !m)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         SqliteErrGuard errGuard{err};
         if (rc != SQLITE_OK)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::Busy, "begin failed"));
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "begin failed"));
 
         auto result = fn(h);
         if (!result) {
@@ -566,7 +566,7 @@ class Engine final {
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::Internal, "commit failed"));
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "commit failed"));
         }
         return {};
     }
@@ -575,7 +575,7 @@ class Engine final {
         auto* h = dbHandle();
         auto* m = dbMutex();
         if (!h || !m)
-            return caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db");
+            return caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db");
         std::unique_lock<std::shared_mutex> lk(*m);
         const char* sql = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
                           "volume, shuffle_perm FROM engine_state WHERE id=1";
@@ -583,7 +583,7 @@ class Engine final {
         int rc = sqlite3_prepare_v2(h, sql, -1, &raw, nullptr);
         StmtGuard stmt(raw);
         if (rc != SQLITE_OK) {
-            return caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed");
+            return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed");
         }
         raw = stmt.get();
         rc = sqlite3_step(raw);
@@ -636,7 +636,7 @@ queue_.perm.clear();
             queue_.queue_id = 1;
             return std::nullopt;
         }
-        return caudio::utils::makeError(caudio::utils::Result::Internal, "load failed");
+        return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "load failed");
     }
 
     std::expected<void, caudio::utils::Error> saveState() {
@@ -649,7 +649,7 @@ queue_.perm.clear();
             StmtGuard stmt(raw);
             if (rc != SQLITE_OK)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
             raw = stmt.get();
             sqlite3_bind_int(raw, 1, state_.shuffleEnabled);
             sqlite3_bind_int(raw, 2, (int)state_.repeatMode);
@@ -657,7 +657,7 @@ queue_.perm.clear();
                 if (queue_.perm.size() >
                     (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
                     return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NoMem, "perm too large"));
+                        caudio::utils::makeError(caudio::utils::StatusCode::NoMem, "perm too large"));
                 }
                 sqlite3_bind_blob(raw, 3, queue_.perm.data(),
                                    (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
@@ -669,7 +669,7 @@ queue_.perm.clear();
             rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
             return {};
         });
     }
@@ -683,13 +683,13 @@ queue_.perm.clear();
             StmtGuard stmt(raw);
             if (rc != SQLITE_OK)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
             raw = stmt.get();
             if (queue_.shuffle && !queue_.perm.empty()) {
                 if (queue_.perm.size() >
                     (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
                     return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NoMem, "perm large"));
+                        caudio::utils::makeError(caudio::utils::StatusCode::NoMem, "perm large"));
                 }
                 sqlite3_bind_blob(raw, 1, queue_.perm.data(),
                                    (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
@@ -700,7 +700,7 @@ queue_.perm.clear();
             rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
             // also update state
             state_.shuffleEnabled = queue_.shuffle ? 1 : 0;
             state_.cursorPos = (int64_t)queue_.cursor;
@@ -714,14 +714,14 @@ queue_.perm.clear();
             sqlite3_stmt* raw = nullptr;
             if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
             StmtGuard stmt(raw);
             raw = stmt.get();
             sqlite3_bind_int64(raw, 1, (int64_t)queue_.cursor);
             int rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "step failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
             state_.cursorPos = (int64_t)queue_.cursor;
             return {};
         });
@@ -735,7 +735,7 @@ queue_.perm.clear();
         auto* m = dbMutex();
         if (!h || !m)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db"));
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
         int64_t trackId = 0;
         {
             std::shared_lock<std::shared_mutex> lk(*m);
@@ -744,7 +744,7 @@ queue_.perm.clear();
             sqlite3_stmt* raw = nullptr;
             if (sqlite3_prepare_v2(h, sql, -1, &raw, nullptr) != SQLITE_OK)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::Internal, "prepare failed"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
             StmtGuard stmt(raw);
             raw = stmt.get();
             sqlite3_bind_int64(raw, 1, qid);
@@ -752,7 +752,7 @@ queue_.perm.clear();
             int rc = sqlite3_step(raw);
             if (rc != SQLITE_ROW) {
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::NotFound, "not found"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "not found"));
             }
             trackId = sqlite3_column_int64(raw, 0);
         }
@@ -816,13 +816,13 @@ queue_.perm.clear();
                 size_t cnt = db_->queueCountLocked(queue_.queue_id);
                 if (cnt == 0)
                     return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+                        caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
                 auto sr = setShuffleLocked(true);
                 if (!sr)
                     return std::unexpected(sr.error());
                 if (queue_.perm.empty())
                     return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::Internal, "no perm"));
+                        caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no perm"));
             }
             if (queue_.cursor >= queue_.perm.size()) {
                 if (queue_.repeat == RepeatMode::One) {
@@ -856,7 +856,7 @@ queue_.perm.clear();
         size_t cnt = db_->queueCountLocked(queue_.queue_id);
         if (cnt == 0)
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
         if (queue_.cursor >= cnt) {
             if (queue_.repeat == RepeatMode::One) {
                 size_t idx = cnt - 1;
@@ -894,11 +894,11 @@ queue_.perm.clear();
             size_t cnt = db_->queueCountLocked(queue_.queue_id);
             if (cnt == 0)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
             if (queue_.cursor <= 1) {
                 if (queue_.cursor == 0)
                     return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "at start"));
+                        caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "at start"));
                 queue_.cursor = 0;
             } else {
                 queue_.cursor -= 2;
@@ -915,11 +915,11 @@ if (queue_.cursor >= cnt)
         }
         if (queue_.perm.empty())
             return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::NotFound, "no perm"));
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no perm"));
         if (queue_.cursor <= 1) {
             if (queue_.cursor == 0)
                 return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::NotFound, "at start"));
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "at start"));
             queue_.cursor = 0;
         } else {
             queue_.cursor -= 2;
@@ -1078,7 +1078,7 @@ if (queue_.cursor >= cnt)
         } else if (ev.type == EngineEventType::QueueChanged && cbsCopy.on_queue_changed) {
             cbsCopy.on_queue_changed(ev.queue_id);
         } else if (ev.type == EngineEventType::Error && cbsCopy.on_error) {
-            cbsCopy.on_error(caudio::utils::Result::Internal, ev.msg);
+            cbsCopy.on_error(caudio::utils::StatusCode::Internal, ev.msg);
         }
     }
 
@@ -1369,3 +1369,7 @@ EngineEvent ev;
 };
 
 } // namespace caudio::engine
+
+
+
+

@@ -77,3 +77,8 @@ TEST_CASE("listTracks after schema init", "[db]") {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 }
+
+
+
+
+

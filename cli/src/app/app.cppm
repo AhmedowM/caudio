@@ -53,7 +53,7 @@ namespace detail {
 // parse.hpp returns expected<double,string>; app layer wraps string into utils::Error.
 inline std::expected<double, caudio::utils::Error> parseTime(std::string_view s) {
     auto r = caudio::app::parse::parseTime(s);
-    if (!r) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, r.error())};
+    if (!r) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
     return *r;
 }
 // TODO: dedup with parse.hpp:90
@@ -65,7 +65,7 @@ inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s)
         s.remove_suffix(1);
     }
     if (s.empty()) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty seek")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty seek")};
     }
     bool relative = false;
     bool neg = false;
@@ -75,7 +75,7 @@ inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s)
         neg = (core.front() == '-');
         core.remove_prefix(1);
         if (core.empty()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing seek value")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing seek value")};
         }
     }
     auto t = parseTime(core);
@@ -109,12 +109,12 @@ inline std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(s
         bool n = s.front() == '-';
         std::string_view num = s.substr(1);
         if (num.empty()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid delta")};
         }
         int iv = 0;
         auto r = std::from_chars(num.data(), num.data() + num.size(), iv);
         if (r.ec != std::errc{} || r.ptr != num.data() + num.size()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid delta")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid delta")};
         }
         if (n) iv = -iv;
         vs.deltaPct = iv;
@@ -123,10 +123,10 @@ inline std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(s
     int iv = 0;
     auto r = std::from_chars(s.data(), s.data() + s.size(), iv);
     if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid volume")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid volume")};
     }
     if (iv < 0 || iv > 100) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "volume out of range 0-100")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "volume out of range 0-100")};
     }
     vs.level = static_cast<float>(iv);
     return vs;
@@ -318,7 +318,7 @@ inline int App::handleShutdown() {
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
     if (!res) {
         // if daemon not running, report
-        if (res.error().code == caudio::utils::Result::State) {
+        if (res.error().code == caudio::utils::StatusCode::State) {
             std::println(std::cerr, "shutdown: daemon not running");
             return 1;
         }
@@ -525,3 +525,7 @@ inline int App::run(int argc, char** argv) {
 }
 
 } // namespace caudio::app
+
+
+
+

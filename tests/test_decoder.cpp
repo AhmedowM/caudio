@@ -18,7 +18,7 @@ TEST_CASE("decode registry probe unsupported", "[decoder]") {
     REQUIRE(r.has_value());
     auto dec = DecoderRegistry::open(**r);
     REQUIRE(!dec.has_value());
-    REQUIRE(dec.error().code == Result::Unsupported);
+    REQUIRE(dec.error().code == StatusCode::Unsupported);
 }
 
 TEST_CASE("decode registry probe restore offset with real ogg", "[decoder]") {
@@ -80,7 +80,7 @@ TEST_CASE("decoder seek clamp invalid", "[decoder]") {
     auto dec = DecoderRegistry::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE(!(*dec)->seek(-5.0).has_value());
-    REQUIRE((*dec)->seek(-5.0).error().code == Result::InvalidArg);
+    REQUIRE((*dec)->seek(-5.0).error().code == StatusCode::InvalidArg);
     auto bad = (*dec)->seek(std::numeric_limits<double>::infinity());
     REQUIRE(!bad.has_value());
 }
@@ -95,3 +95,8 @@ TEST_CASE("decoder FileReader probe 32B with real wav", "[decoder]") {
     // File pos after open is at AVIO offset (headers consumed), not 0 — allow >=0
     REQUIRE((**r).tell() >= 0);
 }
+
+
+
+
+

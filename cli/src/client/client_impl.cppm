@@ -60,7 +60,7 @@ public:
                 if (st.stop_requested()) {
                     try {
                         prom->set_value(std::unexpected{
-                            caudio::utils::makeError(caudio::utils::Result::Busy, "cancelled")});
+                            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
                     } catch (...) {
                     }
                     return;
@@ -69,7 +69,7 @@ public:
                 if (!conn) {
                     try {
                         prom->set_value(std::unexpected{caudio::utils::Error{
-                            caudio::utils::Result::State,
+                            caudio::utils::StatusCode::State,
                             std::string_view{"daemon not running — run 'caudio start'"}}});
                     } catch (...) {
                     }
@@ -78,7 +78,7 @@ public:
                 if (st.stop_requested()) {
                     try {
                         prom->set_value(std::unexpected{
-                            caudio::utils::makeError(caudio::utils::Result::Busy, "cancelled")});
+                            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
                     } catch (...) {
                     }
                     return;
@@ -107,7 +107,7 @@ public:
                 bg.push_back(std::move(worker));
             }
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Io, "timeout")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "timeout")};
         }
     }
 
@@ -142,3 +142,7 @@ public:
 };
 
 } // namespace caudio::client
+
+
+
+

@@ -57,7 +57,7 @@ playbackStateFromString(std::string_view sv) {
     if (sv == "Ready") return PS::Ready;
     if (sv == "Playing") return PS::Playing;
     if (sv == "Paused") return PS::Paused;
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "unknown PlaybackState")};
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown PlaybackState")};
 }
 
 inline std::string repeatModeToString(caudio::engine::RepeatMode m) {
@@ -76,16 +76,16 @@ repeatModeFromString(std::string_view sv) {
     if (sv == "Off") return RM::Off;
     if (sv == "Queue") return RM::Queue;
     if (sv == "One") return RM::One;
-    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "unknown RepeatMode")};
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown RepeatMode")};
 }
 
-inline std::string resultCodeToString(caudio::utils::Result r) {
+inline std::string resultCodeToString(caudio::utils::StatusCode r) {
     return std::string(caudio::utils::toString(r));
 }
 
-inline std::expected<caudio::utils::Result, caudio::utils::Error>
+inline std::expected<caudio::utils::StatusCode, caudio::utils::Error>
 resultCodeFromString(std::string_view sv) {
-    using R = caudio::utils::Result;
+    using R = caudio::utils::StatusCode;
     if (sv == "Ok") return R::Ok;
     if (sv == "InvalidArg") return R::InvalidArg;
     if (sv == "NotFound") return R::NotFound;
@@ -140,7 +140,7 @@ trackFromJson(const ordered_json& j) {
         if (j.contains("genre") && j["genre"].is_string()) t.genre = j["genre"].get<std::string>();
         return t;
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -169,7 +169,7 @@ playlistFromJson(const ordered_json& j) {
         if (j.contains("library_id") && j["library_id"].is_number()) p.library_id = j["library_id"].get<int64_t>();
         return p;
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -191,11 +191,11 @@ errorFromJson(const ordered_json& j) {
         else if (j.contains("code_value") && j["code_value"].is_number()) {
             int v = j["code_value"].get<int>();
             // map via to_underlying comparison
-            for (auto c : {caudio::utils::Result::Ok, caudio::utils::Result::InvalidArg, caudio::utils::Result::NotFound,
-                           caudio::utils::Result::Unsupported, caudio::utils::Result::Io, caudio::utils::Result::Device,
-                           caudio::utils::Result::State, caudio::utils::Result::NoMem, caudio::utils::Result::Internal,
-                           caudio::utils::Result::AlreadyExists, caudio::utils::Result::Busy, caudio::utils::Result::Corrupt,
-                           caudio::utils::Result::NoSpace}) {
+            for (auto c : {caudio::utils::StatusCode::Ok, caudio::utils::StatusCode::InvalidArg, caudio::utils::StatusCode::NotFound,
+                           caudio::utils::StatusCode::Unsupported, caudio::utils::StatusCode::Io, caudio::utils::StatusCode::Device,
+                           caudio::utils::StatusCode::State, caudio::utils::StatusCode::NoMem, caudio::utils::StatusCode::Internal,
+                           caudio::utils::StatusCode::AlreadyExists, caudio::utils::StatusCode::Busy, caudio::utils::StatusCode::Corrupt,
+                           caudio::utils::StatusCode::NoSpace}) {
                 if (std::to_underlying(c) == v) {
                     codeStr = std::string(caudio::utils::toString(c));
                     break;
@@ -208,7 +208,7 @@ errorFromJson(const ordered_json& j) {
         if (!rc) return std::unexpected{rc.error()};
         return caudio::utils::Error{*rc, msg};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -332,7 +332,7 @@ ordered_json toJson(const Command& cmd) {
 std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json& j) {
     try {
         if (!j.contains("type") || !j["type"].is_string()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing type")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing type")};
         }
         std::string t = j["type"].get<std::string>();
         if (t == "Play") return Command{Play{}};
@@ -462,9 +462,9 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
             if (j.contains("file") && j["file"].is_string()) f = j["file"].get<std::string>();
             return Command{Preview{std::move(f)}};
         }
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "unknown Command type: " + t)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown Command type: " + t)};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -478,9 +478,9 @@ std::expected<T, caudio::utils::Error> fromJson(const ordered_json& j) {
         // This branch will be instantiated only for Result; to avoid incomplete type,
         // we handle Result via separate function resultFromJson and call it here.
         // We need forward declaration: implement after Result helpers.
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Unsupported, "use resultFromJson")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "use resultFromJson")};
     } else {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Unsupported, "unsupported fromJson type")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "unsupported fromJson type")};
     }
 }
 
@@ -569,7 +569,7 @@ ordered_json toJson(const Result& r) {
 std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j) {
     try {
         if (!j.contains("type") || !j["type"].is_string()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing Result type")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing Result type")};
         }
         std::string t = j["type"].get<std::string>();
         if (t == "Status") {
@@ -675,9 +675,9 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
             if (!e) return std::unexpected{e.error()};
             return Result{*e};
         }
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "unknown Result type: " + t)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown Result type: " + t)};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -695,14 +695,14 @@ std::expected<IpcRequest, caudio::utils::Error> deserializeRequest(std::string_v
     try {
         auto j = ordered_json::parse(sv);
         if (!j.contains("id") || !j.contains("cmd")) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing id/cmd")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing id/cmd")};
         }
         uint32_t id = j["id"].get<uint32_t>();
         auto cmd = commandFromJson(j["cmd"]);
         if (!cmd) return std::unexpected{cmd.error()};
         return IpcRequest{id, std::move(*cmd)};
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -723,7 +723,7 @@ std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view 
     try {
         auto j = ordered_json::parse(sv);
         if (!j.contains("id")) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing id")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing id")};
         }
         uint32_t id = j["id"].get<uint32_t>();
         bool ok = true;
@@ -732,7 +732,7 @@ std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view 
 
         if (ok) {
             if (!j.contains("result")) {
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing result")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing result")};
             }
             auto r = resultFromJson(j["result"]);
             if (!r) return std::unexpected{r.error()};
@@ -741,13 +741,13 @@ std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view 
             ordered_json ej;
             if (j.contains("error")) ej = j["error"];
             else if (j.contains("result")) ej = j["result"];
-            else return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "missing error")};
+            else return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "missing error")};
             auto e = detail::errorFromJson(ej);
             if (!e) return std::unexpected{e.error()};
             return IpcReply{id, std::unexpected{*e}};
         }
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -768,14 +768,14 @@ std::vector<std::byte> frame(std::string_view json) {
 
 std::expected<std::string, caudio::utils::Error> deframe(std::span<const std::byte> buf) {
     if (buf.size() < 4) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "frame too short")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too short")};
     }
     uint32_t len = (static_cast<uint32_t>(std::to_integer<unsigned char>(buf[0])) << 24) |
                    (static_cast<uint32_t>(std::to_integer<unsigned char>(buf[1])) << 16) |
                    (static_cast<uint32_t>(std::to_integer<unsigned char>(buf[2])) << 8) |
                    static_cast<uint32_t>(std::to_integer<unsigned char>(buf[3]));
     if (buf.size() < 4 + len) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "frame incomplete")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame incomplete")};
     }
     std::string s;
     s.reserve(len);
@@ -794,3 +794,7 @@ inline std::string toJsonString(const Command& c) {
 }
 
 } // namespace caudio::cli
+
+
+
+

@@ -10,25 +10,25 @@ module;
 #include <string>
 #include <string_view>
 
-module caudio.db:statement;
+module caudio.db:SqliteStatement;
 
 import caudio.utils;
 
 namespace caudio::db {
 
-class Statement final {
+class SqliteStatement final {
   public:
-    Statement() = default;
-    ~Statement() {
+    SqliteStatement() = default;
+    ~SqliteStatement() {
         if (stmt_)
             sqlite3_finalize(stmt_);
     }
-    Statement(const Statement&) = delete;
-    Statement& operator=(const Statement&) = delete;
-    Statement(Statement&& o) noexcept : stmt_(o.stmt_) {
+    SqliteStatement(const SqliteStatement&) = delete;
+    SqliteStatement& operator=(const SqliteStatement&) = delete;
+    SqliteStatement(SqliteStatement&& o) noexcept : stmt_(o.stmt_) {
         o.stmt_ = nullptr;
     }
-    Statement& operator=(Statement&& o) noexcept {
+    SqliteStatement& operator=(SqliteStatement&& o) noexcept {
         if (this != &o) {
             if (stmt_)
                 sqlite3_finalize(stmt_);
@@ -38,14 +38,14 @@ class Statement final {
         return *this;
     }
     [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3* db,
-                                                                    std::string_view sql) {
+                                                                     std::string_view sql) {
         if (stmt_)
             sqlite3_finalize(stmt_);
         stmt_ = nullptr;
         int rc = sqlite3_prepare_v2(db, sql.data(), static_cast<int>(sql.size()), &stmt_, nullptr);
         if (rc != SQLITE_OK) {
             std::string msg = db ? sqlite3_errmsg(db) : "prepare failed";
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, msg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg)};
         }
         return {};
     }
@@ -116,3 +116,8 @@ class Statement final {
 };
 
 } // namespace caudio::db
+
+
+
+
+

@@ -71,7 +71,7 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
     REQUIRE(q.push(2).has_value());
     auto r = q.push(3);
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == caudio::utils::Result::Busy);
+    REQUIRE(r.error().code == caudio::utils::StatusCode::Busy);
 
     // Real WriterThread: capacity 2, do NOT open so queue never drains -> flush should timeout after ~200ms with Busy
     {
@@ -85,12 +85,12 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         REQUIRE(pr2.has_value());
         auto pr3 = wt.push("SELECT 1;", nullptr, nullptr);
         REQUIRE(!pr3.has_value());
-        REQUIRE(pr3.error().code == caudio::utils::Result::Busy);
+        REQUIRE(pr3.error().code == caudio::utils::StatusCode::Busy);
         auto start = std::chrono::steady_clock::now();
         auto fr = wt.flush();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
         REQUIRE(!fr.has_value());
-        REQUIRE(fr.error().code == caudio::utils::Result::Busy);
+        REQUIRE(fr.error().code == caudio::utils::StatusCode::Busy);
         REQUIRE(elapsed.count() >= 190);
         REQUIRE(elapsed.count() < 600);
         // after draining by close, flush should succeed quickly
@@ -129,3 +129,8 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         sqlite3_close(db);
     }
 }
+
+
+
+
+

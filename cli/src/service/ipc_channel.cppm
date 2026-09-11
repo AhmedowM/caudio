@@ -68,9 +68,9 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
         return (base / ("caudio-" + hex + ".sock")).generic_string();
 #endif
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
     } catch (...) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socketPathFor failed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "socketPathFor failed")};
     }
 }
 
@@ -93,14 +93,14 @@ inline std::vector<std::byte> frameMessage(std::span<const std::byte> payload) {
 inline caudio::utils::Expected<std::vector<std::byte>> deframeMessage(
     std::span<const std::byte> framed) {
     if (framed.size() < 4) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "frame too small")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too small")};
     }
     std::uint32_t len = (static_cast<std::uint32_t>(std::to_underlying(framed[0])) << 24) |
                         (static_cast<std::uint32_t>(std::to_underlying(framed[1])) << 16) |
                         (static_cast<std::uint32_t>(std::to_underlying(framed[2])) << 8) |
                         static_cast<std::uint32_t>(std::to_underlying(framed[3]));
     if (framed.size() - 4 < len) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, "frame length mismatch")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "frame length mismatch")};
     }
     std::vector<std::byte> out;
     out.reserve(len);
@@ -109,3 +109,7 @@ inline caudio::utils::Expected<std::vector<std::byte>> deframeMessage(
 }
 
 } // namespace caudio::service
+
+
+
+

@@ -45,7 +45,7 @@ TEST_CASE("player create open decode wav", "[player_integration]") {
 TEST_CASE("player open invalid path returns NotFound", "[player_integration]") {
     auto r = FileReader::open("/nonexistent_xyz/sample.wav");
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.error().code == StatusCode::NotFound);
 }
 
 TEST_CASE("player seek and volume", "[player_integration]") {
@@ -54,7 +54,7 @@ TEST_CASE("player seek and volume", "[player_integration]") {
     auto dec = DecoderRegistry::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->seek(0.0).has_value());
-    REQUIRE((*dec)->seek(-1.0).error().code == Result::InvalidArg);
+    REQUIRE((*dec)->seek(-1.0).error().code == StatusCode::InvalidArg);
     // audio output volume
     SpscRing<float> ring{8192, (*dec)->channels()};
     AudioOutput::Config cfg;
@@ -126,10 +126,10 @@ TEST_CASE("player state transitions invalid", "[player_integration]") {
     auto eng = std::move(eRes.value());
     // without db, play should fail State
     REQUIRE(!eng->play(1).has_value());
-    REQUIRE(eng->play(1).error().code == Result::State);
+    REQUIRE(eng->play(1).error().code == StatusCode::State);
     // pause when stopped
     REQUIRE(!eng->pause().has_value());
-    REQUIRE(eng->pause().error().code == Result::State);
+    REQUIRE(eng->pause().error().code == StatusCode::State);
     // resume when not paused
     REQUIRE(!eng->resume().has_value());
 }
@@ -182,7 +182,7 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     REQUIRE(eng->state() == PlaybackState::Playing);
     // seek to invalid -> should fail InvalidArg
     REQUIRE(!eng->seek(-1.0).has_value());
-    REQUIRE(eng->seek(-1.0).error().code == Result::InvalidArg);
+    REQUIRE(eng->seek(-1.0).error().code == StatusCode::InvalidArg);
     REQUIRE(!eng->seek(std::numeric_limits<double>::quiet_NaN()).has_value());
     eng.reset();
     std::error_code ec;
@@ -220,7 +220,7 @@ TEST_CASE("race player open concurrent", "[player_integration][race]") {
     for (int i=0;i<4;++i) {
         ths.emplace_back([&](){
             auto r = FileReader::open("/nonexistent_race_xyz.wav");
-            if (!r.has_value() && r.error().code == Result::NotFound) notFound.fetch_add(1);
+            if (!r.has_value() && r.error().code == StatusCode::NotFound) notFound.fetch_add(1);
         });
     }
     for (auto& th: ths) th.join();
@@ -260,3 +260,9 @@ TEST_CASE("gapless via Player Engine 300ms lookahead", "[player_integration][gap
     std::filesystem::remove(dbPath+"-wal", ec);
     std::filesystem::remove(dbPath+"-shm", ec);
 }
+
+
+
+
+
+

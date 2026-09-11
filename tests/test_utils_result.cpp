@@ -8,14 +8,20 @@ bool result_noexcept_check();
 
 using namespace caudio::utils::test;
 
-TEST_CASE("Result toString maps all codes", "[utils][result]") {
+TEST_CASE("StatusCode toString maps all codes", "[utils][StatusCode]") {
     REQUIRE(result_toString_all());
 }
 
-TEST_CASE("Result enum values sequential 0..12", "[utils][result]") {
+TEST_CASE("StatusCode enum values sequential 0..12", "[utils][StatusCode]") {
     REQUIRE(result_enum_sequential());
 }
 
-TEST_CASE("Result toString noexcept", "[utils][result]") {
+TEST_CASE("StatusCode toString noexcept", "[utils][StatusCode]") {
     REQUIRE(result_noexcept_check());
 }
+
+
+
+
+
+

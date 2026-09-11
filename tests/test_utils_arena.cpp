@@ -49,3 +49,9 @@ TEST_CASE("Arena default 64K capacity", "[utils][arena]") {
 TEST_CASE("Arena allocate zero", "[utils][arena]") {
     REQUIRE(arena_zero_alloc());
 }
+
+
+
+
+
+

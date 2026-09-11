@@ -15,18 +15,18 @@ module;
 export module caudio.db:write_thread;
 
 import caudio.utils;
-import :statement;
+import :SqliteStatement;
 import :detail;
 
 export namespace caudio::db {
 
 struct WriteOp {
     std::string sql;
-    std::unique_ptr<Statement> stmt;
+    std::unique_ptr<SqliteStatement> stmt;
     std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb;
 
     WriteOp() = default;
-    WriteOp(std::string s, std::unique_ptr<Statement> st,
+    WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
             std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c)
         : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
     WriteOp(const WriteOp&) = delete;
@@ -85,7 +85,7 @@ class WriterThread final {
     }
 
     std::expected<void, caudio::utils::Error>
-    push(std::string sql, std::unique_ptr<Statement> stmt,
+    push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
          std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
         WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
         auto r = queue_->push(std::move(op));
@@ -106,7 +106,7 @@ class WriterThread final {
         if (queue_->empty() && in_flight_.load(std::memory_order_acquire) == 0)
             return {};
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Busy, "flush timeout")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "flush timeout")};
     }
 
     bool empty() const {
@@ -140,7 +140,7 @@ class WriterThread final {
             if (op.stmt) {
                 int rc = op.stmt->stepDone();
                 if (rc != SQLITE_DONE && rc != SQLITE_ROW && rc != SQLITE_OK) {
-                    err = caudio::utils::makeError(caudio::utils::Result::Corrupt,
+                    err = caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                    sqlite3_errmsg(db_));
                     ok = false;
                 }
@@ -150,7 +150,7 @@ class WriterThread final {
                 internal::SqliteErrGuard guard{e};
                 int rc = sqlite3_exec(db_, op.sql.c_str(), nullptr, nullptr, &e);
                 if (rc != SQLITE_OK) {
-                    err = caudio::utils::makeError(caudio::utils::Result::Corrupt,
+                    err = caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                    e ? e : sqlite3_errmsg(db_));
                     ok = false;
                 }
@@ -179,3 +179,9 @@ class WriterThread final {
 };
 
 } // namespace caudio::db
+
+
+
+
+
+

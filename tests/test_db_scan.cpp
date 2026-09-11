@@ -294,3 +294,9 @@ TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
+
+
+
+
+
+

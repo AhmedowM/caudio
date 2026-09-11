@@ -90,7 +90,7 @@ public:
         int fd = ::shm_open(handle.name_.c_str(), flags, 0600);
         if (fd < 0) {
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Io,
+                caudio::utils::StatusCode::Io,
                 "shm_open failed: " + std::string(std::strerror(errno)))};
         }
         handle.fd_ = fd;
@@ -100,7 +100,7 @@ public:
                 ::close(fd);
                 ::shm_unlink(handle.name_.c_str());
                 return std::unexpected{caudio::utils::makeError(
-                    caudio::utils::Result::Io,
+                    caudio::utils::StatusCode::Io,
                     "ftruncate failed: " + std::string(std::strerror(errno)))};
             }
         }
@@ -110,7 +110,7 @@ public:
             ::close(fd);
             if (create) ::shm_unlink(handle.name_.c_str());
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Io,
+                caudio::utils::StatusCode::Io,
                 "mmap failed: " + std::string(std::strerror(errno)))};
         }
         handle.map_ = static_cast<AtomicShmStatus*>(ptr);
@@ -132,7 +132,7 @@ public:
 
         if (!hMap) {
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Io,
+                caudio::utils::StatusCode::Io,
                 "CreateFileMapping/OpenFileMapping failed: " + std::to_string(::GetLastError()))};
         }
         handle.hMap_ = hMap;
@@ -141,7 +141,7 @@ public:
         if (!ptr) {
             ::CloseHandle(hMap);
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Io,
+                caudio::utils::StatusCode::Io,
                 "MapViewOfFile failed: " + std::to_string(::GetLastError()))};
         }
         handle.map_ = static_cast<AtomicShmStatus*>(ptr);
@@ -332,3 +332,6 @@ inline ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, boo
 }
 
 } // namespace caudio::service
+
+
+

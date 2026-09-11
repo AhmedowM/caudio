@@ -51,10 +51,15 @@ TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {
     // With fake data, FFmpeg probe returns true but create fails -> unsupported
     auto dec = DecoderRegistry::open(**r);
     REQUIRE(!dec.has_value());
-    REQUIRE(dec.error().code == Result::Unsupported);
+    REQUIRE(dec.error().code == StatusCode::Unsupported);
 #else
     // Without FFmpeg, no decoder available
     auto dec = DecoderRegistry::open(**r);
     REQUIRE(!dec.has_value());
 #endif
 }
+
+
+
+
+

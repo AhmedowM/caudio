@@ -15,7 +15,7 @@ bool queue_busy_on_full() {
     auto r = q.push(3);
     if (r.has_value())
         return false;
-    if (r.error().code != Result::Busy)
+    if (r.error().code != StatusCode::Busy)
         return false;
     return true;
 }
@@ -35,7 +35,7 @@ bool queue_push_pop_fifo() {
     auto v3 = q.pop();
     if (v3.has_value())
         return false;
-    if (v3.error().code != Result::State)
+    if (v3.error().code != StatusCode::State)
         return false;
     return true;
 }
@@ -99,7 +99,7 @@ bool queue_mpsc_thread() {
                     auto r = q.push(val);
                     if (r.has_value())
                         break;
-                    if (r.error().code != Result::Busy)
+                    if (r.error().code != StatusCode::Busy)
                         return;
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 }
@@ -113,7 +113,7 @@ bool queue_mpsc_thread() {
         if (r.has_value()) {
             collected.push_back(*r);
         } else {
-            if (r.error().code != Result::State)
+            if (r.error().code != StatusCode::State)
                 return false;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -154,3 +154,9 @@ bool queue_10k_loop() {
 }
 
 } // namespace caudio::utils::test
+
+
+
+
+
+

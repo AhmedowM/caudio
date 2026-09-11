@@ -10,17 +10,17 @@ export module caudio.utils:log;
 
 export namespace caudio::utils {
 
-enum class Level : int { Debug = 0, Info = 1, Warn = 2, Error = 3 };
+enum class LogLevel : int { Debug = 0, Info = 1, Warn = 2, Error = 3 };
 
-constexpr std::string_view toString(Level lvl) noexcept {
+constexpr std::string_view toString(LogLevel lvl) noexcept {
     switch (lvl) {
-    case Level::Debug:
+    case LogLevel::Debug:
         return "Debug";
-    case Level::Info:
+    case LogLevel::Info:
         return "Info";
-    case Level::Warn:
+    case LogLevel::Warn:
         return "Warn";
-    case Level::Error:
+    case LogLevel::Error:
         return "Error";
     default:
         return "Unknown";
@@ -29,9 +29,9 @@ constexpr std::string_view toString(Level lvl) noexcept {
 
 class Logger {
   public:
-    using Callback = std::function<void(Level, std::string_view)>;
+    using Callback = std::function<void(LogLevel, std::string_view)>;
 
-    explicit Logger(Callback cb = nullptr, Level minLevel = Level::Debug)
+    explicit Logger(Callback cb = nullptr, LogLevel minLevel = LogLevel::Debug)
         : callback_(std::move(cb)), minLevel_(minLevel) {}
 
     void setCallback(Callback cb) {
@@ -39,17 +39,17 @@ class Logger {
         callback_ = std::move(cb);
     }
 
-    void setLevel(Level lvl) noexcept {
+    void setLevel(LogLevel lvl) noexcept {
         std::lock_guard<std::mutex> lk(mutex_);
         minLevel_ = lvl;
     }
 
-    [[nodiscard]] Level level() const noexcept {
+    [[nodiscard]] LogLevel level() const noexcept {
         std::lock_guard<std::mutex> lk(mutex_);
         return minLevel_;
     }
 
-    void log(Level lvl, std::string_view msg) {
+    void log(LogLevel lvl, std::string_view msg) {
         Callback cbCopy;
         if (bool ok = getCallbackIfNeeded(lvl, cbCopy); !ok)
             return;
@@ -57,7 +57,7 @@ class Logger {
     }
 
     template <typename... Args>
-    void log(Level lvl, std::format_string<Args...> fmt, Args&&... args) {
+    void log(LogLevel lvl, std::format_string<Args...> fmt, Args&&... args) {
         Callback cbCopy;
         if (bool ok = getCallbackIfNeeded(lvl, cbCopy); !ok)
             return;
@@ -67,36 +67,36 @@ class Logger {
 
     template <typename... Args>
     void debug(std::format_string<Args...> fmt, Args&&... args) {
-        log(Level::Debug, fmt, std::forward<Args>(args)...);
+        log(LogLevel::Debug, fmt, std::forward<Args>(args)...);
     }
     template <typename... Args>
     void info(std::format_string<Args...> fmt, Args&&... args) {
-        log(Level::Info, fmt, std::forward<Args>(args)...);
+        log(LogLevel::Info, fmt, std::forward<Args>(args)...);
     }
     template <typename... Args>
     void warn(std::format_string<Args...> fmt, Args&&... args) {
-        log(Level::Warn, fmt, std::forward<Args>(args)...);
+        log(LogLevel::Warn, fmt, std::forward<Args>(args)...);
     }
     template <typename... Args>
     void error(std::format_string<Args...> fmt, Args&&... args) {
-        log(Level::Error, fmt, std::forward<Args>(args)...);
+        log(LogLevel::Error, fmt, std::forward<Args>(args)...);
     }
 
     void debug(std::string_view msg) {
-        log(Level::Debug, msg);
+        log(LogLevel::Debug, msg);
     }
     void info(std::string_view msg) {
-        log(Level::Info, msg);
+        log(LogLevel::Info, msg);
     }
     void warn(std::string_view msg) {
-        log(Level::Warn, msg);
+        log(LogLevel::Warn, msg);
     }
     void error(std::string_view msg) {
-        log(Level::Error, msg);
+        log(LogLevel::Error, msg);
     }
 
   private:
-    bool getCallbackIfNeeded(Level lvl, Callback& out) {
+    bool getCallbackIfNeeded(LogLevel lvl, Callback& out) {
         std::lock_guard lk(mutex_);
         if (!callback_)
             return false;
@@ -108,7 +108,11 @@ class Logger {
 
     mutable std::mutex mutex_;
     Callback callback_;
-    Level minLevel_{Level::Debug};
+    LogLevel minLevel_{LogLevel::Debug};
 };
 
 } // namespace caudio::utils
+
+
+
+

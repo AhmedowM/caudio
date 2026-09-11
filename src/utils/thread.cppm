@@ -103,7 +103,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 
 [[nodiscard]] inline Expected<void> setThreadName(std::string_view name) noexcept {
     if (name.empty()) {
-        return std::unexpected(Error{Result::InvalidArg, "empty name"});
+        return std::unexpected(Error{StatusCode::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
     return detail::setCurrentThreadNameImpl(name);
@@ -116,18 +116,18 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     buf[t.size()] = '\0';
     int rc = pthread_setname_np(buf);
     if (rc != 0) {
-        return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
+        return std::unexpected(Error{StatusCode::Unsupported, "pthread_setname_np failed"});
     }
     return {};
 #elif defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__)
     int rc = detail::setPthreadName(pthread_self(), name);
     if (rc != 0) {
-        return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
+        return std::unexpected(Error{StatusCode::Unsupported, "pthread_setname_np failed"});
     }
     return {};
 #else
     (void)name;
-    return std::unexpected(Error{Result::Unsupported, "setThreadName not supported"});
+    return std::unexpected(Error{StatusCode::Unsupported, "setThreadName not supported"});
 #endif
 #endif
 }
@@ -135,10 +135,10 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 [[nodiscard]] inline Expected<void> setThreadName(std::jthread& jt,
                                                   std::string_view name) noexcept {
     if (!jt.joinable()) {
-        return std::unexpected(Error{Result::State, "thread not joinable"});
+        return std::unexpected(Error{StatusCode::State, "thread not joinable"});
     }
     if (name.empty()) {
-        return std::unexpected(Error{Result::InvalidArg, "empty name"});
+        return std::unexpected(Error{StatusCode::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
     HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(jt.native_handle()));
@@ -149,17 +149,17 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     (void)th;
     (void)name;
     return std::unexpected(
-        Error{Result::Unsupported, "setThreadName with jthread not supported on macOS"});
+        Error{StatusCode::Unsupported, "setThreadName with jthread not supported on macOS"});
 #elif defined(__linux__)
     int rc = detail::setPthreadName(th, name);
     if (rc != 0) {
-        return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
+        return std::unexpected(Error{StatusCode::Unsupported, "pthread_setname_np failed"});
     }
     return {};
 #else
     (void)th;
     (void)name;
-    return std::unexpected(Error{Result::Unsupported, "setThreadName not supported"});
+    return std::unexpected(Error{StatusCode::Unsupported, "setThreadName not supported"});
 #endif
 #endif
 }
@@ -167,10 +167,10 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 // Convenience for std::thread as well
 [[nodiscard]] inline Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
     if (!t.joinable()) {
-        return std::unexpected(Error{Result::State, "thread not joinable"});
+        return std::unexpected(Error{StatusCode::State, "thread not joinable"});
     }
     if (name.empty()) {
-        return std::unexpected(Error{Result::InvalidArg, "empty name"});
+        return std::unexpected(Error{StatusCode::InvalidArg, "empty name"});
     }
 #if defined(_WIN32) || defined(_WIN64)
     HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(t.native_handle()));
@@ -180,14 +180,18 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     pthread_t th = t.native_handle();
     int rc = detail::setPthreadName(th, name);
     if (rc != 0)
-        return std::unexpected(Error{Result::Unsupported, "pthread_setname_np failed"});
+        return std::unexpected(Error{StatusCode::Unsupported, "pthread_setname_np failed"});
     return {};
 #else
     (void)t;
     (void)name;
-    return std::unexpected(Error{Result::Unsupported, "not supported"});
+    return std::unexpected(Error{StatusCode::Unsupported, "not supported"});
 #endif
 #endif
 }
 
 } // namespace caudio::utils
+
+
+
+

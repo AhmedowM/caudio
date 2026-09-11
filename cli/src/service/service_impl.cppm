@@ -62,7 +62,7 @@ public:
             cfg.socketPath.empty() ? spStr : cfg.socketPath);
         int lockFd = -1;
         if (!detail::tryAcquireLock(lockPath, lockFd)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (lock held)")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists, "service already running (lock held)")};
         }
 
         // Check for stale PID file
@@ -74,7 +74,7 @@ public:
             if (existingPid && detail::checkPidAlive(*existingPid)) {
                 // Process is alive, daemon already running
                 detail::releaseLock(lockFd);
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pid alive)")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists, "service already running (pid alive)")};
             }
             // Stale PID - remove it
             std::filesystem::remove(pidPath, ec);
@@ -85,7 +85,7 @@ public:
         if (!spStr.empty() && spStr.starts_with("\\\\")) {
             if (detail::probeSocketAlive(spStr)) {
                 detail::releaseLock(lockFd);
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (pipe alive)")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists, "service already running (pipe alive)")};
             }
         } else
 #endif
@@ -94,7 +94,7 @@ public:
             if (std::filesystem::exists(sockP, ec)) {
                 if (detail::probeSocketAlive(spStr)) {
                     detail::releaseLock(lockFd);
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::AlreadyExists, "service already running (socket alive)")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists, "service already running (socket alive)")};
                 } else {
                     // Stale socket - remove
                     std::filesystem::remove(sockP, ec);
@@ -136,11 +136,11 @@ public:
         }
 
         auto loggerPtr = std::make_unique<caudio::utils::Logger>(
-            [](caudio::utils::Level lvl, std::string_view msg) {
+            [](caudio::utils::LogLevel lvl, std::string_view msg) {
                 (void)lvl;
                 (void)msg;
             },
-            static_cast<caudio::utils::Level>(std::clamp(cfg.logLevel, 0, 3)));
+            static_cast<caudio::utils::LogLevel>(std::clamp(cfg.logLevel, 0, 3)));
 
         // Create PID file with current PID
         try {
@@ -185,7 +185,7 @@ public:
 
     caudio::utils::Expected<void> run(std::stop_token st) {
         if (running_.exchange(true)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::State, "already running")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "already running")};
         }
         // build dispatcher
         auto dispatcher = [this](const caudio::cli::Command& cmd)
@@ -347,7 +347,7 @@ private:
             },
             [&](const Seek& s) -> std::expected<Result, caudio::utils::Error> {
                 if (!std::isfinite(s.seconds) || s.seconds < 0) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "seek: invalid seconds")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "seek: invalid seconds")};
                 }
                 auto r = engine_->seek(s.seconds);
                 if (!r) return std::unexpected{r.error()};
@@ -364,7 +364,7 @@ private:
                 if (v.level.has_value()) {
                     float lvl = *v.level;
                     if (!std::isfinite(lvl)) {
-                        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "volume: invalid level")};
+                        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "volume: invalid level")};
                     }
                     // clamp 0-100 -> 0.0-1.0
                     if (lvl < 0.0f) lvl = 0.0f;
@@ -464,7 +464,7 @@ private:
                             newId = *ins;
                             t.id = newId;
                         } else {
-                            if (ins.error().code == caudio::utils::Result::AlreadyExists) {
+                            if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {
                                 auto existing = db_->findByFingerprint(t.fingerprint);
                                 if (existing) {
                                     t = std::move(*existing);
@@ -530,7 +530,7 @@ private:
                             if (!sr) return std::unexpected{sr.error()};
                             toAdd = std::move(*sr);
                             if (toAdd.empty()) {
-                                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "track not found: " + qa.query)};
+                                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "track not found: " + qa.query)};
                             }
                         }
                     }
@@ -565,13 +565,13 @@ private:
                     }
                 } catch (...) {}
                 if (!isNum) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "invalid idOrIndex")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid idOrIndex")};
                 }
                 // try as position first
                 auto rm = db_->queueRemove(qid, val);
                 if (!rm) {
                     // if not found as position, try as track_id lookup
-                    if (rm.error().code == caudio::utils::Result::NotFound) {
+                    if (rm.error().code == caudio::utils::StatusCode::NotFound) {
                         auto items = db_->queueList(qid);
                         if (!items) return std::unexpected{items.error()};
                         bool found = false;
@@ -603,7 +603,7 @@ private:
                 auto items = db_->queueList(qid);
                 if (!items) return std::unexpected{items.error()};
                 if (qm.from >= items->size() || qm.to >= items->size()) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "move out of range")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "move out of range")};
                 }
                 // collect track_ids in order
                 std::vector<int64_t> ids;
@@ -738,10 +738,10 @@ private:
                 std::filesystem::path dst{cmd.path};
                 std::error_code ec;
                 if (!std::filesystem::exists(src, ec)) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "config not found")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "config not found")};
                 }
                 std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
-                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
                 return Result{Empty{}};
             },
             [&](const ConfigImport& cmd) -> std::expected<Result, caudio::utils::Error> {
@@ -749,15 +749,15 @@ private:
                 auto dst = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 std::error_code ec;
                 if (!std::filesystem::exists(src, ec)) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound, "import path not found")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "import path not found")};
                 }
                 std::filesystem::create_directories(dst.parent_path(), ec);
                 std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
-                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+                if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
                 // validate that file is readable and non-empty JSON-like (at least contains '{')
                 std::error_code ec2;
                 if (!std::filesystem::exists(dst, ec2)) {
-                    return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "import failed")};
+                    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "import failed")};
                 }
                 return Result{Empty{}};
             },
@@ -795,7 +795,7 @@ private:
                 return Result{*st};
             },
             [&](const PlaylistSave& cmd) -> std::expected<Result, caudio::utils::Error> {
-                if (cmd.name.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "empty playlist name")};
+                if (cmd.name.empty()) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty playlist name")};
                 auto pidRes = db_->createPlaylist(cmd.name);
                 if (!pidRes) return std::unexpected{pidRes.error()};
                 int64_t pid = *pidRes;
@@ -839,3 +839,7 @@ private:
 };
 
 } // namespace caudio::service
+
+
+
+

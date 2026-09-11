@@ -40,7 +40,7 @@ struct EngineCallbacks {
     std::function<void(int64_t track_id)> on_track_started{};
     std::function<void(int64_t track_id, double pct)> on_track_ended{};
     std::function<void(int64_t queue_id)> on_queue_changed{};
-    std::function<void(caudio::utils::Result err, std::string_view msg)> on_error{};
+    std::function<void(caudio::utils::StatusCode err, std::string_view msg)> on_error{};
     void* user{nullptr}; // unused — reserved
 };
 
@@ -70,3 +70,7 @@ struct EngineState {
 };
 
 } // namespace caudio::engine
+
+
+
+

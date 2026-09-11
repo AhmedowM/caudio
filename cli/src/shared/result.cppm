@@ -76,3 +76,7 @@ using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, T
 using ReplyExpected = std::expected<Result, CliError>;
 
 } // namespace caudio::cli
+
+
+
+

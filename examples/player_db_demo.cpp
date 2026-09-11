@@ -92,7 +92,7 @@ void ensureQueueHasTracks(Database& db, const std::string& samplePath, const std
         auto ins = db.insertTrack(t);
         int64_t tid = 0;
         if (!ins) {
-            if (ins.error().code == Result::AlreadyExists) {
+            if (ins.error().code == StatusCode::AlreadyExists) {
                 auto ex = db.findByFingerprint(t.fingerprint);
                 if (ex)
                     tid = ex->id;
@@ -247,3 +247,8 @@ int main(int argc, char** argv) {
     std::cout << "[demo] done: played=" << played << " errors=" << errors << "\n";
     return 0;
 }
+
+
+
+
+

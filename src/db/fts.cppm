@@ -151,3 +151,8 @@ inline std::string sanitizeFtsTerm(std::string_view term) {
 }
 
 } // namespace caudio::db::internal
+
+
+
+
+

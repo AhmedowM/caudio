@@ -27,13 +27,13 @@ static std::filesystem::path makeTempFile(const std::string& name, std::vector<s
 TEST_CASE("FileReader open not found", "[reader]") {
     auto r = FileReader::open("no_such_file_xyz_12345.wav");
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.error().code == StatusCode::NotFound);
 }
 
 TEST_CASE("FileReader open empty path", "[reader]") {
     auto r = FileReader::open("");
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::InvalidArg);
+    REQUIRE(r.error().code == StatusCode::InvalidArg);
 }
 
 TEST_CASE("reader 64-bit seek clamp", "[reader]") {
@@ -47,15 +47,15 @@ TEST_CASE("reader 64-bit seek clamp", "[reader]") {
         // negative seek from start should fail InvalidArg
         auto bad = reader.seek(-1, SEEK_SET);
         REQUIRE(!bad.has_value());
-        REQUIRE(bad.error().code == Result::InvalidArg);
+        REQUIRE(bad.error().code == StatusCode::InvalidArg);
         // seek beyond size should fail
         auto beyond = reader.seek(1000, SEEK_SET);
         REQUIRE(!beyond.has_value());
-        REQUIRE(beyond.error().code == Result::InvalidArg);
+        REQUIRE(beyond.error().code == StatusCode::InvalidArg);
         // bad whence
         auto badWhence = reader.seek(0, 999);
         REQUIRE(!badWhence.has_value());
-        REQUIRE(badWhence.error().code == Result::InvalidArg);
+        REQUIRE(badWhence.error().code == StatusCode::InvalidArg);
         // valid seek
         auto ok = reader.seek(10, SEEK_SET);
         REQUIRE(ok.has_value());
@@ -153,3 +153,9 @@ TEST_CASE("FileReader tell and read", "[reader]") {
     }
     std::filesystem::remove(path);
 }
+
+
+
+
+
+

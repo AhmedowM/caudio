@@ -72,11 +72,15 @@ int main(int argc, char** argv) {
     }
 
     MiniPlayer mini;
-    auto result = mini.run(path);
-    if (!result) {
-        std::cerr << "Error: " << result.error().message
-                  << " (code: " << static_cast<int>(result.error().code) << ")\n";
+    auto StatusCode = mini.run(path);
+    if (!StatusCode) {
+        std::cerr << "Error: " << StatusCode.error().message
+                  << " (code: " << static_cast<int>(StatusCode.error().code) << ")\n";
         return 1;
     }
     return 0;
 }
+
+
+
+

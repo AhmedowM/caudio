@@ -301,9 +301,9 @@ inline std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path) {
     std::error_code ec;
     auto sz = std::filesystem::file_size(path, ec);
-    if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+    if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
     std::ifstream f(path, std::ios::binary);
-    if (!f) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
+    if (!f) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
     constexpr std::size_t kSample = 64 * 1024;
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
@@ -347,3 +347,6 @@ inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
 }
 
 } // namespace caudio::service::detail
+
+
+

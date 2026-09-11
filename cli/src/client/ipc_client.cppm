@@ -78,7 +78,7 @@ public:
         HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting, 0, nullptr);
         if (h == kInvalidHandle) {
             DWORD err = ::GetLastError();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io,
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
                                                              "CreateFileW connect failed: " + std::to_string(err))};
         }
         DWORD mode = kPipeReadmodeByte;
@@ -91,18 +91,18 @@ public:
 #else
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socket failed")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "socket failed")};
         }
         sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         if (path.size() >= sizeof(addr.sun_path)) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "socket path too long")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "socket path too long")};
         }
         std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "connect failed")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "connect failed")};
         }
         IpcClient c;
         c.fd_ = fd;
@@ -191,7 +191,7 @@ private:
     caudio::utils::Expected<void> rawSend(std::span<const std::byte> data) {
 #ifdef _WIN32
         if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::State, "not connected")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
         }
         std::size_t sent = 0;
         while (sent < data.size()) {
@@ -200,21 +200,21 @@ private:
                                   static_cast<DWORD>(data.size() - sent), &w, nullptr);
             if (ok == 0) {
                 DWORD err = ::GetLastError();
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "WriteFile failed: " + std::to_string(err))};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "WriteFile failed: " + std::to_string(err))};
             }
             sent += w;
         }
         return {};
 #else
         if (fd_ < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::State, "not connected")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
         }
         std::size_t sent = 0;
         while (sent < data.size()) {
             ::ssize_t n = ::send(fd_, reinterpret_cast<const char*>(data.data()) + sent, data.size() - sent, 0);
             if (n < 0) {
                 if (errno == EINTR) continue;
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "send failed")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "send failed")};
             }
             sent += static_cast<std::size_t>(n);
         }
@@ -225,7 +225,7 @@ private:
     caudio::utils::Expected<std::vector<std::byte>> rawRecv() {
 #ifdef _WIN32
         if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::State, "not connected")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
         }
         std::array<std::byte, 4> hdr{};
         std::size_t got = 0;
@@ -234,9 +234,9 @@ private:
             BOOL ok = ::ReadFile(pipeHandle_, reinterpret_cast<char*>(hdr.data()) + got, 4 - static_cast<DWORD>(got), &r, nullptr);
             if (ok == 0) {
                 DWORD err = ::GetLastError();
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "ReadFile hdr failed: " + std::to_string(err))};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "ReadFile hdr failed: " + std::to_string(err))};
             }
-            if (r == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "pipe closed")};
+            if (r == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "pipe closed")};
             got += r;
         }
         std::uint32_t len = (static_cast<std::uint32_t>(std::to_underlying(hdr[0])) << 24) |
@@ -244,7 +244,7 @@ private:
                             (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
                             static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
         if (len > 16 * 1024 * 1024) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "frame too large")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
         }
         std::vector<std::byte> payload(len);
         got = 0;
@@ -253,15 +253,15 @@ private:
             BOOL ok = ::ReadFile(pipeHandle_, reinterpret_cast<char*>(payload.data()) + got, static_cast<DWORD>(len - got), &r, nullptr);
             if (ok == 0) {
                 DWORD err = ::GetLastError();
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "ReadFile payload failed: " + std::to_string(err))};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "ReadFile payload failed: " + std::to_string(err))};
             }
-            if (r == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "pipe closed")};
+            if (r == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "pipe closed")};
             got += r;
         }
         return payload;
 #else
         if (fd_ < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::State, "not connected")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
         }
         std::array<std::byte, 4> hdr{};
         std::size_t got = 0;
@@ -269,9 +269,9 @@ private:
             ::ssize_t n = ::recv(fd_, reinterpret_cast<char*>(hdr.data()) + got, 4 - got, 0);
             if (n < 0) {
                 if (errno == EINTR) continue;
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "recv hdr failed")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "recv hdr failed")};
             }
-            if (n == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "peer closed")};
+            if (n == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "peer closed")};
             got += static_cast<std::size_t>(n);
         }
         std::uint32_t len = (static_cast<std::uint32_t>(std::to_underlying(hdr[0])) << 24) |
@@ -279,7 +279,7 @@ private:
                             (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
                             static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
         if (len > 16 * 1024 * 1024) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "frame too large")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
         }
         std::vector<std::byte> payload(len);
         got = 0;
@@ -287,9 +287,9 @@ private:
             ::ssize_t n = ::recv(fd_, reinterpret_cast<char*>(payload.data()) + got, len - got, 0);
             if (n < 0) {
                 if (errno == EINTR) continue;
-                return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "recv payload failed")};
+                return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "recv payload failed")};
             }
-            if (n == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "peer closed")};
+            if (n == 0) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "peer closed")};
             got += static_cast<std::size_t>(n);
         }
         return payload;
@@ -309,3 +309,7 @@ private:
 };
 
 } // namespace caudio::client
+
+
+
+

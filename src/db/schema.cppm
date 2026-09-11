@@ -155,3 +155,9 @@ inline constexpr std::string_view kSchemaDefaultLibrary =
     "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');";
 
 } // namespace caudio::db
+
+
+
+
+
+

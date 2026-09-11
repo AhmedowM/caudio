@@ -252,3 +252,9 @@ TEST_CASE("search COLLATE NOCASE variation", "[db_search]") {
         REQUIRE(found);
     }
 }
+
+
+
+
+
+

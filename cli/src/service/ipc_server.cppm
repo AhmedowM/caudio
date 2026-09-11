@@ -104,7 +104,7 @@ public:
                                       65536, 65536, 0, nullptr);
         if (h == kInvalidHandle) {
             DWORD err = ::GetLastError();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io,
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
                                                              "CreateNamedPipeW failed: " + std::to_string(err))};
         }
         pipeHandle_ = h;
@@ -121,7 +121,7 @@ public:
         }
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "socket failed")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "socket failed")};
         }
         std::string sockStr = socketPath_;
         ::unlink(sockStr.c_str());
@@ -129,16 +129,16 @@ public:
         addr.sun_family = AF_UNIX;
         if (sockStr.size() >= sizeof(addr.sun_path)) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "socket path too long")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "socket path too long")};
         }
         std::memcpy(addr.sun_path, sockStr.c_str(), sockStr.size() + 1);
         if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "bind failed")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "bind failed")};
         }
         if (::listen(fd, 16) != 0) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "listen failed")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "listen failed")};
         }
         listenFd_ = fd;
         return {};
@@ -398,3 +398,7 @@ private:
 };
 
 } // namespace caudio::service
+
+
+
+

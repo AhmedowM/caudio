@@ -53,12 +53,12 @@ bool thread_parallel_10() {
 
 bool thread_setname_current() {
     auto r = setThreadName("ca-test");
-    if (!r.has_value() && r.error().code != Result::Unsupported &&
-        r.error().code != Result::InvalidArg)
+    if (!r.has_value() && r.error().code != StatusCode::Unsupported &&
+        r.error().code != StatusCode::InvalidArg)
         return false;
     auto r2 = setThreadName("");
-    if (!r2.has_value() && r2.error().code != Result::Unsupported &&
-        r2.error().code != Result::InvalidArg)
+    if (!r2.has_value() && r2.error().code != StatusCode::Unsupported &&
+        r2.error().code != StatusCode::InvalidArg)
         return false;
     return true;
 }
@@ -70,7 +70,7 @@ bool thread_setname_jthread() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     auto r = setThreadName(jt, "worker-1");
-    if (!r.has_value() && r.error().code != Result::Unsupported && r.error().code != Result::State)
+    if (!r.has_value() && r.error().code != StatusCode::Unsupported && r.error().code != StatusCode::State)
         return false;
     jt.request_stop();
     jt.join();
@@ -78,7 +78,7 @@ bool thread_setname_jthread() {
     auto r2 = setThreadName(empty, "nope");
     if (r2.has_value())
         return false;
-    if (r2.error().code != Result::State)
+    if (r2.error().code != StatusCode::State)
         return false;
     return true;
 }
@@ -112,3 +112,9 @@ bool thread_sleepForMs() {
 }
 
 } // namespace caudio::utils::test
+
+
+
+
+
+

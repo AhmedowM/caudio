@@ -21,8 +21,8 @@ import caudio.utils;
 import :types;
 import :detail;
 import :database;
-import :statement;
-import :transaction;
+import :SqliteStatement;
+import :DbTransaction;
 
 namespace caudio::db {
 
@@ -150,7 +150,7 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
         }
         return t;
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -167,10 +167,10 @@ export std::expected<void, caudio::utils::Error> exportJson(Database& db,
     std::ofstream f(outPath, std::ios::binary);
     if (!f)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Io, "cannot open output")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open output")};
     f << root.dump(2);
     if (!f)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, "write failed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "write failed")};
     return {};
 }
 
@@ -179,30 +179,30 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
     std::ifstream f(inPath, std::ios::binary);
     if (!f)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Io, "cannot open input")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open input")};
     std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     if (content.empty())
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Corrupt, "empty file")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "empty file")};
     ordered_json root;
     try {
         root = ordered_json::parse(content);
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Corrupt, e.what())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
     if (!root.contains("tracks") || !root["tracks"].is_array()) {
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Corrupt, "missing tracks array")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "missing tracks array")};
     }
     std::unique_lock lk{db.mutex()};
     sqlite3* h = db.handleLocked();
     if (!h)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-    auto txRes = Transaction::begin(h);
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+    auto txRes = DbTransaction::begin(h);
     if (!txRes)
         return std::unexpected{txRes.error()};
-    Transaction tx = std::move(*txRes);
+    DbTransaction tx = std::move(*txRes);
     bool corrupt = false;
     for (auto& j : root["tracks"]) {
         auto tr = trackFromJson(j);
@@ -211,7 +211,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
             break;
         }
         Track t = *tr;
-        Statement stmt;
+        SqliteStatement stmt;
         if (auto e = stmt.prepare(h,
                                    "INSERT INTO tracks (fingerprint, path, size, mtime, duration, "
                                    "sample_rate, channels, bitrate, title, artist, album, "
@@ -258,7 +258,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
             stmt.bindNull(25);
         int rc = stmt.stepDone();
         if (rc == SQLITE_CONSTRAINT) {
-            Statement sel;
+            SqliteStatement sel;
             if (auto e = sel.prepare(h, "SELECT id FROM tracks WHERE fingerprint=?"); !e) {
                 corrupt = true;
                 break;
@@ -266,7 +266,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
             sel.bindBlob(1, fpSpan);
             if (sel.step()) {
                 int64_t existing = sel.columnInt(0);
-                Statement upd;
+                SqliteStatement upd;
                 if (auto e = upd.prepare(h,
                                           "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, "
                                           "sample_rate=?, channels=?, bitrate=?, title=?, artist=?, "
@@ -308,7 +308,7 @@ upd.bindText(8, t.title);
                 upd.bindInt(25, existing);
                 (void)upd.stepDone();
             } else {
-                Statement sel2;
+                SqliteStatement sel2;
                 if (auto e = sel2.prepare(h, "SELECT id FROM tracks WHERE path=?"); e) {
                     sel2.bindText(1, t.path);
                     if (sel2.step()) {
@@ -324,7 +324,7 @@ upd.bindText(8, t.title);
     if (corrupt) {
         (void)tx.rollback();
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Corrupt, "import corrupt")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "import corrupt")};
     }
     if (auto c = tx.commit(); !c)
         return std::unexpected{c.error()};
@@ -332,3 +332,9 @@ upd.bindText(8, t.title);
 }
 
 } // namespace caudio::db
+
+
+
+
+
+

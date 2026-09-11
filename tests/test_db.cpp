@@ -34,7 +34,7 @@ TEST_CASE("insertTrack duplicate AlreadyExists", "[db]") {
     t2.path = "/tmp/track_dup_path.mp3";
     auto r2 = db->insertTrack(t2);
     REQUIRE(!r2.has_value());
-    REQUIRE(r2.error().code == Result::AlreadyExists);
+    REQUIRE(r2.error().code == StatusCode::AlreadyExists);
     // same path with different fingerprint should succeed (path not unique)
     Track t3 = makeTrack(99, t.path);
     for (int b=0;b<32;++b) t3.fingerprint[b] = (uint8_t)(0xFF - b);
@@ -51,12 +51,12 @@ TEST_CASE("updateTrack missing NotFound", "[db]") {
     t.id = 9999; // non-existent id
     auto r = db->updateTrack(t);
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.error().code == StatusCode::NotFound);
     // updating id 0 should be InvalidArg
     t.id = 0;
     auto r2 = db->updateTrack(t);
     REQUIRE(!r2.has_value());
-    REQUIRE(r2.error().code == Result::InvalidArg);
+    REQUIRE(r2.error().code == StatusCode::InvalidArg);
 }
 
 TEST_CASE("getTrack NotFound", "[db]") {
@@ -65,10 +65,10 @@ TEST_CASE("getTrack NotFound", "[db]") {
     auto db = std::move(dbRes.value());
     auto r = db->getTrack(9999);
     REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.error().code == StatusCode::NotFound);
     auto r2 = db->getTrack(0);
     REQUIRE(!r2.has_value());
-    REQUIRE(r2.error().code == Result::InvalidArg);
+    REQUIRE(r2.error().code == StatusCode::InvalidArg);
 }
 
 TEST_CASE("deleteTrack and verify", "[db]") {
@@ -82,14 +82,14 @@ TEST_CASE("deleteTrack and verify", "[db]") {
     REQUIRE(db->deleteTrack(id).has_value());
     auto g = db->getTrack(id);
     REQUIRE(!g.has_value());
-    REQUIRE(g.error().code == Result::NotFound);
+    REQUIRE(g.error().code == StatusCode::NotFound);
     // delete again -> NotFound
     auto del2 = db->deleteTrack(id);
     REQUIRE(!del2.has_value());
-    REQUIRE(del2.error().code == Result::NotFound);
+    REQUIRE(del2.error().code == StatusCode::NotFound);
     // delete 0 -> InvalidArg
     REQUIRE(!db->deleteTrack(0).has_value());
-    REQUIRE(db->deleteTrack(0).error().code == Result::InvalidArg);
+    REQUIRE(db->deleteTrack(0).error().code == StatusCode::InvalidArg);
 }
 
 TEST_CASE("listTracks pagination limit/offset", "[db]") {
@@ -149,7 +149,7 @@ TEST_CASE("findByFingerprint and findByPath", "[db]") {
     // findByPath missing
     auto byPathMiss = db->findByPath("/nonexistent/path.mp3");
     REQUIRE(!byPathMiss.has_value());
-    REQUIRE(byPathMiss.error().code == Result::NotFound);
+    REQUIRE(byPathMiss.error().code == StatusCode::NotFound);
     // findByFingerprint success
     auto byFp = db->findByFingerprint(t.fingerprint);
     REQUIRE(byFp.has_value());
@@ -159,7 +159,7 @@ TEST_CASE("findByFingerprint and findByPath", "[db]") {
     wrong.fill(0xFF);
     auto byFpMiss = db->findByFingerprint(wrong);
     REQUIRE(!byFpMiss.has_value());
-    REQUIRE(byFpMiss.error().code == Result::NotFound);
+    REQUIRE(byFpMiss.error().code == StatusCode::NotFound);
 }
 
 // Keep original sqlite sanity tests but adapted to use Database::open path check
@@ -168,3 +168,9 @@ TEST_CASE("SQLite open in-memory via Database", "[db_sqlite]") {
     REQUIRE(dbRes.has_value());
     REQUIRE(dbRes.value()->handle() != nullptr);
 }
+
+
+
+
+
+

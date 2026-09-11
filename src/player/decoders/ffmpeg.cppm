@@ -45,7 +45,7 @@ class FfmpegDecoder final : public IDecoder {
 
         if (!p->init()) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::Result::Unsupported, "FFmpeg init failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Unsupported, "FFmpeg init failed"});
         }
 
         return caudio::utils::Expected<std::unique_ptr<IDecoder>>{
@@ -148,12 +148,12 @@ class FfmpegDecoder final : public IDecoder {
     caudio::utils::Expected<void> seek(double seconds) override {
         if (seconds < 0.0 || !std::isfinite(seconds) || !fmt_ || !dec_ || audioStreamIdx_ < 0) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::Result::InvalidArg, "bad seconds"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad seconds"});
         }
         AVStream* stream = fmt_->streams[audioStreamIdx_];
         if (!stream)
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::Result::Internal, "no stream"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, "no stream"});
         // Use stream time_base for seeking - dec time_base is codec, not correct for container
         int64_t seekTarget = av_rescale_q(static_cast<int64_t>(seconds * AV_TIME_BASE),
                                           AVRational{1, AV_TIME_BASE}, stream->time_base);
@@ -171,7 +171,7 @@ class FfmpegDecoder final : public IDecoder {
             ret = av_seek_frame(fmt_, audioStreamIdx_, seekTarget, AVSEEK_FLAG_BACKWARD);
             if (ret < 0)
                 return std::unexpected(
-                    caudio::utils::Error{caudio::utils::Result::Io, "seek failed"});
+                    caudio::utils::Error{caudio::utils::StatusCode::Io, "seek failed"});
         }
         avcodec_flush_buffers(dec_);
         // flush resampler as well
@@ -433,3 +433,6 @@ class FfmpegDecoder final : public IDecoder {
 };
 
 } // namespace caudio::player
+
+
+

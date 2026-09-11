@@ -27,11 +27,11 @@ computeFingerprint(const std::filesystem::path& path) {
     std::error_code ec;
     auto sz = std::filesystem::file_size(path, ec);
     if (ec)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, ec.message())};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
     std::ifstream f(path, std::ios::binary);
     if (!f)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Io, "cannot open file")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
     thread_local std::array<std::byte, kSample> buf{};
@@ -75,3 +75,8 @@ inline std::array<uint8_t, 32> fallbackFingerprint(std::string_view path) noexce
 }
 
 } // namespace caudio::db::internal
+
+
+
+
+

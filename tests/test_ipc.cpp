@@ -193,3 +193,8 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     std::filesystem::remove(dbPath.string() + "-shm", ec);
     std::filesystem::remove(cfg.configPath, ec);
 }
+
+
+
+
+

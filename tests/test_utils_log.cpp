@@ -15,7 +15,7 @@ TEST_CASE("Logger injected callback", "[utils][log]") {
     REQUIRE(log_injected());
 }
 
-TEST_CASE("Logger level filtering", "[utils][log]") {
+TEST_CASE("Logger LogLevel filtering", "[utils][log]") {
     REQUIRE(log_level_filter());
 }
 
@@ -31,6 +31,12 @@ TEST_CASE("Logger null callback safe", "[utils][log]") {
     REQUIRE(log_null_safe());
 }
 
-TEST_CASE("Logger toString Level", "[utils][log]") {
+TEST_CASE("Logger toString LogLevel", "[utils][log]") {
     REQUIRE(log_toString_level());
 }
+
+
+
+
+
+

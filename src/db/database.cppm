@@ -22,8 +22,8 @@ import :types;
 import :schema;
 import :queue;
 import :write_thread;
-import :statement;
-import :transaction;
+import :SqliteStatement;
+import :DbTransaction;
 import :detail;
 
 export namespace caudio::db {
@@ -83,10 +83,10 @@ class Database final {
         std::lock_guard lk{cacheMutex_};
         stmtCache_.clear();
     }
-    // per-connection prepared statement cache
+    // per-connection prepared SqliteStatement cache
     // Primary API: getCachedForUse returns expected; callers must check.
     // Legacy raw-pointer APIs are deprecated and delegate to expected (nullptr only on error).
-    std::expected<Statement*, caudio::utils::Error> getCachedForUse(std::string_view sql) const {
+    std::expected<SqliteStatement*, caudio::utils::Error> getCachedForUse(std::string_view sql) const {
         // assumes stmtCacheMutex_ (cacheMutex_) already held by caller
         std::string key(sql);
         auto it = stmtCache_.find(key);
@@ -94,15 +94,15 @@ class Database final {
             it->second->reset();
             return it->second.get();
         }
-        auto up = std::make_unique<Statement>();
+        auto up = std::make_unique<SqliteStatement>();
         if (auto e = up->prepare(db_.get(), sql); !e)
             return std::unexpected(e.error());
-        Statement* raw = up.get();
+        SqliteStatement* raw = up.get();
         stmtCache_.emplace(std::move(key), std::move(up));
         return raw;
     }
     [[deprecated("use getCachedForUse; raw nullptr is error — check expected")]]
-    Statement* getCachedLocked(std::string_view sql) const {
+    SqliteStatement* getCachedLocked(std::string_view sql) const {
         // Caller must hold stmtCacheMutex_ (cacheMutex_); delegate to expected API.
         auto r = getCachedForUse(sql);
         if (!r)
@@ -110,7 +110,7 @@ class Database final {
         return *r;
     }
     [[deprecated("use getCachedForUse with external lock; raw nullptr is error")]]
-    Statement* getCached(const std::string& sql) const {
+    SqliteStatement* getCached(const std::string& sql) const {
         std::lock_guard lk{cacheMutex_};
         auto r = getCachedForUse(sql);
         if (!r)
@@ -128,7 +128,7 @@ class Database final {
             std::string msg = raw ? sqlite3_errmsg(raw) : "open failed";
             if (raw)
                 sqlite3_close(raw);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, msg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, msg)};
         }
         char* err = nullptr;
         internal::SqliteErrGuard errGuard{err};
@@ -145,7 +145,7 @@ class Database final {
             if (!(isQueueUniqueMigration && isUniqueConstraint)) {
                 sqlite3_close(raw);
                 return std::unexpected{caudio::utils::makeError(
-                    caudio::utils::Result::Corrupt, std::string("schema init failed: ") + msg)};
+                    caudio::utils::StatusCode::Corrupt, std::string("schema init failed: ") + msg)};
             }
             // else: non-fatal migration duplicate — clear err for next exec
             if (err) {
@@ -180,20 +180,20 @@ class Database final {
         return writer_.flush();
     }
 
-    // Generic transaction helper — BEGIN IMMEDIATE / COMMIT / ROLLBACK
+    // Generic DbTransaction helper — BEGIN IMMEDIATE / COMMIT / ROLLBACK
     // Holds Database::mutex() (dbMutex_ dbMutex_) for duration.
     template <typename Fn>
     std::expected<void, caudio::utils::Error> withTransaction(Fn&& fn) {
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Busy, err ? std::string(err) : "BEGIN failed")};
+                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
         auto res = fn(db_.get());
         if (!res) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -205,26 +205,26 @@ class Database final {
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Internal, cErr ? std::string(cErr) : "commit failed")};
+                caudio::utils::StatusCode::Internal, cErr ? std::string(cErr) : "commit failed")};
         }
         return {};
     }
 
-    // Batch queue helpers — single transaction, atomic to concurrent queueList
+// Batch queue helpers — single DbTransaction, atomic to concurrent queueList
     std::expected<void, caudio::utils::Error> queueEnqueueBatch(int64_t qid,
-                                                                std::span<const int64_t> tids) {
+                                                                 std::span<const int64_t> tids) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Busy, err ? std::string(err) : "BEGIN failed")};
+                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
         for (int64_t tid : tids) {
             auto r = caudio::db::queueEnqueueLocked(db_.get(), cacheMutex_, stmtCache_, qid, tid, -1);
             if (!r) {
@@ -238,29 +238,29 @@ class Database final {
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Internal, cErr ? std::string(cErr) : "commit failed")};
+                caudio::utils::StatusCode::Internal, cErr ? std::string(cErr) : "commit failed")};
         }
         return {};
     }
     std::expected<void, caudio::utils::Error> queueEnqueueBatch(int64_t qid,
-                                                                const std::vector<int64_t>& tids) {
+                                                                 const std::vector<int64_t>& tids) {
         return queueEnqueueBatch(qid, std::span<const int64_t>(tids.data(), tids.size()));
     }
 
     std::expected<void, caudio::utils::Error> queueReplaceAll(int64_t qid,
-                                                              std::span<const int64_t> ids) {
+                                                               std::span<const int64_t> ids) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Busy, err ? std::string(err) : "BEGIN failed")};
+                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
         auto clr = caudio::db::queueClearLocked(db_.get(), cacheMutex_, stmtCache_, qid);
         if (!clr) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -279,27 +279,27 @@ class Database final {
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Internal, cErr ? std::string(cErr) : "commit failed")};
+                caudio::utils::StatusCode::Internal, cErr ? std::string(cErr) : "commit failed")};
         }
         return {};
     }
     std::expected<void, caudio::utils::Error> queueReplaceAll(int64_t qid,
-                                                              const std::vector<int64_t>& ids) {
+                                                               const std::vector<int64_t>& ids) {
         return queueReplaceAll(qid, std::span<const int64_t>(ids.data(), ids.size()));
     }
 
-    // Locked track/library helpers — caller must hold Database::mutex() (dbMutex_ dbMutex_)
+// Locked track/library helpers — caller must hold Database::mutex() (dbMutex_ dbMutex_)
     // These avoid re-locking dbMutex_ and are intended for use inside outer transactions/batches.
     std::expected<Track, caudio::utils::Error> findByPathLocked(std::string_view path) {
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindText(1, path);
         bool hasRow = st.step();
         Track t;
@@ -307,20 +307,20 @@ class Database final {
             internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return t;
     }
     std::expected<Track, caudio::utils::Error>
     findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindBlob(1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(fp.data()), fp.size()});
         bool hasRow = st.step();
         Track t;
@@ -328,18 +328,18 @@ class Database final {
             internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return t;
     }
     std::expected<int64_t, caudio::utils::Error> insertTrackLocked(const Track& t) {
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(kInsertTrackSql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         bindTrackForInsert(st, t);
         int rc = st.stepDone();
         st.reset();
@@ -347,63 +347,63 @@ class Database final {
             int ec = sqlite3_extended_errcode(db_.get());
             if (ec == SQLITE_CONSTRAINT_UNIQUE || rc == SQLITE_CONSTRAINT)
                 return std::unexpected{caudio::utils::makeError(
-                    caudio::utils::Result::AlreadyExists, sqlite3_errmsg(db_.get()))};
+                    caudio::utils::StatusCode::AlreadyExists, sqlite3_errmsg(db_.get()))};
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         }
         return sqlite3_last_insert_rowid(db_.get());
     }
     std::expected<void, caudio::utils::Error> updateTrackLocked(const Track& t) {
         if (t.id == 0)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::InvalidArg, "id 0")};
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "id 0")};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(kUpdateTrackSql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         bindTrackForUpdate(st, t);
         int rc = st.stepDone();
         st.reset();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
     std::expected<void, caudio::utils::Error> deleteTrackLocked(int64_t id) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string_view sql = "DELETE FROM tracks WHERE id=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindInt(1, id);
         int rc = st.stepDone();
         st.reset();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
     std::expected<std::vector<Library>, caudio::utils::Error> libraryListLocked() {
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "SELECT id, path, name, date_added, last_scanned, auto_scan, "
-                                      "recursive, extensions FROM libraries ORDER BY id");
+                                          "recursive, extensions FROM libraries ORDER BY id");
             !e)
             return std::unexpected{e.error()};
         std::vector<Library> out;
@@ -423,13 +423,13 @@ class Database final {
     }
     std::expected<void, caudio::utils::Error> libraryUpdateLocked(const Library& l) {
         if (l.id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "UPDATE libraries SET path=?, name=?, last_scanned=?, "
-                                      "auto_scan=?, recursive=?, extensions=? WHERE id=?");
+                                          "auto_scan=?, recursive=?, extensions=? WHERE id=?");
             !e)
             return std::unexpected{e.error()};
         st.bindText(1, l.path);
@@ -445,9 +445,9 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
 
@@ -459,12 +459,12 @@ class Database final {
     // engineQueueSpin_ in engine but DB uses dbMutex_ for queue table as well.
     // Lock order: dbMutex_ (dbMutex_) -> stmtCacheMutex_ (cacheMutex_)
     mutable std::shared_mutex dbMutex_;
-    mutable std::unordered_map<std::string, std::unique_ptr<Statement>> stmtCache_;
+    mutable std::unordered_map<std::string, std::unique_ptr<SqliteStatement>> stmtCache_;
     mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   private:
     // Inline helpers — reduce duplication between insert/update (internal::bindTrack coverage)
-    static void bindTrackForInsert(Statement& st, const Track& t) {
+    static void bindTrackForInsert(SqliteStatement& st, const Track& t) {
         st.bindBlob(1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(t.fingerprint.data()), t.fingerprint.size()});
         st.bindText(2, t.path);
         st.bindInt(3, t.size);
@@ -493,7 +493,7 @@ class Database final {
         st.bindInt(23, t.dirty ? 1 : 0);
         st.bindInt(24, t.library_id ? t.library_id : 1);
     }
-    static void bindTrackForUpdate(Statement& st, const Track& t) {
+    static void bindTrackForUpdate(SqliteStatement& st, const Track& t) {
         st.bindBlob(1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(t.fingerprint.data()), t.fingerprint.size()});
         st.bindText(2, t.path);
         st.bindInt(3, t.size);
@@ -556,16 +556,16 @@ class Database final {
 
     std::expected<Track, caudio::utils::Error> getTrackLocked(int64_t id) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE id=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindInt(1, id);
         bool hasRow = st.step();
         Track t;
@@ -573,7 +573,7 @@ class Database final {
             internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return t;
     }
     std::expected<Track, caudio::utils::Error>
@@ -581,13 +581,13 @@ class Database final {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindBlob(1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(fp.data()), fp.size()});
         bool hasRow = st.step();
         Track t;
@@ -595,20 +595,20 @@ class Database final {
             internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return t;
     }
     std::expected<Track, caudio::utils::Error> findByPath(std::string_view path) {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindText(1, path);
         bool hasRow = st.step();
         Track t;
@@ -616,7 +616,7 @@ class Database final {
             internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return t;
     }
     std::expected<std::vector<Track>, caudio::utils::Error>
@@ -624,7 +624,7 @@ class Database final {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) + " WHERE 1=1";
         if (q) {
             if (q->library_id)
@@ -652,7 +652,7 @@ class Database final {
                 sql += " OFFSET ?";
         } else if (has_offset)
             sql += " LIMIT -1 OFFSET ?";
-        Statement st;
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), sql); !e)
             return std::unexpected{e.error()};
         int idx = 1;
@@ -695,26 +695,26 @@ class Database final {
     }
     std::expected<void, caudio::utils::Error> setDirty(int64_t id, int dirty) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string_view sql = "UPDATE tracks SET dirty=? WHERE id=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindInt(1, dirty);
         st.bindInt(2, id);
         int rc = st.stepDone();
         st.reset();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
 
@@ -743,15 +743,15 @@ class Database final {
     }
 
     // Playlists
-    std::expected<int64_t, caudio::utils::Error> createPlaylist(std::string_view name, int type = 0,
-                                                                std::string_view smart_query = {}) {
+std::expected<int64_t, caudio::utils::Error> createPlaylist(std::string_view name, int type = 0,
+                                                                 std::string_view smart_query = {}) {
         if (name.empty())
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e =
                 st.prepare(db_.get(), "INSERT INTO playlists (name, type, smart_query) VALUES (?,?,?)");
             !e)
@@ -765,24 +765,24 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         return sqlite3_last_insert_rowid(db_.get());
     }
     std::expected<Playlist, caudio::utils::Error> getPlaylist(int64_t id) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "SELECT id, name, type, smart_query, created, modified, "
-                                     "library_id FROM playlists WHERE id=?");
+                                         "library_id FROM playlists WHERE id=?");
             !e)
             return std::unexpected{e.error()};
         st.bindInt(1, id);
         if (!st.step())
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         Playlist p;
         p.id = st.columnInt(0);
         p.name = st.columnText(1);
@@ -795,14 +795,14 @@ class Database final {
     }
     std::expected<void, caudio::utils::Error> updatePlaylist(const Playlist& p) {
         if (p.id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "UPDATE playlists SET name=?, type=?, smart_query=?, "
-                                     "library_id=?, modified=CURRENT_TIMESTAMP WHERE id=?");
+                                         "library_id=?, modified=CURRENT_TIMESTAMP WHERE id=?");
             !e)
             return std::unexpected{e.error()};
         st.bindText(1, p.name);
@@ -816,38 +816,38 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
     std::expected<void, caudio::utils::Error> deletePlaylist(int64_t id) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "DELETE FROM playlists WHERE id=?"); !e)
             return std::unexpected{e.error()};
         st.bindInt(1, id);
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
     std::expected<std::vector<Playlist>, caudio::utils::Error> listPlaylists() {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "SELECT id, name, type, smart_query, created, modified, "
-                                     "library_id FROM playlists ORDER BY id");
+                                         "library_id FROM playlists ORDER BY id");
             !e)
             return std::unexpected{e.error()};
         std::vector<Playlist> out;
@@ -864,16 +864,16 @@ class Database final {
         }
         return out;
     }
-    std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
-                                                               int64_t pos = -1) {
+std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
+                                                                int64_t pos = -1) {
         if (pid == 0 || tid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         if (pos < 0) {
-            Statement ms;
+            SqliteStatement ms;
             if (auto e = ms.prepare(db_.get(),
                     "SELECT COALESCE(MAX(position), -1)+1 FROM playlist_items WHERE playlist_id=?");
                 e) {
@@ -884,7 +884,7 @@ class Database final {
             if (pos < 0)
                 pos = 0;
         } else {
-            Statement ss;
+            SqliteStatement ss;
             if (auto e = ss.prepare(db_.get(), "UPDATE playlist_items SET position=position+1 WHERE "
                                          "playlist_id=? AND position>=?");
                 e) {
@@ -893,7 +893,7 @@ class Database final {
                 (void)ss.stepDone();
             }
         }
-        Statement st;
+        SqliteStatement st;
         if (auto e = st.prepare(
                 db_.get(), "INSERT INTO playlist_items (playlist_id, track_id, position) VALUES (?,?,?)");
             !e)
@@ -904,17 +904,17 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         return {};
     }
     std::expected<void, caudio::utils::Error> playlistRemoveTrack(int64_t pid, int64_t tid) {
         if (pid == 0 || tid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e =
                 st.prepare(db_.get(), "DELETE FROM playlist_items WHERE playlist_id=? AND track_id=?");
             !e)
@@ -924,32 +924,32 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
     std::expected<void, caudio::utils::Error> playlistReorder(int64_t pid, int64_t from,
                                                               int64_t to) {
         if (pid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         if (from == to)
             return {};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement sel;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement sel;
         if (auto e = sel.prepare(db_.get(), "SELECT track_id FROM playlist_items WHERE playlist_id=? AND position=?");
             !e)
             return std::unexpected{e.error()};
         sel.bindInt(1, pid);
         sel.bindInt(2, from);
         if (!sel.step())
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         int64_t track_id = sel.columnInt(0);
         if (from < to) {
-            Statement ss;
+            SqliteStatement ss;
             if (auto e = ss.prepare(db_.get(), "UPDATE playlist_items SET position=position-1 WHERE "
                                          "playlist_id=? AND position>? AND position<=?");
                 e) {
@@ -959,7 +959,7 @@ class Database final {
                 (void)ss.stepDone();
             }
         } else {
-            Statement ss;
+            SqliteStatement ss;
             if (auto e = ss.prepare(db_.get(), "UPDATE playlist_items SET position=position+1 WHERE "
                                          "playlist_id=? AND position>=? AND position<?");
                 e) {
@@ -969,7 +969,7 @@ class Database final {
                 (void)ss.stepDone();
             }
         }
-        Statement us;
+        SqliteStatement us;
         if (auto e = us.prepare(db_.get(), "UPDATE playlist_items SET position=? WHERE playlist_id=? AND track_id=?");
             e) {
             us.bindInt(1, to);
@@ -981,15 +981,15 @@ class Database final {
     }
     std::expected<std::vector<Track>, caudio::utils::Error> playlistGetTracks(int64_t pid) {
         if (pid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = std::string(internal::kSelectTracksCols) +
                           " JOIN playlist_items pi ON pi.track_id=tracks.id "
                           "WHERE pi.playlist_id=? ORDER BY pi.position";
-        Statement st;
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), sql); !e)
             return std::unexpected{e.error()};
         st.bindInt(1, pid);
@@ -1074,10 +1074,10 @@ class Database final {
         return caudio::db::listQueuesLocked(db_.get(), cacheMutex_, stmtCache_);
     }
 
-    std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
-                                                             int64_t library_id = 1) {
+std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
+                                                              int64_t library_id = 1) {
         if (name.empty())
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         return caudio::db::createQueueLocked(db_.get(), cacheMutex_, stmtCache_, name, library_id);
     }
@@ -1108,14 +1108,14 @@ class Database final {
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string_view sql = "INSERT INTO history (track_id, started_at, completed_at, "
                                "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
             return std::unexpected{sRes.error()};
-        Statement& st = *(*sRes);
+        SqliteStatement& st = *(*sRes);
         st.bindInt(1, e.track_id);
         st.bindInt(2, e.started_at);
         if (e.completed_at)
@@ -1127,9 +1127,9 @@ class Database final {
         st.bindInt(6, e.queue_id ? e.queue_id : 1);
         int rc = st.stepDone();
         st.reset();
-        if (rc != SQLITE_DONE)
+if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         return {};
     }
     std::expected<std::vector<HistoryEntry>, caudio::utils::Error>
@@ -1137,7 +1137,7 @@ class Database final {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         std::string sql = "SELECT id, track_id, started_at, completed_at, position_ms, "
                           "completion_pct, queue_id FROM history WHERE 1=1";
         if (q && q->track_id)
@@ -1153,7 +1153,7 @@ class Database final {
                 sql += " OFFSET ?";
         } else if (has_off)
             sql += " LIMIT -1 OFFSET ?";
-        Statement st;
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), sql); !e)
             return std::unexpected{e.error()};
         int idx = 1;
@@ -1188,12 +1188,12 @@ class Database final {
     std::expected<void, caudio::utils::Error> bookmarkAdd(int64_t tid, int64_t pos,
                                                           std::string_view note = {}) {
         if (tid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(
                 db_.get(), "INSERT INTO bookmarks (track_id, position_ms, note) VALUES (?,?,?)");
             !e)
@@ -1207,19 +1207,19 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         return {};
     }
     std::expected<std::vector<Bookmark>, caudio::utils::Error> bookmarkList(int64_t tid) {
         if (tid == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "SELECT id, track_id, position_ms, note, created FROM "
-                                     "bookmarks WHERE track_id=? ORDER BY created");
+                                         "bookmarks WHERE track_id=? ORDER BY created");
             !e)
             return std::unexpected{e.error()};
         st.bindInt(1, tid);
@@ -1240,12 +1240,12 @@ class Database final {
     std::expected<int64_t, caudio::utils::Error> libraryAdd(std::string_view path,
                                                             std::string_view name = {}) {
         if (path.empty())
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "INSERT INTO libraries (path, name) VALUES (?,?)"); !e)
             return std::unexpected{e.error()};
         st.bindText(1, path);
@@ -1256,7 +1256,7 @@ class Database final {
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         return sqlite3_last_insert_rowid(db_.get());
     }
     std::expected<std::vector<Library>, caudio::utils::Error> libraryList() {
@@ -1269,21 +1269,21 @@ class Database final {
     }
     std::expected<void, caudio::utils::Error> libraryDelete(int64_t id) {
         if (id == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        Statement st;
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
         if (auto e = st.prepare(db_.get(), "DELETE FROM libraries WHERE id=?"); !e)
             return std::unexpected{e.error()};
         st.bindInt(1, id);
         int rc = st.stepDone();
         if (rc != SQLITE_DONE)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, sqlite3_errmsg(db_.get()))};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db_.get()))};
         if (sqlite3_changes(db_.get()) == 0)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
 
@@ -1291,14 +1291,14 @@ class Database final {
         std::shared_lock lk{dbMutex_};
         if (!db_)
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         DbStats s;
         std::unique_lock cacheLk{cacheMutex_};
         auto one = [&](std::string_view sql, int64_t& out) {
             auto sRes = getCachedForUse(sql);
             if (!sRes)
                 return;
-            Statement& st = *(*sRes);
+            SqliteStatement& st = *(*sRes);
             if (st.step())
                 out = st.columnInt(0);
             st.reset();
@@ -1312,7 +1312,7 @@ class Database final {
         if (auto sRes = getCachedForUse(
                 "SELECT COALESCE(SUM(duration),0) FROM tracks WHERE deleted_at IS NULL");
             sRes) {
-            Statement& st = *(*sRes);
+            SqliteStatement& st = *(*sRes);
             if (st.step())
                 s.total_duration_ms = (int64_t)(st.columnDouble(0) * 1000);
             st.reset();
@@ -1349,3 +1349,9 @@ class Database final {
 }; // class Database
 
 } // namespace caudio::db
+
+
+
+
+
+

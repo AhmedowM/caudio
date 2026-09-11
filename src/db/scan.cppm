@@ -99,7 +99,7 @@ export std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {}) {
     if (libraryId == 0)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     auto libs = db.libraryList();
     if (!libs)
         return std::unexpected{libs.error()};
@@ -110,13 +110,13 @@ scanLibrary(Database& db, int64_t libraryId,
     if (libPath.empty()) {
         // fallback: library id 1 with empty path is invalid
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::NotFound, "library not found")};
+            caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "library not found")};
     }
     std::filesystem::path root(libPath);
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::NotFound, "path not found")};
+            caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "path not found")};
     int64_t scanned = 0;
     // Scan batches to avoid 30k lock hops and ensures crash atomicity per batch.
     // We hold Database::mutex() as unique_lock<shared_mutex> for the batch duration
@@ -132,14 +132,14 @@ scanLibrary(Database& db, int64_t libraryId,
         batchLock = std::unique_lock<std::shared_mutex>(db.mutex());
         if (!db.handleLocked())
             return std::unexpected{
-                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             batchLock.unlock();
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Busy, err ? std::string(err) : "BEGIN failed")};
+                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
         }
         inTx = true;
         batchPending = 0;
@@ -157,7 +157,7 @@ scanLibrary(Database& db, int64_t libraryId,
             inTx = false;
             batchPending = 0;
             return std::unexpected{caudio::utils::makeError(
-                caudio::utils::Result::Internal, err ? std::string(err) : "commit failed")};
+                caudio::utils::StatusCode::Internal, err ? std::string(err) : "commit failed")};
         }
         batchLock.unlock();
         inTx = false;
@@ -260,7 +260,7 @@ scanLibrary(Database& db, int64_t libraryId,
             return std::unexpected{c.error()};
         }
     }
-    // update library last_scanned — in its own transaction via libraryUpdate (or locked if needed)
+    // update library last_scanned — in its own DbTransaction via libraryUpdate (or locked if needed)
     auto libs2 = db.libraryList();
     if (libs2) {
         for (auto& l : *libs2)
@@ -268,7 +268,7 @@ scanLibrary(Database& db, int64_t libraryId,
                 l.last_scanned = std::chrono::duration_cast<std::chrono::seconds>(
                                      std::chrono::system_clock::now().time_since_epoch())
                                      .count();
-                // ensure atomic update without exposing partial scan state: use a short transaction
+                // ensure atomic update without exposing partial scan state: use a short DbTransaction
                 {
                     std::unique_lock<std::shared_mutex> lk(db.mutex());
                     char* err = nullptr;
@@ -292,3 +292,9 @@ scanLibrary(Database& db, int64_t libraryId,
 }
 
 } // namespace caudio::db
+
+
+
+
+
+

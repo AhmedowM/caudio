@@ -34,7 +34,7 @@ tryFtsQuery(sqlite3* h, std::string_view query, int limit) {
         "t.last_played, t.date_added, t.last_scanned, t.dirty, t.library_id "
         "FROM tracks t JOIN tracks_fts f ON t.id = f.rowid WHERE tracks_fts MATCH ? ORDER BY rank "
         "LIMIT ?";
-    Statement st;
+    SqliteStatement st;
     if (auto e = st.prepare(h, sql); !e) {
         return std::unexpected{e.error()};
     }
@@ -63,7 +63,7 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     sqlite3* h = db.handle();
     if (!h)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     // try exact FTS query
     auto r = tryFtsQuery(h, ftsQ, limit);
     if (r && !r->empty())
@@ -84,7 +84,7 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
         "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE LIMIT ?";
-    Statement st;
+    SqliteStatement st;
     if (auto e = st.prepare(h, likeSql); !e)
         return std::unexpected{e.error()};
     st.bindText(1, pat);
@@ -111,7 +111,7 @@ searchLike(Database& db, std::string_view query, int limit = 50) {
     std::shared_lock lock(db.mutex());
     sqlite3* h = db.handle();
     if (!h)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
@@ -120,7 +120,7 @@ searchLike(Database& db, std::string_view query, int limit = 50) {
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
         "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE LIMIT ?";
-    Statement st;
+    SqliteStatement st;
     if (auto e = st.prepare(h, likeSql); !e)
         return std::unexpected{e.error()};
     st.bindText(1, pat);
@@ -148,3 +148,8 @@ search(Database& db, std::string_view query, int limit = 50) {
 }
 
 } // namespace caudio::db
+
+
+
+
+

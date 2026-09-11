@@ -173,3 +173,9 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
         std::filesystem::remove(dbPath + "-shm", ec);
     }
 }
+
+
+
+
+
+

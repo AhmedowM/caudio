@@ -40,7 +40,7 @@ class AudioOutput {
     static Expected create(const Config& cfg) {
         auto out = std::make_unique<AudioOutput>();
         if (!out->init(cfg)) {
-            return std::unexpected(caudio::utils::Error{caudio::utils::Result::Device,
+            return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
                                                         "miniaudio device init failed"});
         }
         return out;
@@ -170,3 +170,6 @@ class AudioOutput {
 };
 
 } // namespace caudio::player
+
+
+
