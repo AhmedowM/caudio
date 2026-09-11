@@ -131,7 +131,7 @@ class Database final {
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::Io, msg)};
         }
         char* err = nullptr;
-        detail::SqliteErrGuard errGuard{err};
+        internal::SqliteErrGuard errGuard{err};
         rc = sqlite3_exec(raw, std::string(kSchema).c_str(), nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
@@ -189,7 +189,7 @@ class Database final {
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
@@ -200,7 +200,7 @@ class Database final {
             return res;
         }
         char* cErr = nullptr;
-        detail::SqliteErrGuard cGuard{cErr};
+        internal::SqliteErrGuard cGuard{cErr};
         rc = sqlite3_exec(db_.get(), "COMMIT", nullptr, nullptr, &cErr);
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -220,7 +220,7 @@ class Database final {
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
@@ -233,7 +233,7 @@ class Database final {
             }
         }
         char* cErr = nullptr;
-        detail::SqliteErrGuard cGuard{cErr};
+        internal::SqliteErrGuard cGuard{cErr};
         rc = sqlite3_exec(db_.get(), "COMMIT", nullptr, nullptr, &cErr);
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -256,7 +256,7 @@ class Database final {
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
@@ -274,7 +274,7 @@ class Database final {
             }
         }
         char* cErr = nullptr;
-        detail::SqliteErrGuard cGuard{cErr};
+        internal::SqliteErrGuard cGuard{cErr};
         rc = sqlite3_exec(db_.get(), "COMMIT", nullptr, nullptr, &cErr);
         if (rc != SQLITE_OK) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -294,7 +294,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE path=?";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -304,7 +304,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -315,7 +315,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE fingerprint=?";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -325,7 +325,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -463,7 +463,7 @@ class Database final {
     mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   private:
-    // Inline helpers — reduce duplication between insert/update (detail::bindTrack coverage)
+    // Inline helpers — reduce duplication between insert/update (internal::bindTrack coverage)
     static void bindTrackForInsert(Statement& st, const Track& t) {
         st.bindBlob(1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(t.fingerprint.data()), t.fingerprint.size()});
         st.bindText(2, t.path);
@@ -476,7 +476,7 @@ class Database final {
         st.bindText(9, t.title);
         st.bindText(10, t.artist);
         st.bindText(11, t.album);
-        st.bindText(12, t.albumArtist);
+        st.bindText(12, t.album_artist);
         st.bindText(13, t.genre);
         st.bindInt(14, t.year);
         st.bindInt(15, t.track_num);
@@ -505,7 +505,7 @@ class Database final {
         st.bindText(9, t.title);
         st.bindText(10, t.artist);
         st.bindText(11, t.album);
-        st.bindText(12, t.albumArtist);
+        st.bindText(12, t.album_artist);
         st.bindText(13, t.genre);
         st.bindInt(14, t.year);
         st.bindInt(15, t.track_num);
@@ -560,7 +560,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE id=?";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE id=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -570,7 +570,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -582,7 +582,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE fingerprint=?";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -592,7 +592,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -603,7 +603,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE path=?";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
         std::unique_lock cacheLk{cacheMutex_};
         auto sRes = getCachedForUse(sql);
         if (!sRes)
@@ -613,7 +613,7 @@ class Database final {
         bool hasRow = st.step();
         Track t;
         if (hasRow)
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
         st.reset();
         if (!hasRow)
             return std::unexpected{caudio::utils::makeError(caudio::utils::Result::NotFound)};
@@ -625,7 +625,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) + " WHERE 1=1";
+        std::string sql = std::string(internal::kSelectTracksCols) + " WHERE 1=1";
         if (q) {
             if (q->library_id)
                 sql += " AND library_id=?";
@@ -671,7 +671,7 @@ class Database final {
             if (q->dirty)
                 st.bindInt(idx++, *q->dirty ? 1 : 0);
             if (!q->search.empty()) {
-                std::string esc = detail::escapeLike(q->search);
+                std::string esc = internal::escapeLike(q->search);
                 likePat = "%" + esc + "%";
                 st.bindText(idx++, likePat);
                 st.bindText(idx++, likePat);
@@ -688,7 +688,7 @@ class Database final {
         std::vector<Track> out;
         while (st.step()) {
             Track t;
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
             out.push_back(std::move(t));
         }
         return out;
@@ -719,12 +719,14 @@ class Database final {
     }
 
     // compat helpers for older database.cppm API
+    [[deprecated("use getTrack; compat shim — remove in next major")]]
     std::expected<std::string, caudio::utils::Error> getTrackName(int64_t id) {
         auto r = getTrack(id);
         if (!r)
             return std::unexpected{r.error()};
         return r->title.empty() ? r->path : r->title;
     }
+    [[deprecated("use listTracks; compat shim — remove in next major")]]
     std::expected<std::vector<std::tuple<int64_t, std::string>>, caudio::utils::Error>
     listTracksSimple(int64_t libraryId = 0) {
         TrackQuery q;
@@ -984,7 +986,7 @@ class Database final {
         if (!db_)
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
-        std::string sql = std::string(detail::kSelectTracksCols) +
+        std::string sql = std::string(internal::kSelectTracksCols) +
                           " JOIN playlist_items pi ON pi.track_id=tracks.id "
                           "WHERE pi.playlist_id=? ORDER BY pi.position";
         Statement st;
@@ -994,7 +996,7 @@ class Database final {
         std::vector<Track> out;
         while (st.step()) {
             Track t;
-            detail::fillTrackFromStmt(st.get(), t);
+            internal::fillTrackFromStmt(st.get(), t);
             out.push_back(std::move(t));
         }
         return out;
@@ -1114,7 +1116,7 @@ class Database final {
         if (!sRes)
             return std::unexpected{sRes.error()};
         Statement& st = *(*sRes);
-        st.bindInt(1, e.trackId);
+        st.bindInt(1, e.track_id);
         st.bindInt(2, e.started_at);
         if (e.completed_at)
             st.bindInt(3, e.completed_at);
@@ -1171,7 +1173,7 @@ class Database final {
         while (st.step()) {
             HistoryEntry e;
             e.id = st.columnInt(0);
-            e.trackId = st.columnInt(1);
+            e.track_id = st.columnInt(1);
             e.started_at = st.columnInt(2);
             e.completed_at = st.columnInt(3);
             e.position_ms = st.columnInt(4);
@@ -1225,7 +1227,7 @@ class Database final {
         while (st.step()) {
             Bookmark b;
             b.id = st.columnInt(0);
-            b.trackId = st.columnInt(1);
+            b.track_id = st.columnInt(1);
             b.position_ms = st.columnInt(2);
             b.note = st.columnText(3);
             b.created = st.columnInt(4);
@@ -1328,7 +1330,7 @@ class Database final {
         t.title = std::string(name);
         t.path = std::string(path);
         if (!fpHex.empty()) {
-            if (!detail::fromHex(fpHex, t.fingerprint)) {
+            if (!internal::fromHex(fpHex, t.fingerprint)) {
                 // fallback for non-hex or wrong length: raw copy
                 std::memset(t.fingerprint.data(), 0, 32);
                 for (size_t i = 0; i < fpHex.size() && i < 32; i++)
@@ -1336,7 +1338,7 @@ class Database final {
             }
         } else {
             // generate fingerprint from path via fnv fallback
-            t.fingerprint = detail::fallbackFingerprint(t.path);
+            t.fingerprint = internal::fallbackFingerprint(t.path);
         }
         auto r = insertTrack(t);
         if (!r)

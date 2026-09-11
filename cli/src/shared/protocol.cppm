@@ -110,6 +110,7 @@ inline ordered_json trackToJson(const caudio::db::Track& t) {
     j["title"] = t.title;
     j["artist"] = t.artist;
     j["album"] = t.album;
+    j["album_artist"] = t.album_artist;
     j["duration"] = t.duration;
     j["sample_rate"] = t.sample_rate;
     j["channels"] = t.channels;
@@ -129,6 +130,7 @@ trackFromJson(const ordered_json& j) {
         if (j.contains("title") && j["title"].is_string()) t.title = j["title"].get<std::string>();
         if (j.contains("artist") && j["artist"].is_string()) t.artist = j["artist"].get<std::string>();
         if (j.contains("album") && j["album"].is_string()) t.album = j["album"].get<std::string>();
+        if (j.contains("album_artist") && j["album_artist"].is_string()) t.album_artist = j["album_artist"].get<std::string>();
         if (j.contains("duration") && j["duration"].is_number()) t.duration = j["duration"].get<double>();
         if (j.contains("sample_rate") && j["sample_rate"].is_number()) t.sample_rate = j["sample_rate"].get<uint32_t>();
         if (j.contains("channels") && j["channels"].is_number()) t.channels = j["channels"].get<uint32_t>();
@@ -286,8 +288,8 @@ ordered_json toJson(const Command& cmd) {
         } else if constexpr (std::is_same_v<T, PlaylistSave>) {
             j["type"] = "PlaylistSave";
             j["name"] = v.name;
-            if (v.queueId.has_value()) j["queueId"] = *v.queueId;
-            else j["queueId"] = nullptr;
+            if (v.queue_id.has_value()) j["queue_id"] = *v.queue_id;
+            else j["queue_id"] = nullptr;
         } else if constexpr (std::is_same_v<T, PlaylistDelete>) {
             j["type"] = "PlaylistDelete";
             j["pid"] = v.pid;
@@ -410,7 +412,7 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
             std::string name;
             std::optional<int64_t> qid;
             if (j.contains("name") && j["name"].is_string()) name = j["name"].get<std::string>();
-            if (j.contains("queueId") && !j["queueId"].is_null() && j["queueId"].is_number()) qid = j["queueId"].get<int64_t>();
+            if (j.contains("queue_id") && !j["queue_id"].is_null() && j["queue_id"].is_number()) qid = j["queue_id"].get<int64_t>();
             return Command{PlaylistSave{std::move(name), qid}};
         }
         if (t == "PlaylistDelete") {
@@ -500,12 +502,12 @@ ordered_json toJson(const Result& r) {
             j["shuffle"] = v.shuffle;
             j["repeat"] = detail::repeatModeToString(v.repeat);
             j["repeat_value"] = std::to_underlying(v.repeat);
-            j["trackId"] = v.trackId;
+            j["track_id"] = v.track_id;
             j["title"] = v.title;
             j["artist"] = v.artist;
             j["path"] = v.path;
-            j["qSize"] = v.qSize;
-            j["qIdx"] = v.qIdx;
+            j["q_size"] = v.q_size;
+            j["q_idx"] = v.q_idx;
             return j;
         } else if constexpr (std::is_same_v<T, QueueTracks>) {
             ordered_json j;
@@ -593,12 +595,12 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 int v = j["repeat_value"].get<int>();
                 s.repeat = static_cast<caudio::engine::RepeatMode>(v);
             }
-            if (j.contains("trackId") && j["trackId"].is_number()) s.trackId = j["trackId"].get<int64_t>();
+            if (j.contains("track_id") && j["track_id"].is_number()) s.track_id = j["track_id"].get<int64_t>();
             if (j.contains("title") && j["title"].is_string()) s.title = j["title"].get<std::string>();
             if (j.contains("artist") && j["artist"].is_string()) s.artist = j["artist"].get<std::string>();
             if (j.contains("path") && j["path"].is_string()) s.path = j["path"].get<std::string>();
-            if (j.contains("qSize") && j["qSize"].is_number()) s.qSize = j["qSize"].get<std::size_t>();
-            if (j.contains("qIdx") && j["qIdx"].is_number()) s.qIdx = j["qIdx"].get<std::size_t>();
+            if (j.contains("q_size") && j["q_size"].is_number()) s.q_size = j["q_size"].get<std::size_t>();
+            if (j.contains("q_idx") && j["q_idx"].is_number()) s.q_idx = j["q_idx"].get<std::size_t>();
             return Result{std::move(s)};
         }
         if (t == "QueueTracks") {

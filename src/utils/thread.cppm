@@ -90,11 +90,13 @@ inline int setPthreadName(pthread_t th, std::string_view name) noexcept {
 
 export namespace caudio::utils {
 
+// convenience wrapper
 template <typename Rep, typename Period>
 inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
     std::this_thread::sleep_for(d);
 }
 
+// convenience wrapper
 inline void sleepForMs(std::uint32_t ms) noexcept {
     sleepFor(std::chrono::milliseconds(ms));
 }

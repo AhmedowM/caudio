@@ -19,7 +19,7 @@ TEST_CASE("trackToJson and trackFromJson roundtrip ordered", "[db_json]") {
     t.title = "Title";
     t.artist = "Artist";
     t.album = "Album";
-    t.albumArtist = "AA";
+    t.album_artist = "AA";
     t.genre = "Rock";
     t.year = 2020;
     t.track_num = 3;

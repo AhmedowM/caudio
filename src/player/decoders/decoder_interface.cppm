@@ -24,13 +24,4 @@ class IDecoder {
     [[nodiscard]] virtual caudio::utils::Expected<void> seek(double seconds) = 0;
 };
 
-template <typename T>
-concept Decoder = requires(T t) {
-    { t.sampleRate() } -> std::convertible_to<uint32_t>;
-    { t.channels() } -> std::convertible_to<uint32_t>;
-    { t.totalFrames() } -> std::convertible_to<uint64_t>;
-    { t.decode(std::declval<std::span<float>>()) } -> std::convertible_to<std::size_t>;
-    { t.seek(std::declval<double>()) } -> std::same_as<caudio::utils::Expected<void>>;
-};
-
 } // namespace caudio::player

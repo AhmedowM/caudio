@@ -100,8 +100,7 @@ class Arena {
 
   private:
     static std::size_t alignUp(std::size_t v, std::size_t align) noexcept {
-        if (align == 0)
-            return v;
+        [[assume(align > 0)]];
         if ((align & (align - 1)) == 0) {
             return (v + align - 1) & ~(align - 1);
         }

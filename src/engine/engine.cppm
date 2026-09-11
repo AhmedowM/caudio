@@ -24,8 +24,8 @@ module;
 export module caudio.engine;
 
 export import :types;
-export import :history_policy;
-export import :queue_logic;
+export import :history;
+export import :shuffle;
 
 import caudio.utils;
 import caudio.player;
@@ -136,10 +136,6 @@ class Engine final {
         ring_.reset();
     }
 
-    void destroy() {
-        shutdown();
-    }
-
     // Playback
     ExpectedVoid play(int64_t queueId = 1) {
         if (!hasDb())
@@ -181,7 +177,7 @@ class Engine final {
         if (!tryLockQueue())
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::Busy, "queue busy"));
-        queue_.queueId = queueId;
+        queue_.queue_id = queueId;
         caudio::db::Track t;
         auto r = queueNextLocked(t);
         if (!r) {
@@ -333,7 +329,7 @@ class Engine final {
         // push queue changed event
         EngineEvent ev;
         ev.type = EngineEventType::QueueChanged;
-        ev.queueId = queue_.queueId;
+        ev.queue_id = queue_.queue_id;
         pushEvent(ev);
         return {};
     }
@@ -381,8 +377,8 @@ class Engine final {
             startedMs_ = (int64_t)detail::nowMs();
             EngineEvent ev;
             ev.type = EngineEventType::TrackStarted;
-            ev.trackId = currentTrack_.id;
-            ev.queueId = queue_.queueId;
+            ev.track_id = currentTrack_.id;
+            ev.queue_id = queue_.queue_id;
             ev.duration = duration_;
             pushEvent(ev);
             decodeCv_.notify_all();
@@ -466,10 +462,11 @@ class Engine final {
         return out;
     }
 
-    // compatibility helpers for C API naming
+    // compat: use state()/position()
     PlaybackState getState() const noexcept {
         return state();
     }
+    // compat: use state()/position()
     double getPosition() const noexcept {
         return position();
     }
@@ -484,7 +481,7 @@ class Engine final {
         volume_.store(1.0f, std::memory_order_relaxed);
         state_.repeatMode = RepeatMode::Off;
         queue_.repeat = RepeatMode::Off;
-        queue_.queueId = 1;
+        queue_.queue_id = 1;
         playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
         hasCurrent_.store(false, std::memory_order_release);
         markedPlayed_.store(false, std::memory_order_release);
@@ -622,7 +619,7 @@ class Engine final {
                 // for non-shuffle, keep cursor as stored (persistent queue via cursor)
                 // clamp later via queueCount if needed; don't reset to 0
             }
-            queue_.queueId = 1;
+            queue_.queue_id = 1;
             return std::nullopt;
         }
         if (rc == SQLITE_DONE) {
@@ -632,11 +629,11 @@ class Engine final {
             state_.currentTrackId = 0;
             state_.volume = 1.0f;
             volume_.store(1.0f, std::memory_order_relaxed);
-            queue_.perm.clear();
+queue_.perm.clear();
             queue_.cursor = 0;
             queue_.shuffle = false;
             queue_.repeat = RepeatMode::Off;
-            queue_.queueId = 1;
+            queue_.queue_id = 1;
             return std::nullopt;
         }
         return caudio::utils::makeError(caudio::utils::Result::Internal, "load failed");
@@ -774,7 +771,7 @@ class Engine final {
         if (want) {
             queue_.perm.clear();
             queue_.cursor = 0;
-            size_t cnt = db_->queueCountLocked(queue_.queueId);
+            size_t cnt = db_->queueCountLocked(queue_.queue_id);
             if (cnt == 0) {
                 queue_.shuffle = true;
                 queue_.perm.clear();
@@ -811,61 +808,12 @@ class Engine final {
         }
     }
 
-    std::expected<void, caudio::utils::Error> queuePeekLocked(caudio::db::Track& out) {
-        if (queue_.queueId == 0)
-            queue_.queueId = 1;
-        // peek — don't consume, handle shuffle cursor without advancing
-        if (queue_.shuffle) {
-            if (queue_.perm.empty()) {
-                size_t cnt = db_->queueCountLocked(queue_.queueId);
-                if (cnt == 0)
-                    return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
-                auto sr = setShuffleLocked(true);
-                if (!sr)
-                    return std::unexpected(sr.error());
-            }
-            size_t idx = queue_.cursor;
-            if (idx >= queue_.perm.size()) {
-                if (queue_.repeat == RepeatMode::Queue)
-                    idx = 0;
-                else
-                    return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
-            }
-            int64_t pos = queue_.perm[idx];
-            auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
-            if (!tr)
-                return std::unexpected(tr.error());
-            out = tr.value();
-            return {};
-        }
-        // non-shuffle: peek via cursor position (persistent queue)
-        size_t cntPeek = db_->queueCountLocked(queue_.queueId);
-        if (cntPeek == 0)
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
-        size_t idxPeek = queue_.cursor;
-        if (idxPeek >= cntPeek) {
-            if (queue_.repeat == RepeatMode::Queue)
-                idxPeek = 0;
-            else
-                return std::unexpected(
-                    caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
-        }
-        auto trPeek = fetchTrackByPosLocked(queue_.queueId, (int64_t)idxPeek);
-        if (!trPeek)
-            return std::unexpected(trPeek.error());
-        out = trPeek.value();
-        return {};
-    }
-
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out) {
-        if (queue_.queueId == 0)
-            queue_.queueId = 1;
+        if (queue_.queue_id == 0)
+            queue_.queue_id = 1;
         if (queue_.shuffle) {
             if (queue_.perm.empty()) {
-                size_t cnt = db_->queueCountLocked(queue_.queueId);
+                size_t cnt = db_->queueCountLocked(queue_.queue_id);
                 if (cnt == 0)
                     return std::unexpected(
                         caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
@@ -882,7 +830,7 @@ class Engine final {
                     if (queue_.cursor > 0 && queue_.cursor <= queue_.perm.size())
                         idx = queue_.cursor - 1;
                     int64_t pos = queue_.perm[idx];
-                    auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
+                    auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
                     if (!tr)
                         return std::unexpected(tr.error());
                     out = tr.value();
@@ -899,13 +847,13 @@ class Engine final {
             int64_t pos = queue_.perm[queue_.cursor];
             queue_.cursor++;
             (void)persistCursorLocked();
-            auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
+            auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
             if (!tr)
                 return std::unexpected(tr.error());
             out = tr.value();
             return {};
         }
-        size_t cnt = db_->queueCountLocked(queue_.queueId);
+        size_t cnt = db_->queueCountLocked(queue_.queue_id);
         if (cnt == 0)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
@@ -914,7 +862,7 @@ class Engine final {
                 size_t idx = cnt - 1;
                 if (queue_.cursor > 0 && queue_.cursor <= cnt)
                     idx = queue_.cursor - 1;
-                auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)idx);
+                auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)idx);
                 if (!tr)
                     return std::unexpected(tr.error());
                 out = tr.value();
@@ -932,7 +880,7 @@ class Engine final {
                 (void)persistCursorLocked();
             }
         }
-        auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)queue_.cursor);
+        auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)queue_.cursor);
         if (!tr)
             return std::unexpected(tr.error());
         queue_.cursor++;
@@ -943,7 +891,7 @@ class Engine final {
 
     std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::db::Track& out) {
         if (!queue_.shuffle) {
-            size_t cnt = db_->queueCountLocked(queue_.queueId);
+            size_t cnt = db_->queueCountLocked(queue_.queue_id);
             if (cnt == 0)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
@@ -954,10 +902,10 @@ class Engine final {
                 queue_.cursor = 0;
             } else {
                 queue_.cursor -= 2;
-                if (queue_.cursor >= cnt)
-                    queue_.cursor = cnt - 1;
+if (queue_.cursor >= cnt)
+                queue_.cursor = cnt - 1;
             }
-            auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)queue_.cursor);
+            auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)queue_.cursor);
             if (!tr)
                 return std::unexpected(tr.error());
             queue_.cursor++;
@@ -981,7 +929,7 @@ class Engine final {
         int64_t pos = queue_.perm[queue_.cursor];
         queue_.cursor++;
         (void)persistCursorLocked();
-        auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
+        auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
         if (!tr)
             return std::unexpected(tr.error());
         out = tr.value();
@@ -1064,8 +1012,8 @@ class Engine final {
             (void)saveState();
         EngineEvent ev;
         ev.type = EngineEventType::TrackStarted;
-        ev.trackId = t.id;
-        ev.queueId = queue_.queueId;
+        ev.track_id = t.id;
+        ev.queue_id = queue_.queue_id;
         ev.duration = duration_;
         ev.position = 0;
         pushEvent(ev);
@@ -1115,9 +1063,9 @@ class Engine final {
             std::lock_guard<std::mutex> lk(cbMutex_);
             cbsCopy = callbacks_;
         }
-        if (ev.type == EngineEventType::TrackStarted && cbsCopy.onTrackStarted) {
-            cbsCopy.onTrackStarted(ev.trackId);
-        } else if (ev.type == EngineEventType::TrackEnded && cbsCopy.onTrackEnded) {
+        if (ev.type == EngineEventType::TrackStarted && cbsCopy.on_track_started) {
+            cbsCopy.on_track_started(ev.track_id);
+        } else if (ev.type == EngineEventType::TrackEnded && cbsCopy.on_track_ended) {
             double pct = 0;
             if (ev.duration > 0) {
                 pct = (ev.position / ev.duration) * 100;
@@ -1126,11 +1074,11 @@ class Engine final {
                 if (pct > 100)
                     pct = 100;
             }
-            cbsCopy.onTrackEnded(ev.trackId, pct);
-        } else if (ev.type == EngineEventType::QueueChanged && cbsCopy.onQueueChanged) {
-            cbsCopy.onQueueChanged(ev.queueId);
-        } else if (ev.type == EngineEventType::Error && cbsCopy.onError) {
-            cbsCopy.onError(caudio::utils::Result::Internal, ev.msg);
+            cbsCopy.on_track_ended(ev.track_id, pct);
+        } else if (ev.type == EngineEventType::QueueChanged && cbsCopy.on_queue_changed) {
+            cbsCopy.on_queue_changed(ev.queue_id);
+        } else if (ev.type == EngineEventType::Error && cbsCopy.on_error) {
+            cbsCopy.on_error(caudio::utils::Result::Internal, ev.msg);
         }
     }
 
@@ -1240,7 +1188,7 @@ class Engine final {
                 sqlite3_bind_int64(raw, 3, (int64_t)detail::nowMs());
                 sqlite3_bind_int64(raw, 4, posMs);
                 sqlite3_bind_double(raw, 5, compPct);
-                sqlite3_bind_int64(raw, 6, queue_.queueId ? queue_.queueId : 1);
+                sqlite3_bind_int64(raw, 6, queue_.queue_id ? queue_.queue_id : 1);
                 rc = sqlite3_step(raw);
                 if (rc != SQLITE_DONE)
                     ok = false;
@@ -1270,11 +1218,11 @@ class Engine final {
             uint64_t last = lastProgressMs_.load(std::memory_order_acquire);
             if (now - last >= 500) {
                 lastProgressMs_.store(now, std::memory_order_release);
-                EngineEvent ev;
+EngineEvent ev;
                 ev.type = EngineEventType::Progress;
-                ev.trackId = hasCurrent_.load(std::memory_order_acquire) ? currentTrack_.id
-                                                                         : state_.currentTrackId;
-                ev.queueId = queue_.queueId ? queue_.queueId : 1;
+                ev.track_id = hasCurrent_.load(std::memory_order_acquire) ? currentTrack_.id
+                                                                          : state_.currentTrackId;
+                ev.queue_id = queue_.queue_id ? queue_.queue_id : 1;
                 ev.position = currentPositionLocked();
                 ev.duration = duration_;
                 pushEvent(ev);

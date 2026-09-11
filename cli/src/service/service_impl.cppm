@@ -257,10 +257,10 @@ private:
     void updateShmStatus() {
         if (!shmHandle_ || !shmHandle_->valid()) return;
         auto& eng = *engine_;
-        int64_t trackId = eng.currentTrackId();
+        int64_t track_id = eng.currentTrackId();
         std::string title, artist;
-        if (trackId != 0) {
-            auto tr = db_->getTrack(trackId);
+        if (track_id != 0) {
+            auto tr = db_->getTrack(track_id);
             if (tr) {
                 title = tr->title;
                 artist = tr->artist;
@@ -271,11 +271,11 @@ private:
         if (auto items = db_->queueList(1); items) {
             qSize = items->size();
         }
-        shmHandle_->updateFromEngine(eng, trackId, title, artist);
+        shmHandle_->updateFromEngine(eng, track_id, title, artist);
         shmHandle_->setQueueSize(qSize);
         // duration is not directly available from engine, would need track info
-        if (trackId != 0) {
-            auto tr = db_->getTrack(trackId);
+        if (track_id != 0) {
+            auto tr = db_->getTrack(track_id);
             if (tr) {
                 shmHandle_->setDuration(tr->duration);
             }
@@ -412,7 +412,7 @@ private:
                 std::vector<caudio::db::Track> tracks;
                 tracks.reserve(items->size());
                 for (auto& it : *items) {
-                    auto tr = db_->getTrack(it.trackId);
+                    auto tr = db_->getTrack(it.track_id);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
                 return Result{QueueTracks{std::move(tracks)}};
@@ -488,8 +488,6 @@ private:
                         std::vector<caudio::db::Track> single;
                         single.reserve(1);
                         single.push_back(std::move(t));
-                        std::span<const caudio::db::Track> sp(single);
-                        (void)sp;
                         return Result{QueueTracks{std::move(single)}};
                     }
                 }
@@ -545,8 +543,6 @@ private:
                     auto er = db_->queueEnqueueBatch(qid, ids);
                     if (!er) return std::unexpected{er.error()};
                 }
-                std::span<const caudio::db::Track> spanAdd(toAdd);
-                (void)spanAdd;
                 updateShmStatus();
                 return Result{QueueTracks{std::move(toAdd)}};
             },
@@ -574,13 +570,13 @@ private:
                 // try as position first
                 auto rm = db_->queueRemove(qid, val);
                 if (!rm) {
-                    // if not found as position, try as trackId lookup
+                    // if not found as position, try as track_id lookup
                     if (rm.error().code == caudio::utils::Result::NotFound) {
                         auto items = db_->queueList(qid);
                         if (!items) return std::unexpected{items.error()};
                         bool found = false;
                         int64_t pos = -1;
-                        for (auto& it : *items) if (it.trackId == val) { pos = it.position; found = true; break; }
+                        for (auto& it : *items) if (it.track_id == val) { pos = it.position; found = true; break; }
                         if (!found) return std::unexpected{rm.error()};
                         auto rm2 = db_->queueRemove(qid, pos);
                         if (!rm2) return std::unexpected{rm2.error()};
@@ -592,7 +588,7 @@ private:
                 if (!items) return std::unexpected{items.error()};
                 std::vector<caudio::db::Track> tracks;
                 for (auto& it : *items) {
-                    auto tr = db_->getTrack(it.trackId);
+                    auto tr = db_->getTrack(it.track_id);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
                 updateShmStatus();
@@ -609,10 +605,10 @@ private:
                 if (qm.from >= items->size() || qm.to >= items->size()) {
                     return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, "move out of range")};
                 }
-                // collect trackIds in order
+                // collect track_ids in order
                 std::vector<int64_t> ids;
                 ids.reserve(items->size());
-                for (auto& it : *items) ids.push_back(it.trackId);
+                for (auto& it : *items) ids.push_back(it.track_id);
                 int64_t mv = ids[qm.from];
                 ids.erase(ids.begin() + static_cast<std::ptrdiff_t>(qm.from));
                 ids.insert(ids.begin() + static_cast<std::ptrdiff_t>(qm.to), mv);
@@ -625,7 +621,7 @@ private:
                 if (!nitems) return std::unexpected{nitems.error()};
                 std::vector<caudio::db::Track> tracks;
                 for (auto& it : *nitems) {
-                    auto tr = db_->getTrack(it.trackId);
+                    auto tr = db_->getTrack(it.track_id);
                     if (tr) tracks.push_back(std::move(*tr));
                 }
                 updateShmStatus();
@@ -680,7 +676,6 @@ private:
                                 d2.queues = static_cast<std::size_t>(st->num_queue_items);
                                 d2.playlists = static_cast<std::size_t>(st->num_playlists);
                             }
-                            (void)std::to_underlying(caudio::utils::Result::Ok);
                             return Result{std::move(d2)};
                         }
                     }
@@ -699,8 +694,6 @@ private:
                     d.queues = static_cast<std::size_t>(st->num_queue_items);
                     d.playlists = static_cast<std::size_t>(st->num_playlists);
                 }
-                // demonstrate to_underlying usage
-                (void)std::to_underlying(caudio::utils::Result::Ok);
                 return Result{std::move(d)};
             },
             [&](const LibrarySearch& cmd) -> std::expected<Result, caudio::utils::Error> {
@@ -738,8 +731,6 @@ private:
                 if (!lRes) return std::unexpected{lRes.error()};
                 ConfigValues cvs{};
                 cvs.values = std::move(*lRes);
-                std::span<const ConfigValue> span{cvs.values};
-                (void)span;
                 return Result{std::move(cvs)};
             },
             [&](const ConfigExport& cmd) -> std::expected<Result, caudio::utils::Error> {
@@ -774,7 +765,6 @@ private:
                 auto pls = db_->listPlaylists();
                 if (!pls) return std::unexpected{pls.error()};
                 std::span<const caudio::db::Playlist> span{*pls};
-                for (auto& p : span) (void)std::to_underlying(static_cast<caudio::utils::Result>(p.type));
                 std::vector<caudio::db::Playlist> out(span.begin(), span.end());
                 return Result{Playlists{std::move(out)}};
             },
@@ -809,11 +799,11 @@ private:
                 auto pidRes = db_->createPlaylist(cmd.name);
                 if (!pidRes) return std::unexpected{pidRes.error()};
                 int64_t pid = *pidRes;
-                int64_t qid = cmd.queueId.value_or(1);
+                int64_t qid = cmd.queue_id.value_or(1);
                 auto items = db_->queueList(qid);
                 if (!items) return std::unexpected{items.error()};
                 for (auto& it : std::span<const caudio::db::QueueItem>(*items)) {
-                    auto r = db_->playlistAddTrack(pid, it.trackId);
+                    auto r = db_->playlistAddTrack(pid, it.track_id);
                     if (!r) return std::unexpected{r.error()};
                 }
                 return Result{Empty{}};

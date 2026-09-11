@@ -21,7 +21,7 @@ class Transaction final {
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "null db")};
         }
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "BEGIN failed";
@@ -34,7 +34,7 @@ class Transaction final {
     ~Transaction() {
         if (db_ && !committed_) {
             char* err = nullptr;
-            detail::SqliteErrGuard guard{err};
+            internal::SqliteErrGuard guard{err};
             sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
         }
     }
@@ -46,7 +46,7 @@ class Transaction final {
         if (this != &o) {
             if (db_ && !committed_) {
                 char* err = nullptr;
-                detail::SqliteErrGuard guard{err};
+                internal::SqliteErrGuard guard{err};
                 sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
             }
             db_ = std::exchange(o.db_, nullptr);
@@ -60,7 +60,7 @@ class Transaction final {
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no active transaction"));
         }
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "commit failed";
@@ -76,7 +76,7 @@ class Transaction final {
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no active transaction"));
         }
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "rollback failed";

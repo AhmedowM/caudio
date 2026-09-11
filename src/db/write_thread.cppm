@@ -147,7 +147,7 @@ class WriterThread final {
                 // stmt finalized by unique_ptr destructor
             } else if (!op.sql.empty() && db_) {
                 char* e = nullptr;
-                detail::SqliteErrGuard guard{e};
+                internal::SqliteErrGuard guard{e};
                 int rc = sqlite3_exec(db_, op.sql.c_str(), nullptr, nullptr, &e);
                 if (rc != SQLITE_OK) {
                     err = caudio::utils::makeError(caudio::utils::Result::Corrupt,

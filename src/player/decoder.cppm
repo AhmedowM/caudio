@@ -70,12 +70,6 @@ class DecoderRegistry {
         }
 #endif
 
-        // restore offset on failure
-        auto sr = reader.seek(orig, SEEK_SET);
-        if (!sr.has_value()) {
-            (void)reader.seek(0, SEEK_SET);
-        }
-
         return result;
     }
 };

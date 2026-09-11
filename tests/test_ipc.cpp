@@ -60,7 +60,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
         if constexpr (std::is_same_v<U, Status>) {
             hasStatus = true;
             REQUIRE(v.state == PlaybackState::Stopped);
-            REQUIRE(v.qSize == 0);
+            REQUIRE(v.q_size == 0);
         }
     }, statusRes.value());
     REQUIRE(hasStatus);
@@ -173,7 +173,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
         if constexpr (std::is_same_v<U, Status>) {
             hasStatus = true;
             REQUIRE(v.state == PlaybackState::Stopped);
-            REQUIRE(v.qSize == 0);
+            REQUIRE(v.q_size == 0);
         }
     }, statusRes.value());
     REQUIRE(hasStatus);

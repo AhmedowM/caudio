@@ -18,13 +18,13 @@ TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
     for (int i = 0; i < 64; ++i) {
         EngineEvent ev;
         ev.type = EngineEventType::Progress;
-        ev.trackId = i;
+        ev.track_id = i;
         auto r = q.push(ev);
         REQUIRE(r.has_value());
     }
     EngineEvent extra;
     extra.type = EngineEventType::Progress;
-    extra.trackId = 999;
+    extra.track_id = 999;
     auto r = q.push(extra);
     REQUIRE(!r.has_value());
     REQUIRE(r.error().code == Result::Busy);
@@ -134,7 +134,7 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
     REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
     std::atomic<int> startedCount{0};
     EngineCallbacks cbs;
-    cbs.onTrackStarted = [&](int64_t tid) {
+    cbs.on_track_started = [&](int64_t tid) {
         startedCount.fetch_add(1);
         REQUIRE(tid == *ins);
     };

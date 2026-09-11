@@ -25,12 +25,12 @@ struct Status final {
     bool muted{false};
     bool shuffle{false};
     caudio::engine::RepeatMode repeat{caudio::engine::RepeatMode::Off};
-    int64_t trackId{0};
+    int64_t track_id{0};
     std::string title{};
     std::string artist{};
     std::string path{};
-    std::size_t qSize{0};
-    std::size_t qIdx{0};
+    std::size_t q_size{0};
+    std::size_t q_idx{0};
 };
 
 struct QueueTracks final {

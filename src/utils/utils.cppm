@@ -5,5 +5,5 @@ export import :error;
 export import :log;
 export import :arena;
 export import :ring;
-export import :queue;
+export import :mpsc_queue;
 export import :thread;

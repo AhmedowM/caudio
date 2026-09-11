@@ -149,7 +149,7 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/log.cppm
   src/utils/arena.cppm
   src/utils/ring.cppm
-  src/utils/queue.cppm
+  src/utils/mpsc_queue.cppm
   src/utils/thread.cppm
 )
 add_library(caudio_utils STATIC)
@@ -168,7 +168,7 @@ ca_set_warnings(caudio_utils)
 add_library(caudio_utils_shared SHARED)
 set_target_properties(caudio_utils_shared PROPERTIES OUTPUT_NAME caudio_utils)
 add_library(caudio::utils_shared ALIAS caudio_utils_shared)
-target_sources(caudio_utils_shared PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_utils_shared PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_utils_shared PUBLIC caudio::utils Threads::Threads)
 target_link_libraries(caudio_utils_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::utils>)
 target_link_options(caudio_utils_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
@@ -206,7 +206,7 @@ target_compile_options(caudio_player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-globa
 add_library(caudio_player_shared SHARED)
 set_target_properties(caudio_player_shared PROPERTIES OUTPUT_NAME caudio_player)
 add_library(caudio::player_shared ALIAS caudio_player_shared)
-target_sources(caudio_player_shared PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_player_shared PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_player_shared PUBLIC caudio::player caudio::utils_shared)
 target_link_libraries(caudio_player_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::player>)
 target_link_options(caudio_player_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
@@ -235,7 +235,7 @@ FetchContent_MakeAvailable(CLI11)
 # P3-6: centralize DB module list to avoid quartet duplication (static/shared/combined)
 set(CAUDIO_DB_SOURCES
   src/db/db.cppm
-  src/db/types.cppm
+  src/db/db_types.cppm
   src/db/schema.cppm
   src/db/database.cppm
   src/db/queue.cppm
@@ -246,6 +246,9 @@ set(CAUDIO_DB_SOURCES
   src/db/statement.cppm
   src/db/transaction.cppm
   src/db/detail.cppm
+  src/db/fingerprint.cppm
+  src/db/fts.cppm
+  src/db/stmt_helpers.cppm
 )
 add_library(caudio_db STATIC)
 add_library(caudio::db ALIAS caudio_db)
@@ -265,7 +268,7 @@ ca_set_module_warnings(caudio_db)
 add_library(caudio_db_shared SHARED)
 set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
 add_library(caudio::db_shared ALIAS caudio_db_shared)
-target_sources(caudio_db_shared PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_db_shared PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_db_shared PUBLIC caudio::db caudio::utils_shared Threads::Threads)
 target_link_libraries(caudio_db_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::db>)
 target_link_options(caudio_db_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
@@ -273,9 +276,9 @@ target_link_options(caudio_db_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allo
 # caudio::engine
 set(CAUDIO_ENGINE_SOURCES
   src/engine/engine.cppm
-  src/engine/types.cppm
-  src/engine/history_policy.cppm
-  src/engine/queue_logic.cppm
+  src/engine/engine_types.cppm
+  src/engine/history.cppm
+  src/engine/shuffle.cppm
 )
 add_library(caudio_engine STATIC)
 add_library(caudio::engine ALIAS caudio_engine)
@@ -292,7 +295,7 @@ ca_set_module_warnings(caudio_engine)
 add_library(caudio_engine_shared SHARED)
 set_target_properties(caudio_engine_shared PROPERTIES OUTPUT_NAME caudio_engine)
 add_library(caudio::engine_shared ALIAS caudio_engine_shared)
-target_sources(caudio_engine_shared PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_engine_shared PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_engine_shared PUBLIC caudio::engine caudio::db_shared caudio::player_shared caudio::utils_shared Threads::Threads)
 target_link_libraries(caudio_engine_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
 target_link_options(caudio_engine_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
@@ -302,7 +305,7 @@ target_link_options(caudio_engine_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--
 # targets exactly once (see note above).
 add_library(caudio_combined SHARED)
 set_target_properties(caudio_combined PROPERTIES OUTPUT_NAME caudio)
-target_sources(caudio_combined PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_combined PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_combined PUBLIC
   caudio::utils caudio::player caudio::db caudio::engine Threads::Threads)
 target_link_libraries(caudio_combined PRIVATE
@@ -317,8 +320,8 @@ endif()
 
 # caudio::cli shared protocol (command/result/protocol)
 set(CAUDIO_CLI_SHARED_SOURCES
-  cli/src/shared/json_wrapper.cppm
   cli/src/cli.cppm
+  cli/src/shared/json_wrapper.cppm
   cli/src/shared/command.cppm
   cli/src/shared/result.cppm
   cli/src/shared/protocol.cppm
@@ -373,7 +376,7 @@ target_compile_options(caudio_service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-glob
 add_library(caudio_service_shared SHARED)
 set_target_properties(caudio_service_shared PROPERTIES OUTPUT_NAME caudio_service)
 add_library(caudio::service_shared ALIAS caudio_service_shared)
-target_sources(caudio_service_shared PRIVATE cmake/shared_stub.cpp)
+target_sources(caudio_service_shared PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(caudio_service_shared PUBLIC caudio::service caudio::cli_shared caudio::engine_shared caudio::db_shared caudio::utils_shared Threads::Threads)
 target_link_libraries(caudio_service_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::service>)
 target_link_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
@@ -383,16 +386,6 @@ if(NOT WIN32)
     target_link_libraries(caudio_service_shared PUBLIC ${LIBRT})
   endif()
 endif()
-
-# caudio::ipc — alias to caudio::service (same sources, no duplicate library)
-# This avoids building two identical static libraries from the same sources.
-add_library(caudio_ipc INTERFACE)
-add_library(caudio::ipc ALIAS caudio_ipc)
-target_link_libraries(caudio_ipc INTERFACE caudio::service)
-
-add_library(caudio_ipc_shared INTERFACE)
-add_library(caudio::ipc_shared ALIAS caudio_ipc_shared)
-target_link_libraries(caudio_ipc_shared INTERFACE caudio::service_shared)
 
 # caudio::client — IpcClient wrapper + output formatter (feat/cli-service)
 set(CAUDIO_CLIENT_SOURCES
@@ -409,7 +402,7 @@ target_include_directories(caudio_client PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(caudio_client PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-target_link_libraries(caudio_client PUBLIC caudio::cli_shared caudio::utils caudio::ipc Threads::Threads)
+target_link_libraries(caudio_client PUBLIC caudio::cli_shared caudio::utils caudio::service Threads::Threads)
 ca_set_warnings(caudio_client)
 ca_set_module_warnings(caudio_client)
 target_compile_options(caudio_client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
@@ -417,8 +410,8 @@ target_compile_options(caudio_client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-globa
 add_library(caudio_client_shared SHARED)
 set_target_properties(caudio_client_shared PROPERTIES OUTPUT_NAME caudio_client)
 add_library(caudio::client_shared ALIAS caudio_client_shared)
-target_sources(caudio_client_shared PRIVATE cmake/shared_stub.cpp)
-target_link_libraries(caudio_client_shared PUBLIC caudio::client caudio::cli_shared caudio::utils_shared caudio::ipc_shared Threads::Threads)
+target_sources(caudio_client_shared PRIVATE src/_stub/shared_stub.cpp)
+target_link_libraries(caudio_client_shared PUBLIC caudio::client caudio::cli_shared caudio::utils_shared caudio::service_shared Threads::Threads)
 target_link_libraries(caudio_client_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::client>)
 target_link_options(caudio_client_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 
@@ -456,7 +449,6 @@ install(
     caudio_db caudio_db_shared
     caudio_engine caudio_engine_shared
     caudio_cli_shared
-    caudio_ipc caudio_ipc_shared
     caudio_client caudio_client_shared
     caudio_service caudio_service_shared
     caudio_combined

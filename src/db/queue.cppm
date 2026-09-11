@@ -93,7 +93,7 @@ queueDequeueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
     QueueItem it;
     it.id = st.columnInt(0);
     it.queue_id = st.columnInt(1);
-    it.trackId = st.columnInt(2);
+    it.track_id = st.columnInt(2);
     it.position = st.columnInt(3);
     it.added = st.columnInt(4);
     {
@@ -135,7 +135,7 @@ queuePeekLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
     QueueItem it;
     it.id = st.columnInt(0);
     it.queue_id = st.columnInt(1);
-    it.trackId = st.columnInt(2);
+    it.track_id = st.columnInt(2);
     it.position = st.columnInt(3);
     it.added = st.columnInt(4);
     return it;
@@ -210,7 +210,7 @@ queueListLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
         QueueItem it;
         it.id = st.columnInt(0);
         it.queue_id = st.columnInt(1);
-        it.trackId = st.columnInt(2);
+        it.track_id = st.columnInt(2);
         it.position = st.columnInt(3);
         it.added = st.columnInt(4);
         out.push_back(it);

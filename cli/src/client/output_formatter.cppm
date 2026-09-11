@@ -67,17 +67,17 @@ public:
                     std::println(os, "Shuffle: {} Repeat: {}",
                                       v.shuffle ? "on" : "off",
                                       repeatModeToString(v.repeat));
-                    if (!v.title.empty() || !v.artist.empty() || v.trackId != 0) {
+                    if (!v.title.empty() || !v.artist.empty() || v.track_id != 0) {
                         std::println(os, "Track: {} - {} [id: {}]", v.artist,
-                                          v.title, v.trackId);
+                                          v.title, v.track_id);
                     }
                     if (!v.path.empty()) {
                         std::println(os, "Path: {}", v.path);
                     }
-                    std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}",
-                                      v.qIdx, v.qSize,
-                                      std::to_underlying(v.state),
-                                      std::to_underlying(v.repeat));
+std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}",
+                                          v.q_idx, v.q_size,
+                                          std::to_underlying(v.state),
+                                          std::to_underlying(v.repeat));
                 } else if constexpr (std::is_same_v<T, caudio::cli::QueueTracks>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
                     std::println(os, "QueueTracks ({} tracks):", tracksSpan.size());

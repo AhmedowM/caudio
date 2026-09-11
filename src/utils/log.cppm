@@ -44,7 +44,7 @@ class Logger {
         minLevel_ = lvl;
     }
 
-    Level level() const noexcept {
+    [[nodiscard]] Level level() const noexcept {
         std::lock_guard<std::mutex> lk(mutex_);
         return minLevel_;
     }

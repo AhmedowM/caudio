@@ -28,7 +28,6 @@ static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must
 // - reset() requires external synchronization: caller must ensure producer & consumer
 //   are stopped/paused or hold decodeMtx_ (engine's decodeMtx_) before calling.
 //   No internal lock; concurrent reset with read/write is a data race.
-//   gaplessArmed_ semantics: 0→1 CAS arms gapless transition 300ms before track end.
 template <typename T>
     requires std::is_trivially_copyable_v<T>
 class SpscRing {

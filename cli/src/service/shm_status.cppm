@@ -36,7 +36,7 @@ struct ShmStatus {
     float volume{1.0f};        // volume 0.0-1.0
     bool muted{false};         // muted flag
     int state{0};              // PlaybackState enum (int)
-    int64_t trackId{0};        // current track ID
+    int64_t track_id{0};        // current track ID
     size_t queueSize{0};       // queue size
     char title[256]{0};        // track title
     char artist[256]{0};       // track artist
@@ -51,7 +51,7 @@ struct alignas(64) AtomicShmStatus {
     std::atomic<uint32_t> volume{0};    // bit_cast<float>
     std::atomic<bool> muted{false};
     std::atomic<int> state{0};
-    std::atomic<int64_t> trackId{0};
+    std::atomic<int64_t> track_id{0};
     std::atomic<size_t> queueSize{0};
     // Strings can't be atomic, use char arrays with seqlock protection
     char title[256]{0};
@@ -231,7 +231,7 @@ public:
             out.volume = atomicLoadFloat(s->volume);
             out.muted = s->muted.load(std::memory_order_acquire);
             out.state = s->state.load(std::memory_order_acquire);
-            out.trackId = s->trackId.load(std::memory_order_acquire);
+            out.track_id = s->track_id.load(std::memory_order_acquire);
             out.queueSize = s->queueSize.load(std::memory_order_acquire);
             // Copy strings (protected by seqlock)
             std::memcpy(out.title, s->title, sizeof(out.title));
@@ -245,7 +245,7 @@ public:
     }
 
     // Seqlock writer: updates all fields atomically
-    void updateFromEngine(const caudio::engine::Engine& eng, int64_t trackId,
+    void updateFromEngine(const caudio::engine::Engine& eng, int64_t track_id,
                           std::string_view title, std::string_view artist) {
         if (!map_) return;
         AtomicShmStatus* s = map_;
@@ -260,7 +260,7 @@ public:
         atomicStoreDouble(s->position, eng.position());
         atomicStoreFloat(s->volume, eng.volume());
         s->state.store(static_cast<int>(eng.state()), std::memory_order_relaxed);
-        s->trackId.store(trackId, std::memory_order_relaxed);
+        s->track_id.store(track_id, std::memory_order_relaxed);
         s->muted.store(eng.volume() == 0.0f, std::memory_order_relaxed);
 
         // Copy strings with bounds checking

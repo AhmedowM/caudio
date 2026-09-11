@@ -59,6 +59,7 @@ class AudioOutput {
         return volume_.load(std::memory_order_relaxed);
     }
 
+    // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
     void testFill(std::span<float> buf) const noexcept {
         std::ranges::fill(buf, 0.0f);
     }
@@ -83,6 +84,7 @@ class AudioOutput {
         }
     }
 
+    // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
     // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
     // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
     void fillForTest(std::span<float> out) noexcept {

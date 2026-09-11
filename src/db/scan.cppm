@@ -64,7 +64,7 @@ export std::generator<Track> scan(const std::filesystem::path& root,
             if (!e2)
                 t.mtime = (int64_t)ftime.time_since_epoch().count();
             if (mode == ScanMode::Sampled) {
-                auto fp = detail::computeFingerprint(it->path());
+                auto fp = internal::computeFingerprint(it->path());
                 if (fp)
                     t.fingerprint = *fp;
             } else {
@@ -134,7 +134,7 @@ scanLibrary(Database& db, int64_t libraryId,
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             batchLock.unlock();
@@ -149,7 +149,7 @@ scanLibrary(Database& db, int64_t libraryId,
         if (!inTx)
             return {};
         char* err = nullptr;
-        detail::SqliteErrGuard guard{err};
+        internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
@@ -222,7 +222,7 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.title.clear();
             upd.artist.clear();
             upd.album.clear();
-            upd.albumArtist.clear();
+            upd.album_artist.clear();
             upd.genre.clear();
             upd.year = 0;
             upd.track_num = 0;
@@ -272,12 +272,12 @@ scanLibrary(Database& db, int64_t libraryId,
                 {
                     std::unique_lock<std::shared_mutex> lk(db.mutex());
                     char* err = nullptr;
-                    detail::SqliteErrGuard guard{err};
+                    internal::SqliteErrGuard guard{err};
                     int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
                     if (rc == SQLITE_OK) {
                         (void)db.libraryUpdateLocked(l);
                         char* cErr = nullptr;
-                        detail::SqliteErrGuard cGuard{cErr};
+                        internal::SqliteErrGuard cGuard{cErr};
                         rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &cErr);
                         if (rc != SQLITE_OK)
                             sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);

@@ -22,7 +22,7 @@ import :database;
 namespace caudio::db {
 
 inline void fillTrackSearch(sqlite3_stmt* s, Track& out) {
-    detail::fillTrackFromStmt(s, out);
+    internal::fillTrackFromStmt(s, out);
 }
 
 inline std::expected<std::vector<Track>, caudio::utils::Error>
@@ -54,7 +54,7 @@ export std::expected<std::vector<Track>, caudio::utils::Error>
 searchFts(Database& db, std::string_view query, int limit = 50) {
     if (query.empty())
         return std::vector<Track>{};
-    std::string sanitized = detail::sanitizeFtsTerm(query);
+    std::string sanitized = internal::sanitizeFtsTerm(query);
     if (sanitized.empty())
         return std::vector<Track>{};
     std::string ftsQ = sanitized;
@@ -74,7 +74,7 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     if (r2 && !r2->empty())
         return r2;
     // LIKE fallback on 5 cols with COLLATE NOCASE — still under same lock
-    std::string esc = detail::escapeLike(sanitized);
+    std::string esc = internal::escapeLike(sanitized);
     std::string pat = "%" + esc + "%";
     const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
@@ -96,7 +96,7 @@ searchFts(Database& db, std::string_view query, int limit = 50) {
     std::vector<Track> out;
     while (st.step()) {
         Track t;
-        detail::fillTrackFromStmt(st.get(), t);
+        internal::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
     return out;
@@ -106,7 +106,7 @@ export std::expected<std::vector<Track>, caudio::utils::Error>
 searchLike(Database& db, std::string_view query, int limit = 50) {
     if (query.empty())
         return std::vector<Track>{};
-    std::string esc = detail::escapeLike(query);
+    std::string esc = internal::escapeLike(query);
     std::string pat = "%" + esc + "%";
     std::shared_lock lock(db.mutex());
     sqlite3* h = db.handle();
@@ -132,14 +132,14 @@ searchLike(Database& db, std::string_view query, int limit = 50) {
     std::vector<Track> out;
     while (st.step()) {
         Track t;
-        detail::fillTrackFromStmt(st.get(), t);
+        internal::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
     return out;
 }
 
 export std::string sanitizeFtsTerm(std::string_view term) {
-    return detail::sanitizeFtsTerm(term);
+    return internal::sanitizeFtsTerm(term);
 }
 
 export std::expected<std::vector<Track>, caudio::utils::Error>

@@ -76,7 +76,7 @@ struct PlaylistLoad final {
 
 struct PlaylistSave final {
     std::string name{};
-    std::optional<int64_t> queueId{};
+    std::optional<int64_t> queue_id{};
 };
 
 struct PlaylistDelete final {

@@ -30,10 +30,10 @@ export using ordered_json = nlohmann::ordered_json;
 
 // DRY: canonical hex helpers live in caudio.db:detail — thin wrappers for backwards compat
 inline std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {
-    return detail::toHex(fp);
+    return internal::toHex(fp);
 }
 inline bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out) {
-    return detail::fromHex(hex, out);
+    return internal::fromHex(hex, out);
 }
 
 export ordered_json trackToJson(const Track& t) {
@@ -61,7 +61,7 @@ export ordered_json trackToJson(const Track& t) {
     j["title"] = t.title;
     j["artist"] = t.artist;
     j["album"] = t.album;
-    j["album_artist"] = t.albumArtist;
+    j["album_artist"] = t.album_artist;
     j["genre"] = t.genre;
     j["cover_art_path"] = t.cover_art_path;
     return j;
@@ -136,17 +136,17 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
         getStr("title", t.title);
         getStr("artist", t.artist);
         getStr("album", t.album);
-        getStr("album_artist", t.albumArtist);
+        getStr("album_artist", t.album_artist);
         getStr("genre", t.genre);
         getStr("cover_art_path", t.cover_art_path);
         std::string fpHex;
         getStr("fingerprint", fpHex);
         if (!fpHex.empty()) {
             if (!hexToFingerprint(fpHex, t.fingerprint)) {
-                t.fingerprint = detail::fallbackFingerprint(t.path);
+                t.fingerprint = internal::fallbackFingerprint(t.path);
             }
         } else {
-            t.fingerprint = detail::fallbackFingerprint(t.path);
+            t.fingerprint = internal::fallbackFingerprint(t.path);
         }
         return t;
     } catch (const std::exception& e) {
@@ -236,7 +236,7 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
         stmt.bindText(9, t.title);
         stmt.bindText(10, t.artist);
         stmt.bindText(11, t.album);
-        stmt.bindText(12, t.albumArtist);
+        stmt.bindText(12, t.album_artist);
         stmt.bindText(13, t.genre);
         stmt.bindInt(14, t.year);
         stmt.bindInt(15, t.track_num);
@@ -285,11 +285,11 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
                 upd.bindInt(5, t.sample_rate);
                 upd.bindInt(6, t.channels);
                 upd.bindInt(7, t.bitrate);
-                upd.bindText(8, t.title);
-                upd.bindText(9, t.artist);
-                upd.bindText(10, t.album);
-                upd.bindText(11, t.albumArtist);
-                upd.bindText(12, t.genre);
+upd.bindText(8, t.title);
+        upd.bindText(9, t.artist);
+        upd.bindText(10, t.album);
+        upd.bindText(11, t.album_artist);
+        upd.bindText(12, t.genre);
                 upd.bindInt(13, t.year);
                 upd.bindInt(14, t.track_num);
                 upd.bindInt(15, t.disc_num);

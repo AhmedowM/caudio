@@ -56,6 +56,7 @@ inline std::expected<double, caudio::utils::Error> parseTime(std::string_view s)
     if (!r) return std::unexpected{caudio::utils::makeError(caudio::utils::Result::InvalidArg, r.error())};
     return *r;
 }
+// TODO: dedup with parse.hpp:90
 inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
         s.remove_prefix(1);
@@ -86,6 +87,7 @@ inline std::expected<double, caudio::utils::Error> parseSeek(std::string_view s)
     }
     return v;
 }
+// TODO: dedup with parse.hpp:90
 inline std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
     while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
         s.remove_prefix(1);

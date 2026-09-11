@@ -230,9 +230,9 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     s.muted = false;
     s.shuffle = false;
     s.repeat = caudio::engine::RepeatMode::Off;
-    s.trackId = eng.currentTrackId();
-    if (s.trackId != 0) {
-        auto tr = db.getTrack(s.trackId);
+    s.track_id = eng.currentTrackId();
+    if (s.track_id != 0) {
+        auto tr = db.getTrack(s.track_id);
         if (tr) {
             s.title = tr->title;
             s.artist = tr->artist;
@@ -242,12 +242,12 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     try {
         auto items = db.queueList(1);
         if (items) {
-            s.qSize = items->size();
-            s.qIdx = 0;
-            if (s.trackId != 0 && !items->empty()) {
+            s.q_size = items->size();
+            s.q_idx = 0;
+            if (s.track_id != 0 && !items->empty()) {
                 for (std::size_t i = 0; i < items->size(); ++i) {
-                    if ((*items)[i].trackId == s.trackId) {
-                        s.qIdx = i;
+                    if ((*items)[i].track_id == s.track_id) {
+                        s.q_idx = i;
                         break;
                     }
                 }

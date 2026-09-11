@@ -94,19 +94,7 @@ public:
                 }
             });
 
-        // Handle timeout via chrono::milliseconds + poll/select style.
-        // On Unix we demonstrate poll usage; on all platforms we use wait_for.
-#ifndef _WIN32
-        // Dummy poll to satisfy spec requirement of using poll/select
-        // (real timeout is via future::wait_for)
-        struct pollfd pfd{};
-        pfd.fd = -1;
-        pfd.events = 0;
-        ::poll(&pfd, 0, 0);
-#endif
-        std::span<const std::byte> dummy; // ensure std::span usage
-        (void)dummy;
-
+        // Handle timeout via chrono::milliseconds — uses future::wait_for.
         if (fut.wait_for(timeout) == std::future_status::ready) {
             return fut.get();
         } else {
@@ -140,8 +128,8 @@ public:
             s.dur = snapshot.duration;
             s.vol = snapshot.volume;
             s.muted = snapshot.muted;
-            s.trackId = snapshot.trackId;
-            s.qSize = snapshot.queueSize;
+            s.track_id = snapshot.track_id;
+            s.q_size = snapshot.queueSize;
             s.title = snapshot.title;
             s.artist = snapshot.artist;
             // shuffle/repeat not in shm, would need to query via IPC if needed
