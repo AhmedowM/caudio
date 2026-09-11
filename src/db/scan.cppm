@@ -1,4 +1,6 @@
 module;
+#include <sqlite3.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -10,6 +12,8 @@ module;
 #include <fstream>
 #include <functional>
 #include <generator>
+#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -110,42 +114,102 @@ scanLibrary(Database& db, int64_t libraryId,
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::Result::NotFound, "path not found")};
     int64_t scanned = 0;
-    // single transaction for bulk? we do per-file with lock inside db methods, so just iterate
+    // Scan batches to avoid 30k lock hops and ensures crash atomicity per batch.
+    // We hold Database::mutex() as unique_lock<shared_mutex> for the batch duration
+    // and use BEGIN IMMEDIATE / COMMIT per 500 files so concurrent queueList never
+    // sees partial state and a crash leaves DB consistent per batch.
+    constexpr size_t kBatchSize = 500;
+    size_t batchPending = 0;
+    std::unique_lock<std::shared_mutex> batchLock;
+    bool inTx = false;
+    auto beginBatch = [&]() -> std::expected<void, caudio::utils::Error> {
+        if (inTx)
+            return {};
+        batchLock = std::unique_lock<std::shared_mutex>(db.mutex());
+        if (!db.handleLocked())
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::Result::Internal, "no db")};
+        char* err = nullptr;
+        detail::SqliteErrGuard guard{err};
+        int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        if (rc != SQLITE_OK) {
+            batchLock.unlock();
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::Result::Busy, err ? std::string(err) : "BEGIN failed")};
+        }
+        inTx = true;
+        batchPending = 0;
+        return {};
+    };
+    auto commitBatch = [&]() -> std::expected<void, caudio::utils::Error> {
+        if (!inTx)
+            return {};
+        char* err = nullptr;
+        detail::SqliteErrGuard guard{err};
+        int rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &err);
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+            batchLock.unlock();
+            inTx = false;
+            batchPending = 0;
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::Result::Internal, err ? std::string(err) : "commit failed")};
+        }
+        batchLock.unlock();
+        inTx = false;
+        batchPending = 0;
+        return {};
+    };
+    auto rollbackBatch = [&]() {
+        if (!inTx)
+            return;
+        sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+        batchLock.unlock();
+        inTx = false;
+        batchPending = 0;
+    };
+
     for (auto trk : scan(root, ScanMode::Sampled)) {
-        // early-exit check path+size+mtime
-        auto existingPath = db.findByPath(trk.path);
+        if (!inTx) {
+            auto b = beginBatch();
+            if (!b)
+                return std::unexpected{b.error()};
+        }
+        // early-exit check path+size+mtime — within batch tx via Locked helpers
+        auto existingPath = db.findByPathLocked(trk.path);
         if (existingPath && existingPath->size == trk.size && existingPath->mtime == trk.mtime) {
             scanned++;
+            batchPending++;
             if (progress)
                 progress(scanned, 0, trk.path);
+            if (batchPending >= kBatchSize) {
+                auto c = commitBatch();
+                if (!c) {
+                    rollbackBatch();
+                    return std::unexpected{c.error()};
+                }
+            }
             continue;
         }
         // fingerprint dedup
-        auto byFp = db.findByFingerprint(trk.fingerprint);
+        auto byFp = db.findByFingerprintLocked(trk.fingerprint);
         if (byFp) {
-            // update path/size/mtime if duplicate fingerprint found elsewhere
             Track upd = *byFp;
             upd.path = trk.path;
             upd.size = trk.size;
             upd.mtime = trk.mtime;
             upd.library_id = libraryId;
             upd.deleted_at = 0;
-            (void)db.updateTrack(upd);
-            // delete orphan duplicate path only if fingerprint also matches to avoid collision
-            // delete if existingPath exists with different id but same fingerprint, delete it is
-            // already handled by update? For orphan path with same path but different id, we
-            // already updated the fingerprint holder, need to remove duplicate row if exists
+            (void)db.updateTrackLocked(upd);
             if (existingPath && existingPath->id != byFp->id) {
-                // only delete if fingerprint matches
                 bool same = true;
                 for (int i = 0; i < 32; i++)
                     if (existingPath->fingerprint[i] != trk.fingerprint[i])
                         same = false;
                 if (same)
-                    (void)db.deleteTrack(existingPath->id);
+                    (void)db.deleteTrackLocked(existingPath->id);
             }
         } else if (existingPath) {
-            // same path content changed: clear stale metadata preserve play_count/rating
             Track upd = *existingPath;
             int64_t keepPlay = upd.play_count;
             int keepRating = upd.rating;
@@ -173,16 +237,31 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.play_count = keepPlay;
             upd.rating = keepRating;
             upd.date_added = keepAdded;
-            (void)db.updateTrack(upd);
+            (void)db.updateTrackLocked(upd);
         } else {
             trk.library_id = libraryId;
-            (void)db.insertTrack(trk);
+            (void)db.insertTrackLocked(trk);
         }
         scanned++;
+        batchPending++;
         if (progress)
             progress(scanned, 0, trk.path);
+        if (batchPending >= kBatchSize) {
+            auto c = commitBatch();
+            if (!c) {
+                rollbackBatch();
+                return std::unexpected{c.error()};
+            }
+        }
     }
-    // update library last_scanned
+    if (inTx) {
+        auto c = commitBatch();
+        if (!c) {
+            rollbackBatch();
+            return std::unexpected{c.error()};
+        }
+    }
+    // update library last_scanned — in its own transaction via libraryUpdate (or locked if needed)
     auto libs2 = db.libraryList();
     if (libs2) {
         for (auto& l : *libs2)
@@ -190,7 +269,23 @@ scanLibrary(Database& db, int64_t libraryId,
                 l.last_scanned = std::chrono::duration_cast<std::chrono::seconds>(
                                      std::chrono::system_clock::now().time_since_epoch())
                                      .count();
-                (void)db.libraryUpdate(l);
+                // ensure atomic update without exposing partial scan state: use a short transaction
+                {
+                    std::unique_lock<std::shared_mutex> lk(db.mutex());
+                    char* err = nullptr;
+                    detail::SqliteErrGuard guard{err};
+                    int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+                    if (rc == SQLITE_OK) {
+                        (void)db.libraryUpdateLocked(l);
+                        char* cErr = nullptr;
+                        detail::SqliteErrGuard cGuard{cErr};
+                        rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &cErr);
+                        if (rc != SQLITE_OK)
+                            sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+                    } else {
+                        (void)db.libraryUpdate(l);
+                    }
+                }
                 break;
             }
     }

@@ -81,7 +81,7 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     cfg.pollMs = 10;
     cfg.historyThresholdPct = 10;
     cfg.historyThresholdSecs = 1;
-    cfg.gaplessMs = 10000;
+    cfg.gaplessMs = 300;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());

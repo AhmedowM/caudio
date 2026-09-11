@@ -134,6 +134,38 @@ class Engine final {
             return std::unexpected(caudio::utils::makeError(caudio::utils::Result::State, "no db"));
         if (queueId == 0)
             queueId = 1;
+        auto s = playbackState_.load(std::memory_order_acquire);
+        if (s == PlaybackState::Paused) {
+            // resume, don't dequeue
+            playStart_ = std::chrono::steady_clock::now();
+            playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+            if (output_)
+                output_->start();
+            decodeCv_.notify_all();
+            monCv_.notify_all();
+            return {};
+        }
+        if (s == PlaybackState::Playing) {
+            // already playing, restart current track (seek 0), don't dequeue
+            // serialize with decodeLoop (decoder_->decode / ring_->write) via decodeMtx_
+            std::unique_lock<std::mutex> lk(decodeMtx_);
+            if (decoder_) {
+                auto r = decoder_->seek(0);
+                if (!r)
+                    return std::unexpected(r.error());
+            }
+            if (ring_)
+                ring_->reset();
+            pausePos_ = 0;
+            playStart_ = std::chrono::steady_clock::now();
+            if (output_)
+                output_->start();
+            lk.unlock();
+            decodeCv_.notify_all();
+            monCv_.notify_all();
+            return {};
+        }
+        // Stopped -> start new track via cursor (not dequeue)
         if (!tryLockQueue())
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::Busy, "queue busy"));
@@ -200,10 +232,15 @@ class Engine final {
         // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
         std::unique_lock<std::mutex> lk(decodeMtx_);
         playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+        // snapshot for restore on error (Task 1: seek hardening)
+        double savedPause = pausePos_;
+        auto savedStart = playStart_;
 
         if (decoder_) {
             auto res = decoder_->seek(seconds);
             if (!res) {
+                pausePos_ = savedPause;
+                playStart_ = savedStart;
                 playbackState_.store(PlaybackState::Playing, std::memory_order_release);
                 return std::unexpected(res.error());
             }
@@ -215,7 +252,6 @@ class Engine final {
             seconds = dur;
         pausePos_ = seconds;
         playStart_ = std::chrono::steady_clock::now();
-        pausePos_ = seconds;
         if (ring_)
             ring_->reset();
 
@@ -504,8 +540,8 @@ class Engine final {
                 caudio::utils::makeError(caudio::utils::Result::InvalidArg, "no db"));
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
-        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        SqliteErrGuard errGuard{err};
         if (rc != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::Busy, "begin failed"));
@@ -515,7 +551,9 @@ class Engine final {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return result;
         }
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
+        char* commitErr = nullptr;
+        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+        SqliteErrGuard commitGuard{commitErr};
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected(
@@ -569,8 +607,8 @@ class Engine final {
                 queue_.cursor = (size_t)state_.cursorPos;
                 if (!queue_.perm.empty() && queue_.cursor >= queue_.perm.size())
                     queue_.cursor = 0;
-                else if (queue_.perm.empty() && queue_.cursor != 0)
-                    queue_.cursor = 0;
+                // for non-shuffle, keep cursor as stored (persistent queue via cursor)
+                // clamp later via queueCount if needed; don't reset to 0
             }
             queue_.queueId = 1;
             sqlite3_finalize(stmt);
@@ -716,7 +754,9 @@ class Engine final {
         return tr.value();
     }
 
+    // Requires queueLock_ held (caller must have tryLockQueue()/queueLock_ == 1).
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on) {
+        // assert: queueLock_.load(acquire) == 1  (external sync required)
         bool want = on;
         if (queue_.shuffle == want && !queue_.perm.empty())
             return {};
@@ -760,6 +800,55 @@ class Engine final {
         }
     }
 
+    std::expected<void, caudio::utils::Error> queuePeekLocked(caudio::db::Track& out) {
+        if (queue_.queueId == 0)
+            queue_.queueId = 1;
+        // peek — don't consume, handle shuffle cursor without advancing
+        if (queue_.shuffle) {
+            if (queue_.perm.empty()) {
+                size_t cnt = db_->queueCountLocked(queue_.queueId);
+                if (cnt == 0)
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+                auto sr = setShuffleLocked(true);
+                if (!sr)
+                    return std::unexpected(sr.error());
+            }
+            size_t idx = queue_.cursor;
+            if (idx >= queue_.perm.size()) {
+                if (queue_.repeat == RepeatMode::Queue)
+                    idx = 0;
+                else
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+            }
+            int64_t pos = queue_.perm[idx];
+            auto tr = fetchTrackByPosLocked(queue_.queueId, pos);
+            if (!tr)
+                return std::unexpected(tr.error());
+            out = tr.value();
+            return {};
+        }
+        // non-shuffle: peek via cursor position (persistent queue)
+        size_t cntPeek = db_->queueCountLocked(queue_.queueId);
+        if (cntPeek == 0)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+        size_t idxPeek = queue_.cursor;
+        if (idxPeek >= cntPeek) {
+            if (queue_.repeat == RepeatMode::Queue)
+                idxPeek = 0;
+            else
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+        }
+        auto trPeek = fetchTrackByPosLocked(queue_.queueId, (int64_t)idxPeek);
+        if (!trPeek)
+            return std::unexpected(trPeek.error());
+        out = trPeek.value();
+        return {};
+    }
+
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out) {
         if (queue_.queueId == 0)
             queue_.queueId = 1;
@@ -777,10 +866,7 @@ class Engine final {
                         caudio::utils::makeError(caudio::utils::Result::Internal, "no perm"));
             }
             if (queue_.cursor >= queue_.perm.size()) {
-                if (queue_.repeat == RepeatMode::Queue) {
-                    queue_.cursor = 0;
-                    (void)persistCursorLocked();
-                } else if (queue_.repeat == RepeatMode::One) {
+                if (queue_.repeat == RepeatMode::One) {
                     size_t idx = queue_.perm.size() - 1;
                     if (queue_.cursor > 0 && queue_.cursor <= queue_.perm.size())
                         idx = queue_.cursor - 1;
@@ -791,8 +877,12 @@ class Engine final {
                     out = tr.value();
                     return {};
                 } else {
-                    return std::unexpected(
-                        caudio::utils::makeError(caudio::utils::Result::NotFound, "end of queue"));
+                    // wrap/reshuffle for both Off and Queue (shuffle on => new perm)
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                    (void)persistCursorLocked();
                 }
             }
             int64_t pos = queue_.perm[queue_.cursor];
@@ -808,37 +898,62 @@ class Engine final {
         if (cnt == 0)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
-        if (queue_.repeat == RepeatMode::Queue) {
-            return withTransaction(
-                [&]([[maybe_unused]] sqlite3* h) -> std::expected<void, caudio::utils::Error> {
-                    auto dq = db_->queueDequeueLocked(queue_.queueId);
-                    if (!dq)
-                        return std::unexpected(dq.error());
-                    auto qi = dq.value();
-                    (void)db_->queueEnqueueLocked(queue_.queueId, qi.trackId, -1);
-                    auto tr = db_->getTrackLocked(qi.trackId);
-                    if (!tr)
-                        return std::unexpected(tr.error());
-                    out = tr.value();
-                    return {};
-                });
+        if (queue_.cursor >= cnt) {
+            if (queue_.repeat == RepeatMode::One) {
+                size_t idx = cnt - 1;
+                if (queue_.cursor > 0 && queue_.cursor <= cnt)
+                    idx = queue_.cursor - 1;
+                auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)idx);
+                if (!tr)
+                    return std::unexpected(tr.error());
+                out = tr.value();
+                return {};
+            } else {
+                // wrap for both Off and Queue; reshuffle if shuffle on
+                if (queue_.shuffle) {
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                } else {
+                    queue_.cursor = 0;
+                }
+                (void)persistCursorLocked();
+            }
         }
-        {
-            auto dq = db_->queueDequeue(queue_.queueId);
-            if (!dq)
-                return std::unexpected(dq.error());
-            auto tr = db_->getTrack(dq.value().trackId);
-            if (!tr)
-                return std::unexpected(tr.error());
-            out = tr.value();
-            return {};
-        }
+        auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)queue_.cursor);
+        if (!tr)
+            return std::unexpected(tr.error());
+        queue_.cursor++;
+        (void)persistCursorLocked();
+        out = tr.value();
+        return {};
     }
 
     std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::db::Track& out) {
-        if (!queue_.shuffle)
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::Result::NotFound, "prev only shuffle"));
+        if (!queue_.shuffle) {
+            size_t cnt = db_->queueCountLocked(queue_.queueId);
+            if (cnt == 0)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::Result::NotFound, "empty queue"));
+            if (queue_.cursor <= 1) {
+                if (queue_.cursor == 0)
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::Result::NotFound, "at start"));
+                queue_.cursor = 0;
+            } else {
+                queue_.cursor -= 2;
+                if (queue_.cursor >= cnt)
+                    queue_.cursor = cnt - 1;
+            }
+            auto tr = fetchTrackByPosLocked(queue_.queueId, (int64_t)queue_.cursor);
+            if (!tr)
+                return std::unexpected(tr.error());
+            queue_.cursor++;
+            (void)persistCursorLocked();
+            out = tr.value();
+            return {};
+        }
         if (queue_.perm.empty())
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::Result::NotFound, "no perm"));
@@ -907,6 +1022,7 @@ class Engine final {
                         output_ = std::move(oRes.value());
                         // preroll: decode some frames before start
                         preroll();
+                        output_->start();
                     } else {
                         lastErr_ = oRes.error().message;
                     }
@@ -950,17 +1066,26 @@ class Engine final {
     void preroll() {
         if (!decoder_ || !ring_)
             return;
-        // fill up to half capacity
+        uint32_t ch = decoder_->channels();
+        if (ch == 0)
+            ch = 2;
+        // preroll cap/2 frames like Player (ring capacity is in frames)
         size_t need = ring_->availableWrite() / 2;
         if (need == 0)
             return;
-        std::vector<float> tmp(1024 * std::max<uint32_t>(1, decoder_->channels()));
-        while (need > 0 && ring_->availableWrite() >= tmp.size() / decoder_->channels()) {
+        size_t chunkFrames = 1024;
+        size_t maxChunk = 2048 / ch;
+        if (chunkFrames > maxChunk)
+            chunkFrames = maxChunk;
+        std::vector<float> tmp(chunkFrames * ch);
+        while (need > 0 && ring_->availableWrite() >= tmp.size() / ch) {
             size_t frames = decoder_->decode(std::span<float>(tmp.data(), tmp.size()));
             if (frames == 0)
                 break;
-            size_t samples = frames * decoder_->channels();
-            ring_->write(std::span<const float>(tmp.data(), samples));
+            size_t samples = frames * ch;
+            size_t writtenFrames = ring_->write(std::span<float>(tmp.data(), samples));
+            if (writtenFrames < frames)
+                break;
             if (need > frames)
                 need -= frames;
             else
@@ -1027,8 +1152,8 @@ class Engine final {
         }
         std::unique_lock<std::shared_mutex> lk(*m);
         char* err = nullptr;
-        SqliteErrGuard errGuard{err};
         int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        SqliteErrGuard errGuard{err};
         if (rc != SQLITE_OK) {
             markedPlayed_.store(false, std::memory_order_release);
             return;
@@ -1107,7 +1232,9 @@ class Engine final {
             markedPlayed_.store(false, std::memory_order_release);
             return;
         }
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &err);
+        char* commitErr = nullptr;
+        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+        SqliteErrGuard commitGuard{commitErr};
         if (rc != SQLITE_OK) {
             sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
             markedPlayed_.store(false, std::memory_order_release);
@@ -1170,6 +1297,7 @@ class Engine final {
     }
 
     void decodeLoop(std::stop_token st) {
+        constexpr std::size_t kMaxChunkFrames = 1024;
         while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
             auto ps = playbackState_.load(std::memory_order_acquire);
             if (ps != PlaybackState::Playing || !decoder_ || !ring_) {
@@ -1181,13 +1309,23 @@ class Engine final {
                 continue;
             }
             size_t avail = ring_->availableWrite();
-            // gate preroll: if not enough space, wait
-            if (avail < 512) {
+            if (avail == 0) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 continue;
             }
+            uint32_t ch = decoder_->channels();
+            if (ch == 0)
+                ch = 2;
+            size_t maxFrames = avail / ch;
+            if (maxFrames > kMaxChunkFrames)
+                maxFrames = kMaxChunkFrames;
+            size_t maxChunkByCh = 2048 / ch;
+            if (maxFrames > maxChunkByCh)
+                maxFrames = maxChunkByCh;
+            if (maxFrames == 0)
+                maxFrames = 1;
 
-            std::vector<float> buf(1024 * (decoder_->channels() ? decoder_->channels() : 2));
+            std::vector<float> buf(maxFrames * ch);
             size_t frames;
             {
                 std::unique_lock<std::mutex> lk(decodeMtx_);
@@ -1201,16 +1339,18 @@ class Engine final {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
             }
-            size_t samples = frames * (decoder_->channels() ? decoder_->channels() : 2);
-            size_t written;
+            size_t samples = frames * ch;
+            size_t writtenFrames;
             {
                 std::unique_lock<std::mutex> lk(decodeMtx_);
                 // Re-check state under lock to avoid race with seek() ring reset
                 if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
                     continue;
-                written = ring_->write(std::span<const float>(buf.data(), samples));
+                writtenFrames = ring_->write(std::span<float>(buf.data(), samples));
             }
-            (void)written;
+            if (writtenFrames < frames) {
+                // Ring full, will retry next iteration
+            }
         }
     }
 
@@ -1255,8 +1395,10 @@ class Engine final {
 
     // atomics spec required
     std::atomic<uint64_t> lastProgressMs_{0};
+    // gaplessArmed_: 0→1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
+    // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
-    std::atomic<int> queueLock_{0};
+    std::atomic<int> queueLock_{0}; // spin-lock for queue_ (0=unlocked, 1=locked) — use tryLockQueue()
 };
 
 } // namespace caudio::engine

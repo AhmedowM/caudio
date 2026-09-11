@@ -94,10 +94,34 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Off).has_value());
     REQUIRE(eng->play(1).has_value());
+    {
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 2);
+        sqlite3_finalize(stc);
+        sqlite3_close(ch);
+    }
+    int64_t firstId = eng->currentTrackId();
     REQUIRE(eng->next().has_value());
+    // next at end should wrap to beginning (Musicolet/AIMP) or reshuffle if shuffle on
     auto r = eng->next();
-    REQUIRE(!r.has_value());
-    REQUIRE(r.error().code == Result::NotFound);
+    REQUIRE(r.has_value());
+    // wrapped to first track
+    REQUIRE(eng->currentTrackId() == firstId);
+    // queue still has 2 rows (cursor persisted, not deleted)
+    {
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 2);
+        sqlite3_finalize(stc);
+        sqlite3_close(ch);
+    }
     eng.reset();
     safeRemoveDb(dbPath);
 }
@@ -125,8 +149,29 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
     REQUIRE(eng->attachDb(std::move(db)).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
     REQUIRE(eng->play(1).has_value());
-    // queue was size 2, after play size 1 remains (dequeue). next should loop still playable
+    // queue persists via cursor, count stays 2 after play (not dequeued)
+    {
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 2);
+        sqlite3_finalize(stc);
+        sqlite3_close(ch);
+    }
     REQUIRE(eng->next().has_value());
+    // count still 2 after next (cursor advance, not dequeue)
+    {
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 2);
+        sqlite3_finalize(stc);
+        sqlite3_close(ch);
+    }
     // after second next with Queue, should wrap and still succeed (third next)
     REQUIRE(eng->next().has_value());
     eng.reset();
@@ -263,4 +308,131 @@ TEST_CASE("shufflePerm production overload non-deterministic but valid perm", "[
     std::set<int64_t> s(v.begin(), v.end());
     REQUIRE(s.size()==5);
     for (int i=0;i<5;++i) REQUIRE(s.count(i)==1);
+}
+
+TEST_CASE("engine play resumes when paused", "[engine_queue]") {
+    std::string dbPath = tempDbPath("eng_play_pause").string();
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    for (int i = 0; i < 2; ++i) {
+        Track t;
+        t.path = "resume" + std::to_string(i) + ".wav";
+        t.duration = 10.0;
+        for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x60 + i * 32 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+    }
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
+    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->play(1).has_value());
+    int64_t first = eng->currentTrackId();
+    REQUIRE(eng->pause().has_value());
+    REQUIRE(eng->state() == PlaybackState::Paused);
+    // play when paused should resume, not next
+    REQUIRE(eng->play(1).has_value());
+    REQUIRE(eng->state() == PlaybackState::Playing);
+    REQUIRE(eng->currentTrackId() == first);
+    // play when playing should restart, not next
+    REQUIRE(eng->play(1).has_value());
+    REQUIRE(eng->currentTrackId() == first);
+    eng.reset();
+    safeRemoveDb(dbPath);
+}
+
+TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
+    std::string dbPath = tempDbPath("eng_prev").string();
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    for (int i = 0; i < 3; ++i) {
+        Track t;
+        t.path = "prev" + std::to_string(i) + ".wav";
+        t.duration = 1.0;
+        for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x70 + i * 32 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+    }
+    EngineConfig cfg;
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
+    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->play(1).has_value());
+    int64_t first = eng->currentTrackId();
+    REQUIRE(eng->next().has_value());
+    int64_t second = eng->currentTrackId();
+    REQUIRE(first != second);
+    REQUIRE(eng->prev().has_value());
+    REQUIRE(eng->currentTrackId() == first);
+    eng.reset();
+    safeRemoveDb(dbPath);
+}
+
+TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
+    std::string dbPath = tempDbPath("eng_q_persist_cursor").string();
+    int64_t id0 = 0;
+    {
+        auto dbRes = Database::open(dbPath);
+        REQUIRE(dbRes.has_value());
+        auto db = std::move(dbRes.value());
+        for (int i = 0; i < 4; ++i) {
+            Track t;
+            t.path = "persist_cursor" + std::to_string(i) + ".wav";
+            t.duration = 1.0;
+            for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x80 + i * 32 + b);
+            auto r = db->insertTrack(t);
+            REQUIRE(r.has_value());
+            if (i==0) id0 = *r;
+            REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+        }
+        EngineConfig cfg;
+        cfg.enableMonitorThread = false;
+        auto eRes = Engine::create(cfg);
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
+        REQUIRE(eng->attachDb(std::move(db)).has_value());
+        REQUIRE(eng->play(1).has_value());
+        REQUIRE(eng->next().has_value());
+        // queue count should still be 4 (cursor, not dequeue)
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 4);
+        sqlite3_finalize(stc);
+        sqlite3_close(ch);
+        eng->shutdown();
+    }
+    // reopen, queue should still be 4 and cursor persisted
+    {
+        sqlite3* ch = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* stc = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int(stc, 0) == 4);
+        sqlite3_finalize(stc);
+        sqlite3_stmt* st2 = nullptr;
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT cursor_pos FROM engine_state WHERE id=1", -1, &st2, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(st2) == SQLITE_ROW);
+        REQUIRE(sqlite3_column_int64(st2, 0) == 2);
+        sqlite3_finalize(st2);
+        sqlite3_close(ch);
+    }
+    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+    REQUIRE(e2Res.has_value());
+    auto eng2 = std::move(e2Res.value());
+    // next should continue from cursor 2 -> third track
+    REQUIRE(eng2->next().has_value());
+    eng2.reset();
+    safeRemoveDb(dbPath);
 }

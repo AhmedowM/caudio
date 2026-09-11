@@ -12,7 +12,14 @@ export module caudio.utils:ring;
 
 export namespace caudio::utils {
 
-// SPSC: wr release / rd acquire, cache-line padded, reset() requires external sync stopped/paused
+// SPSC ring: single-producer / single-consumer.
+// - wr / rd are cache-line padded atomics (see members below).
+// - write() is producer-only: wr_.load(relaxed) (writer owns wr), rd_.load(acquire).
+// - read()  is consumer-only: rd_.load(relaxed) (reader owns rd), wr_.load(acquire).
+// - reset() requires external synchronization: caller must ensure producer & consumer
+//   are stopped/paused or hold decodeMtx_ (engine's decodeMtx_) before calling.
+//   No internal lock; concurrent reset with read/write is a data race.
+//   gaplessArmed_ semantics: 0→1 CAS arms gapless transition 300ms before track end.
 template <typename T>
 class SpscRing {
   public:
@@ -45,7 +52,7 @@ class SpscRing {
     std::size_t write(const T* data, std::size_t frames) noexcept {
         if (!data || frames == 0 || cap_ == 0)
             return 0;
-        std::size_t wr = wr_.load(std::memory_order_acquire);
+        std::size_t wr = wr_.load(std::memory_order_relaxed); // writer owns wr
         std::size_t rd = rd_.load(std::memory_order_acquire);
         std::size_t used = wr - rd;
         if (used > cap_)
@@ -81,8 +88,8 @@ class SpscRing {
     std::size_t read(T* out, std::size_t frames) noexcept {
         if (!out || frames == 0 || cap_ == 0)
             return 0;
+        std::size_t rd = rd_.load(std::memory_order_relaxed); // reader owns rd
         std::size_t wr = wr_.load(std::memory_order_acquire);
-        std::size_t rd = rd_.load(std::memory_order_acquire);
         std::size_t avail = wr - rd;
         if (avail > cap_)
             avail = cap_;
@@ -104,8 +111,9 @@ class SpscRing {
     }
 
     [[nodiscard]] std::size_t availableRead() const noexcept {
+        // consumer view: rd relaxed (owned), wr acquire (sync with producer)
+        std::size_t rd = rd_.load(std::memory_order_relaxed);
         std::size_t wr = wr_.load(std::memory_order_acquire);
-        std::size_t rd = rd_.load(std::memory_order_acquire);
         std::size_t avail = wr - rd;
         if (avail > cap_)
             avail = cap_;
@@ -113,7 +121,8 @@ class SpscRing {
     }
 
     [[nodiscard]] std::size_t availableWrite() const noexcept {
-        std::size_t wr = wr_.load(std::memory_order_acquire);
+        // producer view: wr relaxed (owned), rd acquire (sync with consumer)
+        std::size_t wr = wr_.load(std::memory_order_relaxed);
         std::size_t rd = rd_.load(std::memory_order_acquire);
         std::size_t avail = wr - rd;
         if (avail > cap_)
@@ -121,7 +130,10 @@ class SpscRing {
         return cap_ - avail;
     }
 
+    // Requires external sync: producer & consumer stopped or decodeMtx_ held.
+    // Caller (Engine::seek/stop/play) must hold decodeMtx_ or ensure decode thread paused.
     void reset() noexcept {
+        // No fence needed: caller guarantees no concurrent read/write.
         rd_.store(0, std::memory_order_release);
         wr_.store(0, std::memory_order_release);
     }
