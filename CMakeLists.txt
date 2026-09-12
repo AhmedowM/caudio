@@ -108,8 +108,8 @@ target_include_directories(caudio_sqlite_static PRIVATE vendor)
 target_include_directories(caudio_sqlite_static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_definitions(caudio_sqlite_static PUBLIC SQLITE_ENABLE_FTS5=1)
 
-# Vendor: BLAKE3 C core (portable + dispatch, no AVX/SSE - force portable)
-add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_dispatch.c vendor/blake3_portable.c)
+# Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
+add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_portable.c)
 target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
 # suppress GCC warnings in vendored C
