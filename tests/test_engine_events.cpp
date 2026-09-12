@@ -2,7 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <filesystem>
 
-#include "helpers/helpers_test.hpp"
+#include "common.hpp"
 
 import caudio.db;
 import caudio.engine;

@@ -5,7 +5,7 @@
 #include <thread>
 #include <vector>
 
-#include "helpers/helpers_test.hpp"
+#include "common.hpp"
 
 import caudio.db;
 import caudio.utils;

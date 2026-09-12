@@ -6,6 +6,8 @@
 #include <variant>
 #include <iostream>
 
+#include "common.hpp"
+
 import caudio.cli;
 import caudio.service;
 import caudio.client;
@@ -19,10 +21,7 @@ using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::service;
 using namespace caudio::client;
-
-static std::filesystem::path tempDbPath(const std::string& suffix) {
-    return std::filesystem::temp_directory_path() / ("caudio_ipc_test_" + suffix + ".db");
-}
+using namespace caudio::test_helpers;
 
 TEST_CASE("daemon start/stop", "[ipc][cli]") {
     std::string suffix = "roundtrip";

@@ -35,4 +35,11 @@ inline void busyWaitUntil(std::function<bool()> pred, std::chrono::milliseconds 
     }
 }
 
+inline void safeRemoveDb(const std::string& p) {
+    std::error_code ec;
+    std::filesystem::remove(p, ec);
+    std::filesystem::remove(p + "-wal", ec);
+    std::filesystem::remove(p + "-shm", ec);
+}
+
 } // namespace caudio::test_helpers

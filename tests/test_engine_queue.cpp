@@ -5,7 +5,7 @@
 #include <set>
 #include <vector>
 
-#include "helpers/helpers_test.hpp"
+#include "common.hpp"
 
 import caudio.db;
 import caudio.engine;
@@ -15,13 +15,6 @@ using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;
-
-static void safeRemoveDb(const std::string& p) {
-    std::error_code ec;
-    std::filesystem::remove(p, ec);
-    std::filesystem::remove(p + "-wal", ec);
-    std::filesystem::remove(p + "-shm", ec);
-}
 
 TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     std::string dbPath = tempDbPath("eng_q_shuffle").string();
