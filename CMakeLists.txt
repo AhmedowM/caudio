@@ -48,8 +48,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # different *_EXPORTS/PIC flags breaks dependents with CRC mismatch).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Options — CAUDIO_WITH_FFMPEG ON required primary (C had OFF CMakeLists.txt:62)
-option(CAUDIO_WITH_FFMPEG "use FFmpeg as primary decoder" ON)
+# Options — FFmpeg is required primary (dr_* deleted, vendor cleaned)
 option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system → vcpkg/Conan → prebuilt → source)" ON)
 option(CAUDIO_ENABLE_TESTS "build tests" OFF)
 option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
@@ -60,20 +59,18 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Threads REQUIRED)
 
-if(CAUDIO_WITH_FFMPEG)
-  find_package(FFmpeg QUIET)
-  if(FFmpeg_FOUND)
-    message(STATUS "FFmpeg found (system): ${FFmpeg_AVCODEC_LIBRARY}")
-  elseif(CAUDIO_WITH_FETCH_FFMPEG)
-    include(cmake/SetupFFmpeg.cmake)
-    caudio_setup_ffmpeg()
-    if(NOT FFmpeg_FOUND)
-      message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
-    endif()
-    message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
-  else()
+find_package(FFmpeg QUIET)
+if(FFmpeg_FOUND)
+  message(STATUS "FFmpeg found (system): ${FFmpeg_AVCODEC_LIBRARY}")
+elseif(CAUDIO_WITH_FETCH_FFMPEG)
+  include(cmake/SetupFFmpeg.cmake)
+  caudio_setup_ffmpeg()
+  if(NOT FFmpeg_FOUND)
     message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
   endif()
+  message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
+else()
+  message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
 endif()
 
 if(CAUDIO_ENABLE_SANITIZERS)
@@ -117,93 +114,7 @@ if(NOT MSVC)
   target_compile_options(blake3 PRIVATE -w)
 endif()
 
-# Warnings
-set(CAUDIO_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
-
-function(ca_set_warnings tgt)
-  target_compile_options(${tgt} PRIVATE ${CAUDIO_WARNING_FLAGS})
-endfunction()
-
-# Additional warning suppressions for module-related issues on GNU
-function(ca_set_module_warnings tgt)
-  target_compile_options(${tgt} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local>)
-endfunction()
-
-# caudio::utils — C++23 named module partitioned, no hpp split
-set(CAUDIO_UTILS_SOURCES
-  src/utils/utils.cppm
-  src/utils/result.cppm
-  src/utils/error.cppm
-  src/utils/log.cppm
-  src/utils/ring.cppm
-  src/utils/mpsc_queue.cppm
-  src/utils/thread.cppm
-)
-add_library(caudio_utils STATIC)
-add_library(caudio::utils ALIAS caudio_utils)
-target_sources(caudio_utils PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_UTILS_SOURCES})
-target_include_directories(caudio_utils PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_link_libraries(caudio_utils PUBLIC Threads::Threads)
-ca_set_warnings(caudio_utils)
-
-# Shared variant: no module recompilation (see note above). Links the static
-# objects whole-archive so the DLL carries the symbols; module BMIs come
-# from the static target exactly once.
-add_library(caudio_utils_shared SHARED)
-set_target_properties(caudio_utils_shared PROPERTIES OUTPUT_NAME caudio_utils)
-add_library(caudio::utils_shared ALIAS caudio_utils_shared)
-target_sources(caudio_utils_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_utils_shared PUBLIC caudio::utils Threads::Threads)
-target_link_libraries(caudio_utils_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::utils>)
-target_link_options(caudio_utils_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-
-# caudio::player — partitioned modules + decoders (Task 3/4)
-set(CAUDIO_PLAYER_SOURCES
-  src/player/player.cppm
-  src/player/player_core.cppm
-  src/player/reader.cppm
-  src/player/output.cppm
-  src/player/decoder.cppm
-  src/player/decoders/decoder_common.cppm
-  src/player/decoders/decoder_interface.cppm
-)
-if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  list(APPEND CAUDIO_PLAYER_SOURCES src/player/decoders/ffmpeg.cppm)
-endif()
-add_library(caudio_player STATIC)
-add_library(caudio::player ALIAS caudio_player)
-target_sources(caudio_player PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_PLAYER_SOURCES})
-target_include_directories(caudio_player PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_player PRIVATE vendor)
-target_link_libraries(caudio_player PUBLIC caudio::utils)
-if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
-  target_compile_definitions(caudio_player PUBLIC CAUDIO_WITH_FFMPEG=1)
-endif()
-ca_set_warnings(caudio_player)
-target_sources(caudio_player PRIVATE src/player/miniaudio_impl.cpp)
-target_compile_options(caudio_player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-
-add_library(caudio_player_shared SHARED)
-set_target_properties(caudio_player_shared PROPERTIES OUTPUT_NAME caudio_player)
-add_library(caudio::player_shared ALIAS caudio_player_shared)
-target_sources(caudio_player_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_player_shared PUBLIC caudio::player caudio::utils_shared)
-target_link_libraries(caudio_player_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::player>)
-target_link_options(caudio_player_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
-endif()
-
-# nlohmann json for ordered_json
+# FetchContent deps needed before components (nlohmann_json_SOURCE_DIR etc.)
 include(FetchContent)
 FetchContent_Declare(
   nlohmann_json
@@ -212,7 +123,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-# CLI11 for App dispatch
 FetchContent_Declare(
   CLI11
   GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
@@ -220,209 +130,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(CLI11)
 
-# caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
-# P3-6: centralize DB module list to avoid quartet duplication (static/shared/combined)
-set(CAUDIO_DB_SOURCES
-  src/db/database.cppm
-  src/db/db_types.cppm
-  src/db/schema.cppm
-  src/db/db_core.cppm
-  src/db/queue.cppm
-  src/db/scan.cppm
-  src/db/search.cppm
-  src/db/json.cppm
-  src/db/write_thread.cppm
-  src/db/statement.cppm
-  src/db/transaction.cppm
-  src/db/detail.cppm
-  src/db/fingerprint.cppm
-  src/db/fts.cppm
-  src/db/stmt_helpers.cppm
-)
-add_library(caudio_db STATIC)
-add_library(caudio::db ALIAS caudio_db)
-target_sources(caudio_db PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_DB_SOURCES})
-target_include_directories(caudio_db PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_db PRIVATE vendor)
-target_link_libraries(caudio_db PUBLIC caudio::utils Threads::Threads)
-target_include_directories(caudio_db PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-target_sources(caudio_db PRIVATE $<TARGET_OBJECTS:caudio_sqlite> $<TARGET_OBJECTS:blake3>)
-target_compile_definitions(caudio_db PUBLIC SQLITE_ENABLE_FTS5=1)
-ca_set_warnings(caudio_db)
-ca_set_module_warnings(caudio_db)
-
-add_library(caudio_db_shared SHARED)
-set_target_properties(caudio_db_shared PROPERTIES OUTPUT_NAME caudio_db)
-add_library(caudio::db_shared ALIAS caudio_db_shared)
-target_sources(caudio_db_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_db_shared PUBLIC caudio::db caudio::utils_shared Threads::Threads)
-target_link_libraries(caudio_db_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::db>)
-target_link_options(caudio_db_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-
-# caudio::engine
-set(CAUDIO_ENGINE_SOURCES
-  src/engine/engine.cppm
-  src/engine/engine_types.cppm
-  src/engine/history.cppm
-  src/engine/shuffle.cppm
-)
-add_library(caudio_engine STATIC)
-add_library(caudio::engine ALIAS caudio_engine)
-target_sources(caudio_engine PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_ENGINE_SOURCES})
-target_include_directories(caudio_engine PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_link_libraries(caudio_engine PUBLIC caudio::db caudio::player caudio::utils Threads::Threads)
-target_include_directories(caudio_engine PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-ca_set_warnings(caudio_engine)
-ca_set_module_warnings(caudio_engine)
-
-add_library(caudio_engine_shared SHARED)
-set_target_properties(caudio_engine_shared PROPERTIES OUTPUT_NAME caudio_engine)
-add_library(caudio::engine_shared ALIAS caudio_engine_shared)
-target_sources(caudio_engine_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_engine_shared PUBLIC caudio::engine caudio::db_shared caudio::player_shared caudio::utils_shared Threads::Threads)
-target_link_libraries(caudio_engine_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
-target_link_options(caudio_engine_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-
-# Optional combined shared library: caudio_all (utils+player+db+engine)
-# Links the static objects whole-archive; module BMIs come from the static
-# targets exactly once (see note above).
-add_library(caudio_all SHARED)
-target_sources(caudio_all PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_all PUBLIC
-  caudio::utils caudio::player caudio::db caudio::engine Threads::Threads)
-target_link_libraries(caudio_all PRIVATE
-  $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::utils>
-  $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::player>
-  $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::db>
-  $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
-target_link_options(caudio_all PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_all PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
-endif()
-
-# caudio::json — nlohmann ordered_json wrapper module
-set(CAUDIO_JSON_SOURCES
-  src/json/json.cppm
-)
-add_library(caudio_json STATIC)
-add_library(caudio::json ALIAS caudio_json)
-target_sources(caudio_json PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_JSON_SOURCES})
-target_include_directories(caudio_json PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_json PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-ca_set_warnings(caudio_json)
-ca_set_module_warnings(caudio_json)
-
-add_library(caudio_json_shared SHARED)
-set_target_properties(caudio_json_shared PROPERTIES OUTPUT_NAME caudio_json)
-add_library(caudio::json_shared ALIAS caudio_json_shared)
-target_sources(caudio_json_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_json_shared PUBLIC caudio::json)
-target_link_libraries(caudio_json_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::json>)
-target_link_options(caudio_json_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-
-# caudio::cli shared protocol (command/result/protocol)
-set(CAUDIO_CLI_SHARED_SOURCES
-  cli/src/cli.cppm
-  cli/src/shared/command.cppm
-  cli/src/shared/result.cppm
-  cli/src/shared/protocol.cppm
-  cli/src/config.cppm
-)
-add_library(caudio_cli_shared STATIC)
-add_library(caudio::cli_shared ALIAS caudio_cli_shared)
-target_sources(caudio_cli_shared PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_CLI_SHARED_SOURCES})
-target_include_directories(caudio_cli_shared PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_cli_shared PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-target_link_libraries(caudio_cli_shared PUBLIC caudio::engine caudio::db caudio::utils caudio::json Threads::Threads)
-ca_set_warnings(caudio_cli_shared)
-ca_set_module_warnings(caudio_cli_shared)
-target_compile_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-# nlohmann json header-only with C++20 modules emits duplicate COMDATs on MinGW; allow deduplication
-target_link_options(caudio_cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-
-# caudio::service — IPC channel, server, shm, implementation (feat/cli-service)
-set(CAUDIO_SERVICE_SOURCES
-  cli/src/service/service.cppm
-  cli/src/service/service_detail.cppm
-  cli/src/service/service_impl.cppm
-  cli/src/service/shm_status.cppm
-  cli/src/service/ipc_channel.cppm
-  cli/src/service/ipc_channel_unix.cpp
-  cli/src/service/ipc_channel_win.cpp
-  cli/src/service/ipc_server.cppm
-)
-add_library(caudio_service STATIC)
-add_library(caudio::service ALIAS caudio_service)
-target_sources(caudio_service PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_SERVICE_SOURCES})
-target_include_directories(caudio_service PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_service PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-target_link_libraries(caudio_service PUBLIC caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads)
-if(NOT WIN32)
-  find_library(LIBRT rt)
-  if(LIBRT)
-    target_link_libraries(caudio_service PUBLIC ${LIBRT})
-  endif()
-endif()
-ca_set_warnings(caudio_service)
-ca_set_module_warnings(caudio_service)
-target_compile_options(caudio_service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-
-add_library(caudio_service_shared SHARED)
-set_target_properties(caudio_service_shared PROPERTIES OUTPUT_NAME caudio_service)
-add_library(caudio::service_shared ALIAS caudio_service_shared)
-target_sources(caudio_service_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_service_shared PUBLIC caudio::service caudio::cli_shared caudio::engine_shared caudio::db_shared caudio::utils_shared Threads::Threads)
-target_link_libraries(caudio_service_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::service>)
-target_link_options(caudio_service_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-if(NOT WIN32)
-  find_library(LIBRT rt)
-  if(LIBRT)
-    target_link_libraries(caudio_service_shared PUBLIC ${LIBRT})
-  endif()
-endif()
-
-# caudio::client — IpcClient wrapper + output formatter (feat/cli-service)
-set(CAUDIO_CLIENT_SOURCES
-  cli/src/client/client.cppm
-  cli/src/client/ipc_client.cppm
-  cli/src/client/client_impl.cppm
-  cli/src/client/output_formatter.cppm
-)
-add_library(caudio_client STATIC)
-add_library(caudio::client ALIAS caudio_client)
-target_sources(caudio_client PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${CAUDIO_CLIENT_SOURCES})
-target_include_directories(caudio_client PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(caudio_client PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-target_link_libraries(caudio_client PUBLIC caudio::cli_shared caudio::utils caudio::service Threads::Threads)
-ca_set_warnings(caudio_client)
-ca_set_module_warnings(caudio_client)
-target_compile_options(caudio_client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-
-add_library(caudio_client_shared SHARED)
-set_target_properties(caudio_client_shared PROPERTIES OUTPUT_NAME caudio_client)
-add_library(caudio::client_shared ALIAS caudio_client_shared)
-target_sources(caudio_client_shared PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_client_shared PUBLIC caudio::client caudio::cli_shared caudio::utils_shared caudio::service_shared Threads::Threads)
-target_link_libraries(caudio_client_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::client>)
-target_link_options(caudio_client_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+# DRY helpers + component split (include preserves single-BMI build)
+include(cmake/CaudioHelpers.cmake)
+include(cmake/components/utils.cmake)
+include(cmake/components/player.cmake)
+include(cmake/components/db.cmake)
+include(cmake/components/engine.cmake)
+include(cmake/components/cli.cmake)
+include(cmake/components/combined.cmake)
 
 # caudio executable — App dispatch (CLI11) + main entry
 add_executable(caudio
@@ -432,9 +147,7 @@ target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio_service caudio_client caudio_cli_shared CLI11::CLI11 Threads::Threads)
-if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
-endif()
+target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
 # Needed on MinGW for template instantiation deduplication across executable + static libs
@@ -521,7 +234,6 @@ endif()
 
 # Tests — Catch2 via FetchContent, ports of test_utils_*
 if(CAUDIO_ENABLE_TESTS)
-  include(FetchContent)
   FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git

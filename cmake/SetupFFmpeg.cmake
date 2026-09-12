@@ -99,5 +99,5 @@ function(caudio_setup_ffmpeg)
   message(WARNING "FFmpeg source build configured. Re-run cmake after it finishes: cmake --build build --target ffmpeg_external")
 
   # 5. Fail
-  message(FATAL_ERROR "FFmpeg not found and all fallback providers failed. Install FFmpeg via: winget install ffmpeg / brew install ffmpeg / apt install libavcodec-dev, or set -DFFmpeg_ROOT=/path/to/ffmpeg, or disable with -DCAUDIO_WITH_FFMPEG=OFF")
+  message(FATAL_ERROR "FFmpeg not found and all fallback providers failed. Install FFmpeg via: winget install ffmpeg / brew install ffmpeg / apt install libavcodec-dev, or set -DFFmpeg_ROOT=/path/to/ffmpeg")
 endfunction()

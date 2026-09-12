@@ -3,10 +3,8 @@
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)
 
-if(@CAUDIO_WITH_FFMPEG@)
-  # FFmpeg is optional — primary when found, fallback to dr_* otherwise
-  find_package(FFmpeg QUIET)
-endif()
+# FFmpeg is required — always find
+find_dependency(FFmpeg)
 
 include("${CMAKE_CURRENT_LIST_DIR}/caudioTargets.cmake")
 

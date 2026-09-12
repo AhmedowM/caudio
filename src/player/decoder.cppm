@@ -16,10 +16,7 @@ export module caudio.player:decoder;
 import caudio.utils;
 import :reader;
 import :decoder_interface;
-
-#ifdef CAUDIO_WITH_FFMPEG
 import :ffmpeg;
-#endif
 
 export namespace caudio::player {
 
@@ -51,7 +48,6 @@ class DecoderRegistry {
         caudio::utils::Expected<std::unique_ptr<IDecoder>> result = std::unexpected(
             caudio::utils::Error{caudio::utils::StatusCode::Unsupported, "no decoder matched"});
 
-#ifdef CAUDIO_WITH_FFMPEG
         if (FfmpegDecoder::probe(probeSpan)) {
             // FFmpeg init expects file at 0 (start of container). C's ca_decode.c
             // restores to orig before open, but that is for decoders that can start
@@ -68,7 +64,6 @@ class DecoderRegistry {
             if (!sr.has_value())
                 (void)reader.seek(0, SEEK_SET);
         }
-#endif
 
         return result;
     }
