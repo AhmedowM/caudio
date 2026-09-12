@@ -92,12 +92,12 @@ function(caudio_setup_ffmpeg)
     INSTALL_COMMAND make install
     BUILD_IN_SOURCE FALSE
   )
-  # After build, set FFmpeg_ROOT to install dir and retry
+  # After build, set FFmpeg_ROOT to install dir and retry on re-configure
   ExternalProject_Get_Property(ffmpeg_external install_dir)
   set(FFmpeg_ROOT "${install_dir}" CACHE PATH "FFmpeg root from source build" FORCE)
   # Note: need to re-run find_package after build completes (user must re-configure)
-  message(WARNING "FFmpeg source build configured. Re-run cmake after it finishes: cmake --build build --target ffmpeg_external")
+  message(WARNING "FFmpeg source build configured as target 'ffmpeg_external'. Build it first: cmake --build build --target ffmpeg_external. Then re-run cmake.")
 
-  # 5. Fail
-  message(FATAL_ERROR "FFmpeg not found and all fallback providers failed. Install FFmpeg via: winget install ffmpeg / brew install ffmpeg / apt install libavcodec-dev, or set -DFFmpeg_ROOT=/path/to/ffmpeg")
+  # 5. Fail — only if not using ExternalProject (user must build then re-configure)
+  message(FATAL_ERROR "FFmpeg not found. ExternalProject 'ffmpeg_external' configured. Build it with: cmake --build build --target ffmpeg_external, then re-run cmake. Or install FFmpeg via: winget install ffmpeg / brew install ffmpeg / apt install libavcodec-dev, or set -DFFmpeg_ROOT=/path/to/ffmpeg")
 endfunction()

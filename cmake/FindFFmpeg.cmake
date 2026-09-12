@@ -33,34 +33,64 @@ find_path(FFmpeg_AVCODEC_INCLUDE_DIR
   PATH_SUFFIXES include
   NO_DEFAULT_PATH
 )
-find_path(FFmpeg_AVCODEC_INCLUDE_DIR
-  NAMES libavcodec/avcodec.h
-  PATH_SUFFIXES include
-)
+if(NOT FFmpeg_AVCODEC_INCLUDE_DIR)
+  find_path(FFmpeg_AVCODEC_INCLUDE_DIR
+    NAMES libavcodec/avcodec.h
+    PATH_SUFFIXES include
+  )
+endif()
 
 find_library(FFmpeg_AVCODEC_LIBRARY
   NAMES avcodec libavcodec
   PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
   PATH_SUFFIXES lib bin
+  NO_DEFAULT_PATH
 )
+if(NOT FFmpeg_AVCODEC_LIBRARY)
+  find_library(FFmpeg_AVCODEC_LIBRARY
+    NAMES avcodec libavcodec
+    PATH_SUFFIXES lib bin
+  )
+endif()
 
 find_library(FFmpeg_AVFORMAT_LIBRARY
   NAMES avformat libavformat
   PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
   PATH_SUFFIXES lib bin
+  NO_DEFAULT_PATH
 )
+if(NOT FFmpeg_AVFORMAT_LIBRARY)
+  find_library(FFmpeg_AVFORMAT_LIBRARY
+    NAMES avformat libavformat
+    PATH_SUFFIXES lib bin
+  )
+endif()
 
 find_library(FFmpeg_AVUTIL_LIBRARY
   NAMES avutil libavutil
   PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
   PATH_SUFFIXES lib bin
+  NO_DEFAULT_PATH
 )
+if(NOT FFmpeg_AVUTIL_LIBRARY)
+  find_library(FFmpeg_AVUTIL_LIBRARY
+    NAMES avutil libavutil
+    PATH_SUFFIXES lib bin
+  )
+endif()
 
 find_library(FFmpeg_SWRESAMPLE_LIBRARY
   NAMES swresample libswresample
   PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
   PATH_SUFFIXES lib bin
+  NO_DEFAULT_PATH
 )
+if(NOT FFmpeg_SWRESAMPLE_LIBRARY)
+  find_library(FFmpeg_SWRESAMPLE_LIBRARY
+    NAMES swresample libswresample
+    PATH_SUFFIXES lib bin
+  )
+endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(FFmpeg

@@ -73,15 +73,24 @@ else()
   message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
 endif()
 
+function(caudio_apply_sanitizers tgt)
+  if(WIN32)
+    return()
+  elseif(MSVC)
+    target_compile_options(${tgt} PRIVATE /fsanitize=address)
+    target_link_options(${tgt} PRIVATE /fsanitize=address)
+  else()
+    target_compile_options(${tgt} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+    target_link_options(${tgt} PRIVATE -fsanitize=address,undefined)
+  endif()
+endfunction()
+
 if(CAUDIO_ENABLE_SANITIZERS)
   if(WIN32)
     message(WARNING "CAUDIO_ENABLE_SANITIZERS not supported on Windows/MinGW — sanitizers require Clang/GCC on Linux. Option ignored.")
   elseif(MSVC)
     message(WARNING "CAUDIO_ENABLE_SANITIZERS: MSVC sanitizers limited; using /fsanitize=address")
-    add_compile_options(/fsanitize=address)
   else()
-    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
-    add_link_options(-fsanitize=address,undefined)
     message(STATUS "Sanitizers enabled: ASan+UBSan")
   endif()
 endif()
@@ -93,21 +102,16 @@ configure_file(
   @ONLY
 )
 
-# Vendor: single caudio_sqlite OBJECT/STATIC (SQLITE_ENABLE_FTS5=1)
-add_library(caudio_sqlite OBJECT vendor/sqlite3.c)
+# Vendor: caudio_sqlite STATIC (SQLITE_ENABLE_FTS5=1)
+add_library(caudio_sqlite STATIC vendor/sqlite3.c)
+set_target_properties(caudio_sqlite PROPERTIES OUTPUT_NAME caudio_sqlite)
 target_include_directories(caudio_sqlite PRIVATE vendor)
-target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
-target_compile_definitions(caudio_sqlite PRIVATE SQLITE_ENABLE_FTS5=1)
-
-add_library(caudio_sqlite_static STATIC vendor/sqlite3.c)
-set_target_properties(caudio_sqlite_static PROPERTIES OUTPUT_NAME caudio_sqlite)
-target_include_directories(caudio_sqlite_static PRIVATE vendor)
-target_include_directories(caudio_sqlite_static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-target_compile_definitions(caudio_sqlite_static PUBLIC SQLITE_ENABLE_FTS5=1)
+target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_compile_definitions(caudio_sqlite PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
-add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_portable.c)
-target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
+add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
+target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
 # suppress GCC warnings in vendored C
 if(NOT MSVC)
@@ -146,7 +150,7 @@ add_executable(caudio
 target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/core.cppm)
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
-target_link_libraries(caudio PRIVATE caudio_service caudio_client caudio_cli_shared CLI11::CLI11 Threads::Threads)
+target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::cli_shared CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
@@ -157,25 +161,29 @@ if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   find_library(STDCXX_EXP_LIB stdc++exp)
   if(STDCXX_EXP_LIB)
     target_link_libraries(caudio PRIVATE stdc++exp)
-    target_link_libraries(caudio_client PRIVATE stdc++exp)
-    target_link_libraries(caudio_cli_shared PRIVATE stdc++exp)
+    target_link_libraries(client PRIVATE stdc++exp)
+    target_link_libraries(cli_shared PRIVATE stdc++exp)
   endif()
+endif()
+if(CAUDIO_ENABLE_SANITIZERS)
+  caudio_apply_sanitizers(caudio)
 endif()
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
 install(
   TARGETS
-    caudio_utils caudio_utils_shared
-    caudio_player caudio_player_shared
-    caudio_db caudio_db_shared
-    caudio_engine caudio_engine_shared
-    caudio_json caudio_json_shared
-    caudio_cli_shared
-    caudio_client caudio_client_shared
-    caudio_service caudio_service_shared
-    caudio_all
-    caudio_sqlite_static
+    utils utils_shared
+    player player_shared
+    db db_shared
+    engine engine_shared
+    json json_shared
+    cli_shared
+    client client_shared
+    service service_shared
+    combined
+    caudio_sqlite
+    blake3
   EXPORT caudioTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -248,6 +256,9 @@ if(CAUDIO_ENABLE_TESTS)
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE caudio::utils Catch2::Catch2WithMain)
     target_compile_features(${name} PRIVATE cxx_std_23)
+    if(CAUDIO_ENABLE_SANITIZERS)
+      caudio_apply_sanitizers(${name})
+    endif()
     catch_discover_tests(${name})
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
@@ -266,6 +277,9 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
     if(${name} STREQUAL "test_decoder")
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     endif()
+    if(CAUDIO_ENABLE_SANITIZERS)
+      caudio_apply_sanitizers(${name})
+    endif()
     catch_discover_tests(${name})
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
@@ -276,16 +290,22 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
 
   # DB tests
   add_executable(test_db tests/test_db.cpp)
-  target_link_libraries(test_db PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_db PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_compile_features(test_db PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_db)
+  endif()
   catch_discover_tests(test_db)
   add_test(NAME test_db COMMAND test_db)
 
   # Write thread tests
   add_executable(test_write_thread tests/test_write_thread.cpp)
-  target_link_libraries(test_write_thread PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_write_thread PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_write_thread PRIVATE vendor)
   target_compile_features(test_write_thread PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_write_thread)
+  endif()
   catch_discover_tests(test_write_thread)
   add_test(NAME test_write_thread COMMAND test_write_thread)
 
@@ -293,15 +313,21 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   add_executable(test_output tests/test_output.cpp)
   target_link_libraries(test_output PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
   target_compile_features(test_output PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_output)
+  endif()
   catch_discover_tests(test_output)
   add_test(NAME test_output COMMAND test_output)
 
   # Task 11: Engine parity
   function(caudio_add_engine_test name src)
     add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+    target_link_libraries(${name} PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
     target_include_directories(${name} PRIVATE vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
+    if(CAUDIO_ENABLE_SANITIZERS)
+      caudio_apply_sanitizers(${name})
+    endif()
     catch_discover_tests(${name})
   endfunction()
   caudio_add_engine_test(test_engine_queue tests/test_engine_queue.cpp)
@@ -312,35 +338,50 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
 
   # DB scan/search/json
   add_executable(test_db_scan tests/test_db_scan.cpp)
-  target_link_libraries(test_db_scan PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_db_scan PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_db_scan PRIVATE vendor)
   target_compile_features(test_db_scan PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_db_scan)
+  endif()
   catch_discover_tests(test_db_scan)
 
   add_executable(test_db_search tests/test_db_search.cpp)
-  target_link_libraries(test_db_search PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_db_search PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_db_search PRIVATE vendor)
   target_compile_features(test_db_search PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_db_search)
+  endif()
   catch_discover_tests(test_db_search)
 
   add_executable(test_db_json tests/test_db_json.cpp)
-  target_link_libraries(test_db_json PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_db_json PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_db_json PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
   target_compile_features(test_db_json PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_db_json)
+  endif()
   catch_discover_tests(test_db_json)
 
   # Player integration
   add_executable(test_player_integration tests/test_player_integration.cpp)
-  target_link_libraries(test_player_integration PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_player_integration PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_player_integration PRIVATE vendor)
   target_compile_features(test_player_integration PRIVATE cxx_std_23)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_player_integration)
+  endif()
   catch_discover_tests(test_player_integration)
 
   # IPC/Cli integration tests
   add_executable(test_ipc tests/test_ipc.cpp)
-  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::cli_shared caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
+  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::cli_shared caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_ipc PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
   target_compile_features(test_ipc PRIVATE cxx_std_23)
   target_link_options(test_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(test_ipc)
+  endif()
   catch_discover_tests(test_ipc)
 endif()
