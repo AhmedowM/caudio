@@ -42,7 +42,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
-    std::jthread svcThread([&](std::stop_token st) { svc->run(st); });
+    std::jthread svcThread([&](std::stop_token st) { (void)svc->run(st); });
     // wait for socket ready
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
@@ -100,7 +100,7 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
-    std::jthread svcThread([&](std::stop_token st) { svc->run(st); });
+    std::jthread svcThread([&](std::stop_token st) { (void)svc->run(st); });
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // Connect and send volume command
@@ -156,7 +156,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
-    std::jthread svcThread([&](std::stop_token st) { svc->run(st); });
+    std::jthread svcThread([&](std::stop_token st) { (void)svc->run(st); });
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // Connect and send status command

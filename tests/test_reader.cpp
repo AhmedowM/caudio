@@ -5,6 +5,7 @@
 #include <fstream>
 #include <span>
 #include <vector>
+#include <atomic>
 
 import caudio.player;
 import caudio.utils;
@@ -14,7 +15,9 @@ using namespace caudio::utils;
 
 // Helper to create a temp file with RIFF header
 static std::filesystem::path makeTempFile(const std::string& name, std::vector<std::byte> data) {
-    auto dir = std::filesystem::temp_directory_path() / "caudio_reader_tests";
+    // Use test-specific subdir to avoid parallel test race on shared directory
+    static std::atomic<int> testId{0};
+    auto dir = std::filesystem::temp_directory_path() / "caudio_reader_tests" / std::to_string(testId.fetch_add(1));
     std::filesystem::create_directories(dir);
     auto p = dir / name;
     std::ofstream out(p, std::ios::binary);

@@ -29,7 +29,6 @@ inline std::expected<double, std::string> parseTime(std::string_view s) {
         size_t count = 0;
         for (char c : s) if (c == ':') ++count;
         // parse each part using from_chars
-        size_t pos = 0;
         double parts[3] = {0, 0, 0};
         int idx = 0;
         while (!remaining.empty() && idx < 3) {
