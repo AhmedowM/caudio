@@ -153,16 +153,16 @@ int main(int argc, char** argv) {
     cfg.historyThresholdPct = 60;
     cfg.historyThresholdSecs = 90;
     EngineCallbacks cbs;
-    cbs.onTrackStarted = [](int64_t tid) {
+    cbs.on_track_started = [](int64_t tid) {
         std::cout << "[engine_demo] callback onTrackStarted track " << tid << "\n";
     };
-    cbs.onQueueChanged = [](int64_t qid) {
+    cbs.on_queue_changed = [](int64_t qid) {
         std::cout << "[engine_demo] callback onQueueChanged queue " << qid << "\n";
     };
-    cbs.onTrackEnded = [](int64_t tid, double pct) {
+    cbs.on_track_ended = [](int64_t tid, double pct) {
         std::cout << "[engine_demo] callback onTrackEnded track " << tid << " pct=" << pct << "\n";
     };
-    cbs.onError = [](caudio::utils::StatusCode r, std::string_view msg) {
+    cbs.on_error = [](caudio::utils::StatusCode r, std::string_view msg) {
         std::cout << "[engine_demo] callback onError " << static_cast<int>(r) << " " << msg << "\n";
     };
     cfg.callbacks = cbs;
@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
             if (!ev)
                 break;
             std::cout << "[engine_demo] event type=" << static_cast<int>(ev->type) << " track "
-                      << ev->trackId << " queue " << ev->queueId << " pos=" << ev->position
+                      << ev->track_id << " queue " << ev->queue_id << " pos=" << ev->position
                       << " dur=" << ev->duration << " msg='" << ev->msg << "'\n";
         }
         if (i == 10) {
@@ -208,7 +208,7 @@ int main(int argc, char** argv) {
                 std::cout << "[engine_demo] drain got " << n << " events at tick " << i << "\n";
                 for (size_t k = 0; k < n; ++k) {
                     std::cout << "  drain[" << k << "] type=" << static_cast<int>(buf[k].type)
-                              << " track " << buf[k].trackId << "\n";
+                              << " track " << buf[k].track_id << "\n";
                 }
             }
         }
@@ -219,7 +219,7 @@ int main(int argc, char** argv) {
     std::cout << "[engine_demo] final drain " << n << " events\n";
     for (size_t k = 0; k < n; ++k) {
         std::cout << "  final[" << k << "] type=" << static_cast<int>(buf[k].type) << " track "
-                  << buf[k].trackId << " queue " << buf[k].queueId << "\n";
+                  << buf[k].track_id << " queue " << buf[k].queue_id << "\n";
     }
     std::cout << "[engine_demo] current track " << engine->currentTrackId() << " state "
               << static_cast<int>(engine->state()) << " pos " << engine->position() << "\n";

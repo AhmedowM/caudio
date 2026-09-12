@@ -230,9 +230,9 @@ int main(int argc, char** argv) {
 
     int played = 0, errors = 0;
     for (auto& qi : *itemsRes) {
-        auto tr = db->getTrack(qi.trackId);
+        auto tr = db->getTrack(qi.track_id);
         if (!tr) {
-            std::cerr << "[demo] getTrack(" << qi.trackId << ") failed: " << tr.error().message
+            std::cerr << "[demo] getTrack(" << qi.track_id << ") failed: " << tr.error().message
                       << "\n";
             ++errors;
             continue;

@@ -16,7 +16,6 @@ using namespace caudio::test_helpers;
 
 TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
     auto root = tempDirPath("scan_test");
-    std::filesystem::create_directories(root);
     std::filesystem::create_directories(root / "sub");
     // create dummy audio files
     for (auto name : {root / "a.mp3", root / "sub" / "b.wav", root / "c.ogg"}) {
@@ -36,7 +35,6 @@ TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
 
 TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") {
     auto dir = tempDirPath("fp_test");
-    std::filesystem::create_directories(dir);
     auto p = dir / "file.wav";
     // create 100K file with known pattern
     std::vector<uint8_t> data(100 * 1024, 0xAB);
@@ -109,7 +107,6 @@ TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") 
 
 TEST_CASE("scanLibrary inserts and dedup by fingerprint", "[db_scan]") {
     auto dir = tempDirPath("scanlib");
-    std::filesystem::create_directories(dir);
     // create two audio files with distinct content
     {
         std::ofstream f1(dir / "x.mp3", std::ios::binary);
@@ -156,7 +153,6 @@ TEST_CASE("scan non-existent dir returns empty", "[db_scan]") {
 
 TEST_CASE("scan empty dir returns empty", "[db_scan]") {
     auto dir = tempDirPath("empty_scan");
-    std::filesystem::create_directories(dir);
     auto tracks = scanDirectory(dir, ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->empty());
@@ -200,7 +196,6 @@ TEST_CASE("scanDirectory filters by audio extensions case-insensitively", "[db_s
 
 TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
     auto dir = tempDirPath("scan_mode");
-    std::filesystem::create_directories(dir);
     auto p = dir / "large.wav";
     // 200 KiB file ( >128 KiB = 2*64K )
     std::vector<uint8_t> data(200 * 1024);
@@ -247,7 +242,6 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
 
 TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     auto dir = tempDirPath("scan_preserve");
-    std::filesystem::create_directories(dir);
     auto p = dir / "song.mp3";
     std::vector<uint8_t> d1(10*1024, 0x11);
     for (size_t i=0;i<d1.size();++i) d1[i]=(uint8_t)(i & 0xFF);

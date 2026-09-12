@@ -9,16 +9,6 @@
 
 namespace caudio::test_helpers {
 
-struct MockClock {
-    using clock = std::chrono::steady_clock;
-    using time_point = clock::time_point;
-    using duration = clock::duration;
-    time_point t{clock::now()};
-    time_point now() const noexcept { return t; }
-    void advance(std::chrono::milliseconds ms) { t += ms; }
-    void advance(std::chrono::seconds s) { t += s; }
-};
-
 inline std::filesystem::path tempDbPath(const std::string &prefix) {
     static std::atomic<int> ctr{0};
     auto dir = std::filesystem::temp_directory_path();
