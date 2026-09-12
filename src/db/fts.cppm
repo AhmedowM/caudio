@@ -7,9 +7,9 @@ module;
 #include <string_view>
 #include <vector>
 
-export module caudio.db:fts;
+module caudio.db:fts;
 
-export namespace caudio::db::internal {
+namespace caudio::db::internal {
 
 inline std::string escapeLike(std::string_view term) {
     std::string result;

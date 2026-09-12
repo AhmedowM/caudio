@@ -11,10 +11,10 @@ export import :scan;
 export import :search;
 export import :json;
 export import :write_thread;
-export import :detail;
-export import :fingerprint;
-export import :fts;
-export import :stmt_helpers;
+import :detail;
+import :fingerprint;
+import :fts;
+import :stmt_helpers;
 
 import caudio.utils;
 

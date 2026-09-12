@@ -1,12 +1,11 @@
 module;
 #include <sqlite3.h>
 
+#include <cstdint>
 #include <expected>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 export module caudio.db:queue;
@@ -18,19 +17,8 @@ import :SqliteStatement;
 
 namespace caudio::db {
 
-// Queue methods extracted from Database class - take explicit params to avoid module cycles
-// cacheMutex / stmtCache params are reserved, explicitly not cached — fresh SqliteStatement per call
-// to avoid stale queue stmts (see fix bypass queue SqliteStatement cache). Kept in signature for
-// API stability; callers pass Database::cacheMutex_/stmtCache_ but queue ops intentionally
-// bypass the cache. Lock order remains dbMutex_ (Database::m_) -> stmtCacheMutex_.
-using StmtCache = std::unordered_map<std::string, std::unique_ptr<SqliteStatement>>;
-
 export std::expected<void, caudio::utils::Error>
-queueEnqueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                   [[maybe_unused]] StmtCache& stmtCache, int64_t qid, int64_t tid,
-                   int64_t pos = -1) {
-    // cacheMutex/stmtCache reserved, explicitly not cached — fresh SqliteStatement per call
-    // to avoid stale queue stmts (see fix bypass queue SqliteStatement cache)
+queueEnqueueLocked(sqlite3* db, int64_t qid, int64_t tid, int64_t pos = -1) {
     if (tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (qid == 0)
@@ -73,9 +61,7 @@ queueEnqueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<QueueItem, caudio::utils::Error>
-queueDequeueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                   [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+queueDequeueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -115,9 +101,7 @@ queueDequeueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<QueueItem, caudio::utils::Error>
-queuePeekLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+queuePeekLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -142,9 +126,7 @@ queuePeekLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<void, caudio::utils::Error> queueRemoveLocked(
-    sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex, [[maybe_unused]] StmtCache& stmtCache,
-    int64_t qid, int64_t pos) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+    sqlite3* db, int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -173,9 +155,7 @@ export std::expected<void, caudio::utils::Error> queueRemoveLocked(
 }
 
 export std::expected<void, caudio::utils::Error>
-queueClearLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                 [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+queueClearLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -193,9 +173,7 @@ queueClearLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<std::vector<QueueItem>, caudio::utils::Error>
-queueListLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+queueListLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -218,9 +196,7 @@ queueListLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
     return out;
 }
 
-export size_t queueCountLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                               [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+export size_t queueCountLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -237,9 +213,7 @@ export size_t queueCountLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMu
 }
 
 export std::expected<Queue, caudio::utils::Error>
-getQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-               [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+getQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -261,9 +235,7 @@ getQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<std::vector<Queue>, caudio::utils::Error>
-listQueuesLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                 [[maybe_unused]] StmtCache& stmtCache) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+listQueuesLocked(sqlite3* db) {
     if (!db)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
@@ -283,10 +255,7 @@ listQueuesLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<int64_t, caudio::utils::Error>
-createQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                  [[maybe_unused]] StmtCache& stmtCache, std::string_view name,
-                  int64_t library_id = 1) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+createQueueLocked(sqlite3* db, std::string_view name, int64_t library_id = 1) {
     if (name.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db)
@@ -306,9 +275,7 @@ createQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<void, caudio::utils::Error>
-deleteQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                  [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+deleteQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -337,9 +304,7 @@ deleteQueueLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<void, caudio::utils::Error>
-setQueueRepeatLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                     [[maybe_unused]] StmtCache& stmtCache, int64_t qid, int repeat_mode) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
+setQueueRepeatLocked(sqlite3* db, int64_t qid, int repeat_mode) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -360,10 +325,8 @@ setQueueRepeatLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
 }
 
 export std::expected<std::vector<QueueItem>, caudio::utils::Error>
-getQueueItemsLocked(sqlite3* db, [[maybe_unused]] std::mutex& cacheMutex,
-                    [[maybe_unused]] StmtCache& stmtCache, int64_t qid) {
-    // reserved, explicitly not cached — fresh SqliteStatement per call to avoid stale queue stmts
-    return queueListLocked(db, cacheMutex, stmtCache, qid);
+getQueueItemsLocked(sqlite3* db, int64_t qid) {
+    return queueListLocked(db, qid);
 }
 
 } // namespace caudio::db

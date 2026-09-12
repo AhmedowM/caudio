@@ -226,7 +226,7 @@ class Database final {
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
         for (int64_t tid : tids) {
-            auto r = caudio::db::queueEnqueueLocked(db_.get(), cacheMutex_, stmtCache_, qid, tid, -1);
+            auto r = caudio::db::queueEnqueueLocked(db_.get(), qid, tid, -1);
             if (!r) {
                 sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
                 return std::unexpected{r.error()};
@@ -261,13 +261,13 @@ class Database final {
         if (rc != SQLITE_OK)
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
-        auto clr = caudio::db::queueClearLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        auto clr = caudio::db::queueClearLocked(db_.get(), qid);
         if (!clr) {
             sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
             return std::unexpected{clr.error()};
         }
         for (int64_t id : ids) {
-            auto r = caudio::db::queueEnqueueLocked(db_.get(), cacheMutex_, stmtCache_, qid, id, -1);
+            auto r = caudio::db::queueEnqueueLocked(db_.get(), qid, id, -1);
             if (!r) {
                 sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
                 return std::unexpected{r.error()};
@@ -1011,7 +1011,7 @@ std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t 
 
     std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
                                                                  int64_t pos = -1) {
-        return caudio::db::queueEnqueueLocked(db_.get(), cacheMutex_, stmtCache_, qid, tid, pos);
+        return caudio::db::queueEnqueueLocked(db_.get(), qid, tid, pos);
     }
 
     std::expected<QueueItem, caudio::utils::Error> queueDequeue(int64_t qid) {
@@ -1020,58 +1020,58 @@ std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t 
     }
 
     std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid) {
-        return caudio::db::queueDequeueLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queueDequeueLocked(db_.get(), qid);
     }
 
     std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(int64_t qid) {
-        return caudio::db::queuePeekLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queuePeekLocked(db_.get(), qid);
     }
 
     std::expected<QueueItem, caudio::utils::Error> queuePeek(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lk{dbMutex_};
-        return caudio::db::queuePeekLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queuePeekLocked(db_.get(), qid);
     }
 
     std::expected<void, caudio::utils::Error> queueRemove(int64_t qid, int64_t pos) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
-        return caudio::db::queueRemoveLocked(db_.get(), cacheMutex_, stmtCache_, qid, pos);
+        return caudio::db::queueRemoveLocked(db_.get(), qid, pos);
     }
 
     std::expected<void, caudio::utils::Error> queueClear(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
-        return caudio::db::queueClearLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queueClearLocked(db_.get(), qid);
     }
 
     std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lk{dbMutex_};
-        return caudio::db::queueListLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queueListLocked(db_.get(), qid);
     }
 
     std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItems(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lk{dbMutex_};
-        return caudio::db::getQueueItemsLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::getQueueItemsLocked(db_.get(), qid);
     }
 
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lk{dbMutex_};
-        return caudio::db::getQueueLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::getQueueLocked(db_.get(), qid);
     }
 
     std::expected<std::vector<Queue>, caudio::utils::Error> listQueues() {
         std::shared_lock lk{dbMutex_};
-        return caudio::db::listQueuesLocked(db_.get(), cacheMutex_, stmtCache_);
+        return caudio::db::listQueuesLocked(db_.get());
     }
 
 std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
@@ -1079,28 +1079,28 @@ std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
         if (name.empty())
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
         std::unique_lock lk{dbMutex_};
-        return caudio::db::createQueueLocked(db_.get(), cacheMutex_, stmtCache_, name, library_id);
+        return caudio::db::createQueueLocked(db_.get(), name, library_id);
     }
 
     std::expected<void, caudio::utils::Error> deleteQueue(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
-        return caudio::db::deleteQueueLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::deleteQueueLocked(db_.get(), qid);
     }
 
     std::expected<void, caudio::utils::Error> setQueueRepeat(int64_t qid, int repeat_mode) {
         if (qid == 0)
             qid = 1;
         std::unique_lock lk{dbMutex_};
-        return caudio::db::setQueueRepeatLocked(db_.get(), cacheMutex_, stmtCache_, qid, repeat_mode);
+        return caudio::db::setQueueRepeatLocked(db_.get(), qid, repeat_mode);
     }
 
     size_t queueCountLocked(int64_t qid) {
         if (qid == 0)
             qid = 1;
         std::shared_lock lk{dbMutex_};
-        return caudio::db::queueCountLocked(db_.get(), cacheMutex_, stmtCache_, qid);
+        return caudio::db::queueCountLocked(db_.get(), qid);
     }
 
     // History

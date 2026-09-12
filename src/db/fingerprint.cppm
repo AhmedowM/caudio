@@ -12,7 +12,7 @@ module;
 #include <string>
 #include <vector>
 
-export module caudio.db:fingerprint;
+module caudio.db:fingerprint;
 
 import caudio.utils;
 import :types;

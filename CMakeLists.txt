@@ -147,7 +147,6 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/result.cppm
   src/utils/error.cppm
   src/utils/log.cppm
-  src/utils/arena.cppm
   src/utils/ring.cppm
   src/utils/mpsc_queue.cppm
   src/utils/thread.cppm
@@ -300,22 +299,21 @@ target_link_libraries(caudio_engine_shared PUBLIC caudio::engine caudio::db_shar
 target_link_libraries(caudio_engine_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
 target_link_options(caudio_engine_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 
-# Optional combined shared library: caudio (utils+player+db+engine)
+# Optional combined shared library: caudio_all (utils+player+db+engine)
 # Links the static objects whole-archive; module BMIs come from the static
 # targets exactly once (see note above).
-add_library(caudio_combined SHARED)
-set_target_properties(caudio_combined PROPERTIES OUTPUT_NAME caudio)
-target_sources(caudio_combined PRIVATE src/_stub/shared_stub.cpp)
-target_link_libraries(caudio_combined PUBLIC
+add_library(caudio_all SHARED)
+target_sources(caudio_all PRIVATE src/_stub/shared_stub.cpp)
+target_link_libraries(caudio_all PUBLIC
   caudio::utils caudio::player caudio::db caudio::engine Threads::Threads)
-target_link_libraries(caudio_combined PRIVATE
+target_link_libraries(caudio_all PRIVATE
   $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::utils>
   $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::player>
   $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::db>
   $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
-target_link_options(caudio_combined PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+target_link_options(caudio_all PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 if(CAUDIO_WITH_FFMPEG AND FFmpeg_FOUND)
-  target_link_libraries(caudio_combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+  target_link_libraries(caudio_all PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 endif()
 
 # caudio::json — nlohmann ordered_json wrapper module
@@ -474,7 +472,7 @@ install(
     caudio_cli_shared
     caudio_client caudio_client_shared
     caudio_service caudio_service_shared
-    caudio_combined
+    caudio_all
     caudio_sqlite_static
   EXPORT caudioTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -553,11 +551,10 @@ if(CAUDIO_BUILD_TESTS)
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
 
-  caudio_add_test(test_utils_result tests/test_utils_result.cpp tests/helpers/test_utils_result_impl.cpp)
+caudio_add_test(test_utils_result tests/test_utils_result.cpp tests/helpers/test_utils_result_impl.cpp)
   caudio_add_test(test_utils_ring tests/test_utils_ring.cpp tests/helpers/test_utils_ring_impl.cpp)
   caudio_add_test(test_utils_queue tests/test_utils_queue.cpp tests/helpers/test_utils_queue_impl.cpp)
   caudio_add_test(test_utils_thread tests/test_utils_thread.cpp tests/helpers/test_utils_thread_impl.cpp)
-  caudio_add_test(test_utils_arena tests/test_utils_arena.cpp tests/helpers/test_utils_arena_impl.cpp)
   caudio_add_test(test_utils_log tests/test_utils_log.cpp tests/helpers/test_utils_log_impl.cpp)
 
   # Task 3: Reader + DecoderRegistry

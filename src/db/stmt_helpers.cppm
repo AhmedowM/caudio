@@ -9,12 +9,12 @@ module;
 #include <string_view>
 #include <vector>
 
-export module caudio.db:stmt_helpers;
+module caudio.db:stmt_helpers;
 
 import caudio.utils;
 import :types;
 
-export namespace caudio::db::internal {
+namespace caudio::db::internal {
 
 inline constexpr std::string_view kSelectTracksCols =
     "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
