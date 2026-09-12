@@ -244,19 +244,19 @@ if(CAUDIO_ENABLE_TESTS)
   include(Catch)
   enable_testing()
 
-  function(caudio_add_test name src impl)
-    add_executable(${name} ${src} ${impl})
+  function(caudio_add_test name src)
+    add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE caudio::utils Catch2::Catch2WithMain)
     target_compile_features(${name} PRIVATE cxx_std_23)
     catch_discover_tests(${name})
     add_test(NAME ${name} COMMAND ${name})
   endfunction()
 
-caudio_add_test(test_utils_result tests/test_utils_result.cpp tests/helpers/test_utils_result_impl.cpp)
-  caudio_add_test(test_utils_ring tests/test_utils_ring.cpp tests/helpers/test_utils_ring_impl.cpp)
-  caudio_add_test(test_utils_queue tests/test_utils_queue.cpp tests/helpers/test_utils_queue_impl.cpp)
-  caudio_add_test(test_utils_thread tests/test_utils_thread.cpp tests/helpers/test_utils_thread_impl.cpp)
-  caudio_add_test(test_utils_log tests/test_utils_log.cpp tests/helpers/test_utils_log_impl.cpp)
+caudio_add_test(test_utils_result tests/test_utils_result.cpp)
+caudio_add_test(test_utils_ring tests/test_utils_ring.cpp)
+caudio_add_test(test_utils_queue tests/test_utils_queue.cpp)
+caudio_add_test(test_utils_thread tests/test_utils_thread.cpp)
+caudio_add_test(test_utils_log tests/test_utils_log.cpp)
 
   # Task 3: Reader + DecoderRegistry
   function(caudio_add_player_test name src)
@@ -275,7 +275,7 @@ caudio_add_test(test_utils_result tests/test_utils_result.cpp tests/helpers/test
   target_compile_definitions(test_ffmpeg PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 
   # DB tests
-  add_executable(test_db tests/test_db.cpp tests/helpers/test_db_impl.cpp)
+  add_executable(test_db tests/test_db.cpp)
   target_link_libraries(test_db PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite_static)
   target_compile_features(test_db PRIVATE cxx_std_23)
   catch_discover_tests(test_db)
