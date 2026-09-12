@@ -56,15 +56,16 @@ class DbTransaction final {
     }
     [[nodiscard]] std::expected<void, caudio::utils::Error> commit() {
         if (!db_) {
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no active DbTransaction"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                            "no active DbTransaction"));
         }
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_, "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "commit failed";
-            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
         }
         committed_ = true;
         db_ = nullptr;
@@ -72,15 +73,16 @@ class DbTransaction final {
     }
     [[nodiscard]] std::expected<void, caudio::utils::Error> rollback() {
         if (!db_) {
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no active DbTransaction"));
+            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                            "no active DbTransaction"));
         }
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
         int rc = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
             std::string msg = err ? err : "rollback failed";
-            return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
         }
         committed_ = true;
         db_ = nullptr;
@@ -95,9 +97,3 @@ class DbTransaction final {
 };
 
 } // namespace caudio::db
-
-
-
-
-
-

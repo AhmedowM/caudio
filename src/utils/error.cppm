@@ -18,7 +18,8 @@ struct Error {
     Error() noexcept = default;
     explicit Error(StatusCode c, std::string_view msg) : code(c), message(msg) {}
     [[deprecated("use string_view overload")]]
-    Error(StatusCode c, const char* msg) : code(c), message(msg ? msg : "") {}
+    Error(StatusCode c, const char* msg)
+        : code(c), message(msg ? msg : "") {}
 
     bool operator==(const Error&) const = default;
 };
@@ -43,7 +44,3 @@ struct std::formatter<caudio::utils::Error> : std::formatter<std::string> {
         return std::formatter<std::string>::format(s, ctx);
     }
 };
-
-
-
-

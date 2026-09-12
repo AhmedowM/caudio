@@ -188,12 +188,14 @@ class FfmpegDecoder final : public IDecoder {
   private:
     struct PacketDeleter {
         void operator()(AVPacket* p) const noexcept {
-            if (p) av_packet_free(&p);
+            if (p)
+                av_packet_free(&p);
         }
     };
     struct FrameDeleter {
         void operator()(AVFrame* p) const noexcept {
-            if (p) av_frame_free(&p);
+            if (p)
+                av_frame_free(&p);
         }
     };
     using PacketPtr = std::unique_ptr<AVPacket, PacketDeleter>;
@@ -201,23 +203,23 @@ class FfmpegDecoder final : public IDecoder {
     struct LayoutGuard {
         AVChannelLayout l{};
         LayoutGuard() = default;
-        ~LayoutGuard() { av_channel_layout_uninit(&l); }
+        ~LayoutGuard() {
+            av_channel_layout_uninit(&l);
+        }
         LayoutGuard(const LayoutGuard&) = delete;
         LayoutGuard& operator=(const LayoutGuard&) = delete;
     };
 
     int convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
                      std::size_t frames) noexcept {
-        uint8_t* outPtrs[1] = {
-            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
+        uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
         int outSamples = static_cast<int>(frames - totalDecoded);
         return swr_convert(swr_, outPtrs, outSamples,
                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
     }
     int flushResampler(std::span<float> out, std::size_t totalDecoded,
                        std::size_t frames) noexcept {
-        uint8_t* outPtrs[1] = {
-            reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
+        uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
         int outSamples = static_cast<int>(frames - totalDecoded);
         return swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
     }
@@ -433,6 +435,3 @@ class FfmpegDecoder final : public IDecoder {
 };
 
 } // namespace caudio::player
-
-
-

@@ -1,13 +1,13 @@
 module;
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
-#include <expected>
-#include <utility>
 
 export module caudio.cli:result;
 
@@ -71,12 +71,9 @@ struct ConfigValues final {
 using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
-using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists, ConfigValue, ConfigValues, Empty, CliError>;
+using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
+                            ConfigValue, ConfigValues, Empty, CliError>;
 
 using ReplyExpected = std::expected<Result, CliError>;
 
 } // namespace caudio::cli
-
-
-
-

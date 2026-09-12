@@ -27,7 +27,7 @@ export module caudio.db:scan;
 import caudio.utils;
 import :types;
 import :detail;
-import :database;
+import :core;
 
 namespace caudio::db {
 
@@ -260,7 +260,8 @@ scanLibrary(Database& db, int64_t libraryId,
             return std::unexpected{c.error()};
         }
     }
-    // update library last_scanned — in its own DbTransaction via libraryUpdate (or locked if needed)
+    // update library last_scanned — in its own DbTransaction via libraryUpdate (or locked if
+    // needed)
     auto libs2 = db.libraryList();
     if (libs2) {
         for (auto& l : *libs2)
@@ -268,12 +269,14 @@ scanLibrary(Database& db, int64_t libraryId,
                 l.last_scanned = std::chrono::duration_cast<std::chrono::seconds>(
                                      std::chrono::system_clock::now().time_since_epoch())
                                      .count();
-                // ensure atomic update without exposing partial scan state: use a short DbTransaction
+                // ensure atomic update without exposing partial scan state: use a short
+                // DbTransaction
                 {
                     std::unique_lock<std::shared_mutex> lk(db.mutex());
                     char* err = nullptr;
                     internal::SqliteErrGuard guard{err};
-                    int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+                    int rc =
+                        sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
                     if (rc == SQLITE_OK) {
                         (void)db.libraryUpdateLocked(l);
                         char* cErr = nullptr;
@@ -292,9 +295,3 @@ scanLibrary(Database& db, int64_t libraryId,
 }
 
 } // namespace caudio::db
-
-
-
-
-
-

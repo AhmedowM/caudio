@@ -179,9 +179,3 @@ class WriterThread final {
 };
 
 } // namespace caudio::db
-
-
-
-
-
-

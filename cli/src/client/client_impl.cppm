@@ -6,9 +6,9 @@ module;
 #include <memory>
 #include <mutex>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <string_view>
-#include <stop_token>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -35,18 +35,23 @@ struct Config final {
 class Client {
     Config config_;
 
-public:
+  public:
     explicit Client(Config cfg) : config_(std::move(cfg)) {}
     explicit Client(std::filesystem::path dbPath) : config_{std::move(dbPath), {}} {}
-    explicit Client(std::filesystem::path dbPath, std::string_view socketPath) : config_{std::move(dbPath), std::string(socketPath.data(), socketPath.size())} {}
+    explicit Client(std::filesystem::path dbPath, std::string_view socketPath)
+        : config_{std::move(dbPath), std::string(socketPath.data(), socketPath.size())} {}
     explicit Client(const caudio::cli::Config& cfg) : config_{cfg.dbPath, cfg.socketPath} {}
 
-    const Config& config() const noexcept { return config_; }
-    std::filesystem::path dbPath() const noexcept { return config_.dbPath; }
+    const Config& config() const noexcept {
+        return config_;
+    }
+    std::filesystem::path dbPath() const noexcept {
+        return config_.dbPath;
+    }
 
-    caudio::utils::Expected<caudio::cli::Result> send(
-        const caudio::cli::Command& cmd,
-        std::chrono::milliseconds timeout = std::chrono::milliseconds{2000}) {
+    caudio::utils::Expected<caudio::cli::Result>
+    send(const caudio::cli::Command& cmd,
+         std::chrono::milliseconds timeout = std::chrono::milliseconds{2000}) {
         // Use promise/future + jthread + stop_token for timeout handling.
         // This avoids C alarm and uses chrono::milliseconds + poll/select style wait.
         auto prom = std::make_shared<std::promise<caudio::utils::Expected<caudio::cli::Result>>>();
@@ -55,44 +60,44 @@ public:
         Config cfgCopy = config_;
 
         // RAII worker via make_unique per spec
-        auto worker = std::make_unique<std::jthread>(
-            [prom, cmdCopy = std::move(cmdCopy), cfgCopy](std::stop_token st) mutable {
-                if (st.stop_requested()) {
-                    try {
-                        prom->set_value(std::unexpected{
-                            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
-                    } catch (...) {
-                    }
-                    return;
-                }
-                auto conn = IpcClient::connect(cfgCopy.dbPath, cfgCopy.socketPath);
-                if (!conn) {
-                    try {
-                        prom->set_value(std::unexpected{caudio::utils::Error{
-                            caudio::utils::StatusCode::State,
-                            std::string_view{"daemon not running — run 'caudio start'"}}});
-                    } catch (...) {
-                    }
-                    return;
-                }
-                if (st.stop_requested()) {
-                    try {
-                        prom->set_value(std::unexpected{
-                            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
-                    } catch (...) {
-                    }
-                    return;
-                }
-                auto res = conn->send(cmdCopy);
+        auto worker = std::make_unique<std::jthread>([prom, cmdCopy = std::move(cmdCopy),
+                                                      cfgCopy](std::stop_token st) mutable {
+            if (st.stop_requested()) {
                 try {
-                    if (res) {
-                        prom->set_value(*res);
-                    } else {
-                        prom->set_value(std::unexpected{res.error()});
-                    }
+                    prom->set_value(std::unexpected{
+                        caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
                 } catch (...) {
                 }
-            });
+                return;
+            }
+            auto conn = IpcClient::connect(cfgCopy.dbPath, cfgCopy.socketPath);
+            if (!conn) {
+                try {
+                    prom->set_value(std::unexpected{caudio::utils::Error{
+                        caudio::utils::StatusCode::State,
+                        std::string_view{"daemon not running — run 'caudio start'"}}});
+                } catch (...) {
+                }
+                return;
+            }
+            if (st.stop_requested()) {
+                try {
+                    prom->set_value(std::unexpected{
+                        caudio::utils::makeError(caudio::utils::StatusCode::Busy, "cancelled")});
+                } catch (...) {
+                }
+                return;
+            }
+            auto res = conn->send(cmdCopy);
+            try {
+                if (res) {
+                    prom->set_value(*res);
+                } else {
+                    prom->set_value(std::unexpected{res.error()});
+                }
+            } catch (...) {
+            }
+        });
 
         // Handle timeout via chrono::milliseconds — uses future::wait_for.
         if (fut.wait_for(timeout) == std::future_status::ready) {
@@ -142,7 +147,3 @@ public:
 };
 
 } // namespace caudio::client
-
-
-
-

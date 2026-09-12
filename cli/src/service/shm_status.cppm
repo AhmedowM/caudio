@@ -30,25 +30,26 @@ export namespace caudio::service {
 // ShmStatus uses regular types for the snapshot (no atomics in the snapshot itself)
 // The atomic fields are in the shared memory, but we read them into a non-atomic snapshot
 struct ShmStatus {
-    uint64_t seq{0};           // seqlock writer: odd=writing, even=done
-    double position{0.0};      // current playback position in seconds
-    double duration{0.0};      // track duration in seconds
-    float volume{1.0f};        // volume 0.0-1.0
-    bool muted{false};         // muted flag
-    int state{0};              // PlaybackState enum (int)
-    int64_t track_id{0};        // current track ID
-    size_t queueSize{0};       // queue size
-    char title[256]{0};        // track title
-    char artist[256]{0};       // track artist
+    uint64_t seq{0};      // seqlock writer: odd=writing, even=done
+    double position{0.0}; // current playback position in seconds
+    double duration{0.0}; // track duration in seconds
+    float volume{1.0f};   // volume 0.0-1.0
+    bool muted{false};    // muted flag
+    int state{0};         // PlaybackState enum (int)
+    int64_t track_id{0};  // current track ID
+    size_t queueSize{0};  // queue size
+    char title[256]{0};   // track title
+    char artist[256]{0};  // track artist
 };
 
 // Atomic view of ShmStatus in shared memory
-// Uses atomic<uint64_t> with bit_cast for double/float to ensure lock-free on all platforms including MSVC
+// Uses atomic<uint64_t> with bit_cast for double/float to ensure lock-free on all platforms
+// including MSVC
 struct alignas(64) AtomicShmStatus {
     std::atomic<uint64_t> seq{0};
-    std::atomic<uint64_t> position{0};  // bit_cast<double>
-    std::atomic<uint64_t> duration{0};  // bit_cast<double>
-    std::atomic<uint32_t> volume{0};    // bit_cast<float>
+    std::atomic<uint64_t> position{0}; // bit_cast<double>
+    std::atomic<uint64_t> duration{0}; // bit_cast<double>
+    std::atomic<uint32_t> volume{0};   // bit_cast<float>
     std::atomic<bool> muted{false};
     std::atomic<int> state{0};
     std::atomic<int64_t> track_id{0};
@@ -75,7 +76,7 @@ inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept {
 }
 
 class ShmStatusHandle {
-public:
+  public:
     using ExpectedShm = std::expected<ShmStatusHandle, caudio::utils::Error>;
 
     static ExpectedShm create(const std::string& name, bool create) {
@@ -86,12 +87,13 @@ public:
 
 #ifndef _WIN32
         int flags = O_RDWR | O_CLOEXEC;
-        if (create) flags |= O_CREAT;
+        if (create)
+            flags |= O_CREAT;
         int fd = ::shm_open(handle.name_.c_str(), flags, 0600);
         if (fd < 0) {
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io,
-                "shm_open failed: " + std::string(std::strerror(errno)))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                         "shm_open failed: " + std::string(std::strerror(errno)))};
         }
         handle.fd_ = fd;
 
@@ -105,27 +107,31 @@ public:
             }
         }
 
-        void* ptr = ::mmap(nullptr, sizeof(AtomicShmStatus), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        void* ptr =
+            ::mmap(nullptr, sizeof(AtomicShmStatus), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (ptr == MAP_FAILED) {
             ::close(fd);
-            if (create) ::shm_unlink(handle.name_.c_str());
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io,
-                "mmap failed: " + std::string(std::strerror(errno)))};
+            if (create)
+                ::shm_unlink(handle.name_.c_str());
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                         "mmap failed: " + std::string(std::strerror(errno)))};
         }
         handle.map_ = static_cast<AtomicShmStatus*>(ptr);
         handle.size_ = sizeof(AtomicShmStatus);
 #else
         std::wstring wname;
         wname.reserve(handle.name_.size());
-        for (char c : handle.name_) wname.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+        for (char c : handle.name_)
+            wname.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
 
         DWORD access = FILE_MAP_READ | FILE_MAP_WRITE;
         DWORD protect = PAGE_READWRITE;
         HANDLE hMap = nullptr;
 
         if (create) {
-            hMap = ::CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, protect, 0, sizeof(AtomicShmStatus), wname.c_str());
+            hMap = ::CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, protect, 0,
+                                        sizeof(AtomicShmStatus), wname.c_str());
         } else {
             hMap = ::OpenFileMappingW(access, FALSE, wname.c_str());
         }
@@ -140,9 +146,9 @@ public:
         void* ptr = ::MapViewOfFile(hMap, access, 0, 0, sizeof(AtomicShmStatus));
         if (!ptr) {
             ::CloseHandle(hMap);
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io,
-                "MapViewOfFile failed: " + std::to_string(::GetLastError()))};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                            "MapViewOfFile failed: " +
+                                                                std::to_string(::GetLastError()))};
         }
         handle.map_ = static_cast<AtomicShmStatus*>(ptr);
         handle.size_ = sizeof(AtomicShmStatus);
@@ -166,9 +172,11 @@ public:
         : map_(other.map_), size_(other.size_), name_(std::move(other.name_)),
           create_(other.create_)
 #ifndef _WIN32
-          , fd_(other.fd_)
+          ,
+          fd_(other.fd_)
 #else
-          , hMap_(other.hMap_)
+          ,
+          hMap_(other.hMap_)
 #endif
     {
         other.map_ = nullptr;
@@ -205,14 +213,19 @@ public:
         return *this;
     }
 
-    bool valid() const noexcept { return map_ != nullptr; }
+    bool valid() const noexcept {
+        return map_ != nullptr;
+    }
 
-    const std::string& name() const noexcept { return name_; }
+    const std::string& name() const noexcept {
+        return name_;
+    }
 
     // Seqlock reader: returns a snapshot copy of the status
     ShmStatus snapshot() const {
         ShmStatus out{};
-        if (!map_) return out;
+        if (!map_)
+            return out;
         AtomicShmStatus* s = map_;
         uint32_t spinCount = 0;
         while (true) {
@@ -247,11 +260,13 @@ public:
     // Seqlock writer: updates all fields atomically
     void updateFromEngine(const caudio::engine::Engine& eng, int64_t track_id,
                           std::string_view title, std::string_view artist) {
-        if (!map_) return;
+        if (!map_)
+            return;
         AtomicShmStatus* s = map_;
         uint64_t old = s->seq.load(std::memory_order_acquire);
         // Ensure old is even
-        if (old & 1) old++;
+        if (old & 1)
+            old++;
 
         // Mark as writing (odd)
         s->seq.store(old + 1, std::memory_order_release);
@@ -280,16 +295,18 @@ public:
     }
 
     void setDuration(double dur) noexcept {
-        if (!map_) return;
+        if (!map_)
+            return;
         atomicStoreDouble(map_->duration, dur);
     }
 
     void setQueueSize(size_t sz) noexcept {
-        if (!map_) return;
+        if (!map_)
+            return;
         map_->queueSize.store(sz, std::memory_order_relaxed);
     }
 
-private:
+  private:
     ShmStatusHandle() = default;
 
     void close() noexcept {
@@ -332,6 +349,3 @@ inline ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, boo
 }
 
 } // namespace caudio::service
-
-
-

@@ -20,7 +20,7 @@ export module caudio.db:json;
 import caudio.utils;
 import :types;
 import :detail;
-import :database;
+import :core;
 import :SqliteStatement;
 import :DbTransaction;
 
@@ -150,7 +150,8 @@ export std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_js
         }
         return t;
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
 }
 
@@ -170,7 +171,8 @@ export std::expected<void, caudio::utils::Error> exportJson(Database& db,
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open output")};
     f << root.dump(2);
     if (!f)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "write failed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "write failed")};
     return {};
 }
 
@@ -188,7 +190,8 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
     try {
         root = ordered_json::parse(content);
     } catch (const std::exception& e) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
     if (!root.contains("tracks") || !root["tracks"].is_array()) {
         return std::unexpected{
@@ -212,13 +215,13 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
         }
         Track t = *tr;
         SqliteStatement stmt;
-        if (auto e = stmt.prepare(h,
-                                   "INSERT INTO tracks (fingerprint, path, size, mtime, duration, "
-                                   "sample_rate, channels, bitrate, title, artist, album, "
-                                   "album_artist, genre, year, track_num, disc_num, "
-                                   "cover_art_path, rating, play_count, last_played, date_added, "
-                                   "last_scanned, dirty, library_id, deleted_at) VALUES "
-                                   "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        if (auto e =
+                stmt.prepare(h, "INSERT INTO tracks (fingerprint, path, size, mtime, duration, "
+                                "sample_rate, channels, bitrate, title, artist, album, "
+                                "album_artist, genre, year, track_num, disc_num, "
+                                "cover_art_path, rating, play_count, last_played, date_added, "
+                                "last_scanned, dirty, library_id, deleted_at) VALUES "
+                                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             !e) {
             corrupt = true;
             break;
@@ -267,13 +270,13 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
             if (sel.step()) {
                 int64_t existing = sel.columnInt(0);
                 SqliteStatement upd;
-                if (auto e = upd.prepare(h,
-                                          "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, "
-                                          "sample_rate=?, channels=?, bitrate=?, title=?, artist=?, "
-                                          "album=?, album_artist=?, genre=?, year=?, track_num=?, "
-                                          "disc_num=?, cover_art_path=?, rating=?, play_count=?, "
-                                          "last_played=?, date_added=?, last_scanned=?, dirty=?, "
-                                          "library_id=?, deleted_at=? WHERE id=?");
+                if (auto e =
+                        upd.prepare(h, "UPDATE tracks SET path=?, size=?, mtime=?, duration=?, "
+                                       "sample_rate=?, channels=?, bitrate=?, title=?, artist=?, "
+                                       "album=?, album_artist=?, genre=?, year=?, track_num=?, "
+                                       "disc_num=?, cover_art_path=?, rating=?, play_count=?, "
+                                       "last_played=?, date_added=?, last_scanned=?, dirty=?, "
+                                       "library_id=?, deleted_at=? WHERE id=?");
                     !e) {
                     corrupt = true;
                     break;
@@ -285,11 +288,11 @@ export std::expected<void, caudio::utils::Error> importJson(Database& db,
                 upd.bindInt(5, t.sample_rate);
                 upd.bindInt(6, t.channels);
                 upd.bindInt(7, t.bitrate);
-upd.bindText(8, t.title);
-        upd.bindText(9, t.artist);
-        upd.bindText(10, t.album);
-        upd.bindText(11, t.album_artist);
-        upd.bindText(12, t.genre);
+                upd.bindText(8, t.title);
+                upd.bindText(9, t.artist);
+                upd.bindText(10, t.album);
+                upd.bindText(11, t.album_artist);
+                upd.bindText(12, t.genre);
                 upd.bindInt(13, t.year);
                 upd.bindInt(14, t.track_num);
                 upd.bindInt(15, t.disc_num);
@@ -332,9 +335,3 @@ upd.bindText(8, t.title);
 }
 
 } // namespace caudio::db
-
-
-
-
-
-

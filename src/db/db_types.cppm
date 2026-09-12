@@ -122,9 +122,3 @@ struct HistoryQuery {
 };
 
 } // namespace caudio::db
-
-
-
-
-
-

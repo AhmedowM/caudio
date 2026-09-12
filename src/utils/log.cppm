@@ -112,7 +112,3 @@ class Logger {
 };
 
 } // namespace caudio::utils
-
-
-
-

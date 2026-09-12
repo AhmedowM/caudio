@@ -38,14 +38,15 @@ class SqliteStatement final {
         return *this;
     }
     [[nodiscard]] std::expected<void, caudio::utils::Error> prepare(sqlite3* db,
-                                                                     std::string_view sql) {
+                                                                    std::string_view sql) {
         if (stmt_)
             sqlite3_finalize(stmt_);
         stmt_ = nullptr;
         int rc = sqlite3_prepare_v2(db, sql.data(), static_cast<int>(sql.size()), &stmt_, nullptr);
         if (rc != SQLITE_OK) {
             std::string msg = db ? sqlite3_errmsg(db) : "prepare failed";
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg)};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg)};
         }
         return {};
     }
@@ -70,9 +71,8 @@ class SqliteStatement final {
                               SQLITE_TRANSIENT);
     }
     [[deprecated("use span overload")]] void bindBlob(int idx, const void* data, int n) {
-        bindBlob(idx,
-                 std::span<const std::byte>{reinterpret_cast<const std::byte*>(data),
-                                            data && n > 0 ? static_cast<std::size_t>(n) : 0});
+        bindBlob(idx, std::span<const std::byte>{reinterpret_cast<const std::byte*>(data),
+                                                 data && n > 0 ? static_cast<std::size_t>(n) : 0});
     }
     void bindNull(int idx) {
         if (stmt_)
@@ -116,8 +116,3 @@ class SqliteStatement final {
 };
 
 } // namespace caudio::db
-
-
-
-
-

@@ -249,7 +249,8 @@ class Player {
     }
 
     static inline float clampVolume(float v) noexcept {
-        if (!std::isfinite(v)) return 0.0f;
+        if (!std::isfinite(v))
+            return 0.0f;
         return std::clamp(v, 0.0f, 1.0f);
     }
 
@@ -456,6 +457,3 @@ class Player {
 };
 
 } // namespace caudio::player
-
-
-

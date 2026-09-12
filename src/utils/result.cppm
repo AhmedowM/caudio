@@ -64,7 +64,3 @@ struct std::formatter<caudio::utils::StatusCode> : std::formatter<std::string_vi
         return std::formatter<std::string_view>::format(caudio::utils::toString(r), ctx);
     }
 };
-
-
-
-

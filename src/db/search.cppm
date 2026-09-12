@@ -17,7 +17,7 @@ export module caudio.db:search;
 import caudio.utils;
 import :types;
 import :detail;
-import :database;
+import :core;
 
 namespace caudio::db {
 
@@ -111,7 +111,8 @@ searchLike(Database& db, std::string_view query, int limit = 50) {
     std::shared_lock lock(db.mutex());
     sqlite3* h = db.handle();
     if (!h)
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     const char* likeSql =
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
@@ -148,8 +149,3 @@ search(Database& db, std::string_view query, int limit = 50) {
 }
 
 } // namespace caudio::db
-
-
-
-
-

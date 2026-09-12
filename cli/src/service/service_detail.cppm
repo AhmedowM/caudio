@@ -27,12 +27,13 @@ module;
 #include "blake3.h"
 
 #ifndef _WIN32
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <cstring>
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+
+#include <cstring>
 #else
 #include <process.h>
 #include <windows.h>
@@ -56,16 +57,19 @@ struct overloaded : Ts... {
 inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
                                               const std::string& /*socketPath*/) {
     auto r = caudio::cli::pidPathFor(dbPath);
-    if (r) return *r;
+    if (r)
+        return *r;
     auto pp = dbPath.parent_path();
-    if (pp.empty()) pp = std::filesystem::current_path();
+    if (pp.empty())
+        pp = std::filesystem::current_path();
     return pp / "caudio.pid";
 }
 
 inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
                                                const std::string& /*socketPath*/) {
     auto r = caudio::cli::lockPathFor(dbPath);
-    if (r) return *r;
+    if (r)
+        return *r;
     auto pidPath = pidPathForSocket(dbPath, "");
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
@@ -74,14 +78,16 @@ inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPa
 
 inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
     auto r = caudio::cli::socketPathFor(dbPath);
-    if (r) return *r;
+    if (r)
+        return *r;
 #ifdef _WIN32
     std::string dbStr = dbPath.generic_string();
     std::size_t hash = std::hash<std::string>{}(dbStr);
     return "\\\\.\\pipe\\caudio-" + std::to_string(hash);
 #else
     auto pp = dbPath.parent_path();
-    if (pp.empty()) pp = std::filesystem::current_path();
+    if (pp.empty())
+        pp = std::filesystem::current_path();
     std::error_code ec;
     std::filesystem::create_directories(pp, ec);
     std::string dbStr = dbPath.generic_string();
@@ -92,11 +98,14 @@ inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
 
 inline bool probeSocketAlive(const std::string& sp) {
 #ifdef _WIN32
-    if (sp.empty()) return false;
+    if (sp.empty())
+        return false;
     std::wstring w;
     w.reserve(sp.size());
-    for (char c : sp) w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    for (char c : sp)
+        w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0,
+                             nullptr);
     if (h != INVALID_HANDLE_VALUE) {
         ::CloseHandle(h);
         return true;
@@ -115,9 +124,11 @@ inline bool probeSocketAlive(const std::string& sp) {
     }
     return false;
 #else
-    if (sp.empty()) return false;
+    if (sp.empty())
+        return false;
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd < 0) return false;
+    if (fd < 0)
+        return false;
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
     if (sp.size() >= sizeof(addr.sun_path)) {
@@ -140,15 +151,13 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
     }
     std::wstring wpath;
     wpath.reserve(lockPath.native().size());
-    for (wchar_t c : lockPath.native()) wpath.push_back(c);
+    for (wchar_t c : lockPath.native())
+        wpath.push_back(c);
 
-    HANDLE h = ::CreateFileW(wpath.c_str(),
-                             GENERIC_READ | GENERIC_WRITE,
-                             FILE_SHARE_READ,  // allow readers, deny writers
-                             nullptr,
-                             OPEN_ALWAYS,
-                             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED,
-                             nullptr);
+    HANDLE h =
+        ::CreateFileW(wpath.c_str(), GENERIC_READ | GENERIC_WRITE,
+                      FILE_SHARE_READ, // allow readers, deny writers
+                      nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr);
     if (h == INVALID_HANDLE_VALUE) {
         outFd = -1;
         return false;
@@ -160,7 +169,7 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
     if (!::LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
         ::CloseHandle(h);
         outFd = -1;
-        return false;  // ERROR_LOCK_VIOLATION (33) or other
+        return false; // ERROR_LOCK_VIOLATION (33) or other
     }
     outFd = reinterpret_cast<intptr_t>(h);
     return true;
@@ -171,7 +180,8 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
         std::filesystem::create_directories(parent, ec);
     }
     int fd = ::open(lockPath.c_str(), O_CREAT | O_CLOEXEC | O_RDWR, 0600);
-    if (fd < 0) return false;
+    if (fd < 0)
+        return false;
     if (::flock(fd, LOCK_EX | LOCK_NB) != 0) {
         ::close(fd);
         return false;
@@ -182,7 +192,8 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
 }
 
 inline void releaseLock(int fd) {
-    if (fd < 0) return;
+    if (fd < 0)
+        return;
 #ifdef _WIN32
     HANDLE h = reinterpret_cast<HANDLE>(static_cast<intptr_t>(fd));
     OVERLAPPED ov{};
@@ -197,12 +208,14 @@ inline void releaseLock(int fd) {
 }
 
 inline bool checkPidAlive(int pid) {
-    if (pid <= 0) return false;
+    if (pid <= 0)
+        return false;
 #ifndef _WIN32
     return ::kill(pid, 0) == 0;
 #else
     HANDLE h = ::OpenProcess(SYNCHRONIZE, FALSE, static_cast<DWORD>(pid));
-    if (!h) return false;
+    if (!h)
+        return false;
     DWORD wait = ::WaitForSingleObject(h, 0);
     ::CloseHandle(h);
     return wait == WAIT_TIMEOUT;
@@ -211,12 +224,15 @@ inline bool checkPidAlive(int pid) {
 
 inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
     std::error_code ec;
-    if (!std::filesystem::exists(pidPath, ec)) return std::nullopt;
+    if (!std::filesystem::exists(pidPath, ec))
+        return std::nullopt;
     std::ifstream in(pidPath);
-    if (!in) return std::nullopt;
+    if (!in)
+        return std::nullopt;
     int pid = 0;
     in >> pid;
-    if (in.fail()) return std::nullopt;
+    if (in.fail())
+        return std::nullopt;
     return pid;
 }
 
@@ -253,20 +269,24 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
                 }
             }
         }
-    } catch (...) {}
+    } catch (...) {
+    }
     return s;
 }
 
 inline std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
                                                const std::filesystem::path& dbPath) {
-    if (!configPath.empty()) return configPath;
+    if (!configPath.empty())
+        return configPath;
     if (!dbPath.empty()) {
         auto pp = dbPath.parent_path();
-        if (!pp.empty()) return pp / "config.json";
+        if (!pp.empty())
+            return pp / "config.json";
     }
     std::error_code ec;
     auto tmp = std::filesystem::temp_directory_path(ec);
-    if (ec) tmp = std::filesystem::path("/tmp");
+    if (ec)
+        tmp = std::filesystem::path("/tmp");
     return tmp / "caudio" / "config.json";
 }
 
@@ -283,10 +303,12 @@ writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::s
 inline std::expected<std::vector<caudio::cli::ConfigValue>, caudio::utils::Error>
 listConfigValuesRaw(const std::filesystem::path& p) {
     auto r = caudio::cli::configListRaw(p);
-    if (!r) return std::unexpected{r.error()};
+    if (!r)
+        return std::unexpected{r.error()};
     std::vector<caudio::cli::ConfigValue> out;
     out.reserve(r->size());
-    for (auto& kv : *r) out.push_back(caudio::cli::ConfigValue{kv.key, kv.value});
+    for (auto& kv : *r)
+        out.push_back(caudio::cli::ConfigValue{kv.key, kv.value});
     return out;
 }
 
@@ -301,23 +323,29 @@ inline std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path) {
     std::error_code ec;
     auto sz = std::filesystem::file_size(path, ec);
-    if (ec) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
+    if (ec)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
     std::ifstream f(path, std::ios::binary);
-    if (!f) return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
+    if (!f)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
     constexpr std::size_t kSample = 64 * 1024;
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
     std::vector<std::uint8_t> buf(kSample);
     f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
     std::size_t n = static_cast<std::size_t>(f.gcount());
-    if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
+    if (n != 0)
+        blake3_hasher_update(&hasher, buf.data(), n);
     if (sz > kSample) {
         f.clear();
         f.seekg(static_cast<std::streamoff>(sz - kSample), std::ios::beg);
         if (f) {
             f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
             n = static_cast<std::size_t>(f.gcount());
-            if (n != 0) blake3_hasher_update(&hasher, buf.data(), n);
+            if (n != 0)
+                blake3_hasher_update(&hasher, buf.data(), n);
         }
     }
     std::uint64_t sz64 = static_cast<std::uint64_t>(sz);
@@ -332,14 +360,17 @@ computeFingerprint(const std::filesystem::path& path) {
 inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
     try {
         auto readerRes = caudio::player::FileReader::open(path);
-        if (!readerRes) return 0.0;
+        if (!readerRes)
+            return 0.0;
         auto& readerPtr = readerRes.value();
         auto decRes = caudio::player::DecoderRegistry::open(*readerPtr);
-        if (!decRes) return 0.0;
+        if (!decRes)
+            return 0.0;
         auto& decPtr = decRes.value();
         std::uint32_t sr = decPtr->sampleRate();
         std::uint64_t frames = decPtr->totalFrames();
-        if (sr == 0) return 0.0;
+        if (sr == 0)
+            return 0.0;
         return static_cast<double>(frames) / static_cast<double>(sr);
     } catch (...) {
         return 0.0;
@@ -347,6 +378,3 @@ inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
 }
 
 } // namespace caudio::service::detail
-
-
-

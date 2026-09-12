@@ -120,13 +120,12 @@ struct Preview final {
     std::string file{};
 };
 
-using Command = std::variant<
-    Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq,
-    VolumeSet, QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove,
-    QueueMove, QueueClear, QueueShuffle, QueueRepeat,
-    PlaylistList, PlaylistTracks, PlaylistLoad, PlaylistSave, PlaylistDelete,
-    LibraryScan, LibrarySearch, LibraryStats, ConfigGet, ConfigSet, ConfigList,
-    ConfigExport, ConfigImport, Shutdown, Preview>;
+using Command =
+    std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
+                 QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
+                 QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
+                 PlaylistSave, PlaylistDelete, LibraryScan, LibrarySearch, LibraryStats, ConfigGet,
+                 ConfigSet, ConfigList, ConfigExport, ConfigImport, Shutdown, Preview>;
 
 // helper concepts
 template <typename T>
@@ -135,18 +134,15 @@ concept CommandAlternative = requires {
         std::is_same<T, Play>, std::is_same<T, Pause>, std::is_same<T, Resume>,
         std::is_same<T, Restart>, std::is_same<T, Stop>, std::is_same<T, Next>,
         std::is_same<T, Prev>, std::is_same<T, Seek>, std::is_same<T, StatusReq>,
-        std::is_same<T, VolumeSet>, std::is_same<T, QueueList>,
-        std::is_same<T, QueueQueues>, std::is_same<T, QueueSwitch>,
-        std::is_same<T, QueueAdd>, std::is_same<T, QueueRemove>,
-        std::is_same<T, QueueMove>, std::is_same<T, QueueClear>,
-        std::is_same<T, QueueShuffle>, std::is_same<T, QueueRepeat>,
-        std::is_same<T, PlaylistList>, std::is_same<T, PlaylistTracks>,
-        std::is_same<T, PlaylistLoad>, std::is_same<T, PlaylistSave>,
-        std::is_same<T, PlaylistDelete>, std::is_same<T, LibraryScan>,
-        std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
-        std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
-        std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>,
-        std::is_same<T, ConfigImport>, std::is_same<T, Shutdown>,
+        std::is_same<T, VolumeSet>, std::is_same<T, QueueList>, std::is_same<T, QueueQueues>,
+        std::is_same<T, QueueSwitch>, std::is_same<T, QueueAdd>, std::is_same<T, QueueRemove>,
+        std::is_same<T, QueueMove>, std::is_same<T, QueueClear>, std::is_same<T, QueueShuffle>,
+        std::is_same<T, QueueRepeat>, std::is_same<T, PlaylistList>,
+        std::is_same<T, PlaylistTracks>, std::is_same<T, PlaylistLoad>,
+        std::is_same<T, PlaylistSave>, std::is_same<T, PlaylistDelete>,
+        std::is_same<T, LibraryScan>, std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
+        std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>, std::is_same<T, ConfigList>,
+        std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>, std::is_same<T, Shutdown>,
         std::is_same<T, Preview>>;
 };
 
@@ -154,7 +150,3 @@ template <typename T>
 concept CommandType = CommandAlternative<std::remove_cvref_t<T>>;
 
 } // namespace caudio::cli
-
-
-
-

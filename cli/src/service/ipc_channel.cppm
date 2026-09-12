@@ -18,7 +18,7 @@ import caudio.utils;
 export namespace caudio::service {
 
 class IpcChannel {
-public:
+  public:
     virtual ~IpcChannel() = default;
     virtual caudio::utils::Expected<void> send(std::span<const std::byte> data) = 0;
     virtual caudio::utils::Expected<std::vector<std::byte>> recv() = 0;
@@ -31,7 +31,8 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
     // Keep in sync with caudio::cli::socketPathFor via shared detail_paths logic (copy).
     try {
         std::string input = dbPath.generic_string();
-        if (input.empty()) input = dbPath.string();
+        if (input.empty())
+            input = dbPath.string();
         std::size_t raw = std::hash<std::string>{}(input);
         std::uint32_t hv = static_cast<std::uint32_t>(raw & 0xFFFFFFFFu);
         hv ^= static_cast<std::uint32_t>((raw >> 32) & 0xFFFFFFFFu);
@@ -55,13 +56,15 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
                 base = std::filesystem::path(xdgData) / "caudio";
             } else {
                 const char* home = std::getenv("HOME");
-                if (!home || home[0] == '\0') home = std::getenv("USERPROFILE");
+                if (!home || home[0] == '\0')
+                    home = std::getenv("USERPROFILE");
                 if (home && home[0] != '\0') {
                     base = std::filesystem::path(home) / ".local" / "share" / "caudio";
                 } else {
                     std::error_code ec;
                     base = std::filesystem::temp_directory_path(ec) / "caudio";
-                    if (ec) base = std::filesystem::path("/tmp/caudio");
+                    if (ec)
+                        base = std::filesystem::path("/tmp/caudio");
                 }
             }
         }
@@ -70,7 +73,8 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
     } catch (const std::exception& e) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
     } catch (...) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "socketPathFor failed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "socketPathFor failed")};
     }
 }
 
@@ -90,17 +94,19 @@ inline std::vector<std::byte> frameMessage(std::span<const std::byte> payload) {
     return out;
 }
 
-inline caudio::utils::Expected<std::vector<std::byte>> deframeMessage(
-    std::span<const std::byte> framed) {
+inline caudio::utils::Expected<std::vector<std::byte>>
+deframeMessage(std::span<const std::byte> framed) {
     if (framed.size() < 4) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too small")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too small")};
     }
     std::uint32_t len = (static_cast<std::uint32_t>(std::to_underlying(framed[0])) << 24) |
                         (static_cast<std::uint32_t>(std::to_underlying(framed[1])) << 16) |
                         (static_cast<std::uint32_t>(std::to_underlying(framed[2])) << 8) |
                         static_cast<std::uint32_t>(std::to_underlying(framed[3]));
     if (framed.size() - 4 < len) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "frame length mismatch")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "frame length mismatch")};
     }
     std::vector<std::byte> out;
     out.reserve(len);
@@ -109,7 +115,3 @@ inline caudio::utils::Expected<std::vector<std::byte>> deframeMessage(
 }
 
 } // namespace caudio::service
-
-
-
-

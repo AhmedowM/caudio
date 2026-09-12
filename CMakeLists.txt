@@ -50,8 +50,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Options — CAUDIO_WITH_FFMPEG ON required primary (C had OFF CMakeLists.txt:62)
 option(CAUDIO_WITH_FFMPEG "use FFmpeg as primary decoder" ON)
-option(CAUDIO_BUILD_TESTS "build tests" OFF)
-option(CAUDIO_BUILD_EXAMPLES "build examples" OFF)
+option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system → vcpkg/Conan → prebuilt → source)" ON)
+option(CAUDIO_ENABLE_TESTS "build tests" OFF)
+option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
 option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
 
 # Module path for FindFFmpeg
@@ -59,24 +60,18 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Threads REQUIRED)
 
-option(CAUDIO_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system → vcpkg/Conan → prebuilt → source)" ON)
-
 if(CAUDIO_WITH_FFMPEG)
   find_package(FFmpeg QUIET)
   if(FFmpeg_FOUND)
     message(STATUS "FFmpeg found (system): ${FFmpeg_AVCODEC_LIBRARY}")
-  elseif(CAUDIO_FETCH_FFMPEG)
+  elseif(CAUDIO_WITH_FETCH_FFMPEG)
     include(cmake/SetupFFmpeg.cmake)
     caudio_setup_ffmpeg()
-    if(FFmpeg_FOUND)
-      message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
-    else()
+    if(NOT FFmpeg_FOUND)
       message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
     endif()
+    message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
   else()
-    message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
-  endif()
-  if(NOT FFmpeg_FOUND)
     message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
   endif()
 endif()
@@ -106,14 +101,12 @@ add_library(caudio_sqlite OBJECT vendor/sqlite3.c)
 target_include_directories(caudio_sqlite PRIVATE vendor)
 target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(caudio_sqlite PRIVATE SQLITE_ENABLE_FTS5=1)
-set_target_properties(caudio_sqlite PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(caudio_sqlite_static STATIC vendor/sqlite3.c)
 set_target_properties(caudio_sqlite_static PROPERTIES OUTPUT_NAME caudio_sqlite)
 target_include_directories(caudio_sqlite_static PRIVATE vendor)
 target_include_directories(caudio_sqlite_static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_compile_definitions(caudio_sqlite_static PUBLIC SQLITE_ENABLE_FTS5=1)
-target_compile_definitions(caudio_sqlite_static PRIVATE SQLITE_ENABLE_FTS5=1)
 
 # RtAudio vendored but not compiled — miniaudio is the chosen output (plan)
 
@@ -121,7 +114,6 @@ target_compile_definitions(caudio_sqlite_static PRIVATE SQLITE_ENABLE_FTS5=1)
 add_library(blake3 OBJECT vendor/blake3.c vendor/blake3_dispatch.c vendor/blake3_portable.c)
 target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
-set_target_properties(blake3 PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # suppress GCC warnings in vendored C
 if(NOT MSVC)
   target_compile_options(blake3 PRIVATE -w)
@@ -233,10 +225,10 @@ FetchContent_MakeAvailable(CLI11)
 # caudio::db — single caudio_sqlite STATIC, shared_mutex+Transaction later
 # P3-6: centralize DB module list to avoid quartet duplication (static/shared/combined)
 set(CAUDIO_DB_SOURCES
-  src/db/db.cppm
+  src/db/database.cppm
   src/db/db_types.cppm
   src/db/schema.cppm
-  src/db/database.cppm
+  src/db/db_core.cppm
   src/db/queue.cppm
   src/db/scan.cppm
   src/db/search.cppm
@@ -345,7 +337,6 @@ set(CAUDIO_CLI_SHARED_SOURCES
   cli/src/shared/command.cppm
   cli/src/shared/result.cppm
   cli/src/shared/protocol.cppm
-  cli/src/shared/shared.cppm
   cli/src/config.cppm
 )
 add_library(caudio_cli_shared STATIC)
@@ -516,7 +507,7 @@ endif()
 include(CPack)
 
 # Examples (C parity: mini + player_db_demo + engine_demo)
-if(CAUDIO_BUILD_EXAMPLES)
+if(CAUDIO_ENABLE_EXAMPLES)
   add_executable(caudio_mini examples/mini_cpp.cpp)
   target_link_libraries(caudio_mini PRIVATE caudio::player caudio::utils)
   target_compile_features(caudio_mini PRIVATE cxx_std_23)
@@ -531,7 +522,7 @@ if(CAUDIO_BUILD_EXAMPLES)
 endif()
 
 # Tests — Catch2 via FetchContent, ports of test_utils_*
-if(CAUDIO_BUILD_TESTS)
+if(CAUDIO_ENABLE_TESTS)
   include(FetchContent)
   FetchContent_Declare(
     Catch2
