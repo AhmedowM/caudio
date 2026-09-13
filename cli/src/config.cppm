@@ -376,6 +376,10 @@ inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p
     }
 }
 
+inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
+                                                            std::string_view key);
+inline caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
+
 inline caudio::utils::Expected<std::vector<RawConfigValue>>
 configListRaw(const std::filesystem::path& p) {
     std::error_code ec;
@@ -408,6 +412,70 @@ configListRaw(const std::filesystem::path& p) {
             out.push_back(RawConfigValue{kk, vs});
         }
         return out;
+    } catch (const std::exception& e) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
+    }
+}
+
+inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
+                                                      std::string_view key) {
+    if (key.empty()) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty key")};
+    }
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "config not found")};
+    }
+    auto fileRes = detail::readFileString(p);
+    if (!fileRes)
+        return std::unexpected{fileRes.error()};
+    std::string content = std::move(*fileRes);
+    if (content.empty()) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                         "key not found: " + std::string(key))};
+    }
+    try {
+        auto j = caudio::json::ordered_json::parse(content);
+        if (!j.is_object()) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
+                                                             "config is not an object")};
+        }
+        std::string k(key);
+        if (!j.contains(k)) {
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                             "key not found: " + k)};
+        }
+        j.erase(k);
+        auto parent = p.parent_path();
+        if (!parent.empty())
+            std::filesystem::create_directories(parent, ec);
+        std::ofstream out(p);
+        if (!out) {
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot write config")};
+        }
+        out << j.dump(2);
+        return {};
+    } catch (const std::exception& e) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
+    }
+}
+
+inline caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p) {
+    try {
+        std::error_code ec;
+        if (std::filesystem::exists(p, ec)) {
+            std::filesystem::remove(p, ec);
+            if (ec) {
+                return std::unexpected{
+                    caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
+            }
+        }
+        return {};
     } catch (const std::exception& e) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};

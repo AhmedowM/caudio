@@ -73,11 +73,15 @@ struct ConfigValues final {
     std::vector<ConfigValue> values{};
 };
 
+struct SingleTrack final {
+    caudio::db::Track track{};
+};
+
 using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
 using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
-                            PlaylistData, ConfigValue, ConfigValues, Empty, CliError>;
+                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, Empty, CliError>;
 
 using ReplyExpected = std::expected<Result, CliError>;
 

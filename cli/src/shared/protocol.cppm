@@ -148,6 +148,8 @@ inline ordered_json trackToJson(const caudio::db::Track& t) {
     j["bitrate"] = t.bitrate;
     j["year"] = t.year;
     j["track_num"] = t.track_num;
+    j["disc_num"] = t.disc_num;
+    j["disc_number"] = t.disc_num;
     j["genre"] = t.genre;
     return j;
 }
@@ -179,6 +181,12 @@ inline std::expected<caudio::db::Track, caudio::utils::Error> trackFromJson(cons
             t.year = j["year"].get<int32_t>();
         if (j.contains("track_num") && j["track_num"].is_number())
             t.track_num = j["track_num"].get<int32_t>();
+        else if (j.contains("track_number") && j["track_number"].is_number())
+            t.track_num = j["track_number"].get<int32_t>();
+        if (j.contains("disc_num") && j["disc_num"].is_number())
+            t.disc_num = j["disc_num"].get<int32_t>();
+        else if (j.contains("disc_number") && j["disc_number"].is_number())
+            t.disc_num = j["disc_number"].get<int32_t>();
         if (j.contains("genre") && j["genre"].is_string())
             t.genre = j["genre"].get<std::string>();
         return t;
@@ -395,6 +403,21 @@ ordered_json toJson(const Command& cmd) {
                 j["limit"] = v.limit;
             } else if constexpr (std::is_same_v<T, LibraryStats>) {
                 j["type"] = "LibraryStats";
+            } else if constexpr (std::is_same_v<T, LibraryAdd>) {
+                j["type"] = "LibraryAdd";
+                j["path"] = v.path;
+                j["recursive"] = v.recursive;
+            } else if constexpr (std::is_same_v<T, LibraryRemove>) {
+                j["type"] = "LibraryRemove";
+                j["query"] = v.query;
+            } else if constexpr (std::is_same_v<T, TagEdit>) {
+                j["type"] = "TagEdit";
+                j["id"] = v.id;
+                j["field"] = v.field;
+                j["value"] = v.value;
+            } else if constexpr (std::is_same_v<T, TagGet>) {
+                j["type"] = "TagGet";
+                j["id"] = v.id;
             } else if constexpr (std::is_same_v<T, ConfigGet>) {
                 j["type"] = "ConfigGet";
                 j["key"] = v.key;
@@ -410,6 +433,12 @@ ordered_json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, ConfigImport>) {
                 j["type"] = "ConfigImport";
                 j["path"] = v.path;
+            } else if constexpr (std::is_same_v<T, ConfigReset>) {
+                j["type"] = "ConfigReset";
+                if (v.key.has_value())
+                    j["key"] = *v.key;
+                else
+                    j["key"] = nullptr;
             } else if constexpr (std::is_same_v<T, Shutdown>) {
                 j["type"] = "Shutdown";
             } else if constexpr (std::is_same_v<T, Preview>) {
@@ -592,6 +621,42 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
         }
         if (t == "LibraryStats")
             return Command{LibraryStats{}};
+        if (t == "LibraryAdd") {
+            std::string p;
+            bool rec = false;
+            if (j.contains("path") && j["path"].is_string())
+                p = j["path"].get<std::string>();
+            if (j.contains("recursive") && j["recursive"].is_boolean())
+                rec = j["recursive"].get<bool>();
+            return Command{LibraryAdd{std::move(p), rec}};
+        }
+        if (t == "LibraryRemove") {
+            std::string q;
+            if (j.contains("query") && j["query"].is_string())
+                q = j["query"].get<std::string>();
+            else if (j.contains("id") && j["id"].is_string())
+                q = j["id"].get<std::string>();
+            else if (j.contains("id") && j["id"].is_number())
+                q = std::to_string(j["id"].get<int64_t>());
+            return Command{LibraryRemove{std::move(q)}};
+        }
+        if (t == "TagEdit") {
+            int64_t id = 0;
+            std::string field, value;
+            if (j.contains("id") && j["id"].is_number())
+                id = j["id"].get<int64_t>();
+            if (j.contains("field") && j["field"].is_string())
+                field = j["field"].get<std::string>();
+            if (j.contains("value") && j["value"].is_string())
+                value = j["value"].get<std::string>();
+            return Command{TagEdit{id, std::move(field), std::move(value)}};
+        }
+        if (t == "TagGet") {
+            int64_t id = 0;
+            if (j.contains("id") && j["id"].is_number())
+                id = j["id"].get<int64_t>();
+            return Command{TagGet{id}};
+        }
         if (t == "ConfigGet") {
             std::string k;
             if (j.contains("key") && j["key"].is_string())
@@ -619,6 +684,12 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
             if (j.contains("path") && j["path"].is_string())
                 p = j["path"].get<std::string>();
             return Command{ConfigImport{std::move(p)}};
+        }
+        if (t == "ConfigReset") {
+            std::optional<std::string> k;
+            if (j.contains("key") && !j["key"].is_null() && j["key"].is_string())
+                k = j["key"].get<std::string>();
+            return Command{ConfigReset{std::move(k)}};
         }
         if (t == "Shutdown")
             return Command{Shutdown{}};
@@ -734,6 +805,11 @@ ordered_json toJson(const Result& r) {
                 j["values"] = ordered_json::array();
                 for (const auto& cv : v.values)
                     j["values"].push_back(ordered_json{{"key", cv.key}, {"value", cv.value}});
+                return j;
+            } else if constexpr (std::is_same_v<T, SingleTrack>) {
+                ordered_json j;
+                j["type"] = "SingleTrack";
+                j["track"] = detail::trackToJson(v.track);
                 return j;
             } else if constexpr (std::is_same_v<T, Empty>) {
                 ordered_json j;
@@ -890,6 +966,22 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 }
             }
             return Result{std::move(cvs)};
+        }
+        if (t == "SingleTrack") {
+            SingleTrack st{};
+            if (j.contains("track")) {
+                auto tr = detail::trackFromJson(j["track"]);
+                if (!tr)
+                    return std::unexpected{tr.error()};
+                st.track = std::move(*tr);
+            } else if (j.contains("id")) {
+                // legacy: track fields directly in object
+                auto tr = detail::trackFromJson(j);
+                if (!tr)
+                    return std::unexpected{tr.error()};
+                st.track = std::move(*tr);
+            }
+            return Result{std::move(st)};
         }
         if (t == "Empty") {
             return Result{Empty{}};

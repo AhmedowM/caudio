@@ -312,6 +312,15 @@ listConfigValuesRaw(const std::filesystem::path& p) {
     return out;
 }
 
+inline caudio::utils::Expected<void>
+deleteConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
+    return caudio::cli::configDeleteRaw(p, key);
+}
+
+inline caudio::utils::Expected<void> resetAllConfigRaw(const std::filesystem::path& p) {
+    return caudio::cli::configResetAllRaw(p);
+}
+
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),

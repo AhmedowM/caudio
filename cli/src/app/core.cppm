@@ -3,6 +3,7 @@ module;
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -508,8 +509,13 @@ inline int App::run(int argc, char** argv) {
     auto* seekCmd = cli_.add_subcommand("seek", "Seek to position");
     seekCmd->add_option("time", seekStr, "mm:ss or seconds or +N/-N")->required();
     bool jsonFlag = false;
+    bool statusWatch = false;
+    int statusInterval = 1000;
     auto* statusCmd = cli_.add_subcommand("status", "Show status");
     statusCmd->add_flag("--json", jsonFlag, "JSON output");
+    statusCmd->add_flag("--watch", statusWatch, "Continuous polling");
+    statusCmd->add_flag("--follow", statusWatch, "Alias for --watch");
+    statusCmd->add_option("--interval", statusInterval, "Poll interval in ms");
     std::string volumeArg;
     auto* volumeCmd = cli_.add_subcommand("volume", "Get/set volume");
     volumeCmd->add_option("level", volumeArg, "0-100|+N|-N|mute|unmute");
@@ -593,6 +599,27 @@ inline int App::run(int argc, char** argv) {
     bool libStatsJson = false;
     auto* libStats = libCmd->add_subcommand("stats", "Library stats");
     libStats->add_flag("--json", libStatsJson, "JSON output");
+    std::string libAddPath;
+    bool libAddRecursive = false;
+    auto* libAdd = libCmd->add_subcommand("add", "Add file or directory to library");
+    libAdd->add_option("path", libAddPath, "File or directory path")->required();
+    libAdd->add_flag("--recursive", libAddRecursive, "Recurse into subdirectories");
+    std::string libRemoveQuery;
+    auto* libRemove = libCmd->add_subcommand("remove", "Remove track from library");
+    libRemove->add_option("id", libRemoveQuery, "Track id or path")->required();
+    auto* tagCmd = cli_.add_subcommand("tag", "Tag operations");
+    std::int64_t tagEditId = 0;
+    std::string tagEditField;
+    std::string tagEditValue;
+    auto* tagEdit = tagCmd->add_subcommand("edit", "Edit track tag");
+    tagEdit->add_option("id", tagEditId, "Track id")->required();
+    tagEdit->add_option("field", tagEditField, "Field (title,artist,album,album_artist,genre,year,track_number,disc_number)")->required()->check(CLI::IsMember({"title","artist","album","album_artist","genre","year","track_number","disc_number"}));
+    tagEdit->add_option("value", tagEditValue, "New value")->required();
+    std::int64_t tagGetId = 0;
+    bool tagGetJson = false;
+    auto* tagGet = tagCmd->add_subcommand("get", "Get track tags");
+    tagGet->add_option("id", tagGetId, "Track id")->required();
+    tagGet->add_flag("--json", tagGetJson, "JSON output");
     std::string previewFile;
     auto* previewCmd = cli_.add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
@@ -614,6 +641,9 @@ inline int App::run(int argc, char** argv) {
     std::string cfgImportPath;
     auto* cfgImport = cfgCmd->add_subcommand("import", "Import config");
     cfgImport->add_option("path", cfgImportPath, "Path")->required();
+    std::string cfgResetKey;
+    auto* cfgReset = cfgCmd->add_subcommand("reset", "Reset config to defaults");
+    cfgReset->add_option("key", cfgResetKey, "Key to reset (omit to reset all)");
     try {
         cli_.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -759,6 +789,49 @@ inline int App::run(int argc, char** argv) {
         return sendViaClient(cmd, false);
     }
     if (statusCmd->parsed()) {
+        if (statusWatch) {
+            if (statusInterval <= 0) {
+                std::println(std::cerr, "status --interval must be positive");
+                return 1;
+            }
+            using namespace std::chrono;
+            caudio::client::OutputFormatter fmt{jsonFlag};
+            while (true) {
+                caudio::client::Client client{config_.dbPath, config_.socketPath};
+                auto res = client.send(caudio::cli::Command{caudio::cli::StatusReq{}},
+                                       milliseconds{2000});
+                if (!res) {
+                    caudio::cli::Result errRes{res.error()};
+                    if (jsonFlag) {
+                        std::println(std::cerr, "{}", caudio::cli::toJson(errRes).dump());
+                    } else {
+                        fmt.print(errRes, std::cerr);
+                    }
+                    return 1;
+                }
+                if (!jsonFlag) {
+                    auto now = system_clock::now();
+                    std::time_t t = system_clock::to_time_t(now);
+                    std::tm tm{};
+#ifdef _WIN32
+                    localtime_s(&tm, &t);
+#else
+                    localtime_r(&t, &tm);
+#endif
+                    char buf[32];
+                    std::strftime(buf, sizeof(buf), "%H:%M:%S", &tm);
+                    std::println(std::cout, "[{}]", buf);
+                    fmt.print(*res, std::cout);
+                } else {
+                    // Compact JSON per line for streaming to avoid multi-line log spam
+                    std::println(std::cout, "{}", caudio::cli::toJson(*res).dump());
+                }
+                std::cout << std::flush;
+                if (std::holds_alternative<caudio::utils::Error>(*res))
+                    return 1;
+                std::this_thread::sleep_for(milliseconds{statusInterval});
+            }
+        }
         caudio::cli::Command cmd{caudio::cli::StatusReq{}};
         return sendViaClient(cmd, jsonFlag);
     }
@@ -914,7 +987,27 @@ inline int App::run(int argc, char** argv) {
             caudio::cli::Command cmd{caudio::cli::LibraryStats{}};
             return sendViaClient(cmd, libStatsJson);
         }
+        if (libAdd->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::LibraryAdd{libAddPath, libAddRecursive}};
+            return sendViaClient(cmd, false);
+        }
+        if (libRemove->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::LibraryRemove{libRemoveQuery}};
+            return sendViaClient(cmd, false);
+        }
         std::cout << libCmd->help() << "\n";
+        return 0;
+    }
+    if (tagCmd->parsed()) {
+        if (tagEdit->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::TagEdit{tagEditId, tagEditField, tagEditValue}};
+            return sendViaClient(cmd, false);
+        }
+        if (tagGet->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::TagGet{tagGetId}};
+            return sendViaClient(cmd, tagGetJson);
+        }
+        std::cout << tagCmd->help() << "\n";
         return 0;
     }
     if (previewCmd->parsed())
@@ -958,6 +1051,18 @@ inline int App::run(int argc, char** argv) {
         }
         if (cfgImport->parsed()) {
             caudio::cli::Command cmd{caudio::cli::ConfigImport{cfgImportPath}};
+            return sendViaClient(cmd, false);
+        }
+        if (cfgReset->parsed()) {
+            std::optional<std::string> k;
+            if (cfgReset->count("key") > 0 && !cfgResetKey.empty())
+                k = cfgResetKey;
+            else if (cfgReset->count("key") > 0 && cfgResetKey.empty()) {
+                // explicit empty string passed -> treat as error
+                std::println(std::cerr, "config reset: empty key");
+                return 1;
+            }
+            caudio::cli::Command cmd{caudio::cli::ConfigReset{k}};
             return sendViaClient(cmd, false);
         }
         std::cout << cfgCmd->help() << "\n";

@@ -829,6 +829,218 @@ class Service final {
                     d.playlists = static_cast<std::size_t>(st->num_playlists);
                     return Result{d};
                 },
+                [&](const LibraryAdd& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    if (cmd.path.empty())
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "library add: missing path")};
+                    std::filesystem::path p(cmd.path);
+                    std::error_code ec;
+                    bool exists = std::filesystem::exists(p, ec);
+                    if (ec || !exists)
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::NotFound, "path not found: " + cmd.path)};
+                    auto addSingleFile = [&](const std::filesystem::path& fp)
+                        -> std::expected<void, caudio::utils::Error> {
+                        if (!detail::hasAudioExt(fp))
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::Unsupported, "unsupported file type: " + fp.string())};
+                        auto fpRes = detail::computeFingerprint(fp);
+                        if (!fpRes)
+                            return std::unexpected{fpRes.error()};
+                        caudio::db::Track t;
+                        t.path = fp.generic_string();
+                        t.fingerprint = *fpRes;
+                        t.duration = detail::durationFromDecoder(fp);
+                        std::error_code ec2;
+                        auto sz = std::filesystem::file_size(fp, ec2);
+                        if (!ec2)
+                            t.size = static_cast<int64_t>(sz);
+                        auto ftime = std::filesystem::last_write_time(fp, ec2);
+                        if (!ec2)
+                            t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
+                        auto ins = db_->insertTrack(t);
+                        if (!ins) {
+                            if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {
+                                auto existing = db_->findByFingerprint(t.fingerprint);
+                                if (existing)
+                                    return {};
+                                auto byPath = db_->findByPath(t.path);
+                                if (byPath)
+                                    return {};
+                            }
+                            return std::unexpected{ins.error()};
+                        }
+                        return {};
+                    };
+                    if (std::filesystem::is_regular_file(p, ec)) {
+                        auto r = addSingleFile(p);
+                        if (!r)
+                            return std::unexpected{r.error()};
+                        return Result{Empty{}};
+                    } else if (std::filesystem::is_directory(p, ec)) {
+                        std::size_t added = 0;
+                        std::error_code iterEc;
+                        if (cmd.recursive) {
+                            for (auto it = std::filesystem::recursive_directory_iterator(
+                                     p, std::filesystem::directory_options::skip_permission_denied, iterEc);
+                                 it != std::filesystem::recursive_directory_iterator(); ++it) {
+                                if (iterEc)
+                                    break;
+                                std::error_code e3;
+                                if (it->is_regular_file(e3) && !e3 && detail::hasAudioExt(it->path())) {
+                                    auto r = addSingleFile(it->path());
+                                    if (r)
+                                        ++added;
+                                }
+                            }
+                        } else {
+                            for (auto it = std::filesystem::directory_iterator(p, iterEc);
+                                 it != std::filesystem::directory_iterator(); ++it) {
+                                if (iterEc)
+                                    break;
+                                std::error_code e3;
+                                if (it->is_regular_file(e3) && !e3 && detail::hasAudioExt(it->path())) {
+                                    auto r = addSingleFile(it->path());
+                                    if (r)
+                                        ++added;
+                                }
+                            }
+                        }
+                        if (added == 0) {
+                            // check if any audio files existed but failed?
+                            // Return Empty still if dir was empty — not an error.
+                        }
+                        return Result{Empty{}};
+                    } else {
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "not a file or directory: " + cmd.path)};
+                    }
+                },
+                [&](const LibraryRemove& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    if (cmd.query.empty())
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "library remove: missing id")};
+                    std::string q = cmd.query;
+                    // trim
+                    q.erase(0, q.find_first_not_of(" \t\r\n"));
+                    q.erase(q.find_last_not_of(" \t\r\n") + 1);
+                    // try numeric id
+                    bool isNum = !q.empty();
+                    for (size_t i = (q[0] == '-' ? 1 : 0); i < q.size() && isNum; ++i)
+                        if (!std::isdigit((unsigned char)q[i]))
+                            isNum = false;
+                    if (isNum) {
+                        try {
+                            int64_t id = std::stoll(q);
+                            if (id != 0) {
+                                auto r = db_->deleteTrack(id);
+                                if (r)
+                                    return Result{Empty{}};
+                                if (r.error().code != caudio::utils::StatusCode::NotFound)
+                                    return std::unexpected{r.error()};
+                                // fallthrough to path lookup
+                            }
+                        } catch (...) {
+                        }
+                    }
+                    // try by path
+                    auto byPath = db_->findByPath(cmd.query);
+                    if (byPath) {
+                        auto r = db_->deleteTrack(byPath->id);
+                        if (!r)
+                            return std::unexpected{r.error()};
+                        return Result{Empty{}};
+                    }
+                    // also try trimmed path
+                    if (q != cmd.query) {
+                        auto byPath2 = db_->findByPath(q);
+                        if (byPath2) {
+                            auto r = db_->deleteTrack(byPath2->id);
+                            if (!r)
+                                return std::unexpected{r.error()};
+                            return Result{Empty{}};
+                        }
+                    }
+                    return std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::NotFound, "track not found: " + cmd.query)};
+                },
+                [&](const TagEdit& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    if (cmd.id == 0)
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "tag edit: invalid id")};
+                    static const std::array<std::string_view, 8> allowed{
+                        "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
+                    bool ok = false;
+                    for (auto a : allowed)
+                        if (a == cmd.field) {
+                            ok = true;
+                            break;
+                        }
+                    if (!ok)
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "invalid field: " + cmd.field)};
+                    auto trRes = db_->getTrack(cmd.id);
+                    if (!trRes)
+                        return std::unexpected{trRes.error()};
+                    caudio::db::Track t = std::move(*trRes);
+                    if (cmd.field == "title")
+                        t.title = cmd.value;
+                    else if (cmd.field == "artist")
+                        t.artist = cmd.value;
+                    else if (cmd.field == "album")
+                        t.album = cmd.value;
+                    else if (cmd.field == "album_artist")
+                        t.album_artist = cmd.value;
+                    else if (cmd.field == "genre")
+                        t.genre = cmd.value;
+                    else if (cmd.field == "year") {
+                        try {
+                            size_t pos = 0;
+                            int v = std::stoi(cmd.value, &pos);
+                            if (pos != cmd.value.size())
+                                throw std::invalid_argument("extra");
+                            t.year = v;
+                        } catch (...) {
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::InvalidArg, "invalid year: " + cmd.value)};
+                        }
+                    } else if (cmd.field == "track_number") {
+                        try {
+                            size_t pos = 0;
+                            int v = std::stoi(cmd.value, &pos);
+                            if (pos != cmd.value.size())
+                                throw std::invalid_argument("extra");
+                            t.track_num = v;
+                        } catch (...) {
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::InvalidArg, "invalid track_number: " + cmd.value)};
+                        }
+                    } else if (cmd.field == "disc_number") {
+                        try {
+                            size_t pos = 0;
+                            int v = std::stoi(cmd.value, &pos);
+                            if (pos != cmd.value.size())
+                                throw std::invalid_argument("extra");
+                            t.disc_num = v;
+                        } catch (...) {
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::InvalidArg, "invalid disc_number: " + cmd.value)};
+                        }
+                    }
+                    auto upd = db_->updateTrack(t);
+                    if (!upd)
+                        return std::unexpected{upd.error()};
+                    return Result{Empty{}};
+                },
+                [&](const TagGet& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    if (cmd.id == 0)
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "tag get: invalid id")};
+                    auto tr = db_->getTrack(cmd.id);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    return Result{SingleTrack{std::move(*tr)}};
+                },
                 [&](const ConfigGet& cmd) -> std::expected<Result, caudio::utils::Error> {
                     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                     auto vRes = detail::readConfigValueRaw(p, cmd.key);
@@ -887,6 +1099,22 @@ class Service final {
                     if (!std::filesystem::exists(dst, ec2)) {
                         return std::unexpected{caudio::utils::makeError(
                             caudio::utils::StatusCode::Io, "import failed")};
+                    }
+                    return Result{Empty{}};
+                },
+                [&](const ConfigReset& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
+                    if (cmd.key.has_value() && !cmd.key->empty()) {
+                        auto r = detail::deleteConfigValueRaw(p, *cmd.key);
+                        if (!r)
+                            return std::unexpected{r.error()};
+                    } else if (cmd.key.has_value() && cmd.key->empty()) {
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "empty key")};
+                    } else {
+                        auto r = detail::resetAllConfigRaw(p);
+                        if (!r)
+                            return std::unexpected{r.error()};
                     }
                     return Result{Empty{}};
                 },

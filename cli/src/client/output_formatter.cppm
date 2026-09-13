@@ -44,13 +44,21 @@ class OutputFormatter {
         return caudio::cli::detail::repeatModeToString(m);
     }
 
+    static std::string truncateField(const std::string& s, std::size_t maxLen = 40) {
+        if (s.size() <= maxLen)
+            return s;
+        if (maxLen <= 3)
+            return s.substr(0, maxLen);
+        return s.substr(0, maxLen - 3) + "...";
+    }
+
   public:
     explicit OutputFormatter(bool json = false) : json_(json) {}
 
     void print(const caudio::cli::Result& r, std::ostream& os) const {
         if (json_) {
-            // Delegate to protocol toJson which properly escapes strings via nlohmann::json.
-            std::println(os, "{}", caudio::cli::toJson(r).dump());
+            // Pretty-printed for single-shot human --json; watch streaming uses compact separately.
+            std::println(os, "{}", caudio::cli::toJson(r).dump(2));
             return;
         }
 
@@ -68,49 +76,51 @@ class OutputFormatter {
                     std::println(os, "Shuffle: {} Repeat: {}", v.shuffle ? "on" : "off",
                                  repeatModeToString(v.repeat));
                     if (!v.title.empty() || !v.artist.empty() || v.track_id != 0) {
-                        std::println(os, "Track: {} - {} [id: {}]", v.artist, v.title, v.track_id);
+                        std::println(os, "Track: {} - {} [id: {}]", truncateField(v.artist, 40),
+                                     truncateField(v.title, 40), v.track_id);
                     }
                     if (!v.path.empty()) {
-                        std::println(os, "Path: {}", v.path);
+                        std::println(os, "Path: {}", truncateField(v.path, 80));
                     }
-                    std::println(os, "Queue: {}/{}  State code: {} Repeat code: {}", v.q_idx,
-                                 v.q_size, std::to_underlying(v.state),
-                                 std::to_underlying(v.repeat));
+                    std::println(os, "Queue: {}/{}", v.q_idx, v.q_size);
                 } else if constexpr (std::is_same_v<T, caudio::cli::QueueTracks>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
-                    std::println(os, "QueueTracks ({} tracks):", tracksSpan.size());
+                    std::println(os, "Queue ({} tracks):", tracksSpan.size());
+                    std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
+                                 "Dur");
                     for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
                         const auto& t = tracksSpan[i];
-                        std::println(os, "{:3} [{}] {} - {} ({})", i, t.id, t.artist, t.title,
+                        std::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                     truncateField(t.artist, 40), truncateField(t.title, 40),
                                      formatTime(t.duration));
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::VolumeInfo>) {
                     int pct = static_cast<int>(v.vol * 100.0f);
                     std::println(os, "Volume: {}% (muted: {})", pct, v.muted ? "yes" : "no");
-                    std::println(os, "Volume code: {}",
-                                 std::to_underlying(caudio::utils::StatusCode::Ok));
                 } else if constexpr (std::is_same_v<T, caudio::cli::LibraryStatsData>) {
                     std::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
                                  v.playlists);
                 } else if constexpr (std::is_same_v<T, caudio::cli::Tracks>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
                     std::println(os, "Tracks ({}):", tracksSpan.size());
+                    std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
+                                 "Dur");
                     for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
                         const auto& t = tracksSpan[i];
-                        std::println(os, "{:3} [{}] {} - {} ({})", i, t.id, t.artist, t.title,
+                        std::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                     truncateField(t.artist, 40), truncateField(t.title, 40),
                                      formatTime(t.duration));
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::Playlists>) {
                     std::span<const caudio::db::Playlist> playlistSpan{v.playlists};
                     std::println(os, "Playlists ({}):", playlistSpan.size());
+                    std::println(os, "{:>3} {:>6}  {:<40}", "#", "ID", "Name");
                     for (std::size_t i = 0; i < playlistSpan.size(); ++i) {
                         const auto& p = playlistSpan[i];
-                        std::println(os, "{:3} [{}] {}", i, p.id, p.name);
+                        std::println(os, "{:3} {:6}  {:<40}", i, p.id, truncateField(p.name, 40));
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValue>) {
                     std::println(os, "{} = {}", v.key, v.value);
-                    std::println(os, "Code value: {}",
-                                 std::to_underlying(caudio::utils::StatusCode::Ok));
                 } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValues>) {
                     std::println(os, "Config ({} entries):", v.values.size());
                     for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values)) {
@@ -118,18 +128,36 @@ class OutputFormatter {
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::PlaylistData>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
-                    std::println(os, "PlaylistData ({} tracks, format: {}):", tracksSpan.size(), v.format);
+                    std::println(os, "Playlist ({} tracks, format: {}):", tracksSpan.size(), v.format);
+                    std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
+                                 "Dur");
                     for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
                         const auto& t = tracksSpan[i];
-                        std::println(os, "{:3} [{}] {} - {} ({})", i, t.id, t.artist, t.title,
+                        std::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                     truncateField(t.artist, 40), truncateField(t.title, 40),
                                      formatTime(t.duration));
                     }
+                } else if constexpr (std::is_same_v<T, caudio::cli::SingleTrack>) {
+                    const auto& t = v.track;
+                    std::println(os, "Track [{}]", t.id);
+                    std::println(os, "  Path:         {}", t.path);
+                    std::println(os, "  Title:        {}", t.title.empty() ? "(empty)" : t.title);
+                    std::println(os, "  Artist:       {}", t.artist.empty() ? "(empty)" : t.artist);
+                    std::println(os, "  Album:        {}", t.album.empty() ? "(empty)" : t.album);
+                    std::println(os, "  Album Artist: {}", t.album_artist.empty() ? "(empty)" : t.album_artist);
+                    std::println(os, "  Genre:        {}", t.genre.empty() ? "(empty)" : t.genre);
+                    std::println(os, "  Year:         {}", t.year);
+                    std::println(os, "  Track:        {}", t.track_num);
+                    std::println(os, "  Disc:         {}", t.disc_num);
+                    std::println(os, "  Duration:     {}", formatTime(t.duration));
+                    std::println(os, "  Sample Rate:  {}", t.sample_rate);
+                    std::println(os, "  Channels:     {}", t.channels);
+                    std::println(os, "  Bitrate:      {}", t.bitrate);
                 } else if constexpr (std::is_same_v<T, std::monostate>) {
                     std::println(os, "OK");
                 } else if constexpr (std::is_same_v<T, caudio::utils::Error>) {
                     // Error variant - print to given stream (caller may pass cerr)
                     std::println(os, "Error: {} {}", caudio::utils::toString(v.code), v.message);
-                    std::println(os, "Code value: {}", std::to_underlying(v.code));
                 } else {
                     std::println(os, "Unknown result");
                 }
