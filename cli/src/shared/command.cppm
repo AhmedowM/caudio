@@ -153,6 +153,12 @@ struct ConfigReset final {
     std::optional<std::string> key{};
 };
 
+struct HistoryList final {
+    std::optional<int> limit{};
+};
+
+struct HistoryClear final {};
+
 struct Shutdown final {};
 
 struct Preview final {
@@ -166,7 +172,7 @@ using Command =
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
                  LibraryScan, LibrarySearch, LibraryStats, LibraryAdd, LibraryRemove, TagEdit,
                  TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport, ConfigImport, ConfigReset,
-                 Shutdown, Preview>;
+                 HistoryList, HistoryClear, Shutdown, Preview>;
 
 // helper concepts
 template <typename T>
@@ -186,7 +192,8 @@ concept CommandAlternative = requires {
         std::is_same<T, LibraryAdd>, std::is_same<T, LibraryRemove>, std::is_same<T, TagEdit>,
         std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
         std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
-        std::is_same<T, ConfigReset>, std::is_same<T, Shutdown>, std::is_same<T, Preview>>;
+        std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
+        std::is_same<T, Shutdown>, std::is_same<T, Preview>>;
 };
 
 template <typename T>

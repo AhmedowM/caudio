@@ -1342,6 +1342,25 @@ class Database final {
         return out;
     }
 
+    std::expected<void, caudio::utils::Error> historyClear() {
+        std::unique_lock lk{dbMutex_};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        char* err = nullptr;
+        int rc = sqlite3_exec(db_.get(), "DELETE FROM history", nullptr, nullptr, &err);
+        if (rc != SQLITE_OK) {
+            std::string msg = err ? std::string(err) : "clear history failed";
+            if (err)
+                sqlite3_free(err);
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Internal, msg)};
+        }
+        if (err)
+            sqlite3_free(err);
+        return {};
+    }
+
     // Bookmarks
     std::expected<void, caudio::utils::Error> bookmarkAdd(int64_t tid, int64_t pos,
                                                           std::string_view note = {}) {

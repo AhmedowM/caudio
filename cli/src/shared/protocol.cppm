@@ -439,6 +439,14 @@ ordered_json toJson(const Command& cmd) {
                     j["key"] = *v.key;
                 else
                     j["key"] = nullptr;
+            } else if constexpr (std::is_same_v<T, HistoryList>) {
+                j["type"] = "HistoryList";
+                if (v.limit.has_value())
+                    j["limit"] = *v.limit;
+                else
+                    j["limit"] = nullptr;
+            } else if constexpr (std::is_same_v<T, HistoryClear>) {
+                j["type"] = "HistoryClear";
             } else if constexpr (std::is_same_v<T, Shutdown>) {
                 j["type"] = "Shutdown";
             } else if constexpr (std::is_same_v<T, Preview>) {
@@ -691,6 +699,15 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
                 k = j["key"].get<std::string>();
             return Command{ConfigReset{std::move(k)}};
         }
+        if (t == "HistoryList") {
+            HistoryList v{};
+            if (j.contains("limit") && !j["limit"].is_null() && j["limit"].is_number())
+                v.limit = j["limit"].get<int>();
+            return Command{std::move(v)};
+        }
+        if (t == "HistoryClear") {
+            return Command{HistoryClear{}};
+        }
         if (t == "Shutdown")
             return Command{Shutdown{}};
         if (t == "Preview") {
@@ -810,6 +827,41 @@ ordered_json toJson(const Result& r) {
                 ordered_json j;
                 j["type"] = "SingleTrack";
                 j["track"] = detail::trackToJson(v.track);
+                return j;
+            } else if constexpr (std::is_same_v<T, HistoryEntry>) {
+                ordered_json j;
+                j["type"] = "HistoryEntry";
+                j["id"] = v.id;
+                j["track_id"] = v.track_id;
+                j["started_at"] = v.started_at;
+                j["completed_at"] = v.completed_at;
+                j["position_ms"] = v.position_ms;
+                j["completion_pct"] = v.completion_pct;
+                j["queue_id"] = v.queue_id;
+                j["title"] = v.title;
+                j["artist"] = v.artist;
+                j["path"] = v.path;
+                j["duration"] = v.duration;
+                return j;
+            } else if constexpr (std::is_same_v<T, History>) {
+                ordered_json j;
+                j["type"] = "History";
+                j["entries"] = ordered_json::array();
+                for (const auto& e : v.entries) {
+                    ordered_json ej;
+                    ej["id"] = e.id;
+                    ej["track_id"] = e.track_id;
+                    ej["started_at"] = e.started_at;
+                    ej["completed_at"] = e.completed_at;
+                    ej["position_ms"] = e.position_ms;
+                    ej["completion_pct"] = e.completion_pct;
+                    ej["queue_id"] = e.queue_id;
+                    ej["title"] = e.title;
+                    ej["artist"] = e.artist;
+                    ej["path"] = e.path;
+                    ej["duration"] = e.duration;
+                    j["entries"].push_back(ej);
+                }
                 return j;
             } else if constexpr (std::is_same_v<T, Empty>) {
                 ordered_json j;
@@ -982,6 +1034,38 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 st.track = std::move(*tr);
             }
             return Result{std::move(st)};
+        }
+        if (t == "History") {
+            History h{};
+            if (j.contains("entries") && j["entries"].is_array()) {
+                for (const auto& je : j["entries"]) {
+                    HistoryEntry e{};
+                    if (je.contains("id") && je["id"].is_number())
+                        e.id = je["id"].get<int64_t>();
+                    if (je.contains("track_id") && je["track_id"].is_number())
+                        e.track_id = je["track_id"].get<int64_t>();
+                    if (je.contains("started_at") && je["started_at"].is_number())
+                        e.started_at = je["started_at"].get<int64_t>();
+                    if (je.contains("completed_at") && je["completed_at"].is_number())
+                        e.completed_at = je["completed_at"].get<int64_t>();
+                    if (je.contains("position_ms") && je["position_ms"].is_number())
+                        e.position_ms = je["position_ms"].get<int64_t>();
+                    if (je.contains("completion_pct") && je["completion_pct"].is_number())
+                        e.completion_pct = je["completion_pct"].get<double>();
+                    if (je.contains("queue_id") && je["queue_id"].is_number())
+                        e.queue_id = je["queue_id"].get<int64_t>();
+                    if (je.contains("title") && je["title"].is_string())
+                        e.title = je["title"].get<std::string>();
+                    if (je.contains("artist") && je["artist"].is_string())
+                        e.artist = je["artist"].get<std::string>();
+                    if (je.contains("path") && je["path"].is_string())
+                        e.path = je["path"].get<std::string>();
+                    if (je.contains("duration") && je["duration"].is_number())
+                        e.duration = je["duration"].get<double>();
+                    h.entries.push_back(std::move(e));
+                }
+            }
+            return Result{std::move(h)};
         }
         if (t == "Empty") {
             return Result{Empty{}};

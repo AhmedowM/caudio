@@ -327,6 +327,22 @@ class Engine final {
         return db_->getStats();
     }
 
+    std::expected<std::vector<HistoryEntry>, caudio::utils::Error> listHistory(int limit = 50) {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        caudio::engine::History hist(db_);
+        return hist.listHistory(limit);
+    }
+
+    std::expected<void, caudio::utils::Error> clearHistory() {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        caudio::engine::History hist(db_);
+        return hist.clearHistory();
+    }
+
     std::string lastError() const {
         if (!lastErr_.empty())
             return lastErr_;

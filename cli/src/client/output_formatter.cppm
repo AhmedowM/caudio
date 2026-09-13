@@ -153,6 +153,28 @@ class OutputFormatter {
                     std::println(os, "  Sample Rate:  {}", t.sample_rate);
                     std::println(os, "  Channels:     {}", t.channels);
                     std::println(os, "  Bitrate:      {}", t.bitrate);
+                } else if constexpr (std::is_same_v<T, caudio::cli::History>) {
+                    std::span<const caudio::cli::HistoryEntry> entriesSpan{v.entries};
+                    std::println(os, "History ({} entries):", entriesSpan.size());
+                    std::println(os, "{:>3}  {:<20}  {:<40} {:<40} {:>10} {:>8}", "#", "Date", "Artist", "Title", "Pos", "Dur");
+                    for (std::size_t i = 0; i < entriesSpan.size(); ++i) {
+                        const auto& e = entriesSpan[i];
+                        // Convert started_at (milliseconds since epoch) to human readable
+                        std::time_t t = static_cast<std::time_t>(e.started_at / 1000);
+                        std::tm tm{};
+#ifdef _WIN32
+                        localtime_s(&tm, &t);
+#else
+                        localtime_r(&t, &tm);
+#endif
+                        char timeBuf[32];
+                        std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M", &tm);
+                        std::string posStr = formatTime(e.position_ms / 1000.0);
+                        std::string durStr = formatTime(e.duration);
+                        std::println(os, "{:3}  {:<20}  {:<40} {:<40} {:>10} {:>8}", i,
+                                     timeBuf, truncateField(e.artist, 40),
+                                     truncateField(e.title, 40), posStr, durStr);
+                    }
                 } else if constexpr (std::is_same_v<T, std::monostate>) {
                     std::println(os, "OK");
                 } else if constexpr (std::is_same_v<T, caudio::utils::Error>) {

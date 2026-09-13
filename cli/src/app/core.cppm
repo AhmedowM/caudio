@@ -620,6 +620,13 @@ inline int App::run(int argc, char** argv) {
     auto* tagGet = tagCmd->add_subcommand("get", "Get track tags");
     tagGet->add_option("id", tagGetId, "Track id")->required();
     tagGet->add_flag("--json", tagGetJson, "JSON output");
+    auto* historyCmd = cli_.add_subcommand("history", "Playback history operations");
+    bool historyJson = false;
+    int historyLimit = 50;
+    auto* historyList = historyCmd->add_subcommand("list", "List playback history");
+    historyList->add_flag("--json", historyJson, "JSON output");
+    historyList->add_option("--limit", historyLimit, "Limit entries");
+    auto* historyClear = historyCmd->add_subcommand("clear", "Clear playback history");
     std::string previewFile;
     auto* previewCmd = cli_.add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
@@ -1008,6 +1015,18 @@ inline int App::run(int argc, char** argv) {
             return sendViaClient(cmd, tagGetJson);
         }
         std::cout << tagCmd->help() << "\n";
+        return 0;
+    }
+    if (historyCmd->parsed()) {
+        if (historyList->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::HistoryList{historyLimit}};
+            return sendViaClient(cmd, historyJson);
+        }
+        if (historyClear->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::HistoryClear{}};
+            return sendViaClient(cmd, false);
+        }
+        std::cout << historyCmd->help() << "\n";
         return 0;
     }
     if (previewCmd->parsed())

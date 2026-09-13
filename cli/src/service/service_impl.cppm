@@ -836,6 +836,36 @@ class Service final {
                     d.playlists = static_cast<std::size_t>(st->num_playlists);
                     return Result{d};
                 },
+                [&](const HistoryList& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    int limit = cmd.limit.value_or(50);
+                    auto hist = engine_->listHistory(limit);
+                    if (!hist)
+                        return std::unexpected{hist.error()};
+                    std::vector<caudio::cli::HistoryEntry> cliEntries;
+                    cliEntries.reserve(hist->size());
+                    for (const auto& e : *hist) {
+                        caudio::cli::HistoryEntry cliEntry;
+                        cliEntry.id = e.id;
+                        cliEntry.track_id = e.track_id;
+                        cliEntry.started_at = e.started_at;
+                        cliEntry.completed_at = e.completed_at;
+                        cliEntry.position_ms = e.position_ms;
+                        cliEntry.completion_pct = e.completion_pct;
+                        cliEntry.queue_id = e.queue_id;
+                        cliEntry.title = e.title;
+                        cliEntry.artist = e.artist;
+                        cliEntry.path = e.path;
+                        cliEntry.duration = e.duration;
+                        cliEntries.push_back(std::move(cliEntry));
+                    }
+                    return Result{caudio::cli::History{std::move(cliEntries)}};
+                },
+                [&](const HistoryClear&) -> std::expected<Result, caudio::utils::Error> {
+                    auto r = engine_->clearHistory();
+                    if (!r)
+                        return std::unexpected{r.error()};
+                    return Result{Empty{}};
+                },
                 [&](const LibraryAdd& cmd) -> std::expected<Result, caudio::utils::Error> {
                     if (cmd.path.empty())
                         return std::unexpected{caudio::utils::makeError(

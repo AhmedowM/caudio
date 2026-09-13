@@ -77,11 +77,29 @@ struct SingleTrack final {
     caudio::db::Track track{};
 };
 
+struct HistoryEntry final {
+    int64_t id{};
+    int64_t track_id{};
+    int64_t started_at{};
+    int64_t completed_at{};
+    int64_t position_ms{};
+    double completion_pct{};
+    int64_t queue_id{1};
+    std::string title{};
+    std::string artist{};
+    std::string path{};
+    double duration{};
+};
+
+struct History final {
+    std::vector<HistoryEntry> entries{};
+};
+
 using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
 using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
-                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, Empty, CliError>;
+                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, History, Empty, CliError>;
 
 using ReplyExpected = std::expected<Result, CliError>;
 
