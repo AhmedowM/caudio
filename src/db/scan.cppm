@@ -25,6 +25,7 @@ module;
 export module caudio.db:scan;
 
 import caudio.utils;
+import caudio.player;
 import :types;
 import :detail;
 import :core;
@@ -80,6 +81,21 @@ export std::generator<Track> scan(const std::filesystem::path& root,
                         blake3_hasher_update(&hasher, buf.data(), static_cast<size_t>(f.gcount()));
                     blake3_hasher_finalize(&hasher, t.fingerprint.data(), t.fingerprint.size());
                 }
+            }
+            // Extract metadata (title, artist, album, etc.)
+            if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+                t.title = std::move(meta->title);
+                t.artist = std::move(meta->artist);
+                t.album = std::move(meta->album);
+                t.album_artist = std::move(meta->album_artist);
+                t.genre = std::move(meta->genre);
+                t.year = meta->year;
+                t.track_num = meta->track_num;
+                t.disc_num = meta->disc_num;
+                t.duration = meta->duration;
+                t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+                t.channels = static_cast<uint32_t>(meta->channels);
+                t.bitrate = meta->bitrate;
             }
             co_yield t;
         }
@@ -204,6 +220,37 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.mtime = trk.mtime;
             upd.library_id = libraryId;
             upd.deleted_at = 0;
+            // Extract and update metadata from file; clear if extraction fails or returns empty
+            bool hasMeta = false;
+            if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
+                if (!meta->title.empty()) { upd.title = std::move(meta->title); hasMeta = true; }
+                if (!meta->artist.empty()) { upd.artist = std::move(meta->artist); hasMeta = true; }
+                if (!meta->album.empty()) { upd.album = std::move(meta->album); hasMeta = true; }
+                if (!meta->album_artist.empty()) { upd.album_artist = std::move(meta->album_artist); hasMeta = true; }
+                if (!meta->genre.empty()) { upd.genre = std::move(meta->genre); hasMeta = true; }
+                if (meta->year != 0) { upd.year = meta->year; hasMeta = true; }
+                if (meta->track_num != 0) { upd.track_num = meta->track_num; hasMeta = true; }
+                if (meta->disc_num != 0) { upd.disc_num = meta->disc_num; hasMeta = true; }
+                if (meta->duration > 0) { upd.duration = meta->duration; hasMeta = true; }
+                if (meta->sample_rate != 0) { upd.sample_rate = static_cast<uint32_t>(meta->sample_rate); hasMeta = true; }
+                if (meta->channels != 0) { upd.channels = static_cast<uint32_t>(meta->channels); hasMeta = true; }
+                if (meta->bitrate != 0) { upd.bitrate = meta->bitrate; hasMeta = true; }
+            }
+            if (!hasMeta) {
+                upd.title.clear();
+                upd.artist.clear();
+                upd.album.clear();
+                upd.album_artist.clear();
+                upd.genre.clear();
+                upd.year = 0;
+                upd.track_num = 0;
+                upd.disc_num = 0;
+                upd.cover_art_path.clear();
+                upd.duration = 0;
+                upd.sample_rate = 0;
+                upd.channels = 0;
+                upd.bitrate = 0;
+            }
             (void)db.updateTrackLocked(upd);
             if (existingPath && existingPath->id != byFp->id) {
                 if (existingPath->fingerprint == trk.fingerprint)
@@ -219,19 +266,37 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.mtime = trk.mtime;
             upd.library_id = libraryId;
             upd.deleted_at = 0;
-            upd.title.clear();
-            upd.artist.clear();
-            upd.album.clear();
-            upd.album_artist.clear();
-            upd.genre.clear();
-            upd.year = 0;
-            upd.track_num = 0;
-            upd.disc_num = 0;
-            upd.cover_art_path.clear();
-            upd.duration = 0;
-            upd.sample_rate = 0;
-            upd.channels = 0;
-            upd.bitrate = 0;
+            // Extract and update metadata from file (preserve play_count, rating, date_added)
+            bool hasMeta = false;
+            if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
+                if (!meta->title.empty()) { upd.title = std::move(meta->title); hasMeta = true; }
+                if (!meta->artist.empty()) { upd.artist = std::move(meta->artist); hasMeta = true; }
+                if (!meta->album.empty()) { upd.album = std::move(meta->album); hasMeta = true; }
+                if (!meta->album_artist.empty()) { upd.album_artist = std::move(meta->album_artist); hasMeta = true; }
+                if (!meta->genre.empty()) { upd.genre = std::move(meta->genre); hasMeta = true; }
+                if (meta->year != 0) { upd.year = meta->year; hasMeta = true; }
+                if (meta->track_num != 0) { upd.track_num = meta->track_num; hasMeta = true; }
+                if (meta->disc_num != 0) { upd.disc_num = meta->disc_num; hasMeta = true; }
+                if (meta->duration > 0) { upd.duration = meta->duration; hasMeta = true; }
+                if (meta->sample_rate != 0) { upd.sample_rate = static_cast<uint32_t>(meta->sample_rate); hasMeta = true; }
+                if (meta->channels != 0) { upd.channels = static_cast<uint32_t>(meta->channels); hasMeta = true; }
+                if (meta->bitrate != 0) { upd.bitrate = meta->bitrate; hasMeta = true; }
+            }
+            if (!hasMeta) {
+                upd.title.clear();
+                upd.artist.clear();
+                upd.album.clear();
+                upd.album_artist.clear();
+                upd.genre.clear();
+                upd.year = 0;
+                upd.track_num = 0;
+                upd.disc_num = 0;
+                upd.cover_art_path.clear();
+                upd.duration = 0;
+                upd.sample_rate = 0;
+                upd.channels = 0;
+                upd.bitrate = 0;
+            }
             upd.dirty = false;
             upd.play_count = keepPlay;
             upd.rating = keepRating;

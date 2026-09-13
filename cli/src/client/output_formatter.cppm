@@ -45,6 +45,8 @@ class OutputFormatter {
     }
 
     static std::string truncateField(const std::string& s, std::size_t maxLen = 40) {
+        if (s.empty())
+            return "---";
         if (s.size() <= maxLen)
             return s;
         if (maxLen <= 3)

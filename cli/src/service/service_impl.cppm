@@ -895,6 +895,21 @@ class Service final {
                         auto ftime = std::filesystem::last_write_time(fp, ec2);
                         if (!ec2)
                             t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
+                        // Extract metadata (title, artist, album, etc.)
+                        if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+                            t.title = std::move(meta->title);
+                            t.artist = std::move(meta->artist);
+                            t.album = std::move(meta->album);
+                            t.album_artist = std::move(meta->album_artist);
+                            t.genre = std::move(meta->genre);
+                            t.year = meta->year;
+                            t.track_num = meta->track_num;
+                            t.disc_num = meta->disc_num;
+                            if (meta->duration > 0) t.duration = meta->duration;
+                            t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+                            t.channels = static_cast<uint32_t>(meta->channels);
+                            t.bitrate = meta->bitrate;
+                        }
                         auto ins = db_->insertTrack(t);
                         if (!ins) {
                             if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {

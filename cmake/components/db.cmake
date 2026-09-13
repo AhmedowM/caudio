@@ -15,7 +15,7 @@ set(CAUDIO_DB_SOURCES
   src/db/fts.cppm
   src/db/stmt_helpers.cppm
 )
-caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} DEPS caudio::utils Threads::Threads INCLUDES vendor)
+caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} DEPS caudio::utils caudio::player Threads::Threads INCLUDES vendor)
 target_include_directories(db PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(db PRIVATE caudio_sqlite blake3)
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)

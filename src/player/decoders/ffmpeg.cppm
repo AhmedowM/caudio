@@ -30,6 +30,79 @@ import :decoder_common;
 
 export namespace caudio::player {
 
+struct TrackMetadata {
+    std::string title;
+    std::string artist;
+    std::string album;
+    std::string album_artist;
+    std::string genre;
+    int year = 0;
+    int track_num = 0;
+    int disc_num = 0;
+    double duration = 0;
+    int sample_rate = 0;
+    int channels = 0;
+    int bitrate = 0;
+};
+
+caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
+    AVFormatContext* fmt = avformat_alloc_context();
+    if (!fmt) {
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::NoMem, "avformat_alloc_context failed"));
+    }
+
+    if (avformat_open_input(&fmt, path.data(), nullptr, nullptr) < 0) {
+        avformat_free_context(fmt);
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_open_input failed"));
+    }
+
+    if (avformat_find_stream_info(fmt, nullptr) < 0) {
+        avformat_close_input(&fmt);
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_find_stream_info failed"));
+    }
+
+    TrackMetadata meta;
+
+    auto getDict = [](AVDictionary* dict, const char* key) -> std::string {
+        AVDictionaryEntry* entry = av_dict_get(dict, key, nullptr, 0);
+        return entry && entry->value ? std::string(entry->value) : std::string{};
+    };
+
+    meta.title = getDict(fmt->metadata, "title");
+    meta.artist = getDict(fmt->metadata, "artist");
+    meta.album = getDict(fmt->metadata, "album");
+    meta.album_artist = getDict(fmt->metadata, "album_artist");
+    meta.genre = getDict(fmt->metadata, "genre");
+
+    if (auto dateStr = getDict(fmt->metadata, "date"); !dateStr.empty()) {
+        try { meta.year = std::stoi(dateStr.substr(0, 4)); } catch (...) {}
+    }
+    if (auto trackStr = getDict(fmt->metadata, "track"); !trackStr.empty()) {
+        try { meta.track_num = std::stoi(trackStr); } catch (...) {}
+    }
+    if (auto discStr = getDict(fmt->metadata, "disc"); !discStr.empty()) {
+        try { meta.disc_num = std::stoi(discStr); } catch (...) {}
+    }
+
+    int audioStreamIdx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    if (audioStreamIdx >= 0) {
+        AVStream* stream = fmt->streams[audioStreamIdx];
+        if (stream->codecpar) {
+            meta.sample_rate = static_cast<int>(stream->codecpar->sample_rate);
+            meta.channels = static_cast<int>(stream->codecpar->ch_layout.nb_channels);
+            meta.bitrate = static_cast<int>(stream->codecpar->bit_rate);
+        }
+        if (fmt->duration != AV_NOPTS_VALUE && fmt->duration > 0) {
+            meta.duration = static_cast<double>(fmt->duration) / AV_TIME_BASE;
+        } else if (stream->duration != AV_NOPTS_VALUE && stream->duration > 0) {
+            meta.duration = stream->duration * av_q2d(stream->time_base);
+        }
+    }
+
+    avformat_close_input(&fmt);
+    return meta;
+}
+
 class FfmpegDecoder final : public IDecoder {
   public:
     static bool probe(std::span<const std::byte> data) noexcept {
