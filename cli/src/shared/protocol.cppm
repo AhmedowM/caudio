@@ -363,10 +363,26 @@ ordered_json toJson(const Command& cmd) {
                     j["queue_id"] = *v.queue_id;
                 else
                     j["queue_id"] = nullptr;
-            } else if constexpr (std::is_same_v<T, PlaylistDelete>) {
-                j["type"] = "PlaylistDelete";
-                j["pid"] = v.pid;
-            } else if constexpr (std::is_same_v<T, LibraryScan>) {
+} else if constexpr (std::is_same_v<T, PlaylistDelete>) {
+            j["type"] = "PlaylistDelete";
+            j["pid"] = v.pid;
+        } else if constexpr (std::is_same_v<T, PlaylistRename>) {
+            j["type"] = "PlaylistRename";
+            j["pid"] = v.pid;
+            j["newName"] = v.newName;
+        } else if constexpr (std::is_same_v<T, PlaylistExport>) {
+            j["type"] = "PlaylistExport";
+            j["pid"] = v.pid;
+            j["path"] = v.path;
+            j["format"] = v.format;
+        } else if constexpr (std::is_same_v<T, PlaylistImport>) {
+            j["type"] = "PlaylistImport";
+            j["path"] = v.path;
+            if (v.name.has_value())
+                j["name"] = *v.name;
+            else
+                j["name"] = nullptr;
+        } else if constexpr (std::is_same_v<T, LibraryScan>) {
                 j["type"] = "LibraryScan";
                 if (v.path.has_value())
                     j["path"] = *v.path;
@@ -527,6 +543,36 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
                 pid = j["pid"].get<int64_t>();
             return Command{PlaylistDelete{pid}};
         }
+        if (t == "PlaylistRename") {
+            int64_t pid = 0;
+            std::string newName;
+            if (j.contains("pid") && j["pid"].is_number())
+                pid = j["pid"].get<int64_t>();
+            if (j.contains("newName") && j["newName"].is_string())
+                newName = j["newName"].get<std::string>();
+            return Command{PlaylistRename{pid, std::move(newName)}};
+        }
+        if (t == "PlaylistExport") {
+            int64_t pid = 0;
+            std::string path;
+            std::string format = "m3u";
+            if (j.contains("pid") && j["pid"].is_number())
+                pid = j["pid"].get<int64_t>();
+            if (j.contains("path") && j["path"].is_string())
+                path = j["path"].get<std::string>();
+            if (j.contains("format") && j["format"].is_string())
+                format = j["format"].get<std::string>();
+            return Command{PlaylistExport{pid, std::move(path), std::move(format)}};
+        }
+        if (t == "PlaylistImport") {
+            std::string path;
+            std::optional<std::string> name;
+            if (j.contains("path") && j["path"].is_string())
+                path = j["path"].get<std::string>();
+            if (j.contains("name") && !j["name"].is_null() && j["name"].is_string())
+                name = j["name"].get<std::string>();
+            return Command{PlaylistImport{std::move(path), name}};
+        }
         if (t == "LibraryScan") {
             LibraryScan v{};
             if (j.contains("path") && !j["path"].is_null() && j["path"].is_string())
@@ -668,6 +714,14 @@ ordered_json toJson(const Result& r) {
                 for (const auto& p : v.playlists)
                     j["playlists"].push_back(detail::playlistToJson(p));
                 return j;
+            } else if constexpr (std::is_same_v<T, PlaylistData>) {
+                ordered_json j;
+                j["type"] = "PlaylistData";
+                j["tracks"] = ordered_json::array();
+                for (const auto& t : v.tracks)
+                    j["tracks"].push_back(detail::trackToJson(t));
+                j["format"] = v.format;
+                return j;
             } else if constexpr (std::is_same_v<T, ConfigValue>) {
                 ordered_json j;
                 j["type"] = "ConfigValue";
@@ -800,6 +854,20 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 }
             }
             return Result{std::move(pl)};
+        }
+        if (t == "PlaylistData") {
+            PlaylistData pd{};
+            if (j.contains("tracks") && j["tracks"].is_array()) {
+                for (const auto& jt : j["tracks"]) {
+                    auto tr = detail::trackFromJson(jt);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    pd.tracks.push_back(std::move(*tr));
+                }
+            }
+            if (j.contains("format") && j["format"].is_string())
+                pd.format = j["format"].get<std::string>();
+            return Result{std::move(pd)};
         }
         if (t == "ConfigValue") {
             ConfigValue cv{};

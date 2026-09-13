@@ -312,6 +312,14 @@ class Engine final {
         return state_.currentTrackId;
     }
 
+    bool shuffle() const noexcept {
+        return queue_.shuffle;
+    }
+
+    RepeatMode repeat() const noexcept {
+        return queue_.repeat;
+    }
+
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats() {
         if (!hasDb())
             return std::unexpected(

@@ -116,6 +116,14 @@ class OutputFormatter {
                     for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values)) {
                         std::println(os, "{} = {}", cv.key, cv.value);
                     }
+                } else if constexpr (std::is_same_v<T, caudio::cli::PlaylistData>) {
+                    std::span<const caudio::db::Track> tracksSpan{v.tracks};
+                    std::println(os, "PlaylistData ({} tracks, format: {}):", tracksSpan.size(), v.format);
+                    for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
+                        const auto& t = tracksSpan[i];
+                        std::println(os, "{:3} [{}] {} - {} ({})", i, t.id, t.artist, t.title,
+                                     formatTime(t.duration));
+                    }
                 } else if constexpr (std::is_same_v<T, std::monostate>) {
                     std::println(os, "OK");
                 } else if constexpr (std::is_same_v<T, caudio::utils::Error>) {

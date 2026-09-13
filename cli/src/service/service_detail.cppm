@@ -244,8 +244,8 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     s.dur = eng.duration();
     s.vol = eng.volume();
     s.muted = false;
-    s.shuffle = false;
-    s.repeat = caudio::engine::RepeatMode::Off;
+    s.shuffle = eng.shuffle();
+    s.repeat = eng.repeat();
     s.track_id = eng.currentTrackId();
     if (s.track_id != 0) {
         auto tr = db.getTrack(s.track_id);

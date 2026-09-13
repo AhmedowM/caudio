@@ -83,6 +83,22 @@ struct PlaylistDelete final {
     int64_t pid{0};
 };
 
+struct PlaylistRename final {
+    int64_t pid{0};
+    std::string newName{};
+};
+
+struct PlaylistExport final {
+    int64_t pid{0};
+    std::string path{};
+    std::string format{"m3u"};
+};
+
+struct PlaylistImport final {
+    std::string path{};
+    std::optional<std::string> name{};
+};
+
 struct LibraryScan final {
     std::optional<std::string> path{};
     std::string mode{"sampled"};
@@ -124,7 +140,8 @@ using Command =
     std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
                  QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
                  QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
-                 PlaylistSave, PlaylistDelete, LibraryScan, LibrarySearch, LibraryStats, ConfigGet,
+                 PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
+                 LibraryScan, LibrarySearch, LibraryStats, ConfigGet,
                  ConfigSet, ConfigList, ConfigExport, ConfigImport, Shutdown, Preview>;
 
 // helper concepts
@@ -140,6 +157,7 @@ concept CommandAlternative = requires {
         std::is_same<T, QueueRepeat>, std::is_same<T, PlaylistList>,
         std::is_same<T, PlaylistTracks>, std::is_same<T, PlaylistLoad>,
         std::is_same<T, PlaylistSave>, std::is_same<T, PlaylistDelete>,
+        std::is_same<T, PlaylistRename>, std::is_same<T, PlaylistExport>, std::is_same<T, PlaylistImport>,
         std::is_same<T, LibraryScan>, std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
         std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>, std::is_same<T, ConfigList>,
         std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>, std::is_same<T, Shutdown>,

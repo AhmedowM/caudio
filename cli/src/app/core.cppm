@@ -46,6 +46,8 @@ import caudio.client;
 import caudio.service;
 import caudio.engine;
 import caudio.player;
+import caudio.json;
+import caudio.db;
 
 export namespace caudio::app {
 
@@ -150,6 +152,51 @@ inline std::chrono::duration<double> parseDuration(std::string_view s) {
         return std::chrono::duration<double>{0};
     return std::chrono::duration<double>{*t};
 }
+
+inline void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks, std::string_view format) {
+    if (format == "m3u") {
+        os << "#EXTM3U\n";
+        for (const auto& t : tracks) {
+            int dur = static_cast<int>(std::round(t.duration));
+            std::string title = t.title.empty() ? t.path : t.title;
+            std::string artist = t.artist.empty() ? "" : t.artist;
+            os << "#EXTINF:" << dur;
+            if (!artist.empty())
+                os << "," << artist << " - " << title;
+            else
+                os << "," << title;
+            os << "\n";
+            os << t.path << "\n";
+        }
+    } else if (format == "pls") {
+        os << "[playlist]\n";
+        int i = 1;
+        for (const auto& t : tracks) {
+            os << "File" << i << "=" << t.path << "\n";
+            std::string title = t.title.empty() ? t.path : t.title;
+            if (!t.artist.empty())
+                title = t.artist + " - " + title;
+            os << "Title" << i << "=" << title << "\n";
+            int dur = static_cast<int>(std::round(t.duration));
+            os << "Length" << i << "=" << dur << "\n";
+            ++i;
+        }
+        os << "NumberOfEntries=" << tracks.size() << "\n";
+        os << "Version=2\n";
+    }
+}
+
+inline void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks) {
+    caudio::json::ordered_json j;
+    j["format"] = "caudio-playlist";
+    j["version"] = 1;
+    j["tracks"] = caudio::json::ordered_json::array();
+    for (const auto& t : tracks) {
+        j["tracks"].push_back(caudio::cli::detail::trackToJson(t));
+    }
+    os << j.dump(2) << "\n";
+}
+
 } // namespace detail
 using detail::parseSeek;
 using detail::parseTime;
@@ -513,6 +560,23 @@ inline int App::run(int argc, char** argv) {
     std::int64_t plDeletePid = 0;
     auto* plDelete = plCmd->add_subcommand("delete", "Delete playlist");
     plDelete->add_option("pid", plDeletePid, "Playlist id")->required();
+    std::int64_t plRenamePid = 0;
+    std::string plRenameName;
+    auto* plRename = plCmd->add_subcommand("rename", "Rename playlist");
+    plRename->add_option("pid", plRenamePid, "Playlist id")->required();
+    plRename->add_option("name", plRenameName, "New name")->required();
+    std::int64_t plExportPid = 0;
+    std::string plExportPath;
+    std::string plExportFormat = "m3u";
+    auto* plExport = plCmd->add_subcommand("export", "Export playlist to file");
+    plExport->add_option("pid", plExportPid, "Playlist id")->required();
+    plExport->add_option("path", plExportPath, "Output file path")->required();
+    plExport->add_option("--format", plExportFormat, "Format: m3u|pls|json")->check(CLI::IsMember({"m3u", "pls", "json"}));
+    std::string plImportPath;
+    std::string plImportName;
+    auto* plImport = plCmd->add_subcommand("import", "Import playlist from file");
+    plImport->add_option("path", plImportPath, "Input file path")->required();
+    plImport->add_option("--name", plImportName, "Playlist name (default: filename)");
     auto* libCmd = cli_.add_subcommand("library", "Library operations");
     std::string libScanPath;
     std::string libScanMode = "sampled";
@@ -789,6 +853,46 @@ inline int App::run(int argc, char** argv) {
         }
         if (plDelete->parsed()) {
             caudio::cli::Command cmd{caudio::cli::PlaylistDelete{plDeletePid}};
+            return sendViaClient(cmd, false);
+        }
+        if (plRename->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::PlaylistRename{plRenamePid, plRenameName}};
+            return sendViaClient(cmd, false);
+        }
+        if (plExport->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::PlaylistExport{plExportPid, plExportPath, plExportFormat}};
+            caudio::client::Client client{config_.dbPath, config_.socketPath};
+            auto timeout = std::chrono::milliseconds{5000};
+            auto cliRes = client.send(cmd, timeout);
+            if (!cliRes) {
+                std::println(std::cerr, "export: {}", cliRes.error().message);
+                return 1;
+            }
+            if (std::holds_alternative<caudio::utils::Error>(*cliRes)) {
+                std::println(std::cerr, "export: {}", std::get<caudio::utils::Error>(*cliRes).message);
+                return 1;
+            }
+            if (std::holds_alternative<caudio::cli::PlaylistData>(*cliRes)) {
+                auto& pd = std::get<caudio::cli::PlaylistData>(*cliRes);
+                std::ofstream ofs(plExportPath);
+                if (!ofs) {
+                    std::println(std::cerr, "export: failed to open output file");
+                    return 1;
+                }
+                if (pd.format == "m3u" || pd.format == "pls") {
+                    detail::writePlaylistText(ofs, pd.tracks, pd.format);
+                } else if (pd.format == "json") {
+                    detail::writePlaylistJson(ofs, pd.tracks);
+                }
+                ofs.close();
+                std::println("exported {} tracks to {}", pd.tracks.size(), plExportPath);
+                return 0;
+            }
+            std::println(std::cerr, "export: unexpected response");
+            return 1;
+        }
+        if (plImport->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::PlaylistImport{plImportPath, plImportName.empty() ? std::optional<std::string>{} : std::optional<std::string>{plImportName}}};
             return sendViaClient(cmd, false);
         }
         std::cout << plCmd->help() << "\n";

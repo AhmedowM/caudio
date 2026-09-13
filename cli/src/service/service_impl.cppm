@@ -9,6 +9,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <span>
@@ -26,6 +27,7 @@ import caudio.engine;
 import caudio.db;
 import caudio.cli;
 import caudio.player;
+import caudio.json;
 import :ipc_channel;
 import :ipc_server;
 import :shm_status;
@@ -737,11 +739,12 @@ class Service final {
                     return Result{QueueTracks{{}}};
                 },
                 [&](const QueueShuffle& qs) -> std::expected<Result, caudio::utils::Error> {
-                    bool on = qs.on.value_or(false);
-                    // if on not provided, toggle? default to true for now
-                    if (!qs.on.has_value()) {
-                        // toggle: we don't have getter, just enable
-                        on = true;
+                    bool on;
+                    if (qs.on.has_value()) {
+                        on = *qs.on;
+                    } else {
+                        // toggle: get current state and flip
+                        on = !engine_->shuffle();
                     }
                     auto r = engine_->setShuffle(on);
                     if (!r)
@@ -750,11 +753,12 @@ class Service final {
                     return statusResult();
                 },
                 [&](const QueueRepeat& qr) -> std::expected<Result, caudio::utils::Error> {
-                    caudio::engine::RepeatMode m =
-                        qr.mode.value_or(caudio::engine::RepeatMode::Off);
-                    auto r = engine_->setRepeat(m);
-                    if (!r)
-                        return std::unexpected{r.error()};
+                    if (qr.mode.has_value()) {
+                        auto r = engine_->setRepeat(*qr.mode);
+                        if (!r)
+                            return std::unexpected{r.error()};
+                    }
+                    // if no arg provided, just show current (statusResult already includes it)
                     updateShmStatus();
                     return statusResult();
                 },
@@ -950,6 +954,124 @@ class Service final {
                     if (!r)
                         return std::unexpected{r.error()};
                     return Result{Empty{}};
+                },
+                [&](const PlaylistRename& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    if (cmd.newName.empty())
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::InvalidArg, "empty playlist name")};
+                    auto r = db_->renamePlaylist(cmd.pid, cmd.newName);
+                    if (!r)
+                        return std::unexpected{r.error()};
+                    return Result{Empty{}};
+                },
+                [&](const PlaylistExport& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    auto tracks = db_->playlistGetTracks(cmd.pid);
+                    if (!tracks)
+                        return std::unexpected{tracks.error()};
+                    std::vector<caudio::db::Track> out;
+                    out.reserve(tracks->size());
+                    for (auto& t : std::span<const caudio::db::Track>(*tracks))
+                        out.push_back(std::move(t));
+                    return Result{PlaylistData{std::move(out), cmd.format}};
+                },
+                [&](const PlaylistImport& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    std::filesystem::path path{cmd.path};
+                    std::error_code ec;
+                    if (!std::filesystem::exists(path, ec)) {
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::NotFound, "file not found: " + cmd.path)};
+                    }
+                    std::string ext = path.extension().string();
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    std::vector<std::string> lines;
+                    if (ext == ".json") {
+                        // Parse JSON format
+                        std::ifstream ifs(path);
+                        if (!ifs)
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::Io, "failed to open file")};
+                        std::string content((std::istreambuf_iterator<char>(ifs)),
+                                            std::istreambuf_iterator<char>());
+                        try {
+                            auto j = caudio::json::ordered_json::parse(content);
+                            if (j.contains("tracks") && j["tracks"].is_array()) {
+                                for (const auto& track : j["tracks"]) {
+                                    if (track.contains("path") && track["path"].is_string()) {
+                                        lines.push_back(track["path"].get<std::string>());
+                                    }
+                                }
+                            }
+                        } catch (const std::exception& e) {
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::Corrupt, std::string("JSON parse error: ") + e.what())};
+                        }
+                    } else {
+                        // M3U/PLS format
+                        std::ifstream ifs(path);
+                        if (!ifs)
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::Io, "failed to open file")};
+                        std::string line;
+                        while (std::getline(ifs, line)) {
+                            // trim
+                            line.erase(0, line.find_first_not_of(" \t\r\n"));
+                            line.erase(line.find_last_not_of(" \t\r\n") + 1);
+                            if (line.empty() || line[0] == '#')
+                                continue;
+                            // Handle PLS format: File1=path, File2=path, etc.
+                            if (ext == ".pls") {
+                                std::size_t eq = line.find('=');
+                                if (eq != std::string::npos && eq + 1 < line.size()) {
+                                    std::string key = line.substr(0, eq);
+                                    std::string val = line.substr(eq + 1);
+                                    // trim key and val
+                                    key.erase(0, key.find_first_not_of(" \t\r\n"));
+                                    key.erase(key.find_last_not_of(" \t\r\n") + 1);
+                                    val.erase(0, val.find_first_not_of(" \t\r\n"));
+                                    val.erase(val.find_last_not_of(" \t\r\n") + 1);
+                                    if (key.rfind("File", 0) == 0) { // starts with "File"
+                                        lines.push_back(val);
+                                    }
+                                }
+                            } else {
+                                // M3U format: just the path
+                                lines.push_back(line);
+                            }
+                        }
+                    }
+                    std::vector<int64_t> trackIds;
+                    trackIds.reserve(lines.size());
+                    size_t matched = 0, skipped = 0;
+                    for (const auto& line : lines) {
+                        auto tr = db_->findByPath(line);
+                        if (tr) {
+                            trackIds.push_back(tr->id);
+                            ++matched;
+                        } else {
+                            ++skipped;
+                        }
+                    }
+                    if (trackIds.empty()) {
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::NotFound, "no matching tracks found in library")};
+                    }
+                    std::string name = cmd.name.value_or(path.stem().string());
+                    auto pidRes = db_->createPlaylistFromTracks(name, trackIds);
+                    if (!pidRes)
+                        return std::unexpected{pidRes.error()};
+                    caudio::cli::PlaylistData pd{};
+                    auto tracksRes = db_->playlistGetTracks(*pidRes);
+                    if (tracksRes) {
+                        for (auto& t : std::span<const caudio::db::Track>(*tracksRes))
+                            pd.tracks.push_back(std::move(t));
+                    }
+                    pd.format = ext;
+                    if (skipped > 0) {
+                        std::println(std::cerr, "playlist import: skipped {} unmatched tracks", skipped);
+                    }
+                    std::println(std::cerr, "playlist import: matched {} tracks, created playlist '{}' (id={})",
+                                 matched, name, *pidRes);
+                    return Result{std::move(pd)};
                 },
                 [&](const Shutdown&) -> std::expected<Result, caudio::utils::Error> {
                     shutdownRequested_.store(true, std::memory_order_release);

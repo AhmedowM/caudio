@@ -59,6 +59,11 @@ struct Playlists final {
     std::vector<caudio::db::Playlist> playlists{};
 };
 
+struct PlaylistData final {
+    std::vector<caudio::db::Track> tracks{};
+    std::string format{};
+};
+
 struct ConfigValue final {
     std::string key{};
     std::string value{};
@@ -72,7 +77,7 @@ using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
 using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
-                            ConfigValue, ConfigValues, Empty, CliError>;
+                            PlaylistData, ConfigValue, ConfigValues, Empty, CliError>;
 
 using ReplyExpected = std::expected<Result, CliError>;
 

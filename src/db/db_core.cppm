@@ -848,6 +848,135 @@ class Database final {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
         return {};
     }
+    std::expected<void, caudio::utils::Error> renamePlaylist(int64_t id, std::string_view newName) {
+        if (id == 0 || newName.empty())
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+        std::unique_lock lk{dbMutex_};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
+        if (auto e = st.prepare(db_.get(),
+                                "UPDATE playlists SET name=?, modified=CURRENT_TIMESTAMP WHERE id=?");
+            !e)
+            return std::unexpected{e.error()};
+        st.bindText(1, newName);
+        st.bindInt(2, id);
+        int rc = st.stepDone();
+        if (rc != SQLITE_DONE)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                            sqlite3_errmsg(db_.get()))};
+        if (sqlite3_changes(db_.get()) == 0)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
+        return {};
+    }
+    std::expected<int64_t, caudio::utils::Error>
+    createPlaylistFromTracks(std::string_view name, std::span<const int64_t> trackIds) {
+        if (name.empty())
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+        std::unique_lock lk{dbMutex_};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        char* err = nullptr;
+        internal::SqliteErrGuard guard{err};
+        int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        if (rc != SQLITE_OK)
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
+        auto pidRes = createPlaylistLocked(name);
+        if (!pidRes) {
+            sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
+            return std::unexpected{pidRes.error()};
+        }
+        int64_t pid = *pidRes;
+        for (int64_t tid : trackIds) {
+            auto r = playlistAddTrackLocked(pid, tid);
+            if (!r) {
+                sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
+                return std::unexpected{r.error()};
+            }
+        }
+        char* cErr = nullptr;
+        internal::SqliteErrGuard cGuard{cErr};
+        rc = sqlite3_exec(db_.get(), "COMMIT", nullptr, nullptr, &cErr);
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Internal, cErr ? std::string(cErr) : "commit failed")};
+        }
+        return pid;
+    }
+    std::expected<int64_t, caudio::utils::Error> createPlaylistLocked(std::string_view name,
+                                                                      int type = 0,
+                                                                      std::string_view smart_query = {}) {
+        if (name.empty())
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        SqliteStatement st;
+        if (auto e = st.prepare(db_.get(),
+                                "INSERT INTO playlists (name, type, smart_query) VALUES (?,?,?)");
+            !e)
+            return std::unexpected{e.error()};
+        st.bindText(1, name);
+        st.bindInt(2, type);
+        if (smart_query.empty())
+            st.bindNull(3);
+        else
+            st.bindText(3, smart_query);
+        int rc = st.stepDone();
+        if (rc != SQLITE_DONE)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                            sqlite3_errmsg(db_.get()))};
+        return sqlite3_last_insert_rowid(db_.get());
+    }
+    std::expected<void, caudio::utils::Error> playlistAddTrackLocked(int64_t pid, int64_t tid,
+                                                                     int64_t pos = -1) {
+        if (pid == 0 || tid == 0)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        if (pos < 0) {
+            SqliteStatement ms;
+            if (auto e = ms.prepare(
+                    db_.get(),
+                    "SELECT COALESCE(MAX(position), -1)+1 FROM playlist_items WHERE playlist_id=?");
+                e) {
+                ms.bindInt(1, pid);
+                if (ms.step())
+                    pos = ms.columnInt(0);
+            }
+            if (pos < 0)
+                pos = 0;
+        } else {
+            SqliteStatement ss;
+            if (auto e =
+                    ss.prepare(db_.get(), "UPDATE playlist_items SET position=position+1 WHERE "
+                                          "playlist_id=? AND position>=?");
+                e) {
+                ss.bindInt(1, pid);
+                ss.bindInt(2, pos);
+                (void)ss.stepDone();
+            }
+        }
+        SqliteStatement st;
+        if (auto e = st.prepare(
+                db_.get(),
+                "INSERT INTO playlist_items (playlist_id, track_id, position) VALUES (?,?,?)");
+            !e)
+            return std::unexpected{e.error()};
+        st.bindInt(1, pid);
+        st.bindInt(2, tid);
+        st.bindInt(3, pos);
+        int rc = st.stepDone();
+        if (rc != SQLITE_DONE)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                            sqlite3_errmsg(db_.get()))};
+        return {};
+    }
     std::expected<std::vector<Playlist>, caudio::utils::Error> listPlaylists() {
         std::shared_lock lk{dbMutex_};
         if (!db_)
