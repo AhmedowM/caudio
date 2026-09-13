@@ -597,8 +597,10 @@ inline int App::run(int argc, char** argv) {
     libSearch->add_option("--limit", libSearchLimit, "Limit");
     libSearch->add_flag("--json", libSearchJson, "JSON output");
     bool libStatsJson = false;
+    bool libStatsDetailed = false;
     auto* libStats = libCmd->add_subcommand("stats", "Library stats");
     libStats->add_flag("--json", libStatsJson, "JSON output");
+    libStats->add_flag("--detailed", libStatsDetailed, "Show detailed stats (most played, total play time)");
     std::string libAddPath;
     bool libAddRecursive = false;
     auto* libAdd = libCmd->add_subcommand("add", "Add file or directory to library");
@@ -607,6 +609,21 @@ inline int App::run(int argc, char** argv) {
     std::string libRemoveQuery;
     auto* libRemove = libCmd->add_subcommand("remove", "Remove track from library");
     libRemove->add_option("id", libRemoveQuery, "Track id or path")->required();
+    int libListLimit = 50;
+    int libListOffset = 0;
+    std::string libListQuery;
+    std::string libListArtist;
+    std::string libListAlbum;
+    std::string libListGenre;
+    bool libListJson = false;
+    auto* libList = libCmd->add_subcommand("list", "List all tracks in library");
+    libList->add_option("--query", libListQuery, "Search query (title, artist, album, genre)");
+    libList->add_option("--artist", libListArtist, "Filter by artist");
+    libList->add_option("--album", libListAlbum, "Filter by album");
+    libList->add_option("--genre", libListGenre, "Filter by genre");
+    libList->add_option("--limit", libListLimit, "Limit results");
+    libList->add_option("--offset", libListOffset, "Offset for pagination");
+    libList->add_flag("--json", libListJson, "JSON output");
     auto* tagCmd = cli_.add_subcommand("tag", "Tag operations");
     std::int64_t tagEditId = 0;
     std::string tagEditField;
@@ -662,6 +679,9 @@ inline int App::run(int argc, char** argv) {
     std::string devTestId;
     auto* devTest = deviceCmd->add_subcommand("test", "Test audio device (play tone)");
     devTest->add_option("--id", devTestId, "Device ID (default: current config)");
+    bool infoJson = false;
+    auto* infoCmd = cli_.add_subcommand("info", "Show current track info");
+    infoCmd->add_flag("--json", infoJson, "JSON output");
     try {
         cli_.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -1002,8 +1022,23 @@ inline int App::run(int argc, char** argv) {
             return sendViaClient(cmd, libSearchJson);
         }
         if (libStats->parsed()) {
+            if (libStatsDetailed) {
+                caudio::cli::Command cmd{caudio::cli::LibraryStatsDetailed{}};
+                return sendViaClient(cmd, libStatsJson);
+            }
             caudio::cli::Command cmd{caudio::cli::LibraryStats{}};
             return sendViaClient(cmd, libStatsJson);
+        }
+        if (libList->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::LibraryList{
+                libListQuery.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListQuery},
+                libListLimit,
+                libListOffset,
+                libListArtist.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListArtist},
+                libListAlbum.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListAlbum},
+                libListGenre.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListGenre}
+            }};
+            return sendViaClient(cmd, libListJson);
         }
         if (libAdd->parsed()) {
             caudio::cli::Command cmd{caudio::cli::LibraryAdd{libAddPath, libAddRecursive}};
@@ -1118,6 +1153,10 @@ inline int App::run(int argc, char** argv) {
         }
         std::cout << deviceCmd->help() << "\n";
         return 0;
+    }
+    if (infoCmd->parsed()) {
+        caudio::cli::Command cmd{caudio::cli::Info{}};
+        return sendViaClient(cmd, infoJson);
     }
     std::cout << cli_.help() << "\n";
     return 0;

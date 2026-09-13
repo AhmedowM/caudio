@@ -51,6 +51,15 @@ struct LibraryStatsData final {
     std::size_t playlists{0};
 };
 
+struct LibraryStatsDetailedData final {
+    std::size_t tracks{0};
+    std::size_t queues{0};
+    std::size_t playlists{0};
+    int64_t total_duration_ms{0};
+    int64_t total_play_time_ms{0};
+    std::vector<caudio::db::Track> most_played{};
+};
+
 struct Tracks final {
     std::vector<caudio::db::Track> tracks{};
 };
@@ -75,6 +84,12 @@ struct ConfigValues final {
 
 struct SingleTrack final {
     caudio::db::Track track{};
+};
+
+struct TrackInfo final {
+    caudio::db::Track track{};
+    int64_t play_count{0};
+    int64_t last_played{0};
 };
 
 struct HistoryEntry final {
@@ -108,8 +123,8 @@ struct Devices final {
 using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
-using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
-                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, History, Empty, CliError,
+using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData, Tracks, Playlists,
+                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError,
                             Devices>;
 
 using ReplyExpected = std::expected<Result, CliError>;

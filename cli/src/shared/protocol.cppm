@@ -403,6 +403,8 @@ ordered_json toJson(const Command& cmd) {
                 j["limit"] = v.limit;
             } else if constexpr (std::is_same_v<T, LibraryStats>) {
                 j["type"] = "LibraryStats";
+            } else if constexpr (std::is_same_v<T, LibraryStatsDetailed>) {
+                j["type"] = "LibraryStatsDetailed";
             } else if constexpr (std::is_same_v<T, LibraryAdd>) {
                 j["type"] = "LibraryAdd";
                 j["path"] = v.path;
@@ -410,6 +412,26 @@ ordered_json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, LibraryRemove>) {
                 j["type"] = "LibraryRemove";
                 j["query"] = v.query;
+            } else if constexpr (std::is_same_v<T, LibraryList>) {
+                j["type"] = "LibraryList";
+                if (v.query.has_value())
+                    j["query"] = *v.query;
+                else
+                    j["query"] = nullptr;
+                j["limit"] = v.limit;
+                j["offset"] = v.offset;
+                if (v.artist.has_value())
+                    j["artist"] = *v.artist;
+                else
+                    j["artist"] = nullptr;
+                if (v.album.has_value())
+                    j["album"] = *v.album;
+                else
+                    j["album"] = nullptr;
+                if (v.genre.has_value())
+                    j["genre"] = *v.genre;
+                else
+                    j["genre"] = nullptr;
             } else if constexpr (std::is_same_v<T, TagEdit>) {
                 j["type"] = "TagEdit";
                 j["id"] = v.id;
@@ -463,6 +485,8 @@ ordered_json toJson(const Command& cmd) {
                     j["id"] = *v.id;
                 else
                     j["id"] = nullptr;
+            } else if constexpr (std::is_same_v<T, Info>) {
+                j["type"] = "Info";
             }
             return j;
         },
@@ -640,6 +664,8 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
         }
         if (t == "LibraryStats")
             return Command{LibraryStats{}};
+        if (t == "LibraryStatsDetailed")
+            return Command{LibraryStatsDetailed{}};
         if (t == "LibraryAdd") {
             std::string p;
             bool rec = false;
@@ -658,6 +684,22 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
             else if (j.contains("id") && j["id"].is_number())
                 q = std::to_string(j["id"].get<int64_t>());
             return Command{LibraryRemove{std::move(q)}};
+        }
+        if (t == "LibraryList") {
+            LibraryList v{};
+            if (j.contains("query") && !j["query"].is_null() && j["query"].is_string())
+                v.query = j["query"].get<std::string>();
+            if (j.contains("limit") && j["limit"].is_number())
+                v.limit = j["limit"].get<int>();
+            if (j.contains("offset") && j["offset"].is_number())
+                v.offset = j["offset"].get<int>();
+            if (j.contains("artist") && !j["artist"].is_null() && j["artist"].is_string())
+                v.artist = j["artist"].get<std::string>();
+            if (j.contains("album") && !j["album"].is_null() && j["album"].is_string())
+                v.album = j["album"].get<std::string>();
+            if (j.contains("genre") && !j["genre"].is_null() && j["genre"].is_string())
+                v.genre = j["genre"].get<std::string>();
+            return Command{std::move(v)};
         }
         if (t == "TagEdit") {
             int64_t id = 0;
@@ -741,6 +783,8 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
                 id = j["id"].get<std::string>();
             return Command{DeviceTest{std::move(id)}};
         }
+        if (t == "Info")
+            return Command{Info{}};
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "unknown Command type: " + t)};
     } catch (const std::exception& e) {
@@ -813,6 +857,18 @@ ordered_json toJson(const Result& r) {
                 j["queues"] = v.queues;
                 j["playlists"] = v.playlists;
                 return j;
+            } else if constexpr (std::is_same_v<T, LibraryStatsDetailedData>) {
+                ordered_json j;
+                j["type"] = "LibraryStatsDetailed";
+                j["tracks"] = v.tracks;
+                j["queues"] = v.queues;
+                j["playlists"] = v.playlists;
+                j["total_duration_ms"] = v.total_duration_ms;
+                j["total_play_time_ms"] = v.total_play_time_ms;
+                j["most_played"] = ordered_json::array();
+                for (const auto& t : v.most_played)
+                    j["most_played"].push_back(detail::trackToJson(t));
+                return j;
             } else if constexpr (std::is_same_v<T, Tracks>) {
                 ordered_json j;
                 j["type"] = "Tracks";
@@ -852,6 +908,13 @@ ordered_json toJson(const Result& r) {
                 ordered_json j;
                 j["type"] = "SingleTrack";
                 j["track"] = detail::trackToJson(v.track);
+                return j;
+            } else if constexpr (std::is_same_v<T, TrackInfo>) {
+                ordered_json j;
+                j["type"] = "TrackInfo";
+                j["track"] = detail::trackToJson(v.track);
+                j["play_count"] = v.play_count;
+                j["last_played"] = v.last_played;
                 return j;
             } else if constexpr (std::is_same_v<T, HistoryEntry>) {
                 ordered_json j;
@@ -996,6 +1059,28 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 ls.playlists = j["playlists"].get<std::size_t>();
             return Result{std::move(ls)};
         }
+        if (t == "LibraryStatsDetailed") {
+            LibraryStatsDetailedData ls{};
+            if (j.contains("tracks") && j["tracks"].is_number())
+                ls.tracks = j["tracks"].get<std::size_t>();
+            if (j.contains("queues") && j["queues"].is_number())
+                ls.queues = j["queues"].get<std::size_t>();
+            if (j.contains("playlists") && j["playlists"].is_number())
+                ls.playlists = j["playlists"].get<std::size_t>();
+            if (j.contains("total_duration_ms") && j["total_duration_ms"].is_number())
+                ls.total_duration_ms = j["total_duration_ms"].get<int64_t>();
+            if (j.contains("total_play_time_ms") && j["total_play_time_ms"].is_number())
+                ls.total_play_time_ms = j["total_play_time_ms"].get<int64_t>();
+            if (j.contains("most_played") && j["most_played"].is_array()) {
+                for (const auto& jt : j["most_played"]) {
+                    auto tr = detail::trackFromJson(jt);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    ls.most_played.push_back(std::move(*tr));
+                }
+            }
+            return Result{std::move(ls)};
+        }
         if (t == "Tracks") {
             Tracks trs{};
             if (j.contains("tracks") && j["tracks"].is_array()) {
@@ -1071,6 +1156,20 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 st.track = std::move(*tr);
             }
             return Result{std::move(st)};
+        }
+        if (t == "TrackInfo") {
+            TrackInfo ti{};
+            if (j.contains("track")) {
+                auto tr = detail::trackFromJson(j["track"]);
+                if (!tr)
+                    return std::unexpected{tr.error()};
+                ti.track = std::move(*tr);
+            }
+            if (j.contains("play_count") && j["play_count"].is_number())
+                ti.play_count = j["play_count"].get<int64_t>();
+            if (j.contains("last_played") && j["last_played"].is_number())
+                ti.last_played = j["last_played"].get<int64_t>();
+            return Result{std::move(ti)};
         }
         if (t == "History") {
             History h{};

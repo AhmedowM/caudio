@@ -1497,6 +1497,68 @@ class Database final {
         return s;
     }
 
+    std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error> libraryStatsDetailed() {
+        std::shared_lock lk{dbMutex_};
+        if (!db_)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+        LibraryStatsDetailedData d{};
+        std::unique_lock cacheLk{cacheMutex_};
+        
+        // Total tracks, queues, playlists
+        auto one = [&](std::string_view sql, auto& out) {
+            auto sRes = getCachedForUse(sql);
+            if (!sRes)
+                return;
+            SqliteStatement& st = *(*sRes);
+            if (st.step())
+                out = static_cast<std::size_t>(st.columnInt(0));
+            st.reset();
+        };
+        
+        one("SELECT COUNT(*) FROM tracks WHERE deleted_at IS NULL", d.tracks);
+        one("SELECT COUNT(*) FROM queue", d.queues);
+        one("SELECT COUNT(*) FROM playlists", d.playlists);
+        
+        // Total duration
+        if (auto sRes = getCachedForUse(
+                "SELECT COALESCE(SUM(duration),0) FROM tracks WHERE deleted_at IS NULL");
+            sRes) {
+            SqliteStatement& st = *(*sRes);
+            if (st.step())
+                d.total_duration_ms = (int64_t)(st.columnDouble(0) * 1000);
+            st.reset();
+        }
+        
+        // Total play time (sum of play_count * duration)
+        if (auto sRes = getCachedForUse(
+                "SELECT COALESCE(SUM(play_count * duration),0) FROM tracks WHERE deleted_at IS NULL");
+            sRes) {
+            SqliteStatement& st = *(*sRes);
+            if (st.step())
+                d.total_play_time_ms = (int64_t)(st.columnDouble(0) * 1000);
+            st.reset();
+        }
+        
+        // Most played tracks (top 10)
+        {
+            std::string sql = std::string(internal::kSelectTracksCols) + 
+                " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT 10";
+            auto sRes = getCachedForUse(sql);
+            if (sRes) {
+                SqliteStatement& st = *(*sRes);
+                while (st.step()) {
+                    caudio::db::Track t;
+                    internal::fillTrackFromStmt(st.get(), t);
+                    d.most_played.push_back(std::move(t));
+                }
+                st.reset();
+            }
+        }
+        
+        return d;
+    }
+
     // insert overload for legacy database.cppm signature
     std::expected<void, caudio::utils::Error> insertTrackLegacy(int64_t libraryId,
                                                                 std::string_view name,

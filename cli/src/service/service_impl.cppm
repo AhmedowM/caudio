@@ -836,6 +836,52 @@ class Service final {
                     d.playlists = static_cast<std::size_t>(st->num_playlists);
                     return Result{d};
                 },
+                [&](const LibraryStatsDetailed&) -> std::expected<Result, caudio::utils::Error> {
+                    auto st = db_->libraryStatsDetailed();
+                    if (!st)
+                        return std::unexpected{st.error()};
+                    caudio::cli::LibraryStatsDetailedData d{};
+                    d.tracks = static_cast<std::size_t>(st->tracks);
+                    d.queues = static_cast<std::size_t>(st->queues);
+                    d.playlists = static_cast<std::size_t>(st->playlists);
+                    d.total_duration_ms = st->total_duration_ms;
+                    d.total_play_time_ms = st->total_play_time_ms;
+                    d.most_played = std::move(st->most_played);
+                    return Result{std::move(d)};
+                },
+                [&](const LibraryList& cmd) -> std::expected<Result, caudio::utils::Error> {
+                    caudio::db::TrackQuery q{};
+                    q.limit = cmd.limit;
+                    q.offset = cmd.offset;
+                    if (cmd.query.has_value())
+                        q.search = *cmd.query;
+                    if (cmd.artist.has_value())
+                        q.artist = *cmd.artist;
+                    if (cmd.album.has_value())
+                        q.album = *cmd.album;
+                    if (cmd.genre.has_value())
+                        q.genre = *cmd.genre;
+                    auto tracks = db_->listTracks(&q);
+                    if (!tracks)
+                        return std::unexpected{tracks.error()};
+                    return Result{Tracks{std::move(*tracks)}};
+                },
+                [&](const Info&) -> std::expected<Result, caudio::utils::Error> {
+                    // Get current track from engine status
+                    int64_t track_id = engine_->currentTrackId();
+                    if (track_id == 0) {
+                        return std::unexpected{caudio::utils::makeError(
+                            caudio::utils::StatusCode::NotFound, "no track currently playing")};
+                    }
+                    auto tr = db_->getTrack(track_id);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    caudio::cli::TrackInfo ti{};
+                    ti.track = std::move(*tr);
+                    ti.play_count = ti.track.play_count;
+                    ti.last_played = ti.track.last_played;
+                    return Result{std::move(ti)};
+                },
                 [&](const HistoryList& cmd) -> std::expected<Result, caudio::utils::Error> {
                     int limit = cmd.limit.value_or(50);
                     auto hist = engine_->listHistory(limit);

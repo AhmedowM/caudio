@@ -102,6 +102,15 @@ struct DbStats {
     int64_t total_duration_ms{};
 };
 
+struct LibraryStatsDetailedData {
+    std::size_t tracks{0};
+    std::size_t queues{0};
+    std::size_t playlists{0};
+    int64_t total_duration_ms{0};
+    int64_t total_play_time_ms{0};
+    std::vector<Track> most_played{};
+};
+
 struct TrackQuery {
     std::string artist;
     std::string album;

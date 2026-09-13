@@ -102,6 +102,25 @@ class OutputFormatter {
                 } else if constexpr (std::is_same_v<T, caudio::cli::LibraryStatsData>) {
                     std::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
                                  v.playlists);
+                } else if constexpr (std::is_same_v<T, caudio::cli::LibraryStatsDetailedData>) {
+                    std::println(os, "Library Stats (Detailed):");
+                    std::println(os, "  Tracks:      {}", v.tracks);
+                    std::println(os, "  Queues:      {}", v.queues);
+                    std::println(os, "  Playlists:   {}", v.playlists);
+                    double totalDurSec = v.total_duration_ms / 1000.0;
+                    double totalPlaySec = v.total_play_time_ms / 1000.0;
+                    std::println(os, "  Total Duration:  {}", formatTime(totalDurSec));
+                    std::println(os, "  Total Play Time: {}", formatTime(totalPlaySec));
+                    if (!v.most_played.empty()) {
+                        std::println(os, "\n  Most Played Tracks:");
+                        std::println(os, "  {:>3} {:>6}  {:<40} {:<40} {:>8} {:>10}", "#", "ID", "Artist", "Title", "Dur", "Plays");
+                        for (std::size_t i = 0; i < v.most_played.size(); ++i) {
+                            const auto& t = v.most_played[i];
+                            std::println(os, "  {:3} {:6}  {:<40} {:<40} {:>8} {:>10}", i + 1, t.id,
+                                         truncateField(t.artist, 40), truncateField(t.title, 40),
+                                         formatTime(t.duration), t.play_count);
+                        }
+                    }
                 } else if constexpr (std::is_same_v<T, caudio::cli::Tracks>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
                     std::println(os, "Tracks ({}):", tracksSpan.size());
@@ -155,6 +174,37 @@ class OutputFormatter {
                     std::println(os, "  Sample Rate:  {}", t.sample_rate);
                     std::println(os, "  Channels:     {}", t.channels);
                     std::println(os, "  Bitrate:      {}", t.bitrate);
+                } else if constexpr (std::is_same_v<T, caudio::cli::TrackInfo>) {
+                    const auto& t = v.track;
+                    std::println(os, "Track [{}]", t.id);
+                    std::println(os, "  Path:         {}", t.path);
+                    std::println(os, "  Title:        {}", t.title.empty() ? "(empty)" : t.title);
+                    std::println(os, "  Artist:       {}", t.artist.empty() ? "(empty)" : t.artist);
+                    std::println(os, "  Album:        {}", t.album.empty() ? "(empty)" : t.album);
+                    std::println(os, "  Album Artist: {}", t.album_artist.empty() ? "(empty)" : t.album_artist);
+                    std::println(os, "  Genre:        {}", t.genre.empty() ? "(empty)" : t.genre);
+                    std::println(os, "  Year:         {}", t.year);
+                    std::println(os, "  Track:        {}", t.track_num);
+                    std::println(os, "  Disc:         {}", t.disc_num);
+                    std::println(os, "  Duration:     {}", formatTime(t.duration));
+                    std::println(os, "  Sample Rate:  {}", t.sample_rate);
+                    std::println(os, "  Channels:     {}", t.channels);
+                    std::println(os, "  Bitrate:      {}", t.bitrate);
+                    std::println(os, "  Play Count:   {}", v.play_count);
+                    if (v.last_played > 0) {
+                        std::time_t tp = static_cast<std::time_t>(v.last_played / 1000);
+                        std::tm tm{};
+#ifdef _WIN32
+                        localtime_s(&tm, &tp);
+#else
+                        localtime_r(&tp, &tm);
+#endif
+                        char timeBuf[32];
+                        std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M", &tm);
+                        std::println(os, "  Last Played:  {}", timeBuf);
+                    } else {
+                        std::println(os, "  Last Played:  (never)");
+                    }
                 } else if constexpr (std::is_same_v<T, caudio::cli::History>) {
                     std::span<const caudio::cli::HistoryEntry> entriesSpan{v.entries};
                     std::println(os, "History ({} entries):", entriesSpan.size());

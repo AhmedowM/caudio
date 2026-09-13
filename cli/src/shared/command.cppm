@@ -159,6 +159,19 @@ struct HistoryList final {
 
 struct HistoryClear final {};
 
+struct LibraryList final {
+    std::optional<std::string> query{};
+    int limit{50};
+    int offset{0};
+    std::optional<std::string> artist{};
+    std::optional<std::string> album{};
+    std::optional<std::string> genre{};
+};
+
+struct LibraryStatsDetailed final {};
+
+struct Info final {};
+
 struct Shutdown final {};
 
 struct Preview final {
@@ -180,9 +193,9 @@ using Command =
                  QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
                  QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
-                 LibraryScan, LibrarySearch, LibraryStats, LibraryAdd, LibraryRemove, TagEdit,
+                 LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd, LibraryRemove, LibraryList, TagEdit,
                  TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport, ConfigImport, ConfigReset,
-                 HistoryList, HistoryClear, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest>;
+                 HistoryList, HistoryClear, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
 
 // helper concepts
 template <typename T>
@@ -199,12 +212,13 @@ concept CommandAlternative = requires {
         std::is_same<T, PlaylistSave>, std::is_same<T, PlaylistDelete>,
         std::is_same<T, PlaylistRename>, std::is_same<T, PlaylistExport>, std::is_same<T, PlaylistImport>,
         std::is_same<T, LibraryScan>, std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
-        std::is_same<T, LibraryAdd>, std::is_same<T, LibraryRemove>, std::is_same<T, TagEdit>,
-        std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
+        std::is_same<T, LibraryStatsDetailed>, std::is_same<T, LibraryAdd>, std::is_same<T, LibraryRemove>,
+        std::is_same<T, LibraryList>, std::is_same<T, TagEdit>, std::is_same<T, TagGet>,
+        std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
         std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
         std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
         std::is_same<T, Shutdown>, std::is_same<T, Preview>, std::is_same<T, DeviceList>,
-        std::is_same<T, DeviceSet>, std::is_same<T, DeviceTest>>;
+        std::is_same<T, DeviceSet>, std::is_same<T, DeviceTest>, std::is_same<T, Info>>;
 };
 
 template <typename T>
