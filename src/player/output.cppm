@@ -11,6 +11,7 @@ module;
 #include <span>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "miniaudio.h"
 
@@ -19,6 +20,48 @@ export module caudio.player:output;
 import caudio.utils;
 
 export namespace caudio::player {
+
+struct DeviceInfo {
+    std::string id;
+    std::string name;
+    bool isDefault = false;
+};
+
+struct DeviceList {
+    std::vector<DeviceInfo> devices;
+};
+
+inline DeviceList enumerateDevices() {
+    DeviceList list;
+    ma_context context;
+    ma_context_config ctxConfig = ma_context_config_init();
+    ma_result res = ma_context_init(nullptr, 0, &ctxConfig, &context);
+    if (res != MA_SUCCESS) {
+        return list;
+    }
+
+    ma_device_info* pPlaybackInfos = nullptr;
+    ma_uint32 playbackCount = 0;
+    ma_device_info* pCaptureInfos = nullptr;
+    ma_uint32 captureCount = 0;
+
+    res = ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount);
+    if (res == MA_SUCCESS && pPlaybackInfos && playbackCount > 0) {
+        list.devices.reserve(playbackCount);
+        for (ma_uint32 i = 0; i < playbackCount; ++i) {
+            const auto& info = pPlaybackInfos[i];
+            DeviceInfo di;
+            di.name = info.name;
+            di.isDefault = info.isDefault;
+            // Use simple index-based ID for user-friendly CLI
+            di.id = std::to_string(i);
+            list.devices.push_back(std::move(di));
+        }
+    }
+
+    ma_context_uninit(&context);
+    return list;
+}
 
 class AudioOutput {
   public:

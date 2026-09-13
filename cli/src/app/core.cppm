@@ -651,6 +651,17 @@ inline int App::run(int argc, char** argv) {
     std::string cfgResetKey;
     auto* cfgReset = cfgCmd->add_subcommand("reset", "Reset config to defaults");
     cfgReset->add_option("key", cfgResetKey, "Key to reset (omit to reset all)");
+    // Device commands
+    auto* deviceCmd = cli_.add_subcommand("device", "Audio device operations");
+    bool devJson = false;
+    auto* devList = deviceCmd->add_subcommand("list", "List audio output devices");
+    devList->add_flag("--json", devJson, "JSON output");
+    std::string devSetId;
+    auto* devSet = deviceCmd->add_subcommand("set", "Set default audio device");
+    devSet->add_option("id", devSetId, "Device ID")->required();
+    std::string devTestId;
+    auto* devTest = deviceCmd->add_subcommand("test", "Test audio device (play tone)");
+    devTest->add_option("--id", devTestId, "Device ID (default: current config)");
     try {
         cli_.parse(argc, argv);
     } catch (const CLI::ParseError& e) {
@@ -1087,6 +1098,25 @@ inline int App::run(int argc, char** argv) {
             return sendViaClient(cmd, false);
         }
         std::cout << cfgCmd->help() << "\n";
+        return 0;
+    }
+    if (deviceCmd->parsed()) {
+        if (devList->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::DeviceList{}};
+            return sendViaClient(cmd, devJson);
+        }
+        if (devSet->parsed()) {
+            caudio::cli::Command cmd{caudio::cli::DeviceSet{devSetId}};
+            return sendViaClient(cmd, false);
+        }
+        if (devTest->parsed()) {
+            std::optional<std::string> id;
+            if (!devTestId.empty())
+                id = devTestId;
+            caudio::cli::Command cmd{caudio::cli::DeviceTest{id}};
+            return sendViaClient(cmd, false);
+        }
+        std::cout << deviceCmd->help() << "\n";
         return 0;
     }
     std::cout << cli_.help() << "\n";

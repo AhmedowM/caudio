@@ -452,6 +452,17 @@ ordered_json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, Preview>) {
                 j["type"] = "Preview";
                 j["file"] = v.file;
+            } else if constexpr (std::is_same_v<T, DeviceList>) {
+                j["type"] = "DeviceList";
+            } else if constexpr (std::is_same_v<T, DeviceSet>) {
+                j["type"] = "DeviceSet";
+                j["id"] = v.id;
+            } else if constexpr (std::is_same_v<T, DeviceTest>) {
+                j["type"] = "DeviceTest";
+                if (v.id.has_value())
+                    j["id"] = *v.id;
+                else
+                    j["id"] = nullptr;
             }
             return j;
         },
@@ -716,6 +727,20 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
                 f = j["file"].get<std::string>();
             return Command{Preview{std::move(f)}};
         }
+        if (t == "DeviceList")
+            return Command{DeviceList{}};
+        if (t == "DeviceSet") {
+            std::string id;
+            if (j.contains("id") && j["id"].is_string())
+                id = j["id"].get<std::string>();
+            return Command{DeviceSet{std::move(id)}};
+        }
+        if (t == "DeviceTest") {
+            std::optional<std::string> id;
+            if (j.contains("id") && !j["id"].is_null() && j["id"].is_string())
+                id = j["id"].get<std::string>();
+            return Command{DeviceTest{std::move(id)}};
+        }
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "unknown Command type: " + t)};
     } catch (const std::exception& e) {
@@ -861,6 +886,18 @@ ordered_json toJson(const Result& r) {
                     ej["path"] = e.path;
                     ej["duration"] = e.duration;
                     j["entries"].push_back(ej);
+                }
+                return j;
+            } else if constexpr (std::is_same_v<T, Devices>) {
+                ordered_json j;
+                j["type"] = "Devices";
+                j["devices"] = ordered_json::array();
+                for (const auto& d : v.devices) {
+                    ordered_json dj;
+                    dj["id"] = d.id;
+                    dj["name"] = d.name;
+                    dj["isDefault"] = d.isDefault;
+                    j["devices"].push_back(dj);
                 }
                 return j;
             } else if constexpr (std::is_same_v<T, Empty>) {
@@ -1066,6 +1103,22 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 }
             }
             return Result{std::move(h)};
+        }
+        if (t == "Devices") {
+            Devices d{};
+            if (j.contains("devices") && j["devices"].is_array()) {
+                for (const auto& jd : j["devices"]) {
+                    DeviceInfo di{};
+                    if (jd.contains("id") && jd["id"].is_string())
+                        di.id = jd["id"].get<std::string>();
+                    if (jd.contains("name") && jd["name"].is_string())
+                        di.name = jd["name"].get<std::string>();
+                    if (jd.contains("isDefault") && jd["isDefault"].is_boolean())
+                        di.isDefault = jd["isDefault"].get<bool>();
+                    d.devices.push_back(std::move(di));
+                }
+            }
+            return Result{std::move(d)};
         }
         if (t == "Empty") {
             return Result{Empty{}};

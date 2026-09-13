@@ -95,11 +95,22 @@ struct History final {
     std::vector<HistoryEntry> entries{};
 };
 
+struct DeviceInfo final {
+    std::string id{};
+    std::string name{};
+    bool isDefault{false};
+};
+
+struct Devices final {
+    std::vector<DeviceInfo> devices{};
+};
+
 using Empty = std::monostate;
 using CliError = caudio::utils::Error;
 
 using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, Tracks, Playlists,
-                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, History, Empty, CliError>;
+                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, History, Empty, CliError,
+                            Devices>;
 
 using ReplyExpected = std::expected<Result, CliError>;
 

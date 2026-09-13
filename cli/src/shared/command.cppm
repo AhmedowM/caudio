@@ -165,6 +165,16 @@ struct Preview final {
     std::string file{};
 };
 
+struct DeviceList final {};
+
+struct DeviceSet final {
+    std::string id{};
+};
+
+struct DeviceTest final {
+    std::optional<std::string> id{};
+};
+
 using Command =
     std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
                  QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
@@ -172,7 +182,7 @@ using Command =
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
                  LibraryScan, LibrarySearch, LibraryStats, LibraryAdd, LibraryRemove, TagEdit,
                  TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport, ConfigImport, ConfigReset,
-                 HistoryList, HistoryClear, Shutdown, Preview>;
+                 HistoryList, HistoryClear, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest>;
 
 // helper concepts
 template <typename T>
@@ -193,7 +203,8 @@ concept CommandAlternative = requires {
         std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
         std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
         std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
-        std::is_same<T, Shutdown>, std::is_same<T, Preview>>;
+        std::is_same<T, Shutdown>, std::is_same<T, Preview>, std::is_same<T, DeviceList>,
+        std::is_same<T, DeviceSet>, std::is_same<T, DeviceTest>>;
 };
 
 template <typename T>

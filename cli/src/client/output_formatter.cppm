@@ -175,6 +175,15 @@ class OutputFormatter {
                                      timeBuf, truncateField(e.artist, 40),
                                      truncateField(e.title, 40), posStr, durStr);
                     }
+                } else if constexpr (std::is_same_v<T, caudio::cli::Devices>) {
+                    std::span<const caudio::cli::DeviceInfo> devicesSpan{v.devices};
+                    std::println(os, "Devices ({}):", devicesSpan.size());
+                    std::println(os, "{:>3}  {:<40}  {:<60}  {}", "#", "ID", "Name", "Default");
+                    for (std::size_t i = 0; i < devicesSpan.size(); ++i) {
+                        const auto& d = devicesSpan[i];
+                        std::println(os, "{:3}  {:<40}  {:<60}  {}", i, truncateField(d.id, 40),
+                                     truncateField(d.name, 60), d.isDefault ? "*" : "");
+                    }
                 } else if constexpr (std::is_same_v<T, std::monostate>) {
                     std::println(os, "OK");
                 } else if constexpr (std::is_same_v<T, caudio::utils::Error>) {
