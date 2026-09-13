@@ -256,7 +256,8 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
         }
     }
     try {
-        auto items = db.queueList(1);
+        int64_t activeQ = eng.activeQueueId();
+        auto items = db.queueList(activeQ);
         if (items) {
             s.q_size = items->size();
             s.q_idx = 0;

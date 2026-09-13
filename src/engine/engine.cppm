@@ -371,6 +371,54 @@ class Engine final {
         return {};
     }
 
+    int64_t activeQueueId() const noexcept {
+        std::lock_guard<std::mutex> lk(queueMutex_);
+        return queue_.queue_id ? queue_.queue_id : state_.activeQueueId ? state_.activeQueueId : 1;
+    }
+
+    ExpectedVoid switchQueue(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        // validate queue exists (holds queueMutex_ -> dbMutex_ shared)
+        {
+            auto q = db_->getQueue(qid);
+            if (!q) {
+                unlockQueue();
+                return std::unexpected(q.error());
+            }
+        }
+        if (queue_.queue_id == qid) {
+            // already active, ensure cursor consistent with DB state but not error
+            unlockQueue();
+            return {};
+        }
+        // switch active queue: reset cursor, clear shuffle perm, update state
+        queue_.queue_id = qid;
+        queue_.cursor = 0;
+        queue_.perm.clear();
+        state_.activeQueueId = qid;
+        state_.cursorPos = 0;
+        // keep shuffle flag as-is but perm cleared; next shuffle will regenerate for new queue
+        std::optional<caudio::utils::Error> err;
+        if (auto e = saveState(); !e)
+            err = e.error();
+        // also persist via saveState includes active_queue_id, cursor_pos, shuffle_perm cleared
+        unlockQueue();
+        if (err)
+            return std::unexpected(*err);
+        EngineEvent ev;
+        ev.type = EngineEventType::QueueChanged;
+        ev.queue_id = qid;
+        pushEvent(ev);
+        return {};
+    }
+
     ExpectedVoid next() {
         if (!hasDb())
             return std::unexpected(
@@ -604,14 +652,24 @@ class Engine final {
         if (!h || !m)
             return caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db");
         std::unique_lock<std::shared_mutex> lk(*m);
-        const char* sql = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
-                          "volume, shuffle_perm FROM engine_state WHERE id=1";
+        const char* sqlNew = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
+                             "volume, shuffle_perm, active_queue_id FROM engine_state WHERE id=1";
+        const char* sqlOld = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
+                             "volume, shuffle_perm FROM engine_state WHERE id=1";
         sqlite3_stmt* raw = nullptr;
-        int rc = sqlite3_prepare_v2(h, sql, -1, &raw, nullptr);
-        StmtGuard stmt(raw);
+        int rc = sqlite3_prepare_v2(h, sqlNew, -1, &raw, nullptr);
+        bool hasActiveCol = true;
         if (rc != SQLITE_OK) {
-            return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed");
+            // fallback to old schema without active_queue_id
+            sqlite3_finalize(raw);
+            raw = nullptr;
+            rc = sqlite3_prepare_v2(h, sqlOld, -1, &raw, nullptr);
+            hasActiveCol = false;
+            if (rc != SQLITE_OK) {
+                return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed");
+            }
         }
+        StmtGuard stmt(raw);
         raw = stmt.get();
         rc = sqlite3_step(raw);
         if (rc == SQLITE_ROW) {
@@ -625,6 +683,13 @@ class Engine final {
             volume_.store(state_.volume, std::memory_order_relaxed);
             const void* blob = sqlite3_column_blob(raw, 5);
             int blobBytes = sqlite3_column_bytes(raw, 5);
+            if (hasActiveCol) {
+                state_.activeQueueId = sqlite3_column_int64(raw, 6);
+                if (state_.activeQueueId <= 0)
+                    state_.activeQueueId = 1;
+            } else {
+                state_.activeQueueId = 1;
+            }
             queue_.perm.clear();
             queue_.perm.shrink_to_fit();
             queue_.cursor = 0;
@@ -646,7 +711,21 @@ class Engine final {
                 // for non-shuffle, keep cursor as stored (persistent queue via cursor)
                 // clamp later via queueCount if needed; don't reset to 0
             }
-            queue_.queue_id = 1;
+            queue_.queue_id = state_.activeQueueId;
+            // validate queue exists; fallback to 1 if not
+            {
+                sqlite3_stmt* chk = nullptr;
+                if (sqlite3_prepare_v2(h, "SELECT id FROM queues WHERE id=?", -1, &chk, nullptr) ==
+                    SQLITE_OK) {
+                    sqlite3_bind_int64(chk, 1, queue_.queue_id);
+                    int step = sqlite3_step(chk);
+                    if (step != SQLITE_ROW) {
+                        queue_.queue_id = 1;
+                        state_.activeQueueId = 1;
+                    }
+                    sqlite3_finalize(chk);
+                }
+            }
             return std::nullopt;
         }
         if (rc == SQLITE_DONE) {
@@ -655,6 +734,7 @@ class Engine final {
             state_.cursorPos = 0;
             state_.currentTrackId = 0;
             state_.volume = 1.0f;
+            state_.activeQueueId = 1;
             volume_.store(1.0f, std::memory_order_relaxed);
             queue_.perm.clear();
             queue_.cursor = 0;
@@ -668,15 +748,27 @@ class Engine final {
 
     std::expected<void, caudio::utils::Error> saveState() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
-            const char* sql =
+            // Try with active_queue_id column; fallback to old schema if missing
+            const char* sqlNew =
+                "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
+                "cursor_pos=?, current_track_id=?, volume=?, active_queue_id=?, "
+                "updated=CURRENT_TIMESTAMP WHERE id=1";
+            const char* sqlOld =
                 "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
                 "cursor_pos=?, current_track_id=?, volume=?, updated=CURRENT_TIMESTAMP WHERE id=1";
             sqlite3_stmt* raw = nullptr;
-            int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
+            int rc = sqlite3_prepare_v2(db, sqlNew, -1, &raw, nullptr);
+            bool hasActiveCol = true;
+            if (rc != SQLITE_OK) {
+                sqlite3_finalize(raw);
+                raw = nullptr;
+                rc = sqlite3_prepare_v2(db, sqlOld, -1, &raw, nullptr);
+                hasActiveCol = false;
+                if (rc != SQLITE_OK)
+                    return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                                    "prepare failed"));
+            }
             StmtGuard stmt(raw);
-            if (rc != SQLITE_OK)
-                return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
-                                                                "prepare failed"));
             raw = stmt.get();
             sqlite3_bind_int(raw, 1, state_.shuffleEnabled);
             sqlite3_bind_int(raw, 2, (int)state_.repeatMode);
@@ -687,12 +779,15 @@ class Engine final {
                         caudio::utils::StatusCode::NoMem, "perm too large"));
                 }
                 sqlite3_bind_blob(raw, 3, queue_.perm.data(),
-                                  (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
+                                   (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
             } else
                 sqlite3_bind_null(raw, 3);
             sqlite3_bind_int64(raw, 4, state_.cursorPos);
             sqlite3_bind_int64(raw, 5, state_.currentTrackId);
             sqlite3_bind_double(raw, 6, (double)state_.volume);
+            if (hasActiveCol) {
+                sqlite3_bind_int64(raw, 7, state_.activeQueueId ? state_.activeQueueId : queue_.queue_id);
+            }
             rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
                 return std::unexpected(
@@ -1392,7 +1487,7 @@ class Engine final {
     // gaplessArmed_: 0→1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
-    std::mutex queueMutex_;
+    mutable std::mutex queueMutex_;
 };
 
 } // namespace caudio::engine

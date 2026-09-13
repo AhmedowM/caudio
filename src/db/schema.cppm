@@ -148,6 +148,7 @@ constexpr std::string_view kSchema =
     "CREATE TABLE IF NOT EXISTS engine_state (id INTEGER PRIMARY KEY CHECK(id=1), "
     "shuffle_enabled INTEGER DEFAULT 0, repeat_mode INTEGER DEFAULT 0, shuffle_perm BLOB, "
     "cursor_pos INTEGER DEFAULT 0, current_track_id INTEGER DEFAULT 0, volume REAL DEFAULT 1.0, "
+    "active_queue_id INTEGER DEFAULT 1, "
     "updated DATETIME DEFAULT CURRENT_TIMESTAMP);"
     "INSERT OR IGNORE INTO engine_state(id) VALUES (1);";
 

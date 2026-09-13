@@ -67,6 +67,7 @@ struct EngineState {
     int64_t cursorPos{0};
     int64_t currentTrackId{0};
     float volume{1.0f};
+    int64_t activeQueueId{1};
 };
 
 } // namespace caudio::engine

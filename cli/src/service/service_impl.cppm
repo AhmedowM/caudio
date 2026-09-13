@@ -295,10 +295,13 @@ class Service final {
                 artist = tr->artist;
             }
         }
-        // Get queue size
+        // Get queue size for active queue
         size_t qSize = 0;
-        if (auto items = db_->queueList(1); items) {
-            qSize = items->size();
+        {
+            int64_t aq = eng.activeQueueId();
+            if (auto items = db_->queueList(aq); items) {
+                qSize = items->size();
+            }
         }
         shmHandle_->updateFromEngine(eng, track_id, title, artist);
         shmHandle_->setQueueSize(qSize);
@@ -325,7 +328,8 @@ class Service final {
         return std::visit(
             detail::overloaded{
                 [&](const Play&) -> std::expected<Result, caudio::utils::Error> {
-                    auto r = engine_->play(1);
+                    int64_t aq = engine_->activeQueueId();
+                    auto r = engine_->play(aq);
                     if (!r)
                         return std::unexpected{r.error()};
                     updateShmStatus();
@@ -350,7 +354,8 @@ class Service final {
                     auto r = engine_->seek(0.0);
                     if (!r) {
                         // if no track, try play
-                        auto pr = engine_->play(1);
+                        int64_t aq = engine_->activeQueueId();
+                        auto pr = engine_->play(aq);
                         if (!pr)
                             return std::unexpected{pr.error()};
                         updateShmStatus();
@@ -448,7 +453,7 @@ class Service final {
                     return Result{vi};
                 },
                 [&](const QueueList&) -> std::expected<Result, caudio::utils::Error> {
-                    int64_t qid = 1;
+                    int64_t qid = engine_->activeQueueId();
                     // validation: queue exists
                     {
                         auto q = db_->getQueue(qid);
@@ -485,12 +490,14 @@ class Service final {
                     auto q = db_->getQueue(qs.qid);
                     if (!q)
                         return std::unexpected{q.error()};
-                    // For now just return status; engine queue switching not fully implemented
-                    // We store queueId in engine via play(qid) context? Keep simple.
+                    auto sw = engine_->switchQueue(qs.qid);
+                    if (!sw)
+                        return std::unexpected{sw.error()};
+                    updateShmStatus();
                     return statusResult();
                 },
                 [&](const QueueAdd& qa) -> std::expected<Result, caudio::utils::Error> {
-                    int64_t qid = 1;
+                    int64_t qid = engine_->activeQueueId();
                     auto q = db_->getQueue(qid);
                     if (!q)
                         return std::unexpected{q.error()};
@@ -618,7 +625,7 @@ class Service final {
                     return Result{QueueTracks{std::move(toAdd)}};
                 },
                 [&](const QueueRemove& qr) -> std::expected<Result, caudio::utils::Error> {
-                    int64_t qid = 1;
+                    int64_t qid = engine_->activeQueueId();
                     auto q = db_->getQueue(qid);
                     if (!q)
                         return std::unexpected{q.error()};
@@ -689,7 +696,7 @@ class Service final {
                     // QueueMove: reorder within queue via playlistReorder? For queue we lack direct
                     // move. Simulate via remove+enqueue: fetch items, reorder vector, clear and
                     // re-enqueue
-                    int64_t qid = 1;
+                    int64_t qid = engine_->activeQueueId();
                     auto q = db_->getQueue(qid);
                     if (!q)
                         return std::unexpected{q.error()};
@@ -728,7 +735,7 @@ class Service final {
                     return Result{QueueTracks{std::move(tracks)}};
                 },
                 [&](const QueueClear&) -> std::expected<Result, caudio::utils::Error> {
-                    int64_t qid = 1;
+                    int64_t qid = engine_->activeQueueId();
                     auto q = db_->getQueue(qid);
                     if (!q)
                         return std::unexpected{q.error()};

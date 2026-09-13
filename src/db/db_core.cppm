@@ -163,6 +163,18 @@ class Database final {
                 err = nullptr;
             }
         }
+        // Migration: add active_queue_id column if missing (for existing DBs)
+        {
+            char* migErr = nullptr;
+            int migRc = sqlite3_exec(raw,
+                                     "ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
+                                     nullptr, nullptr, &migErr);
+            if (migErr) {
+                sqlite3_free(migErr);
+                migErr = nullptr;
+            }
+            (void)migRc;
+        }
         auto db = std::make_unique<Database>(opts);
         db->db_.reset(raw);
         db->writer_.open(raw);
