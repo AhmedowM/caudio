@@ -1,0 +1,51 @@
+# Doxyfile.in for caudio-cpp — configured via CMake
+# @CMAKE_CURRENT_SOURCE_DIR@ and @CMAKE_CURRENT_BINARY_DIR@ substituted by configure_file
+# Usage: cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc
+
+PROJECT_NAME           = "caudio-cpp"
+PROJECT_NUMBER         = "@PROJECT_VERSION@"
+OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@"
+INPUT                  = "@CMAKE_CURRENT_SOURCE_DIR@/src" "@CMAKE_CURRENT_SOURCE_DIR@/cli/src"
+RECURSIVE              = YES
+FILE_PATTERNS          = *.cppm *.cpp *.h
+EXCLUDE_PATTERNS       =
+EXCLUDE_SYMLINKS       = NO
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = docs/html
+GENERATE_LATEX         = NO
+
+HAVE_DOT               = @DOXYGEN_HAVE_DOT@
+DOT_IMAGE_FORMAT       = svg
+DOT_NUM_THREADS        = 0
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+
+JAVADOC_AUTOBRIEF      = YES
+BUILTIN_STL_SUPPORT    = YES
+GROUP_NESTED_COMPOUNDS = YES
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+
+GENERATE_XML           = NO
+GENERATE_MAN           = NO
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = NO
+SKIP_FUNCTION_MACROS   = YES
+SOURCE_BROWSER         = NO
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+VERBATIM_HEADERS       = YES
+ALPHABETICAL_INDEX     = YES
+HTML_DYNAMIC_MENUS     = NO
+GENERATE_TREEVIEW      = YES
+GENERATE_LEGEND        = YES
+DOT_CLEANUP            = YES

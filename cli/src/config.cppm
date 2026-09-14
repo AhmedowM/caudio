@@ -1,3 +1,8 @@
+/**
+ * @file config.cppm
+ * @brief Configuration management: canonical paths, load/save, and raw key/value access.
+ * @ingroup caudio_config
+ */
 module;
 #include <array>
 #include <cstdint>
@@ -17,28 +22,45 @@ import caudio.json;
 
 export namespace caudio::cli {
 
-// Canonical path helpers: single source for socket/pid/lock derived from dbPath.
-// All three use hash of dbPath.generic_string() + XDG/LOCALAPPDATA base dir.
-// - Windows socket is Named Pipe \\.\pipe\caudio-<hex>, pid/lock are files under
-// %LOCALAPPDATA%\caudio
-// - POSIX socket/pid/lock are under $XDG_RUNTIME_DIR/caudio or $XDG_DATA_HOME/caudio or
-// ~/.local/share/caudio
+/**
+ * @brief Canonical path helpers: single source for socket/pid/lock derived from dbPath.
+ * All three use hash of dbPath.generic_string() + XDG/LOCALAPPDATA base dir.
+ * - Windows socket is Named Pipe \\.\pipe\caudio-<hex>, pid/lock are files under
+ * %LOCALAPPDATA%\caudio
+ * - POSIX socket/pid/lock are under $XDG_RUNTIME_DIR/caudio or $XDG_DATA_HOME/caudio or
+ * ~/.local/share/caudio
+ */
 inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
 inline caudio::utils::Expected<std::filesystem::path>
 pidPathFor(const std::filesystem::path& dbPath);
 inline caudio::utils::Expected<std::filesystem::path>
 lockPathFor(const std::filesystem::path& dbPath);
 
+/**
+ * @brief User-facing configuration loaded from config.json.
+ * @ingroup caudio_config
+ */
 struct Config {
+    /** @brief Database file path. Default: derived from XDG/LOCALAPPDATA. */
     std::filesystem::path dbPath{};
+    /** @brief Config file path. Default: derived from XDG/LOCALAPPDATA. */
     std::filesystem::path configPath{};
+    /** @brief Audio device ID ("auto" for default). */
     std::string device{"auto"};
-    int logLevel{2}; // 0=trace,1=debug,2=info,3=warn,4=error (default: info)
+    /** @brief Log level (0=trace,1=debug,2=info,3=warn,4=error). Default: 2 (info). */
+    int logLevel{2};
+    /** @brief Optional explicit socket path. If empty, derived from dbPath. */
     std::string socketPath{};
 };
 
 namespace detail {
 
+/**
+ * @brief Get default database path.
+ * Windows: %LOCALAPPDATA%\caudio\library.db
+ * POSIX: $XDG_DATA_HOME/caudio/library.db or ~/.local/share/caudio/library.db
+ * @return Default database path.
+ */
 inline std::filesystem::path defaultDbPath() {
 #ifdef _WIN32
     const char* localApp = std::getenv("LOCALAPPDATA");
@@ -66,6 +88,12 @@ inline std::filesystem::path defaultDbPath() {
     return base / "library.db";
 }
 
+/**
+ * @brief Get default config file path.
+ * Windows: %LOCALAPPDATA%\caudio\config.json (same as db dir)
+ * POSIX: $XDG_CONFIG_HOME/caudio/config.json or ~/.config/caudio/config.json
+ * @return Default config file path.
+ */
 inline std::filesystem::path defaultConfigPath() {
     const char* xdgCfg = std::getenv("XDG_CONFIG_HOME");
     std::filesystem::path base;
@@ -87,6 +115,11 @@ inline std::filesystem::path defaultConfigPath() {
     return base / "config.json";
 }
 
+/**
+ * @brief Read entire file into string.
+ * @param p File path.
+ * @return File contents on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::string> readFileString(const std::filesystem::path& p) {
     std::ifstream in(p);
     if (!in) {
@@ -99,6 +132,14 @@ inline caudio::utils::Expected<std::string> readFileString(const std::filesystem
 
 } // namespace detail
 
+/**
+ * @brief Load configuration from file with defaults.
+ * @param path Config file path (empty = use default).
+ * @return Config with defaults merged from file on success, Error on failure.
+ *
+ * Reads JSON config file, falls back to defaults for missing keys.
+ * Supports legacy keys: db_path, log_level (snake_case).
+ */
 inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
     Config cfg{};
     cfg.dbPath = detail::defaultDbPath();
@@ -157,6 +198,14 @@ inline caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& p
     return cfg;
 }
 
+/**
+ * @brief Save configuration to file.
+ * @param cfg Config to save.
+ * @return void on success, Error on failure.
+ *
+ * Creates parent directories if needed. Writes JSON with 2-space indentation.
+ * Only writes dbPath, device, logLevel, and socketPath (if non-empty).
+ */
 inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
     try {
         std::filesystem::path dir = cfg.configPath.parent_path();
@@ -186,6 +235,13 @@ inline caudio::utils::Expected<void> saveConfig(const Config& cfg) {
 // Canonical socket/pid/lock path helpers — single source, XDG/LOCALAPPDATA +
 // hash(dbPath.generic_string())
 namespace detail_paths {
+
+/**
+ * @brief Compute 8-char hex hash from dbPath for socket/pid/lock naming.
+ * Uses std::hash on dbPath.generic_string(), folded to 32 bits, formatted as 8-char hex.
+ * @param dbPath Database path.
+ * @return 8-character lowercase hex string.
+ */
 inline std::string hex8ForDb(const std::filesystem::path& dbPath) {
     std::string input = dbPath.generic_string();
     if (input.empty())
@@ -195,6 +251,13 @@ inline std::string hex8ForDb(const std::filesystem::path& dbPath) {
     hv ^= static_cast<std::uint32_t>((raw >> 32) & 0xFFFFFFFFu);
     return std::format("{:08x}", hv);
 }
+
+/**
+ * @brief Get base directory for socket/pid/lock files.
+ * Windows: %LOCALAPPDATA%\caudio
+ * POSIX: $XDG_RUNTIME_DIR/caudio > $XDG_DATA_HOME/caudio > ~/.local/share/caudio > temp/caudio
+ * @return Base directory path.
+ */
 inline std::filesystem::path baseDirForSocket() {
 #ifdef _WIN32
     const char* localApp = std::getenv("LOCALAPPDATA");
@@ -224,6 +287,13 @@ inline std::filesystem::path baseDirForSocket() {
 }
 } // namespace detail_paths
 
+/**
+ * @brief Get canonical socket path for a database path.
+ * Windows: \\.\pipe\caudio-<hex>
+ * POSIX: <baseDir>/caudio-<hex>.sock
+ * @param dbPath Database path.
+ * @return Socket path string on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath) {
     try {
         std::string hex = detail_paths::hex8ForDb(dbPath);
@@ -241,6 +311,12 @@ inline caudio::utils::Expected<std::string> socketPathFor(const std::filesystem:
     }
 }
 
+/**
+ * @brief Get canonical PID file path for a database path.
+ * <baseDir>/caudio-<hex>.pid
+ * @param dbPath Database path.
+ * @return PID file path on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::filesystem::path>
 pidPathFor(const std::filesystem::path& dbPath) {
     try {
@@ -255,6 +331,12 @@ pidPathFor(const std::filesystem::path& dbPath) {
     }
 }
 
+/**
+ * @brief Get canonical lock file path for a database path.
+ * <baseDir>/caudio-<hex>.lock
+ * @param dbPath Database path.
+ * @return Lock file path on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::filesystem::path>
 lockPathFor(const std::filesystem::path& dbPath) {
     try {
@@ -276,14 +358,20 @@ struct RawConfigValue {
     std::string value{};
 };
 inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
-                                                         std::string_view key);
+                                                          std::string_view key);
 inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
-                                                  std::string_view key, std::string_view value);
+                                                   std::string_view key, std::string_view value);
 inline caudio::utils::Expected<std::vector<RawConfigValue>>
 configListRaw(const std::filesystem::path& p);
 
+/**
+ * @brief Get a raw config value by key from JSON file.
+ * @param p Config file path.
+ * @param key Key to read.
+ * @return Value string (JSON string, "null", or JSON dump) on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
-                                                         std::string_view key) {
+                                                          std::string_view key) {
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) {
         return std::unexpected{
@@ -320,8 +408,17 @@ inline caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::
     }
 }
 
+/**
+ * @brief Set a raw config value in JSON file.
+ * Parses value as JSON if valid; otherwise stores as string.
+ * Creates file and parent directories if needed.
+ * @param p Config file path.
+ * @param key Key to write.
+ * @param value Value to write (JSON-parsed if valid JSON).
+ * @return void on success, Error on failure.
+ */
 inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
-                                                  std::string_view key, std::string_view value) {
+                                                   std::string_view key, std::string_view value) {
     caudio::json::ordered_json j = caudio::json::ordered_json::object();
     std::error_code ec;
     if (std::filesystem::exists(p, ec)) {
@@ -376,10 +473,12 @@ inline caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p
     }
 }
 
-inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
-                                                            std::string_view key);
-inline caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
-
+/**
+ * @brief List all config key-value pairs from JSON file.
+ * Skips empty keys and "type" key.
+ * @param p Config file path.
+ * @return Vector of RawConfigValue on success, Error on failure.
+ */
 inline caudio::utils::Expected<std::vector<RawConfigValue>>
 configListRaw(const std::filesystem::path& p) {
     std::error_code ec;
@@ -419,7 +518,17 @@ configListRaw(const std::filesystem::path& p) {
 }
 
 inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
-                                                      std::string_view key) {
+                                                             std::string_view key);
+inline caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
+
+/**
+ * @brief Delete a config key from JSON file.
+ * @param p Config file path.
+ * @param key Key to delete.
+ * @return void on success, Error on failure (not found, corrupt, IO).
+ */
+inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
+                                                       std::string_view key) {
     if (key.empty()) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty key")};
@@ -465,6 +574,11 @@ inline caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path
     }
 }
 
+/**
+ * @brief Reset entire config (delete config file).
+ * @param p Config file path.
+ * @return void on success, Error on failure.
+ */
 inline caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p) {
     try {
         std::error_code ec;

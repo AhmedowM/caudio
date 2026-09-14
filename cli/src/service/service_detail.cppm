@@ -1,3 +1,9 @@
+/**
+ * @file service_detail.cppm
+ * @brief Internal helpers for caudio.service — not exported. Contains path utilities,
+ * locking, PID management, SHM status building, config helpers, and audio file utilities.
+ * @ingroup caudio_service
+ */
 module;
 // Internal helpers for caudio.service — not exported. This partition is imported
 // by :impl but not re-exported by caudio.service, keeping internal linkage.
@@ -49,13 +55,24 @@ import caudio.player;
 
 namespace caudio::service::detail {
 
+/**
+ * @brief Overload set for std::visit with multiple lambdas.
+ * @tparam Ts Callable types.
+ */
 template <class... Ts>
 struct overloaded : Ts... {
     using Ts::operator()...;
 };
 
+/**
+ * @brief Get PID file path for a database path.
+ * Delegates to cli::pidPathFor; falls back to dbPath parent / "caudio.pid".
+ * @param dbPath Database path.
+ * @param socketPath Unused (kept for signature compatibility).
+ * @return PID file path.
+ */
 inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
-                                              const std::string& /*socketPath*/) {
+                                               const std::string& /*socketPath*/) {
     auto r = caudio::cli::pidPathFor(dbPath);
     if (r)
         return *r;
@@ -65,8 +82,15 @@ inline std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPat
     return pp / "caudio.pid";
 }
 
+/**
+ * @brief Get lock file path for a database path.
+ * Delegates to cli::lockPathFor; falls back to PID dir / "caudio-<hash>.lock".
+ * @param dbPath Database path.
+ * @param socketPath Unused (kept for signature compatibility).
+ * @return Lock file path.
+ */
 inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                               const std::string& /*socketPath*/) {
+                                                const std::string& /*socketPath*/) {
     auto r = caudio::cli::lockPathFor(dbPath);
     if (r)
         return *r;
@@ -76,6 +100,14 @@ inline std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPa
     return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
 }
 
+/**
+ * @brief Get socket path for a database path.
+ * Delegates to cli::socketPathFor; falls back to platform-specific default.
+ * Windows: Named pipe \\.\pipe\caudio-<hash>
+ * POSIX: $XDG_RUNTIME_DIR/caudio/caudio-<hash>.sock (created if needed)
+ * @param dbPath Database path.
+ * @return Socket path string.
+ */
 inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
     auto r = caudio::cli::socketPathFor(dbPath);
     if (r)
@@ -96,6 +128,13 @@ inline std::string socketPathForDb(const std::filesystem::path& dbPath) {
 #endif
 }
 
+/**
+ * @brief Probe if a socket/named pipe is alive (connectable).
+ * Windows: Try CreateFileW + WaitNamedPipeW.
+ * POSIX: Try connect() to AF_UNIX socket.
+ * @param sp Socket path string.
+ * @return true if connection succeeds (service alive), false otherwise.
+ */
 inline bool probeSocketAlive(const std::string& sp) {
 #ifdef _WIN32
     if (sp.empty())
@@ -142,6 +181,15 @@ inline bool probeSocketAlive(const std::string& sp) {
 #endif
 }
 
+/**
+ * @brief Try to acquire exclusive lock on a file (single-instance enforcement).
+ * Windows: CreateFileW + LockFileEx on first byte.
+ * POSIX: open() + flock(LOCK_EX | LOCK_NB).
+ * Creates parent directories if needed.
+ * @param lockPath Lock file path.
+ * @param outFd Output file descriptor/handle (set on success).
+ * @return true if lock acquired, false if already held or error.
+ */
 inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
 #ifdef _WIN32
     std::error_code ec;
@@ -191,6 +239,12 @@ inline bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
 #endif
 }
 
+/**
+ * @brief Release a previously acquired lock.
+ * Windows: UnlockFileEx + CloseHandle.
+ * POSIX: flock(LOCK_UN) + close().
+ * @param fd File descriptor/handle returned by tryAcquireLock.
+ */
 inline void releaseLock(int fd) {
     if (fd < 0)
         return;
@@ -207,6 +261,13 @@ inline void releaseLock(int fd) {
 #endif
 }
 
+/**
+ * @brief Check if a process ID is alive.
+ * POSIX: kill(pid, 0) == 0.
+ * Windows: OpenProcess(SYNCHRONIZE) + WaitForSingleObject(0) == WAIT_TIMEOUT.
+ * @param pid Process ID to check.
+ * @return true if process exists, false otherwise.
+ */
 inline bool checkPidAlive(int pid) {
     if (pid <= 0)
         return false;
@@ -222,6 +283,11 @@ inline bool checkPidAlive(int pid) {
 #endif
 }
 
+/**
+ * @brief Read PID from a PID file.
+ * @param pidPath Path to PID file.
+ * @return PID if file exists and contains valid integer, nullopt otherwise.
+ */
 inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
     std::error_code ec;
     if (!std::filesystem::exists(pidPath, ec))
@@ -236,6 +302,14 @@ inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
     return pid;
 }
 
+/**
+ * @brief Build a Status object from Engine and Database.
+ * Populates playback state, position, duration, volume, shuffle, repeat,
+ * current track info (title, artist, path), and active queue size/index.
+ * @param eng Engine reference.
+ * @param db Database reference.
+ * @return Status on success, Error on failure.
+ */
 inline std::expected<caudio::cli::Status, caudio::utils::Error>
 buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     caudio::cli::Status s{};
@@ -275,8 +349,15 @@ buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     return s;
 }
 
+/**
+ * @brief Resolve config file path.
+ * Priority: explicit configPath > dbPath parent / "config.json" > temp/caudio/config.json.
+ * @param configPath Explicit config path (may be empty).
+ * @param dbPath Database path.
+ * @return Resolved config file path.
+ */
 inline std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
-                                               const std::filesystem::path& dbPath) {
+                                                const std::filesystem::path& dbPath) {
     if (!configPath.empty())
         return configPath;
     if (!dbPath.empty()) {
@@ -291,16 +372,37 @@ inline std::filesystem::path resolveConfigPath(const std::filesystem::path& conf
     return tmp / "caudio" / "config.json";
 }
 
+/**
+ * @brief Read a single config value from JSON file.
+ * Delegates to cli::configGetRaw.
+ * @param p Config file path.
+ * @param key Config key to read.
+ * @return Value string on success, Error on failure.
+ */
 inline std::expected<std::string, caudio::utils::Error>
 readConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
     return caudio::cli::configGetRaw(p, key);
 }
 
+/**
+ * @brief Write a single config value to JSON file.
+ * Delegates to cli::configSetRaw.
+ * @param p Config file path.
+ * @param key Config key to write.
+ * @param value Value to write (JSON-parsed if valid JSON, else string).
+ * @return void on success, Error on failure.
+ */
 inline caudio::utils::Expected<void>
 writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::string_view value) {
     return caudio::cli::configSetRaw(p, key, value);
 }
 
+/**
+ * @brief List all config key-value pairs from JSON file.
+ * Delegates to cli::configListRaw.
+ * @param p Config file path.
+ * @return Vector of ConfigValue on success, Error on failure.
+ */
 inline std::expected<std::vector<caudio::cli::ConfigValue>, caudio::utils::Error>
 listConfigValuesRaw(const std::filesystem::path& p) {
     auto r = caudio::cli::configListRaw(p);
@@ -313,15 +415,34 @@ listConfigValuesRaw(const std::filesystem::path& p) {
     return out;
 }
 
+/**
+ * @brief Delete a config key from JSON file.
+ * Delegates to cli::configDeleteRaw.
+ * @param p Config file path.
+ * @param key Config key to delete.
+ * @return void on success, Error on failure.
+ */
 inline caudio::utils::Expected<void>
 deleteConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
     return caudio::cli::configDeleteRaw(p, key);
 }
 
+/**
+ * @brief Reset entire config file (delete it).
+ * Delegates to cli::configResetAllRaw.
+ * @param p Config file path.
+ * @return void on success, Error on failure.
+ */
 inline caudio::utils::Expected<void> resetAllConfigRaw(const std::filesystem::path& p) {
     return caudio::cli::configResetAllRaw(p);
 }
 
+/**
+ * @brief Check if a file has a supported audio extension.
+ * Supported: .mp3, .flac, .ogg, .wav, .m4a (case-insensitive).
+ * @param p File path.
+ * @return true if extension matches, false otherwise.
+ */
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -329,6 +450,12 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
     return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
 }
 
+/**
+ * @brief Compute BLAKE3 fingerprint of an audio file.
+ * Hashes first 64KB, last 64KB (if file larger), plus file size and version.
+ * @param path Audio file path.
+ * @return 32-byte fingerprint array on success, Error on failure.
+ */
 inline std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path) {
     std::error_code ec;
@@ -367,6 +494,12 @@ computeFingerprint(const std::filesystem::path& path) {
     return out;
 }
 
+/**
+ * @brief Get audio duration from decoder.
+ * Opens file reader and decoder to read sample rate and total frames.
+ * @param path Audio file path.
+ * @return Duration in seconds, or 0.0 on failure.
+ */
 inline double durationFromDecoder(const std::filesystem::path& path) noexcept {
     try {
         auto readerRes = caudio::player::FileReader::open(path);

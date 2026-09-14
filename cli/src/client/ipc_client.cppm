@@ -1,3 +1,8 @@
+/**
+ * @file ipc_client.cppm
+ * @brief IPC client for connecting to caudio service via Unix socket or Windows named pipe.
+ * @ingroup caudio_client
+ */
 module;
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -58,11 +63,26 @@ import caudio.service;
 
 export namespace caudio::client {
 
+/**
+ * @brief IPC client for communicating with the caudio service.
+ *
+ * Provides synchronous request/response over Unix domain sockets (POSIX) or
+ * named pipes (Windows). Handles framing (4-byte big-endian length prefix),
+ * JSON serialization, and connection lifecycle.
+ *
+ * Thread safety: Not thread-safe. Use one IpcClient per thread or synchronize externally.
+ */
 class IpcClient {
   public:
-    // connect using canonical socketPathFor(dbPath); if socketPathOverride non-empty it is used
-    // verbatim (honors --socket / Config::socketPath). Default overload preserves existing call
-    // sites.
+    /**
+     * @brief Connect to the service using canonical socket path derived from dbPath.
+     * @param dbPath Database path used to derive default socket/pid/lock paths.
+     * @param socketPathOverride Optional explicit socket path (e.g., from --socket or config).
+     * @return IpcClient on success, Error on connection failure.
+     *
+     * If socketPathOverride is empty, uses cli::socketPathFor(dbPath) to derive
+     * the canonical socket path (honors XDG/LOCALAPPDATA + hash of dbPath).
+     */
     static caudio::utils::Expected<IpcClient> connect(const std::filesystem::path& dbPath,
                                                       std::string_view socketPathOverride = {}) {
         caudio::utils::Expected<std::string> sp;
@@ -122,12 +142,20 @@ class IpcClient {
 #endif
     }
 
+    /**
+     * @brief Destructor: closes the connection.
+     */
     ~IpcClient() {
         close();
     }
 
     IpcClient(const IpcClient&) = delete;
     IpcClient& operator=(const IpcClient&) = delete;
+
+    /**
+     * @brief Move constructor.
+     * Transfers ownership of the socket/pipe handle.
+     */
     IpcClient(IpcClient&& other) noexcept
         : socketPath_(std::move(other.socketPath_)), isWinPipe_(other.isWinPipe_)
 #ifdef _WIN32
@@ -145,6 +173,11 @@ class IpcClient {
 #endif
         nextId_.store(other.nextId_.load());
     }
+
+    /**
+     * @brief Move assignment operator.
+     * Closes current connection, takes ownership of other's handle.
+     */
     IpcClient& operator=(IpcClient&& other) noexcept {
         if (this != &other) {
             close();
@@ -162,6 +195,15 @@ class IpcClient {
         return *this;
     }
 
+    /**
+     * @brief Send a command and receive the response (synchronous RPC).
+     * @param cmd Command to send.
+     * @return Result variant on success, Error on failure (connection, serialization, or service error).
+     *
+     * Serializes command to JSON, frames with 4-byte BE length prefix, sends,
+     * receives framed response, deserializes, and returns Result.
+     * Not thread-safe; serialize calls externally if needed.
+     */
     caudio::utils::Expected<caudio::cli::Result> send(const caudio::cli::Command& cmd) {
         uint32_t id = nextId_.fetch_add(1) + 1;
         caudio::cli::IpcRequest req{id, cmd};
@@ -190,6 +232,10 @@ class IpcClient {
         return *(repExp->result);
     }
 
+    /**
+     * @brief Close the connection (idempotent).
+     * Closes socket or pipe handle, resets internal state.
+     */
     void close() noexcept {
 #ifdef _WIN32
         if (pipeHandle_ && pipeHandle_ != kInvalidHandle) {
@@ -207,6 +253,11 @@ class IpcClient {
   private:
     IpcClient() = default;
 
+    /**
+     * @brief Send raw framed data.
+     * @param data Byte span to send (already framed with length prefix).
+     * @return void on success, Error on send failure or not connected.
+     */
     caudio::utils::Expected<void> rawSend(std::span<const std::byte> data) {
 #ifdef _WIN32
         if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
@@ -247,6 +298,12 @@ class IpcClient {
 #endif
     }
 
+    /**
+     * @brief Receive a framed response.
+     * Reads 4-byte BE length header, then reads exact payload length.
+     * Enforces 16MB max frame size.
+     * @return Payload bytes (without length header) on success, Error on failure.
+     */
     caudio::utils::Expected<std::vector<std::byte>> rawRecv() {
 #ifdef _WIN32
         if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
@@ -342,15 +399,22 @@ class IpcClient {
 #endif
     }
 
+    /** @brief Connected socket/named pipe path. */
     std::string socketPath_;
+    /** @brief True if using Windows named pipe, false for Unix socket. */
     bool isWinPipe_{false};
 #ifdef _WIN32
+    /** @brief Windows named pipe handle. */
     HANDLE pipeHandle_{nullptr};
 #else
+    /** @brief Unix domain socket file descriptor. */
     int fd_{-1};
 #endif
+    /** @brief Atomic request ID counter for framing. */
     std::atomic<uint32_t> nextId_{0};
+    /** @brief Condition variable (unused, reserved for future async support). */
     std::condition_variable cv_;
+    /** @brief Mutex for condition variable (unused, reserved for future async support). */
     std::mutex cvMtx_;
 };
 

@@ -22,6 +22,23 @@ module;
 
 #include "blake3.h"
 
+/**
+ * @file scan.cppm
+ * @brief Filesystem scanning and library import.
+ * @ingroup caudio_db
+ * @details Provides:
+ * - `ScanMode` (Sampled vs Full fingerprinting).
+ * - `scan()` generator that lazily yields Tracks from a directory.
+ * - `scanDirectory()` convenience wrapper collecting into a vector.
+ * - `scanLibrary()` DB-integrated scan with batch transactions (500),
+ *   deduplication by path+size+mtime and fingerprint, and metadata
+ *   extraction via `caudio::player::extractMetadata`.
+ * Fingerprint sampled vs full: Sampled hashes head 64K + tail 64K + size +
+ * version (fast, in fingerprint.cppm); Full hashes the entire file (see
+ * generator branch). Batch size 500 balances lock granularity vs crash
+ * atomicity — each batch is a single `BEGIN IMMEDIATE / COMMIT`.
+ */
+
 export module caudio.db:scan;
 
 import caudio.utils;
@@ -32,10 +49,23 @@ import :core;
 
 namespace caudio::db {
 
-export enum class ScanMode { Sampled, Full };
+/**
+ * @brief Scan fingerprinting mode.
+ * @ingroup caudio_db
+ */
+export enum class ScanMode {
+    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) — fast, default.
+    Full     ///< Full-file BLAKE3 — slower, more collision-resistant.
+};
 
 namespace detail {
 
+/**
+ * @brief Checks if a path has a supported audio extension.
+ * @ingroup caudio_db
+ * @param p Path to check.
+ * @return true if extension is .mp3/.flac/.ogg/.wav/.m4a (case-insensitive).
+ */
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
@@ -45,7 +75,23 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
 
 } // namespace detail
 
-// Generator-based scan: yields Tracks lazily
+/**
+ * @brief Lazily scans a directory tree yielding Tracks.
+ * @ingroup caudio_db
+ * @param root Root directory to traverse recursively.
+ * @param mode Fingerprinting mode (Sampled vs Full).
+ * @return Generator yielding one `Track` per audio file.
+ * @details Uses `recursive_directory_iterator` with `skip_permission_denied`.
+ * For each regular file with an audio extension, populates `path`, `size`,
+ * `mtime`, fingerprint (per `mode`) and metadata via
+ * `caudio::player::extractMetadata`. Files that cannot be read yield
+ * a track with zeroed fingerprint (fallback handled by caller).
+ * @par Thread safety
+ * Not thread-safe with concurrent filesystem mutation; otherwise re-entrant.
+ * @see ScanMode
+ * @see scanDirectory
+ * @see scanLibrary
+ */
 export std::generator<Track> scan(const std::filesystem::path& root,
                                   ScanMode mode = ScanMode::Sampled) {
     std::error_code ec;
@@ -102,6 +148,16 @@ export std::generator<Track> scan(const std::filesystem::path& root,
     }
 }
 
+/**
+ * @brief Scans a directory and collects all tracks into a vector.
+ * @ingroup caudio_db
+ * @param root Root directory.
+ * @param mode Fingerprinting mode.
+ * @return Vector of tracks, or `Error` (currently always succeeds, returns empty on missing root).
+ * @par Thread safety
+ * Same as `scan()`.
+ * @see scan
+ */
 export std::expected<std::vector<Track>, caudio::utils::Error>
 scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled) {
     std::vector<Track> out;
@@ -110,7 +166,31 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
     return out;
 }
 
-// DB-integrated scan: inserts/updates tracks with deduplication & metadata preservation
+/**
+ * @brief Scans a library root and upserts tracks into the database.
+ * @ingroup caudio_db
+ * @param db Database to update.
+ * @param libraryId Library id whose `path` is the scan root.
+ * @param progress Optional callback `progress(scanned, total, path)` invoked per file.
+ * @return Success or `Error` with `StatusCode::InvalidArg` if libraryId==0,
+ * `StatusCode::NotFound` if library or path not found, `StatusCode::Busy` if
+ * `BEGIN IMMEDIATE` fails, or `StatusCode::Internal` on commit failure.
+ * @details Batching: holds `Database::mutex()` as `unique_lock<shared_mutex>`
+ * for `kBatchSize` (500) files, wrapped in `BEGIN IMMEDIATE / COMMIT`, so
+ * concurrent `queueList` never sees partial state and a crash leaves DB
+ * consistent per batch. Deduplication: early-exit on `path+size+mtime` match;
+ * otherwise fingerprint dedup via `findByFingerprintLocked`/`findByPathLocked`.
+ * @par Thread safety
+ * Thread-safe: internally acquires `db.mutex()` per batch. Caller must not
+ * hold `db.mutex()` across the call.
+ * @par Lock ordering
+ * Acquires `db.mutex()` (dbMutex_) exclusively per batch; inside the batch
+ * uses `*Locked` helpers that assume the lock is held and additionally take
+ * `cacheMutex_` internally.
+ * @see scan
+ * @see Database::findByPathLocked
+ * @see Database::findByFingerprintLocked
+ */
 export std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {}) {
@@ -325,7 +405,7 @@ scanLibrary(Database& db, int64_t libraryId,
             return std::unexpected{c.error()};
         }
     }
-    // update library last_scanned — in its own DbTransaction via libraryUpdate (or locked if
+    // update library last_scanned — in its own transaction via libraryUpdate (or locked if
     // needed)
     auto libs2 = db.libraryList();
     if (libs2) {
@@ -335,7 +415,7 @@ scanLibrary(Database& db, int64_t libraryId,
                                      std::chrono::system_clock::now().time_since_epoch())
                                      .count();
                 // ensure atomic update without exposing partial scan state: use a short
-                // DbTransaction
+                // transaction
                 {
                     std::unique_lock<std::shared_mutex> lk(db.mutex());
                     char* err = nullptr;

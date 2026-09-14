@@ -7,10 +7,26 @@ module;
 #include <string_view>
 #include <vector>
 
+/**
+ * @file fts.cppm
+ * @brief FTS5 sanitization, LIKE escaping and hex helpers.
+ * @ingroup caudio_db
+ * @details Internal helpers: escapeLike() escapes LIKE wildcards,
+ * toHex()/fromHex() convert fingerprints, sanitizeFtsTerm() strips
+ * FTS5 operators and escapes quotes by doubling them. See search.cppm
+ * for the quoting logic and the queue UNIQUE invariant discussion.
+ */
+
 module caudio.db:fts;
 
 namespace caudio::db::internal {
 
+/**
+ * @brief Escapes LIKE wildcards % _ and \ with backslash.
+ * @ingroup caudio_db
+ * @param term Raw term.
+ * @return Escaped term suitable for LIKE ... ESCAPE '\'.
+ */
 inline std::string escapeLike(std::string_view term) {
     std::string result;
     result.reserve(term.size() + 4);
@@ -23,6 +39,12 @@ inline std::string escapeLike(std::string_view term) {
     return result;
 }
 
+/**
+ * @brief Converts a 32-byte fingerprint to 64-char hex.
+ * @ingroup caudio_db
+ * @param fp Fingerprint bytes.
+ * @return Lowercase hex string.
+ */
 inline std::string toHex(const std::array<uint8_t, 32>& fp) {
     static const char* hex = "0123456789abcdef";
     std::string s;
@@ -34,6 +56,13 @@ inline std::string toHex(const std::array<uint8_t, 32>& fp) {
     return s;
 }
 
+/**
+ * @brief Parses 64-char hex into 32 bytes.
+ * @ingroup caudio_db
+ * @param hexStr Hex view (must be 64 chars).
+ * @param out Output bytes.
+ * @return true on success, false on length/char error.
+ */
 inline bool fromHex(std::string_view hexStr, std::array<uint8_t, 32>& out) {
     if (hexStr.size() != 64)
         return false;
@@ -56,6 +85,15 @@ inline bool fromHex(std::string_view hexStr, std::array<uint8_t, 32>& out) {
     return true;
 }
 
+/**
+ * @brief Sanitizes a user term for FTS5 MATCH.
+ * @ingroup caudio_db
+ * @param term Raw user input.
+ * @return Sanitized term or empty (match-nothing).
+ * @details Strips FTS5 syntax (* : - ( ) ^ ~ '), escapes " by doubling,
+ * removes logical operators AND/OR/NOT/NEAR (case-insensitive, word-boundary),
+ * collapses spaces and trims. Empty after stripping returns empty.
+ */
 inline std::string sanitizeFtsTerm(std::string_view term) {
     // Empty term -> return empty to match everything
     if (term.empty())

@@ -21,6 +21,36 @@ module;
 #include <thread>
 #include <vector>
 
+/**
+ * @file engine.cppm
+ * @brief Playback engine — state machine, gapless, decode/monitor loops and persistence.
+ * @ingroup caudio_engine
+ * @details Aggregate module `caudio.engine` re-exporting `:types`, `:history`
+ * and `:shuffle`. Core class is Engine which owns:
+ * - Playback state machine (`Stopped -> Playing -> Paused -> Playing`,
+ *   next/prev with shuffle/repeat, see queueNextLocked/queuePrevLocked).
+ * - Gapless transition: preroll() fills SpscRing<float> to half capacity
+ *   before AudioOutput::start(); decodeLoop continuously refills the ring;
+ *   engineTick arms gaplessArmed_ (CAS 0->1) when remaining <= gaplessMs
+ *   (300 ms) and calls next().
+ * - Threads: decodeLoop runs on decodeThread_ (SPSC ring, decodeMtx_ +
+ *   decodeCv_, wakes on Playing); monitorLoop runs on monitorThread_
+ *   polling every pollMs (default 10 ms) via monMtx_/monCv_ and calling
+ *   engineTick() (history + progress + gapless).
+ * - Persistence: engine_state row id=1 stores shuffle_enabled,
+ *   repeat_mode, cursor_pos, current_track_id, volume, shuffle_perm BLOB
+ *   and active_queue_id. loadState/saveState handle the active_queue_id
+ *   migration (try sqlNew, fallback to sqlOld). persistShuffleBlobLocked
+ *   and persistCursorLocked update the blob/cursor transactionally.
+ * - History: doHistoryMark uses shouldMarkPlayedEx(historyThresholdPct/Secs)
+ *   with atomic CAS on markedPlayed_ and a BEGIN IMMEDIATE transaction.
+ * Locking: queueMutex_ (mutex, try_lock) for QueueState; decodeMtx_
+ * (mutex) for decoder_/ring_ vs seek/decodeLoop; queue/state DB writes
+ * go through Database::mutex() (shared_mutex) + withTransaction.
+ * Events: MpscQueue<EngineEvent,64> with drop-on-full, dispatched via
+ * pushEvent to callbacks under cbMutex_.
+ */
+
 export module caudio.engine;
 
 export import :types;
@@ -33,14 +63,24 @@ import caudio.db;
 
 export namespace caudio::engine {
 
+/**
+ * @brief RAII guard for sqlite3_exec error strings.
+ * @ingroup caudio_engine
+ * @details Frees the `char*` returned by `sqlite3_exec` on scope exit.
+ */
 struct SqliteErrGuard {
-    char* p;
+    char* p; ///< Owned error string from sqlite3_exec.
     ~SqliteErrGuard() {
         if (p)
             sqlite3_free(p);
     }
 };
 
+/**
+ * @brief RAII guard for sqlite3_stmt.
+ * @ingroup caudio_engine
+ * @details Finalizes the statement on scope exit. Non-copyable.
+ */
 struct StmtGuard {
     sqlite3_stmt* s = nullptr;
     explicit StmtGuard(sqlite3_stmt* stmt) : s(stmt) {}
@@ -58,15 +98,55 @@ struct StmtGuard {
     }
 };
 
+/**
+ * @brief Forwards StatusCode to string via caudio::utils::toString.
+ * @ingroup caudio_engine
+ * @param r Status code.
+ * @return String view from utils::toString.
+ */
 constexpr std::string_view toString(caudio::utils::StatusCode r) noexcept {
     return caudio::utils::toString(r);
 }
 
+/**
+ * @brief Main playback engine — queue, decoding, gapless, history and persistence.
+ * @ingroup caudio_engine
+ * @details See file-level docs for state machine, threading and persistence.
+ * Public mutators that touch QueueState use `tryLockQueue()` (non-blocking);
+ * callers get `StatusCode::Busy` if the queue is contended. Decode/ring
+ * access is serialized by `decodeMtx_`. State (`playbackState_`,
+ * `hasCurrent_`, `volume_`, `markedPlayed_`, `gaplessArmed_`,
+ * `lastProgressMs_`) is atomic.
+ *
+ * Error codes: `InvalidArg` (null/empty args), `State` (no db / not
+ * playing/paused), `NotFound` (empty queue / no event), `Busy` (queue
+ * locked / transaction begin failed), `Internal` (SQLite / decoder),
+ * `NoMem` (perm too large).
+ *
+ * Thread safety: thread-safe for concurrent play/pause/next/prev/seek
+ * under the documented locks; `queueMutex_` is try_lock so callers
+ * must handle Busy.
+ * @see PlaybackState
+ * @see QueueState
+ * @see EngineConfig
+ */
 class Engine final {
   public:
-    using ExpectedVoid = std::expected<void, caudio::utils::Error>;
-    using ExpectedEngine = std::expected<std::unique_ptr<Engine>, caudio::utils::Error>;
+    using ExpectedVoid = std::expected<void, caudio::utils::Error>; ///< Void or Error.
+    using ExpectedEngine = std::expected<std::unique_ptr<Engine>, caudio::utils::Error>; ///< Engine ptr or Error.
 
+    /**
+     * @brief Creates an Engine with no database attached.
+     * @ingroup caudio_engine
+     * @param cfg Engine configuration (poll/gapless/history thresholds).
+     * @return Owning Engine or Error from init().
+     * @details Starts decodeThread_ and optionally monitorThread_ via init().
+     * No DB is opened; attach via open() or attachDatabase().
+     * @par Thread safety
+     * Thread-safe; constructs internal atomics/threads.
+     * @see open
+     * @see attachDatabase
+     */
     static ExpectedEngine create(const EngineConfig& cfg = {}) {
         auto e = std::unique_ptr<Engine>(new Engine(cfg));
         auto err = e->init();
@@ -75,6 +155,20 @@ class Engine final {
         return e;
     }
 
+    /**
+     * @brief Opens (or creates) a database and creates an Engine.
+     * @ingroup caudio_engine
+     * @param path Filesystem path (passed to Database::open).
+     * @param cfg Engine configuration.
+     * @return Owning Engine or Error (Io/Corrupt from Database::open).
+     * @details Opens the DB, attaches it, loads persisted state via
+     * loadState() (active_queue_id migration) and restores volume to
+     * the AudioOutput if present.
+     * @par Thread safety
+     * Thread-safe; see Database::open.
+     * @see Database::open
+     * @see loadState
+     */
     static ExpectedEngine open(std::string_view path, const EngineConfig& cfg = {}) {
         auto dbRes = caudio::db::Database::open(path);
         if (!dbRes)
@@ -89,6 +183,17 @@ class Engine final {
         return e;
     }
 
+    /**
+     * @brief Attaches an already-open Database.
+     * @ingroup caudio_engine
+     * @param db Shared Database handle (must be non-null and open).
+     * @return Success or Error InvalidArg / loadState failure.
+     * @retval StatusCode::InvalidArg if db is null or handle is null.
+     * @par Thread safety
+     * Thread-safe; calls loadState() under dbMutex_.
+     * @see attachDb
+     * @see loadState
+     */
     ExpectedVoid attachDatabase(std::shared_ptr<caudio::db::Database> db) {
         if (!db || !db->handle())
             return std::unexpected(
@@ -98,6 +203,15 @@ class Engine final {
             return std::unexpected(*ec);
         return {};
     }
+    /**
+     * @brief Attaches a unique Database handle (compat).
+     * @ingroup caudio_engine
+     * @param db Owning handle to move into shared_ptr.
+     * @return Success or Error InvalidArg.
+     * @details Wraps the unique_ptr into shared_ptr then delegates to attachDatabase.
+     * @par Thread safety
+     * Thread-safe.
+     */
     ExpectedVoid attachDb(std::unique_ptr<caudio::db::Database> db) {
         if (!db || !db->handle())
             return std::unexpected(
@@ -106,10 +220,21 @@ class Engine final {
         return attachDatabase(std::move(shared));
     }
 
+    /** @brief Tears down threads and persists state. @ingroup caudio_engine */
     ~Engine() {
         shutdown();
     }
 
+    /**
+     * @brief Shuts down monitor/decode threads and persists state.
+     * @ingroup caudio_engine
+     * @details Stops monRun_/decodeRun_, notifies cvs, joins jthreads
+     * via request_stop(), persists cursorPos from queue_.cursor via
+     * saveState(), then stops AudioOutput and resets decoder/reader/ring.
+     * Idempotent.
+     * @par Thread safety
+     * Thread-safe; joins threads and locks where needed.
+     */
     void shutdown() {
         // stop monitor
         monRun_.store(false, std::memory_order_release);
@@ -141,6 +266,28 @@ class Engine final {
         ring_.reset();
     }
 
+    /**
+     * @brief Starts or resumes playback.
+     * @ingroup caudio_engine
+     * @param queueId Active queue id (0 defaults to 1).
+     * @return Success or Error State/Busy/NotFound/Internal.
+     * @retval StatusCode::State if no db.
+     * @retval StatusCode::Busy if queueMutex_ try_lock fails.
+     * @retval StatusCode::NotFound if queue empty.
+     * @details State machine:
+     * - Paused -> Playing: resume (no dequeue), restart monotonic clock,
+     *   start AudioOutput.
+     * - Playing -> Playing: restart current track (seek 0 under decodeMtx_,
+     *   ring reset).
+     * - Stopped -> Playing: queueNextLocked under queueMutex_, then
+     *   doPlayTrack.
+     * Gapless: doPlayTrack prerolls and pushes TrackStarted event.
+     * @par Thread safety
+     * Thread-safe; uses tryLockQueue() and decodeMtx_ for decoder.
+     * @see pause
+     * @see resume
+     * @see stop
+     */
     // Playback
     ExpectedVoid play(int64_t queueId = 1) {
         if (!hasDb())
@@ -197,6 +344,13 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Pauses playback.
+     * @ingroup caudio_engine
+     * @return Success or Error State if not playing.
+     * @par Thread safety
+     * Thread-safe; atomics only.
+     */
     ExpectedVoid pause() {
         auto s = playbackState_.load(std::memory_order_acquire);
         if (s != PlaybackState::Playing)
@@ -210,6 +364,13 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Resumes from paused.
+     * @ingroup caudio_engine
+     * @return Success or Error State if not paused.
+     * @par Thread safety
+     * Thread-safe; notifies decode/monitor cvs.
+     */
     ExpectedVoid resume() {
         auto s = playbackState_.load(std::memory_order_acquire);
         if (s != PlaybackState::Paused)
@@ -224,6 +385,14 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Stops playback and resets position/ring.
+     * @ingroup caudio_engine
+     * @return Success (always).
+     * @par Thread safety
+     * Thread-safe.
+     * @see play
+     */
     ExpectedVoid stop() {
         playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
         if (output_)
@@ -235,6 +404,20 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Seeks to a position in the current track.
+     * @ingroup caudio_engine
+     * @param seconds Target position in seconds [0, duration].
+     * @return Success or Error State/InvalidArg/Internal.
+     * @retval StatusCode::State if no current track.
+     * @retval StatusCode::InvalidArg if seconds is NaN/inf/negative.
+     * @retval StatusCode::Internal if decoder seek fails (state restored).
+     * @details Holds decodeMtx_ to serialize with decodeLoop (decoder_->decode
+     * / ring_->write). Temporarily Pauses, snapshots pausePos_/playStart_ so
+     * a failed seek restores the prior state and resumes Playing.
+     * @par Thread safety
+     * Thread-safe; locks decodeMtx_.
+     */
     ExpectedVoid seek(double seconds) {
         if (!hasCurrent_.load(std::memory_order_acquire))
             return std::unexpected(
@@ -275,12 +458,28 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Clamps volume to [0,1], mapping non-finite to 0.
+     * @ingroup caudio_engine
+     * @param v Input volume.
+     * @return Clamped value.
+     */
     static inline float clampVolume(float v) noexcept {
         if (!std::isfinite(v))
             return 0.0f;
         return std::clamp(v, 0.0f, 1.0f);
     }
 
+    /**
+     * @brief Sets playback volume and persists it.
+     * @ingroup caudio_engine
+     * @param g Volume in [0,1] (clamped; NaN/inf -> 0).
+     * @return Success (always).
+     * @details Updates state_.volume, volume_ atomically and forwards to
+     * AudioOutput::setVolume; persists via saveState() if DB attached.
+     * @par Thread safety
+     * Thread-safe; atomic volume + saveState transaction.
+     */
     ExpectedVoid setVolume(float g) {
         g = clampVolume(g);
         state_.volume = g;
@@ -294,32 +493,55 @@ class Engine final {
         return {};
     }
 
+    /** @brief Returns current volume [0,1]. @ingroup caudio_engine
+     * @return Volume level (atomic load, relaxed). */
     float volume() const noexcept {
         return volume_.load(std::memory_order_relaxed);
     }
+    /** @brief Returns current playback state. @ingroup caudio_engine
+     * @return PlaybackState (atomic load, acquire). */
     PlaybackState state() const noexcept {
         return playbackState_.load(std::memory_order_acquire);
     }
+    /** @brief Returns current track duration in seconds. @ingroup caudio_engine
+     * @return Duration (cached from decoder or metadata). */
     double duration() const noexcept {
         return duration_;
     }
+    /** @brief Returns current playback position in seconds. @ingroup caudio_engine
+     * @return Position (0 if no track; pausePos_ if paused; pausePos_ + elapsed if playing, clamped). */
     double position() const noexcept {
         return currentPositionLocked();
     }
+    /** @brief Returns current track id (or persisted one if no current). @ingroup caudio_engine
+     * @return Track id if hasCurrent_, else state_.currentTrackId (persisted). */
     int64_t currentTrackId() const noexcept {
         if (hasCurrent_.load(std::memory_order_acquire))
             return currentTrack_.id;
         return state_.currentTrackId;
     }
 
+    /** @brief Returns whether shuffle is enabled. @ingroup caudio_engine
+     * @return True if shuffle mode active. */
     bool shuffle() const noexcept {
         return queue_.shuffle;
     }
 
+    /** @brief Returns current repeat mode. @ingroup caudio_engine
+     * @return RepeatMode (Off/Queue/One). */
     RepeatMode repeat() const noexcept {
         return queue_.repeat;
     }
 
+    /**
+     * @brief Returns database statistics.
+     * @ingroup caudio_engine
+     * @return `std::expected<DbStats, Error>` — stats on success, State if no db.
+     * @par Thread safety
+     * Thread-safe; delegates to Database::getStats() which takes shared_lock.
+     * @see caudio::db::Database::getStats
+     * @see caudio::db::DbStats
+     */
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats() {
         if (!hasDb())
             return std::unexpected(
@@ -327,6 +549,16 @@ class Engine final {
         return db_->getStats();
     }
 
+    /**
+     * @brief Lists history entries.
+     * @ingroup caudio_engine
+     * @param limit Max rows (0 = no limit, default 50).
+     * @return `std::expected<std::vector<HistoryEntry>, Error>` — vector on success, State if no db.
+     * @par Thread safety
+     * Thread-safe; History::listHistory takes shared_lock on its mutex.
+     * @see History::listHistory
+     * @see HistoryEntry
+     */
     std::expected<std::vector<HistoryEntry>, caudio::utils::Error> listHistory(int limit = 50) {
         if (!hasDb())
             return std::unexpected(
@@ -335,6 +567,14 @@ class Engine final {
         return hist.listHistory(limit);
     }
 
+    /**
+     * @brief Clears all history entries.
+     * @ingroup caudio_engine
+     * @return `std::expected<void, Error>` — success or State/Internal.
+     * @par Thread safety
+     * Thread-safe; History::clearHistory takes unique_lock on its mutex.
+     * @see History::clearHistory
+     */
     std::expected<void, caudio::utils::Error> clearHistory() {
         if (!hasDb())
             return std::unexpected(
@@ -343,12 +583,33 @@ class Engine final {
         return hist.clearHistory();
     }
 
+    /**
+     * @brief Returns last decoder/output error string.
+     * @ingroup caudio_engine
+     * @return Error message or empty string if none.
+     * @par Thread safety
+     * Thread-safe; reads lastErr_ (written from doPlayTrack, not atomic but single-writer).
+     * @see doPlayTrack
+     */
     std::string lastError() const {
         if (!lastErr_.empty())
             return lastErr_;
         return "";
     }
 
+    /**
+     * @brief Enables or disables shuffle.
+     * @ingroup caudio_engine
+     * @param on True to enable, false to disable.
+     * @return Success or Error State/Busy/Internal.
+     * @retval StatusCode::State if no db.
+     * @retval StatusCode::Busy if queueMutex_ try_lock fails.
+     * @details Delegates to setShuffleLocked under queueMutex_, then
+     * pushes QueueChanged event.
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_.
+     * @see setShuffleLocked
+     */
     ExpectedVoid setShuffle(bool on) {
         if (!hasDb())
             return std::unexpected(
@@ -368,6 +629,17 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Sets repeat mode and persists it.
+     * @ingroup caudio_engine
+     * @param m RepeatMode (Off/Queue/One).
+     * @return Success or Error InvalidArg/Busy/Internal.
+     * @retval StatusCode::InvalidArg if m is out of range.
+     * @details Under queueMutex_: updates queue_.repeat/state_.repeatMode
+     * and persists via saveState() (handles active_queue_id migration).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_.
+     */
     ExpectedVoid setRepeat(RepeatMode m) {
         if (m != RepeatMode::Off && m != RepeatMode::Queue && m != RepeatMode::One)
             return std::unexpected(
@@ -387,11 +659,34 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Returns the active queue id.
+     * @ingroup caudio_engine
+     * @return queue_.queue_id if set, else state_.activeQueueId, else 1 (atomic under queueMutex_).
+     * @par Thread safety
+     * Thread-safe; locks queueMutex_.
+     * @see switchQueue
+     */
     int64_t activeQueueId() const noexcept {
         std::lock_guard<std::mutex> lk(queueMutex_);
         return queue_.queue_id ? queue_.queue_id : state_.activeQueueId ? state_.activeQueueId : 1;
     }
 
+    /**
+     * @brief Switches the active queue.
+     * @ingroup caudio_engine
+     * @param qid Queue id to switch to (0 defaults to 1).
+     * @return Success or Error State/Busy/NotFound.
+     * @retval StatusCode::State if no db.
+     * @retval StatusCode::Busy if queueMutex_ try_lock fails.
+     * @details Validates via db_->getQueue(qid) while holding
+     * queueMutex_ (then dbMutex_ shared). On switch: resets cursor to 0,
+     * clears perm (shuffle flag kept but perm regenerated on next shuffle),
+     * updates state_.activeQueueId/cursorPos and persists via saveState().
+     * Pushes QueueChanged event.
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_.
+     */
     ExpectedVoid switchQueue(int64_t qid) {
         if (qid == 0)
             qid = 1;
@@ -435,6 +730,20 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Advances to the next track per RepeatMode/shuffle.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy/NotFound.
+     * @details Fast-path: if !shuffle && repeat==One && hasCurrent, seeks
+     * decoder to 0 under decodeMtx_ and resets ring without touching the
+     * queue. Otherwise locks queueMutex_ try_lock, calls queueNextLocked
+     * (which handles shuffle perm, wrap/reshuffle and RepeatMode::One),
+     * then doPlayTrack.
+     * @par Thread safety
+     * Thread-safe; fast-path locks decodeMtx_, otherwise queueMutex_.
+     * @see queueNextLocked
+     * @see doPlayTrack
+     */
     ExpectedVoid next() {
         if (!hasDb())
             return std::unexpected(
@@ -484,6 +793,16 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Moves to the previous track.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy/NotFound ("at start"/"no perm").
+     * @details Locks queueMutex_ try_lock then queuePrevLocked + doPlayTrack.
+     * Shuffle path steps cursor back by 2 and clamps; non-shuffle mirrors.
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_.
+     * @see queuePrevLocked
+     */
     ExpectedVoid prev() {
         if (!hasDb())
             return std::unexpected(
@@ -504,6 +823,16 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Sets runtime callbacks.
+     * @ingroup caudio_engine
+     * @param cbs New EngineCallbacks struct (copied).
+     * @return Success (always).
+     * @par Thread safety
+     * Thread-safe; locks cbMutex_.
+     * @see EngineCallbacks
+     * @see pushEvent
+     */
     ExpectedVoid setCallbacks(const EngineCallbacks& cbs) {
         std::lock_guard<std::mutex> lk(cbMutex_);
         callbacks_ = cbs;
@@ -511,6 +840,16 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Pops one event from the MPSC queue (non-blocking).
+     * @ingroup caudio_engine
+     * @return `std::expected<EngineEvent, Error>` — event on success, NotFound if queue empty.
+     * @par Thread safety
+     * Thread-safe; MpscQueue is lock-free MPSC.
+     * @see drainEvents
+     * @see drainAll
+     * @see EngineEvent
+     */
     std::expected<EngineEvent, caudio::utils::Error> pollEvent() {
         auto r = eventQueue_.pop();
         if (!r)
@@ -519,6 +858,19 @@ class Engine final {
         return r.value();
     }
 
+    /**
+     * @brief Drains up to cap events into a caller-provided buffer.
+     * @ingroup caudio_engine
+     * @param buf Output buffer (may be null if cap==0).
+     * @param cap Capacity of buf.
+     * @param n Out: number of events written (must be non-null).
+     * @return `std::expected<void, Error>` — success or InvalidArg if n is null or buf is null with cap>0.
+     * @par Thread safety
+     * Thread-safe; pops from MpscQueue (lock-free).
+     * @see pollEvent
+     * @see drainAll
+     * @see EngineEvent
+     */
     ExpectedVoid drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
         if (!n)
             return std::unexpected(
@@ -538,6 +890,16 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Drains all queued events into a vector.
+     * @ingroup caudio_engine
+     * @return Vector of events (may be empty).
+     * @par Thread safety
+     * Thread-safe; pops from MpscQueue (lock-free).
+     * @see pollEvent
+     * @see drainEvents
+     * @see EngineEvent
+     */
     std::vector<EngineEvent> drainAll() {
         std::vector<EngineEvent> out;
         while (true) {
@@ -549,16 +911,35 @@ class Engine final {
         return out;
     }
 
+    /**
+     * @brief Compatibility alias for state().
+     * @ingroup caudio_engine
+     * @return Current PlaybackState (Stopped/Playing/Paused).
+     * @see state()
+     */
     // compat: use state()/position()
     PlaybackState getState() const noexcept {
         return state();
     }
+    /**
+     * @brief Compatibility alias for position().
+     * @ingroup caudio_engine
+     * @return Current playback position in seconds.
+     * @see position()
+     */
     // compat: use state()/position()
     double getPosition() const noexcept {
         return position();
     }
 
   private:
+    /**
+     * @brief Constructs Engine with config defaults applied.
+     * @ingroup caudio_engine
+     * @param cfg EngineConfig; zero poll/gapless/history values are replaced by defaults.
+     * @details Applies defaults: pollMs 10, gaplessMs 300, historyThresholdPct 60,
+     * historyThresholdSecs 90; initializes atomics and copies callbacks.
+     */
     explicit Engine(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
         cfg_.pollMs = cfg.pollMs ? cfg.pollMs : 10;
         cfg_.gaplessMs = cfg.gaplessMs ? cfg.gaplessMs : 300;
@@ -578,6 +959,15 @@ class Engine final {
         callbacks_ = cfg.callbacks;
     }
 
+    /**
+     * @brief Starts decode and (optionally) monitor threads.
+     * @ingroup caudio_engine
+     * @return std::nullopt on success.
+     * @details Sets decodeRun_/monRun_, spawns jthreads running
+     * decodeLoop/monitorLoop. Called from create()/open().
+     * @par Thread safety
+     * Called during construction before shared access.
+     */
     std::optional<caudio::utils::Error> init() {
         // start decode thread
         decodeRun_.store(true, std::memory_order_release);
@@ -590,17 +980,32 @@ class Engine final {
         return std::nullopt;
     }
 
+    /** @brief Returns true if DB handle is attached. @ingroup caudio_engine */
     bool hasDb() const noexcept {
         return db_ && db_->handle();
     }
 
+    /**
+     * @brief Tries to acquire queueMutex_ without blocking.
+     * @ingroup caudio_engine
+     * @return true if lock acquired; false means Busy.
+     */
     bool tryLockQueue() noexcept {
         return queueMutex_.try_lock();
     }
+    /** @brief Releases queueMutex_. @ingroup caudio_engine */
     void unlockQueue() noexcept {
         queueMutex_.unlock();
     }
 
+    /**
+     * @brief Computes current playback position in seconds.
+     * @ingroup caudio_engine
+     * @return Position; 0 if no current track; pausePos_ if Paused/Stopped,
+     * otherwise pausePos_ + elapsed since playStart_ clamped to duration.
+     * @par Thread safety
+     * Lock-free; reads atomics.
+     */
     double currentPositionLocked() const noexcept {
         if (!hasCurrent_.load(std::memory_order_acquire))
             return 0.0;
@@ -620,17 +1025,42 @@ class Engine final {
     }
 
     // State persistence
+    /**
+     * @brief Returns borrowed sqlite3* handle or nullptr if no database.
+     * @ingroup caudio_engine
+     * @return Raw sqlite3 pointer (owned by Database) or nullptr.
+     * @par Thread safety
+     * Thread-safe; reads shared_ptr atomically.
+     */
     sqlite3* dbHandle() const noexcept {
         if (db_)
             return db_->handle();
         return nullptr;
     }
+    /**
+     * @brief Returns pointer to Database mutex or nullptr if no database.
+     * @ingroup caudio_engine
+     * @return Pointer to shared_mutex (owned by Database) or nullptr.
+     * @par Thread safety
+     * Thread-safe; reads shared_ptr atomically.
+     */
     std::shared_mutex* dbMutex() const noexcept {
         if (db_)
             return &db_->mutex();
         return nullptr;
     }
 
+    /**
+     * @brief Executes a callable inside a SQLite BEGIN IMMEDIATE / COMMIT transaction.
+     * @ingroup caudio_engine
+     * @tparam Fn Callable with signature `std::expected<void, caudio::utils::Error>(sqlite3*)`.
+     * @param fn Transaction body; receives the database handle.
+     * @return `std::expected<void, Error>` — success or error (Busy if begin fails, Internal on commit failure, InvalidArg if no db).
+     * @details Acquires unique_lock on dbMutex_, executes `BEGIN IMMEDIATE`, runs `fn(h)`,
+     * commits on success, rolls back on any failure. Used by all state persistence methods.
+     * @par Thread safety
+     * Locks dbMutex_ exclusively; callers must not hold queueMutex_ to avoid deadlock.
+     */
     template <typename Fn>
     std::expected<void, caudio::utils::Error> withTransaction(Fn&& fn) {
         auto* h = dbHandle();
@@ -662,12 +1092,30 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Loads persisted engine state from engine_state row id=1.
+     * @ingroup caudio_engine
+     * @return `std::optional<Error>` — `std::nullopt` on success (including no row, defaults applied), or Error on failure.
+     * @details Tries `sqlNew` (with `active_queue_id` column) first; if prepare fails (old schema),
+     * falls back to `sqlOld` without that column for migration. On row found:
+     * - Restores EngineState fields: shuffle_enabled, repeat_mode, cursor_pos, current_track_id, volume, active_queue_id.
+     * - Deserializes `shuffle_perm` BLOB into `queue_.perm` if shuffleEnabled.
+     * - Validates `active_queue_id` (>=1, checks queues table) and clamps cursor to permutation size.
+     * On SQLITE_DONE (no row): resets all state to defaults (shuffle=off, repeat=Off, cursor=0, volume=1.0, queue_id=1).
+     * Holds dbMutex_ unique_lock throughout.
+     * @par Thread safety
+     * Locks dbMutex_ exclusively; callers may hold queueMutex_ externally but not required.
+     * @see saveState
+     * @see persistShuffleBlobLocked
+     * @see persistCursorLocked
+     */
     std::optional<caudio::utils::Error> loadState() {
         auto* h = dbHandle();
         auto* m = dbMutex();
         if (!h || !m)
             return caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db");
         std::unique_lock<std::shared_mutex> lk(*m);
+        // Try new schema with active_queue_id; fallback to old schema for migration
         const char* sqlNew = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
                              "volume, shuffle_perm, active_queue_id FROM engine_state WHERE id=1";
         const char* sqlOld = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
@@ -762,6 +1210,20 @@ class Engine final {
         return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "load failed");
     }
 
+    /**
+     * @brief Persists current engine state to engine_state row id=1.
+     * @ingroup caudio_engine
+     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure, NoMem if perm too large).
+     * @details Uses `withTransaction()` for atomicity. Tries `sqlNew` (with `active_queue_id`)
+     * first; if prepare fails (old schema), falls back to `sqlOld`. Binds:
+     * - shuffle_enabled, repeat_mode, shuffle_perm (BLOB or NULL), cursor_pos,
+     *   current_track_id, volume, active_queue_id (or queue_.queue_id fallback).
+     * Handles `active_queue_id` migration: writes new column if schema supports it.
+     * @par Thread safety
+     * Locks dbMutex_ exclusively via withTransaction(); callers typically hold queueMutex_.
+     * @see loadState
+     * @see withTransaction
+     */
     std::expected<void, caudio::utils::Error> saveState() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             // Try with active_queue_id column; fallback to old schema if missing
@@ -812,6 +1274,21 @@ class Engine final {
         });
     }
 
+    /**
+     * @brief Persists shuffle permutation and cursor position atomically.
+     * @ingroup caudio_engine
+     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure, NoMem if perm too large).
+     * @details Executes `UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, shuffle_enabled=? WHERE id=1`
+     * inside a transaction. Binds the current `queue_.perm` as BLOB (or NULL if not shuffling),
+     * `queue_.cursor`, and `queue_.shuffle`. Also updates `state_.shuffleEnabled` and `state_.cursorPos`.
+     * Called by `setShuffleLocked`, `queueNextLocked`, `queuePrevLocked` after modifying shuffle/cursor.
+     * @par Thread safety
+     * Caller must hold `queueMutex_`; locks dbMutex_ exclusively via withTransaction().
+     * @see setShuffleLocked
+     * @see queueNextLocked
+     * @see queuePrevLocked
+     * @see withTransaction
+     */
     std::expected<void, caudio::utils::Error> persistShuffleBlobLocked() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql = "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, "
@@ -846,6 +1323,18 @@ class Engine final {
         });
     }
 
+    /**
+     * @brief Persists only the cursor position to engine_state.
+     * @ingroup caudio_engine
+     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure).
+     * @details Executes `UPDATE engine_state SET cursor_pos=? WHERE id=1` inside a transaction.
+     * Binds `queue_.cursor`. Also updates `state_.cursorPos`. Lighter than persistShuffleBlobLocked;
+     * used when only cursor advances (non-shuffle next/prev).
+     * @par Thread safety
+     * Caller must hold `queueMutex_`; locks dbMutex_ exclusively via withTransaction().
+     * @see persistShuffleBlobLocked
+     * @see withTransaction
+     */
     std::expected<void, caudio::utils::Error> persistCursorLocked() {
         return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
             const char* sql = "UPDATE engine_state SET cursor_pos=? WHERE id=1";
@@ -865,6 +1354,19 @@ class Engine final {
         });
     }
 
+/**
+     * @brief Fetches track from queue at given position (under db shared_lock).
+     * @ingroup caudio_engine
+     * @param qid Queue id (0 defaults to 1).
+     * @param pos Zero-based position in queue.
+     * @return `std::expected<Track, Error>` — track on success, NotFound if position out of range, Internal on SQL error.
+     * @details Executes `SELECT track_id FROM queue WHERE queue_id=? ORDER BY position LIMIT 1 OFFSET ?`
+     * under dbMutex_ shared_lock, then calls `db_->getTrack(trackId)`.
+     * @par Thread safety
+     * Locks dbMutex_ shared; caller typically holds queueMutex_.
+     * @see queueNextLocked
+     * @see queuePrevLocked
+     */
     std::expected<caudio::db::Track, caudio::utils::Error> fetchTrackByPosLocked(int64_t qid,
                                                                                  int64_t pos) {
         if (qid == 0)
@@ -900,7 +1402,21 @@ class Engine final {
         return tr.value();
     }
 
-    // Requires queueMutex_ held via tryLockQueue() success.
+    /**
+     * @brief Internal shuffle toggle with persistence (queueMutex_ must be held).
+     * @ingroup caudio_engine
+     * @param on True to enable shuffle, false to disable.
+     * @return `std::expected<void, Error>` — success or error from persistShuffleBlobLocked.
+     * @details If enabling and perm empty: clears perm/cursor, gets queue count, generates new
+     * permutation via `detail::shufflePerm` with random_device, persists via persistShuffleBlobLocked.
+     * If disabling: clears perm, sets shuffle=false, persists. No-op if state unchanged and perm non-empty.
+     * Updates `state_.shuffleEnabled` on success.
+     * @par Thread safety
+     * Caller MUST hold `queueMutex_` (acquired via tryLockQueue()). Locks dbMutex_ via persistShuffleBlobLocked.
+     * @see setShuffle
+     * @see persistShuffleBlobLocked
+     * @see detail::shufflePerm
+     */
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on) {
         // assert: queueMutex_ locked by caller
         bool want = on;
@@ -946,6 +1462,31 @@ class Engine final {
         }
     }
 
+    /**
+     * @brief Advances queue cursor to next track per shuffle/repeat mode (queueMutex_ held).
+     * @ingroup caudio_engine
+     * @param out Output track reference (filled on success).
+     * @return `std::expected<void, Error>` — success, NotFound if queue empty, Internal on fetch error.
+     * @details Shuffle path:
+     * - If perm empty, calls setShuffleLocked(true) to generate.
+     * - If cursor >= perm.size():
+     *   - RepeatMode::One: re-plays last perm index (cursor-1 or last).
+     *   - Off/Queue: calls setShuffleLocked(true) to reshuffle, resets cursor=0, persists cursor.
+     * - Returns track at perm[cursor], increments cursor, persists cursor.
+     * Non-shuffle path:
+     * - If cursor >= count:
+     *   - RepeatMode::One: re-plays last index (cursor-1 or last).
+     *   - Off/Queue: wraps cursor to 0 (reshuffles if shuffle on), persists cursor.
+     * - Returns track at cursor, increments cursor, persists cursor.
+     * @par Thread safety
+     * Caller MUST hold `queueMutex_` (acquired via tryLockQueue()). Locks dbMutex_ shared for fetch,
+     * exclusive via persistCursorLocked/persistShuffleBlobLocked.
+     * @see next
+     * @see queuePrevLocked
+     * @see setShuffleLocked
+     * @see persistCursorLocked
+     * @see persistShuffleBlobLocked
+     */
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out) {
         if (queue_.queue_id == 0)
             queue_.queue_id = 1;
@@ -1027,6 +1568,25 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Moves queue cursor to previous track per shuffle/repeat mode (queueMutex_ held).
+     * @ingroup caudio_engine
+     * @param out Output track reference (filled on success).
+     * @return `std::expected<void, Error>` — success, NotFound if queue empty/at start/no perm.
+     * @details Non-shuffle path:
+     * - If cursor <= 1: returns NotFound ("at start" if cursor==0).
+     * - Else: cursor -= 2, clamp to count-1, fetch track at cursor, increment cursor, persist cursor.
+     * Shuffle path:
+     * - If perm empty: NotFound ("no perm").
+     * - If cursor <= 1: cursor=0 (or NotFound if cursor==0).
+     * - Else: cursor -= 2, clamp to perm.size()-1, fetch track at perm[cursor], increment cursor, persist cursor.
+     * @par Thread safety
+     * Caller MUST hold `queueMutex_` (acquired via tryLockQueue()). Locks dbMutex_ shared for fetch,
+     * exclusive via persistCursorLocked.
+     * @see prev
+     * @see queueNextLocked
+     * @see persistCursorLocked
+     */
     std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::db::Track& out) {
         if (!queue_.shuffle) {
             size_t cnt = db_->queueCountLocked(queue_.queue_id);
@@ -1074,6 +1634,29 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Initializes decoder/reader/ring/output for a track and starts playback.
+     * @ingroup caudio_engine
+     * @param t Track to play (path used to open reader/decoder).
+     * @return `std::expected<void, Error>` — always success (errors stored in lastErr_).
+     * @details Resets prior decoder/reader/ring/output. Attempts to open FileReader + DecoderRegistry
+     * from track path. On success: sets duration_, creates SpscRing (8192*ch frames), AudioOutput,
+     * calls preroll() to fill ring to half capacity, starts output. On failure: falls back to
+     * metadata duration (no audio output), sets lastErr_. Updates state: currentTrack_, hasCurrent_=true,
+     * markedPlayed_=false, gaplessArmed_=false, startedMs_=nowMs(), state_.currentTrackId, cursorPos,
+     * playbackState_=Playing, playStart_=now, pausePos_=0. Calls saveState() if DB attached. Pushes
+     * TrackStarted event. Notifies decodeCv_ and monCv_.
+     * @par Thread safety
+     * Called with queueMutex_ held (from play/next/prev). Locks decodeMtx_ indirectly via
+     * output/decoder creation (no concurrent decodeLoop access yet). Must not be called from
+     * decodeLoop/monitorLoop.
+     * @see play
+     * @see next
+     * @see prev
+     * @see preroll
+     * @see saveState
+     * @see pushEvent
+     */
     std::expected<void, caudio::utils::Error> doPlayTrack(caudio::db::Track& t) {
         // try to open decoder path
         std::string path = t.path;
@@ -1160,6 +1743,34 @@ class Engine final {
         return {};
     }
 
+    /**
+     * @brief Pre-fills the SPSC ring to half capacity before starting audio output.
+     * @ingroup caudio_engine
+     * @details Called from doPlayTrack after creating ring and output. Decodes frames in
+     * chunks (up to 1024 frames, max 2048/ch) until ring is half full or EOF. Uses
+     * decoder_->decode() into a temporary buffer, writes to ring_. Early exit if ring
+     * cannot accept a full chunk. Ensures gapless transition by having audio ready
+     * immediately on output_->start().
+     * @par Thread safety
+     * Called from doPlayTrack with queueMutex_ held; decodeLoop not yet running for
+     * this track. No locks needed.
+     * @see doPlayTrack
+     * @see decodeLoop
+     */
+    /**
+     * @brief Pre-fills the SPSC ring to half capacity before starting audio output.
+     * @ingroup caudio_engine
+     * @details Called from doPlayTrack after creating ring and output. Decodes frames in
+     * chunks (up to 1024 frames, max 2048/ch) until ring is half full or EOF. Uses
+     * decoder_->decode() into a temporary buffer, writes to ring_. Early exit if ring
+     * cannot accept a full chunk. Ensures gapless transition by having audio ready
+     * immediately on output_->start().
+     * @par Thread safety
+     * Called from doPlayTrack with queueMutex_ held; decodeLoop not yet running for
+     * this track. No locks needed.
+     * @see doPlayTrack
+     * @see decodeLoop
+     */
     void preroll() {
         if (!decoder_ || !ring_)
             return;
@@ -1190,6 +1801,22 @@ class Engine final {
         }
     }
 
+    /**
+     * @brief Pushes event to MPSC queue and dispatches callbacks.
+     * @ingroup caudio_engine
+     * @param ev EngineEvent to enqueue.
+     * @details Pushes to eventQueue_ (capacity 64, drop-on-full). On success, copies callbacks
+     * under cbMutex_ and dispatches synchronously: TrackStarted -> on_track_started,
+     * TrackEnded -> on_track_ended (with completion % calc), QueueChanged -> on_queue_changed,
+     * Error -> on_error.
+     * @par Thread safety
+     * Thread-safe; eventQueue_ is lock-free MPSC. cbMutex_ protects callback copy.
+     * Called from: play/next/prev/doPlayTrack (TrackStarted), engineTick (Progress/TrackEnded via gapless),
+     * setShuffle/switchQueue (QueueChanged).
+     * @see eventQueue_
+     * @see EngineCallbacks
+     * @see EngineEventType
+     */
     void pushEvent(const EngineEvent& ev) {
         // MpscQueue cap 64 drop policy
         auto r = eventQueue_.push(ev);
@@ -1220,6 +1847,23 @@ class Engine final {
         }
     }
 
+    /**
+     * @brief Marks current track as played in history if thresholds met (exactly-once via CAS).
+     * @ingroup caudio_engine
+     * @details Called from engineTick(). Early exits if: no DB, no current track, already marked.
+     * Checks thresholds via detail::shouldMarkPlayedEx(duration, position, false, pct, secs)
+     * using config historyThresholdPct (default 60) and historyThresholdSecs (default 90).
+     * Uses atomic CAS on markedPlayed_ (false->true) for exactly-once semantics.
+     * Inside transaction (BEGIN IMMEDIATE): fetches track play_count, updates tracks
+     * (play_count+1, last_played=now), inserts into history (track_id, started_at,
+     * completed_at, position_ms, completion_pct, queue_id). Rolls back on any failure,
+     * resets markedPlayed_=false. On commit success, markedPlayed_ remains true.
+     * @par Thread safety
+     * Called from monitorLoop (single-threaded). Locks dbMutex_ exclusively.
+     * @see engineTick
+     * @see monitorLoop
+     * @see detail::shouldMarkPlayedEx
+     */
     void doHistoryMark() {
         if (!hasDb())
             return;
@@ -1348,6 +1992,25 @@ class Engine final {
         // success keep marked true
     }
 
+    /**
+     * @brief Periodic tick: history marking, progress events, gapless transition.
+     * @ingroup caudio_engine
+     * @details Called from monitorLoop every pollMs (default 10 ms).
+     * 1. Calls doHistoryMark() to persist history if thresholds met.
+     * 2. If Playing: emits Progress event every 500 ms (track_id, queue_id, position, duration).
+     * 3. If Playing and duration_ > 0: computes remaining = duration - position; if
+     *    remaining <= gaplessMs/1000 (default 300 ms) and >= 0: attempts CAS on
+     *    gaplessArmed_ (0->1). On success: calls next() to queue/start next track;
+     *    on next() failure, resets gaplessArmed_=false. This arms gapless ~300ms
+     *    before track end so decodeLoop can preroll the next track.
+     * @par Thread safety
+     * Called from monitorLoop (single-threaded). Reads atomics (playbackState_, hasCurrent_,
+     * lastProgressMs_, gaplessArmed_). Calls next() which locks queueMutex_.
+     * @see monitorLoop
+     * @see doHistoryMark
+     * @see next
+     * @see gaplessArmed_
+     */
     void engineTick() {
         doHistoryMark();
         auto st = playbackState_.load(std::memory_order_acquire);
@@ -1386,6 +2049,23 @@ class Engine final {
         }
     }
 
+    /**
+     * @brief Monitor thread main loop — polls engineTick at configurable interval.
+     * @ingroup caudio_engine
+     * @param st Stop token from jthread (request_stop() on shutdown).
+     * @details Runs while monRun_ is true and stop not requested. Uses monMtx_/monCv_ to wait
+     * for pollMs (default 10 ms) or notification. Each iteration calls engineTick() to:
+     * - mark history, emit progress, arm gapless transition.
+     * Poll interval set by EngineConfig::pollMs (min 1 ms). Lock released during engineTick()
+     * to minimize contention.
+     * @par Thread safety
+     * Runs on dedicated monitorThread_ (jthread). Single writer for engineTick().
+     * Waits on monCv_ with predicate checking stop token and monRun_.
+     * @see engineTick
+     * @see init
+     * @see shutdown
+     * @see EngineConfig::pollMs
+     */
     void monitorLoop(std::stop_token st) {
         int poll = cfg_.pollMs ? cfg_.pollMs : 10;
         if (poll <= 0)
@@ -1401,6 +2081,29 @@ class Engine final {
         }
     }
 
+    /**
+     * @brief Decode thread main loop — fills SPSC ring with decoded audio frames.
+     * @ingroup caudio_engine
+     * @param st Stop token from jthread (request_stop() on shutdown).
+     * @details Runs while decodeRun_ is true and stop not requested.
+     * - If not Playing or no decoder/ring: waits on decodeCv_ (10 ms timeout) for state change.
+     * - If ring full: sleeps 5 ms and retries.
+     * - Computes max frames to decode (avail/ch, capped at 1024 frames, max 2048/ch).
+     * - Decodes under decodeMtx_ (re-checks Playing state to avoid race with seek()).
+     * - On EOF (frames==0): sleeps 10 ms, lets monitorLoop handle gapless/next.
+     * - Writes decoded frames to ring under decodeMtx_ (re-checks Playing to avoid race with seek() ring reset).
+     * SPSC ring (ring_) is written by decodeLoop only; read by AudioOutput callback.
+     * @par Thread safety
+     * Runs on dedicated decodeThread_ (jthread). Single writer to ring_.
+     * Uses decodeMtx_ to serialize with seek()/doPlayTrack() decoder/ring access.
+     * Waits on decodeCv_ notified by play/pause/resume/stop/seek/next/prev.
+     * @see init
+     * @see shutdown
+     * @see decodeMtx_
+     * @see decodeCv_
+     * @see caudio::utils::SpscRing
+     * @see caudio::player::IDecoder
+     */
     void decodeLoop(std::stop_token st) {
         constexpr std::size_t kMaxChunkFrames = 1024;
         while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {

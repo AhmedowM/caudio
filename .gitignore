@@ -37,6 +37,10 @@ Thumbs.db
 *.dylib
 *.exe
 
+# Doxygen output
+docs/html/
+docs/latex/
+
 # Keep source md on disk but not required in repo history (AI docs)
 # Uncomment to ignore all markdown if desired:
 # *.md

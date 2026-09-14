@@ -1,3 +1,8 @@
+/**
+ * @file output_formatter.cppm
+ * @brief Output formatting for CLI results: table and JSON output.
+ * @ingroup caudio_client
+ */
 module;
 #include <chrono>
 #include <format>
@@ -20,6 +25,13 @@ import caudio.db;
 
 export namespace caudio::client {
 
+/**
+ * @brief Formats CLI results for human-readable table output or JSON.
+ *
+ * Provides print() for formatted output and printWithStatus() for exit code handling.
+ * Supports all Result variant types: Status, QueueTracks, VolumeInfo, LibraryStats, etc.
+ * JSON mode uses nlohmann::json pretty-printing (2-space indent).
+ */
 class OutputFormatter {
     bool json_{false};
 
@@ -55,8 +67,20 @@ class OutputFormatter {
     }
 
   public:
+    /**
+     * @brief Construct formatter.
+     * @param json If true, output JSON; otherwise formatted table/text.
+     */
     explicit OutputFormatter(bool json = false) : json_(json) {}
 
+    /**
+     * @brief Print a Result to an output stream.
+     * @param r Result variant to format.
+     * @param os Output stream (stdout/stderr).
+     *
+     * In JSON mode: pretty-prints entire Result as JSON.
+     * In table mode: dispatches to type-specific formatter for each Result alternative.
+     */
     void print(const caudio::cli::Result& r, std::ostream& os) const {
         if (json_) {
             // Pretty-printed for single-shot human --json; watch streaming uses compact separately.
@@ -248,7 +272,16 @@ class OutputFormatter {
             r);
     }
 
-    // Convenience overload that returns exit code for Error case
+    /**
+     * @brief Print Result with automatic stderr/stdout routing and exit code.
+     * @param r Result to print.
+     * @param out Output stream for success (default stdout).
+     * @param err Output stream for errors (default stderr).
+     * @return 0 on success, 1 if Result holds Error variant.
+     *
+     * Routes Error variants to err stream, others to out stream.
+     * Suitable for CLI main() to return appropriate exit code.
+     */
     int printWithStatus(const caudio::cli::Result& r, std::ostream& out, std::ostream& err) const {
         bool isError = std::holds_alternative<caudio::utils::Error>(r);
         if (isError) {

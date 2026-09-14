@@ -8,6 +8,19 @@ module;
 #include <string_view>
 #include <vector>
 
+/**
+ * @file queue.cppm
+ * @brief Queue table helpers (single-writer invariant).
+ * @ingroup caudio_db
+ * @details All helpers are `*Locked` — the caller must hold the
+ * Database mutex (dbMutex_) exclusively for mutating ops and at least
+ * shared for reads. The `queue` table enforces UNIQUE(queue_id, position)
+ * (see schema.cppm); position shifts use
+ * `UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?`
+ * which requires serialized access — guaranteed by the single-writer lock.
+ * Every function normalizes qid == 0 to 1 (default queue).
+ */
+
 export module caudio.db:queue;
 
 import caudio.utils;
@@ -17,6 +30,21 @@ import :SqliteStatement;
 
 namespace caudio::db {
 
+/**
+ * @brief Enqueues a track (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @param tid Track id (must be non-zero).
+ * @param pos Position (-1 = append at MAX+1, else shift + insert).
+ * @return Success or Error with StatusCode::InvalidArg if tid==0,
+ * StatusCode::Internal if no handle or SQLite error.
+ * @details If pos < 0, computes MAX(position)+1; otherwise shifts
+ * positions >= pos via position+1 before inserting. The UNIQUE invariant
+ * requires exclusive lock (caller must hold dbMutex_).
+ * @par Thread safety
+ * Caller must hold Database::mutex().
+ */
 export std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_t qid,
                                                                     int64_t tid, int64_t pos = -1) {
     if (tid == 0)
@@ -65,6 +93,17 @@ export std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db,
     return {};
 }
 
+/**
+ * @brief Dequeues the head item (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return QueueItem or Error NotFound/Internal.
+ * @details Selects ORDER BY position LIMIT 1, deletes it, then shifts
+ * remaining positions down by 1 (position-1 where position > removed).
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -107,6 +146,15 @@ export std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3
     return it;
 }
 
+/**
+ * @brief Peeks the head item without removing (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return QueueItem or Error NotFound/Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() (shared or exclusive).
+ */
 export std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -132,6 +180,18 @@ export std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* d
     return it;
 }
 
+/**
+ * @brief Removes item at position (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @param pos Position to remove.
+ * @return Success or Error NotFound/Internal.
+ * @details Deletes WHERE queue_id=? AND position=?, then shifts down
+ * positions > pos.
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid,
                                                                    int64_t pos) {
     if (qid == 0)
@@ -164,6 +224,15 @@ export std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, 
     return {};
 }
 
+/**
+ * @brief Clears all items in a queue (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return Success or Error Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -182,6 +251,15 @@ export std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, i
     return {};
 }
 
+/**
+ * @brief Lists all items in a queue ordered by position (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return Vector of QueueItems or Error Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() (shared or exclusive).
+ */
 export std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
                                                                                    int64_t qid) {
     if (qid == 0)
@@ -208,6 +286,15 @@ export std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLock
     return out;
 }
 
+/**
+ * @brief Counts items in a queue (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return Count (0 if no db or on prepare failure).
+ * @par Thread safety
+ * Caller must hold Database::mutex() (shared or exclusive).
+ */
 export size_t queueCountLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -224,6 +311,15 @@ export size_t queueCountLocked(sqlite3* db, int64_t qid) {
     return cnt;
 }
 
+/**
+ * @brief Gets a queue container row (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return Queue or Error NotFound/Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex().
+ */
 export std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -246,6 +342,14 @@ export std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, in
     return q;
 }
 
+/**
+ * @brief Lists all queue containers (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @return Vector of Queues or Error.
+ * @par Thread safety
+ * Caller must hold Database::mutex().
+ */
 export std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3* db) {
     if (!db)
         return std::unexpected{
@@ -266,6 +370,16 @@ export std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(
     return out;
 }
 
+/**
+ * @brief Creates a queue container (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param name Queue name (must be non-empty).
+ * @param library_id Owning library.
+ * @return New row id or Error InvalidArg/Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<int64_t, caudio::utils::Error>
 createQueueLocked(sqlite3* db, std::string_view name, int64_t library_id = 1) {
     if (name.empty())
@@ -287,6 +401,16 @@ createQueueLocked(sqlite3* db, std::string_view name, int64_t library_id = 1) {
     return sqlite3_last_insert_rowid(db);
 }
 
+/**
+ * @brief Deletes a queue container and its items (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @return Success or Error NotFound/Internal.
+ * @details First deletes from queue (items), then from queues (container).
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<void, caudio::utils::Error> deleteQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -316,6 +440,16 @@ export std::expected<void, caudio::utils::Error> deleteQueueLocked(sqlite3* db, 
     return {};
 }
 
+/**
+ * @brief Sets the repeat mode for a queue (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @param repeat_mode New mode.
+ * @return Success or Error NotFound/Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
 export std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int64_t qid,
                                                                       int repeat_mode) {
     if (qid == 0)
@@ -338,6 +472,16 @@ export std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* d
     return {};
 }
 
+/**
+ * @brief Alias for queueListLocked (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id.
+ * @return Vector of items or Error.
+ * @par Thread safety
+ * Caller must hold Database::mutex().
+ * @see queueListLocked
+ */
 export std::expected<std::vector<QueueItem>, caudio::utils::Error>
 getQueueItemsLocked(sqlite3* db, int64_t qid) {
     return queueListLocked(db, qid);

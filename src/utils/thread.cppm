@@ -15,6 +15,12 @@ module;
 #include <thread>
 #include <utility>
 
+/**
+ * @file thread.cppm
+ * @brief Thread naming and sleep helpers (cross-platform).
+ * @ingroup caudio_utils
+ */
+
 export module caudio.utils:thread;
 
 import :result;
@@ -46,6 +52,14 @@ __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
 
 namespace caudio::utils::detail {
 #if defined(_WIN32) || defined(_WIN64)
+/**
+ * @brief Sets native handle thread description via SetThreadDescription (Win10+).
+ * @param nativeHandle HANDLE of thread (void*).
+ * @param name UTF-8 view converted to wide string.
+ * @return Expected<void> always success on Windows (errors ignored for compat).
+ * @details Dynamically resolves SetThreadDescription from kernel32.dll; falls
+ * back to success if unavailable. Converts UTF-8 via MultiByteToWideChar.
+ */
 inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept {
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
@@ -70,13 +84,31 @@ inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view n
     }
     return {};
 }
+/**
+ * @brief Sets current thread name on Windows.
+ * @param name UTF-8 name view.
+ * @return Expected<void> always success (compat).
+ */
 inline Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept {
     return setNativeHandleName(GetCurrentThread(), name);
 }
 #else
+/**
+ * @brief Truncates name to 15 chars for pthread limit.
+ * @param s Input view.
+ * @return View of first 15 bytes (pthread limit is 16 inc. NUL).
+ */
 constexpr std::string_view truncate15(std::string_view s) noexcept {
     return s.substr(0, 15);
 }
+/**
+ * @brief Sets pthread name with truncation and NUL termination.
+ * @param th pthread_t handle.
+ * @param name View truncated to 15 chars.
+ * @return 0 on success, errno-style error otherwise.
+ * @details Copies truncated view into 16-byte buffer with NUL terminator,
+ * calls pthread_setname_np.
+ */
 inline int setPthreadName(pthread_t th, std::string_view name) noexcept {
     std::string_view t = truncate15(name);
     char buf[16]{};
@@ -90,17 +122,50 @@ inline int setPthreadName(pthread_t th, std::string_view name) noexcept {
 
 export namespace caudio::utils {
 
-// convenience wrapper
+/**
+ * @brief Sleeps for a chrono duration.
+ * @ingroup caudio_utils
+ * @tparam Rep Duration rep type.
+ * @tparam Period Duration period type.
+ * @param d Duration to sleep.
+ * @details Thin wrapper around `std::this_thread::sleep_for`; noexcept.
+ */
+ // convenience wrapper
 template <typename Rep, typename Period>
 inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
     std::this_thread::sleep_for(d);
 }
 
-// convenience wrapper
+/**
+ * @brief Sleeps for a number of milliseconds.
+ * @ingroup caudio_utils
+ * @param ms Milliseconds to sleep.
+ * @details Delegates to sleepFor(std::chrono::milliseconds).
+ */
+ // convenience wrapper
 inline void sleepForMs(std::uint32_t ms) noexcept {
     sleepFor(std::chrono::milliseconds(ms));
 }
 
+/**
+ * @brief Sets the current thread's name.
+ * @ingroup caudio_utils
+ * @param name Non-empty name view (UTF-8 on Windows).
+ * @return Expected<void> success, or error with codes:
+ * - `InvalidArg` if `name` empty,
+ * - `Unsupported` on macOS/Linux if `pthread_setname_np` fails or platform unsupported,
+ * - `Unsupported` with "setThreadName not supported" on unknown POSIX,
+ * - Always success on Windows (errors ignored for compat).
+ * @details Platform:
+ * - Windows: uses `SetThreadDescription` via dynamic `GetProcAddress`; if
+ *   unavailable, returns success (no-op for compat).
+ * - macOS: `pthread_setname_np` for current thread only; fails with
+ *   `Unsupported` if non-zero return.
+ * - Linux/glibc: `pthread_setname_np(pthread_self(), truncated15)`; truncates
+ *   to 15 chars + NUL.
+ * @see setThreadName(std::jthread&, std::string_view)
+ * @see setThreadName(std::thread&, std::string_view)
+ */
 [[nodiscard]] inline Expected<void> setThreadName(std::string_view name) noexcept {
     if (name.empty()) {
         return std::unexpected(Error{StatusCode::InvalidArg, "empty name"});
@@ -132,6 +197,22 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #endif
 }
 
+/**
+ * @brief Sets a `std::jthread`'s name by native handle.
+ * @ingroup caudio_utils
+ * @param jt Joinable jthread whose name to set.
+ * @param name Non-empty name view.
+ * @return Expected<void> success or error:
+ * - `State` with "thread not joinable" if !jt.joinable(),
+ * - `InvalidArg` if name empty,
+ * - `Unsupported` if platform does not support naming this handle
+ *   (macOS jthread unsupported, unknown POSIX),
+ * - `Unsupported` with "pthread_setname_np failed" on Linux failure,
+ * - Always success on Windows (via SetThreadDescription).
+ * @details Windows reinterprets `native_handle()` via HANDLE; Linux uses
+ * `pthread_setname_np(th, truncated15)`.
+ * @see setThreadName(std::string_view)
+ */
 [[nodiscard]] inline Expected<void> setThreadName(std::jthread& jt,
                                                   std::string_view name) noexcept {
     if (!jt.joinable()) {
@@ -146,6 +227,8 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #else
     pthread_t th = jt.native_handle();
 #if defined(__APPLE__) && defined(__MACH__)
+    // macOS pthread_setname_np only supports naming the current thread (no handle arg).
+    // std::jthread native_handle is not the current thread, so we cannot name it.
     (void)th;
     (void)name;
     return std::unexpected(
@@ -164,7 +247,21 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
 #endif
 }
 
-// Convenience for std::thread as well
+/**
+ * @brief Sets a `std::thread`'s name by native handle.
+ * @ingroup caudio_utils
+ * @param t Joinable thread whose name to set.
+ * @param name Non-empty name view.
+ * @return Expected<void> success or error:
+ * - `State` if !t.joinable(),
+ * - `InvalidArg` if name empty,
+ * - `Unsupported` on non-Linux POSIX or `pthread_setname_np` failure,
+ * - Always success on Windows.
+ * @details Linux path only; other POSIX returns Unsupported (macOS falls
+ * through to generic unsupported). Name truncated to 15 chars on Linux.
+ * @see setThreadName(std::jthread&, std::string_view)
+ */
+ // Convenience for std::thread as well
 [[nodiscard]] inline Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
     if (!t.joinable()) {
         return std::unexpected(Error{StatusCode::State, "thread not joinable"});

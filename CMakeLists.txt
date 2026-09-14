@@ -53,6 +53,7 @@ option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system → vcpk
 option(CAUDIO_ENABLE_TESTS "build tests" OFF)
 option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
 option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
+option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 
 # Module path for FindFFmpeg
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -143,6 +144,14 @@ include(cmake/components/engine.cmake)
 include(cmake/components/cli.cmake)
 include(cmake/components/combined.cmake)
 
+# Umbrella module
+add_library(caudio_umbrella STATIC src/caudio.cppm)
+target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/caudio.cppm)
+target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+target_link_libraries(caudio_umbrella PUBLIC caudio::utils caudio::player caudio::db caudio::engine)
+ca_set_warnings(caudio_umbrella)
+ca_set_module_warnings(caudio_umbrella)
+
 # caudio executable — App dispatch (CLI11) + main entry
 add_executable(caudio
   cli/src/main.cpp
@@ -168,6 +177,77 @@ endif()
 if(CAUDIO_ENABLE_SANITIZERS)
   caudio_apply_sanitizers(caudio)
 endif()
+
+# ── Documentation (Doxygen) ─────────────────────────────────────────────
+# How to build docs:
+#   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
+#   cmake --build build --target doc   # generates HTML to build/docs/html (and docs/html if OUTPUT_DIRECTORY=.)
+# Requires Doxygen (optional). If not found, configure still succeeds.
+if(CAUDIO_BUILD_DOCS)
+  find_package(Doxygen OPTIONAL_COMPONENTS dot)
+  if(DOXYGEN_FOUND)
+    if(DOXYGEN_DOT_FOUND)
+      set(DOXYGEN_HAVE_DOT YES)
+    else()
+      set(DOXYGEN_HAVE_DOT NO)
+    endif()
+
+    # Prefer template docs/Doxyfile.in (CMake @VAR@ substitution) if present
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in")
+      configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
+        @ONLY
+      )
+      set(_caudio_doxyfile "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in")
+      configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
+        @ONLY
+      )
+      set(_caudio_doxyfile "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile")
+      set(_caudio_doxyfile "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile")
+      set(_caudio_doxyfile "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile")
+    else()
+      message(WARNING "CAUDIO_BUILD_DOCS=ON but no Doxyfile or Doxyfile.in found")
+      set(_caudio_doxyfile "")
+    endif()
+
+    if(_caudio_doxyfile)
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+        doxygen_add_docs(doc CONFIG_FILE "${_caudio_doxyfile}" COMMENT "Generating Doxygen docs")
+        # Doxygen on Windows does not auto-create intermediate dirs for HTML_OUTPUT=docs/html
+        # Ensure parent exists before doxygen runs (PRE_BUILD works for Ninja/Make)
+        if(TARGET doc)
+          # Create a helper target to ensure docs/html exists; doc will depend on it
+          # Doxygen on Windows does not auto-create intermediate dirs for nested HTML_OUTPUT
+          add_custom_target(doc_mkdir
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/docs/html"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/docs/html"
+            COMMENT "Preparing docs output directory"
+            VERBATIM
+          )
+          add_dependencies(doc doc_mkdir)
+        endif()
+      else()
+        # Fallback for CMake < 3.16
+        add_custom_target(doc
+          COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/docs/html"
+          COMMAND ${DOXYGEN_EXECUTABLE} "${_caudio_doxyfile}"
+          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+          COMMENT "Generating Doxygen docs (custom target)"
+          VERBATIM
+        )
+      endif()
+    endif()
+  else()
+    message(STATUS "CAUDIO_BUILD_DOCS=ON but Doxygen not found - docs target will not be available (install Doxygen to build docs)")
+  endif()
+endif()
+# ── End Documentation ───────────────────────────────────────────────────
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)

@@ -2,19 +2,49 @@ module;
 #include <string>
 #include <string_view>
 
+/**
+ * @file schema.cppm
+ * @brief SQLite schema, pragmas and migration helpers.
+ * @ingroup caudio_db
+ * @details Single source of truth for DDL. `kSchema` is executed as a
+ * single `sqlite3_exec` batch on `Database::open()`. The queue table
+ * enforces `UNIQUE(queue_id, position)` as a safety net for the
+ * single-writer invariant (all queue writes are serialized by
+ * `Database::dbMutex_`). See queue.cppm and db_core.cppm for lock
+ * ordering.
+ */
+
 export module caudio.db:schema;
 
 export namespace caudio::db {
 
-// queue table enforces UNIQUE(queue_id, position) — single-writer invariant.
-// Database::m_ serializes all queue writes; the UNIQUE is a safety net. For
-// existing DBs created without the constraint, IF NOT EXISTS leaves the old
-// table as-is; the CREATE UNIQUE INDEX is IF NOT EXISTS and will fail only if
-// duplicate positions exist — Database::open handles that gracefully by ignoring
-// the index-creation error and queue ops will normalize positions on next write.
-// Position shifts use UPDATE ... SET position=position+1 which under UNIQUE
-// requires serialized access (guaranteed by dbMutex_); transient duplicates are
-// avoided by single-writer.
+/**
+ * @brief Queue table UNIQUE invariant — single-writer guarantee.
+ * @ingroup caudio_db
+ * @details `queue` enforces `UNIQUE(queue_id, position)` and a unique
+ * index `idx_queue_queue_pos`. `Database::dbMutex_` serializes all queue
+ * writes; the UNIQUE is a safety net. For existing DBs created before
+ * the constraint, `IF NOT EXISTS` leaves the old table as-is; the
+ * `CREATE UNIQUE INDEX IF NOT EXISTS` may fail if duplicate positions
+ * exist — `Database::open()` handles that gracefully by ignoring the
+ * index-creation error and queue ops will normalize positions on next write.
+ * Position shifts use `UPDATE ... SET position=position+1` which under
+ * UNIQUE requires serialized access (guaranteed by `dbMutex_`); transient
+ * duplicates are avoided by single-writer.
+ */
+
+/**
+ * @brief Full DDL + pragmas executed on database open.
+ * @ingroup caudio_db
+ * @details Includes:
+ * - WAL / NORMAL / cache_size / foreign_keys pragmas.
+ * - Tables: libraries, tracks, playlists, playlist_items, queue, queues,
+ *   history, bookmarks, lyrics, eq_presets, engine_state and the
+ *   `tracks_fts` FTS5 virtual table with AI/AD/AU triggers.
+ * @par Thread safety
+ * Executed once under no lock (fresh handle in `Database::open()`).
+ * @see kSchemaDefaultLibrary
+ */
 constexpr std::string_view kSchema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
@@ -152,6 +182,11 @@ constexpr std::string_view kSchema =
     "updated DATETIME DEFAULT CURRENT_TIMESTAMP);"
     "INSERT OR IGNORE INTO engine_state(id) VALUES (1);";
 
+/**
+ * @brief Ensures the default library row exists.
+ * @ingroup caudio_db
+ * @details Executed after `kSchema`; idempotent via `INSERT OR IGNORE`.
+ */
 inline constexpr std::string_view kSchemaDefaultLibrary =
     "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');";
 

@@ -1,3 +1,8 @@
+/**
+ * @file service_impl.cppm
+ * @brief Service implementation: owns Engine, Database, Logger, IPC server, and dispatches commands.
+ * @ingroup caudio_service
+ */
 module;
 // Service owns Engine/DB/Config/Logger/IpcServer and dispatches commands
 
@@ -35,10 +40,18 @@ import :detail;
 
 export namespace caudio::service {
 
+/**
+ * @brief Configuration for Service creation.
+ * @ingroup caudio_service
+ */
 struct ServiceConfig {
+    /** @brief Path to SQLite database file. Defaults to "library.db" in current directory. */
     std::filesystem::path dbPath{"library.db"};
+    /** @brief Optional explicit socket path. If empty, derived from dbPath via socketPathFor(). */
     std::string socketPath{};
+    /** @brief Optional explicit config file path. If empty, derived from XDG/LOCALAPPDATA. */
     std::filesystem::path configPath{};
+    /** @brief Log level (0=trace, 1=debug, 2=info, 3=warn, 4=error). Default: 2 (info). */
     int logLevel{2};
 };
 
@@ -46,10 +59,30 @@ struct ServiceConfig {
 
 export namespace caudio::service {
 
+/**
+ * @brief Main service class that owns core components and dispatches IPC commands.
+ * @ingroup caudio_service
+ *
+ * Thread safety: Service is not thread-safe for concurrent method calls. The IPC server runs
+ * on its own thread and calls dispatch() serially. External callers should not invoke
+ * Service methods concurrently with server->run().
+ *
+ * Lifetime: Created via create(), runs via run(stop_token), cleaned up via shutdown() in destructor.
+ * Uses RAII for all resources (DB, Engine, IPC server, PID file, lock file, shared memory).
+ */
 class Service final {
   public:
     using ExpectedService = std::expected<std::unique_ptr<Service>, caudio::utils::Error>;
 
+    /**
+     * @brief Factory method to create and initialize a Service instance.
+     * @param cfg Service configuration (dbPath, optional socketPath, configPath, logLevel).
+     * @return Expected unique_ptr to Service, or Error if initialization fails.
+     *
+     * Performs single-instance enforcement via flock lock file and PID file checks.
+     * Creates PID file, initializes shared memory status block for TUI polling (10fps),
+     * and starts IPC server listening on derived or explicit socket path.
+     */
     static ExpectedService create(const ServiceConfig& cfg) {
         // Determine socket path
         std::string spStr;
@@ -191,6 +224,9 @@ class Service final {
         return svc;
     }
 
+    /**
+     * @brief Destructor: ensures cleanup via shutdown().
+     */
     ~Service() {
         shutdown();
     }
@@ -200,6 +236,15 @@ class Service final {
     Service(Service&&) = delete;
     Service& operator=(Service&&) = delete;
 
+    /**
+     * @brief Run the service event loop until stop_token is triggered.
+     * @param st Stop token to request graceful shutdown.
+     * @return void on success, Error if already running.
+     *
+     * Starts the IPC server with a dispatcher that forwards commands to dispatch().
+     * Blocks until stop_token signals or shutdown() is called.
+     * Thread safety: Must not be called concurrently with another run() or with dispatch().
+     */
     caudio::utils::Expected<void> run(std::stop_token st) {
         if (running_.exchange(true)) {
             return std::unexpected{
@@ -219,6 +264,13 @@ class Service final {
         return {};
     }
 
+    /**
+     * @brief Gracefully shut down the service.
+     *
+     * Signals shutdown to IPC server and Engine, removes PID file, socket file (Unix),
+     * and releases the flock lock file. Shared memory handle is cleaned up via RAII.
+     * Safe to call multiple times; idempotent.
+     */
     void shutdown() {
         bool was = running_.exchange(false);
         (void)was;
@@ -255,23 +307,46 @@ class Service final {
         // shm handle will be cleaned up via RAII
     }
 
+    /**
+     * @brief Access the database instance.
+     * @return Reference to the Database.
+     */
     caudio::db::Database& db() noexcept {
         return *db_;
     }
+    /**
+     * @brief Access the audio engine instance.
+     * @return Reference to the Engine.
+     */
     caudio::engine::Engine& engine() noexcept {
         return *engine_;
     }
+    /**
+     * @brief Access the IPC server instance.
+     * @return Reference to the IpcServer.
+     */
     IpcServer& server() noexcept {
         return *server_;
     }
+    /**
+     * @brief Get the shared memory name used for status block.
+     * @return Shared memory name (hash of dbPath).
+     */
     const std::string& shmName() const noexcept {
         return shmName_;
     }
+    /**
+     * @brief Get the shared memory status handle (if available).
+     * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
+     */
     caudio::service::ShmStatusHandle* shmHandle() noexcept {
         return shmHandle_.get();
     }
 
   private:
+    /**
+     * @brief Private constructor used by create().
+     */
     Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
             std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
@@ -282,6 +357,13 @@ class Service final {
           socketPath_(std::move(socketPath)), lockFd_(lockFd), shmHandle_(std::move(shmHandle)),
           shmName_(std::move(shmName)) {}
 
+    /**
+     * @brief Update the shared memory status block with current engine state.
+     *
+     * Called after playback state changes (play, pause, seek, track change, queue modifications).
+     * Updates track info, queue size, and duration in the SHM block for TUI polling at 10fps.
+     * No-op if SHM handle is invalid or not created.
+     */
     void updateShmStatus() {
         if (!shmHandle_ || !shmHandle_->valid())
             return;
@@ -314,6 +396,15 @@ class Service final {
         }
     }
 
+    /**
+     * @brief Dispatch a command to the appropriate handler.
+     * @param cmd Command variant to execute.
+     * @return Result variant on success, Error on failure.
+     *
+     * Central command dispatcher using std::visit over the Command variant.
+     * Each handler updates shared memory status after state changes.
+     * Returns Status result for most commands to keep client state in sync.
+     */
     std::expected<caudio::cli::Result, caudio::utils::Error>
     dispatch(const caudio::cli::Command& cmd) {
         using namespace caudio::cli;
@@ -327,6 +418,7 @@ class Service final {
 
         return std::visit(
             detail::overloaded{
+                // Play command: start/resume playback of active queue
                 [&](const Play&) -> std::expected<Result, caudio::utils::Error> {
                     int64_t aq = engine_->activeQueueId();
                     auto r = engine_->play(aq);
@@ -1482,17 +1574,29 @@ class Service final {
             cmd);
     }
 
+    /** @brief Service configuration (dbPath, socketPath, configPath, logLevel). */
     ServiceConfig config_{};
+    /** @brief Shared database instance. */
     std::shared_ptr<caudio::db::Database> db_{};
+    /** @brief Audio engine instance. */
     std::unique_ptr<caudio::engine::Engine> engine_{};
+    /** @brief IPC server instance. */
     std::unique_ptr<IpcServer> server_{};
+    /** @brief Logger instance. */
     std::unique_ptr<caudio::utils::Logger> logger_{};
+    /** @brief Path to PID file. */
     std::filesystem::path pidPath_{};
+    /** @brief Socket path (Unix socket or Windows named pipe). */
     std::string socketPath_{};
+    /** @brief Lock file descriptor/handle for single-instance enforcement. */
     int lockFd_{-1};
+    /** @brief Shared memory status handle for TUI polling. */
     std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle_{};
+    /** @brief Shared memory name (hash of dbPath). */
     std::string shmName_{};
+    /** @brief Running flag (atomic). */
     std::atomic<bool> running_{false};
+    /** @brief Shutdown requested flag (atomic). */
     std::atomic<bool> shutdownRequested_{false};
 };
 
