@@ -1,0 +1,324 @@
+.TH CAUDIO 1 "2026-09-14" "caudio 0.25.4" "User Commands"
+.SH NAME
+caudio \- C++23 headless music player daemon and CLI
+.SH SYNOPSIS
+.B caudio
+[\fIOPTIONS\fR]
+\fISUBCOMMAND\fR [\fIARGS\fR]...
+.br
+.B caudio
+[\fIOPTIONS\fR]
+\fBstart\fR [\fB\-\-foreground\fR]
+.br
+.B caudio
+\fBseek\fR \fITIME\fR
+.br
+.B caudio
+\fBvolume\fR [\fILEVEL\fR]
+.br
+.B caudio
+\fBqueue\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBplaylist\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBlibrary\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBconfig\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBtag\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBhistory\fR \fISUBCOMMAND\fR
+.br
+.B caudio
+\fBdevice\fR \fISUBCOMMAND\fR
+.SH DESCRIPTION
+.B caudio
+is a C++23 headless music player. It consists of a background daemon
+(\fBcaudio start\fR) and a CLI that communicates with the daemon over a
+local IPC channel (Unix Domain Socket on POSIX, Named Pipe on Windows)
+using a JSON protocol with a 4\-byte big\-endian length prefix.
+Audio decoding uses FFmpeg (libavformat/avcodec/avutil/swresample).
+The library is split into modules: \fBcaudio::utils\fR, \fBcaudio::player\fR,
+\fBcaudio::db\fR, \fBcaudio::engine\fR, plus \fBcaudio::cli\fR/\fBservice\fR/\fBclient\fR.
+.PP
+Shared\-memory status (\fBAtomicShmStatus\fR) is published at 10 fps for
+low\-latency TUI polling without IPC round\-trips.
+.SH OPTIONS
+.TP
+.BR \-\-config " \fIFILE\fR"
+Config file path. Default is XDG config home on POSIX
+(\fB$XDG_CONFIG_HOME/caudio/config.json\fR or \fB~/.config/caudio/config.json\fR)
+and \fB%LOCALAPPDATA%/caudio/config.json\fR on Windows.
+.TP
+.BR \-\-log\-level " \fILEVEL\fR"
+Daemon log level: \fBtrace\fR|\fBdebug\fR|\fBinfo\fR|\fBwarn\fR|\fBerror\fR.
+.TP
+.BR \-\-device " \fIDEVICE\fR"
+Audio output device ID. Overrides config.
+.TP
+.BR \-\-version
+Show version (\fBcaudio::kVersionFull\fR, e.g. \fBv0.25.4\fR) and exit.
+.TP
+.BR \-h ", " \-\-help
+Print help and exit.
+.TP
+.BR \-\-daemon ", " \-\-foreground
+Internal daemon flags. Do not pass manually; used by \fBcaudio start\fR
+when spawning the background process.
+.SH COMMANDS
+.SS Daemon lifecycle
+.TP
+.B start [\-\-foreground]
+Start daemon. By default spawns a background process (fork/CreateProcess
+with \fBDETACHED_PROCESS\fR) and polls for socket readiness. With
+\fB\-\-foreground\fR runs in the foreground (for systemd or debugging).
+Creates DB parent directories if needed and derives the socket path
+from the DB path via \fBcaudio::cli::socketPathFor\fR.
+.TP
+.B shutdown
+Stop daemon. Sends \fBShutdown\fR IPC command and polls for socket and
+pid file removal. Reports an error if the daemon is still running.
+.SS Playback control
+.TP
+.B play
+Start playback. If paused, resumes;
+if playing
+    , restarts;
+if stopped,
+starts from queue head.
+.TP
+.B pause
+Pause playback, preserving position.
+.TP
+.B resume
+Resume from paused position.
+.TP
+.B restart
+Seek to 0 and ensure playing state.
+.TP
+.B stop
+Stop playback and clear current track.
+.TP
+.B next
+Advance to next track. Handles \fBRepeatMode::One\fR and shuffle.
+.TP
+.B prev
+Go to previous track.
+.TP
+.B seek \fITIME\fR
+Seek to position. \fITIME\fR can be absolute (\fBmm:ss\fR or seconds,
+e.g. \fB1:30\fR or \fB90\fR) or relative (\fB+N\fR/\fB\-N\fR). Relative
+seeks fetch current position via \fBStatusReq\fR and clamp to 0.
+.TP
+.B status [\-\-json] [\-\-watch] [\-\-follow] [\-\-interval \fIMS\fR]
+Show playback status (state, position, duration, volume, shuffle,
+repeat, track id/title/artist/path, queue size/index). \fB\-\-json\fR
+emits JSON. \fB\-\-watch\fR/\fB\-\-follow\fR polls continuously every
+\fB\-\-interval\fR ms (default 1000) with timestamps in text mode or
+compact JSON per line in JSON mode.
+.TP
+.B volume [\fILEVEL\fR]
+Get or set volume. \fILEVEL\fR: \fB0\fR\-100 (absolute), \fB+N\fR/\fB\-N\fR
+(delta), \fBmute\fR/\fBunmute\fR. No argument prints current volume.
+.TP
+.B info [\-\-json]
+Show detailed info for the currently playing track (metadata + play
+statistics).
+.SS Queue
+.TP
+.B queue list [\-\-json]
+List tracks in the active queue.
+.TP
+.B queue queues
+List all queues with track counts.
+.TP
+.B queue switch \fIQID\fR
+Switch active queue by ID. Engine validates that the queue exists.
+.TP
+.B queue add \fIQUERY\fR [\-\-search]
+Add to queue. \fIQUERY\fR is interpreted as file path, track ID, or
+FTS query. \fB\-\-search\fR forces FTS search. New files are fingerprinted
+(BLAKE3).
+.TP
+.B queue remove \fIID\fR
+Remove from queue by queue position or track ID.
+.TP
+.B queue move \fIFROM\fR \fITO\fR
+Move track within queue from index \fIFROM\fR to \fITO\fR (atomic
+clear+re\-enqueue transaction).
+.TP
+.B queue clear
+Clear entire queue atomically.
+.TP
+.B queue shuffle [\fIon\fR|\fIoff\fR]
+Set shuffle mode. No argument toggles.
+.TP
+.B queue repeat [\fIoff\fR|\fIone\fR|\fIall\fR]
+Set repeat mode. No argument shows current mode. \fBall\fR maps to
+\fBRepeatMode::Queue\fR.
+.SS Playlist
+.TP
+.B playlist list [\-\-json]
+List all playlists.
+.TP
+.B playlist tracks \fIPID\fR
+List tracks in playlist \fIPID\fR.
+.TP
+.B playlist load \fIPID\fR [\-\-play]
+Load playlist \fIPID\fR into the queue (clears first). With \fB\-\-play\fR
+starts playback.
+.TP
+.B playlist save \fINAME\fR [\-\-queue \fIQID\fR]
+Save queue as a new playlist named \fINAME\fR. Optionally specify queue
+ID (default active queue).
+.TP
+.B playlist delete \fIPID\fR
+Delete playlist \fIPID\fR.
+.TP
+.B playlist rename \fIPID\fR \fINAME\fR
+Rename playlist \fIPID\fR to \fINAME\fR.
+.TP
+.B playlist export \fIPID\fR \fIPATH\fR [\-\-format m3u|pls|json]
+Export playlist \fIPID\fR to file \fIPATH\fR. Formats: \fBm3u\fR (default),
+\fBpls\fR, \fBjson\fR.
+.TP
+.B playlist import \fIPATH\fR [\-\-name \fINAME\fR]
+Import playlist from file \fIPATH\fR. If \fB\-\-name\fR omitted, derived
+from filename.
+.SS Library
+.TP
+.B library scan [\-\-path \fIPATH\fR] [\-\-mode sampled|full]
+Scan library for audio files. Default path is the music directory
+adjacent to the DB. \fBsampled\fR (fast, first/last 64 KiB) or
+\fBfull\fR (entire file) for BLAKE3 fingerprint.
+.TP
+.B library search \fIQUERY\fR [\-\-limit \fIN\fR] [\-\-json]
+FTS5 search with \fBLIKE\fR fallback. Default limit 50.
+.TP
+.B library stats [\-\-json] [\-\-detailed]
+Show library counts (tracks/queues/playlists). With \fB\-\-detailed\fR
+includes most\-played and total play time.
+.TP
+.B library list [\-\-query \fIQ\fR] [\-\-artist \fIA\fR] [\-\-album \fIA\fR] [\-\-genre \fIG\fR] [\-\-limit \fIN\fR] [\-\-offset \fIN\fR] [\-\-json]
+List library tracks with optional filtering and pagination.
+.TP
+.B library add \fIPATH\fR [\-\-recursive]
+Add file or directory to library with metadata extraction.
+.TP
+.B library remove \fIID\fR
+Remove track from library by ID or path.
+.SS Tags
+.TP
+.B tag edit \fIID\fR \fIFIELD\fR \fIVALUE\fR
+Edit track tag. \fIFIELD\fR: \fBtitle\fR|\fBartist\fR|\fBalbum\fR|\fBalbum_artist\fR|\fBgenre\fR|\fByear\fR|\fBtrack_number\fR|\fBdisc_number\fR.
+.TP
+.B tag get \fIID\fR [\-\-json]
+Get track tags for track \fIID\fR.
+.SS History
+.TP
+.B history list [\-\-limit \fIN\fR] [\-\-json]
+List playback history. Default limit 50.
+.TP
+.B history clear
+Clear playback history.
+.SS Device
+.TP
+.B device list [\-\-json]
+List audio output devices (via miniaudio enumeration).
+.TP
+.B device set \fIID\fR
+Set default audio output device.
+.TP
+.B device test [\-\-id \fIID\fR]
+Test audio device by playing a tone. Defaults to current config device.
+.SS Config
+.TP
+.B config get \fIKEY\fR
+Get config value for \fIKEY\fR.
+.TP
+.B config set \fIKEY\fR \fIVALUE\fR
+Set config value. \fIVALUE\fR is stored as JSON or plain string.
+.TP
+.B config list [\-\-json]
+List all config key/value pairs.
+.TP
+.B config export \fIPATH\fR
+Copy config file to \fIPATH\fR.
+.TP
+.B config import \fIPATH\fR
+Copy file at \fIPATH\fR to config location.
+.TP
+.B config reset [\fIKEY\fR]
+Reset config \fIKEY\fR or all keys to defaults.
+.SS Preview and TUI
+.TP
+.B preview \fIFILE\fR
+Ephemeral playback of \fIFILE\fR without daemon (direct \fBcaudio::player::Player\fR).
+Blocks until playback finishes.
+.TP
+.B tui
+Launch TUI preview. Ensures daemon is running, prints current status,
+and shows guidance. Full ratatui TUI is planned for v0.28.0. For live
+polling use \fBcaudio status \-\-watch\fR.
+.SH EXAMPLES
+.TP
+Start daemon and play a file:
+.B caudio start;
+caudio queue add ~/ Music / album / track.flac;
+caudio play;
+caudio status.TP Search and queue :.B caudio library search
+                                   "beatles" --limit 10 .br.B caudio queue add
+                                   "beatles" --search.br.B caudio next; caudio status --json
+.TP
+Library scan and stats:
+.B caudio library scan --path ~/Music --mode sampled
+.br
+.B caudio library stats --detailed --json
+.TP
+Live status polling (for scripts/TUI):
+.B caudio status --watch --interval 200
+.TP
+Volume control:
+.B caudio volume 75;
+caudio volume + 5;
+caudio volume mute;
+caudio volume.TP Playlist workflows :.B caudio playlist save "My Mix";
+caudio playlist export 1 / tmp / mix.m3u-- format m3u.br.B caudio playlist import / tmp /
+        mix.m3u-- name "Imported".SH FILES.TP.I ~/.config / caudio / config.json(POSIX).TP.I
+        % LOCALAPPDATA %\\caudio\\config.json(Windows) Default config file.Overridden by \fB\-\-
+    config\fR.Stores DB path,
+    socket path, device, log level,
+    etc..TP.I ~/.local / share / caudio / caudio.db(POSIX).TP.I % LOCALAPPDATA
+        %\\caudio\\caudio.db(Windows) Default SQLite database path.Contains tracks,
+    queues, playlists, history,
+    FTS5 index.Parent directories are created automatically..TP.I / tmp / caudio -
+            <hash>.sock(POSIX).TP.I \\\\.\\pipe\\caudio -
+            <hash>(Windows) IPC socket /
+                named pipe
+                    .Canonical path derived from DB path hash via
+\fBcaudio::cli::socketPathFor\fR.Hash is BLAKE3 of the DB path..TP.I
+                / tmp / caudio
+            - <hash>.pid
+        or % LOCALAPPDATA % / caudio /
+                   caudio.pid Daemon pid file
+                       .Path derived from DB path via \fBcaudio::cli::pidPathFor\fR..TP.I
+                   / dev / shm / caudio
+               - <hash>(POSIX) or
+        named shared memory(Windows)
+SHM status block (\fBAtomicShmStatus\fR) for 10 fps TUI polling.
+.SH SEE ALSO
+.BR cmake (1),
+.BR ninja (1),
+.BR doxygen (1),
+.BR ffmpeg (1)
+.PP
+Project docs: \fBdocs/html/index.html\fR (Doxygen), \fBdocs/polyglot-integration.md\fR.
+.SH AUTHOR
+Written by the caudio contributors.
+.PP
+Report bugs at <https://github.com/anomalyco/caudio-cpp/issues>.

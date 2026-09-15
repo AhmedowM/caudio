@@ -1013,6 +1013,7 @@ ordered_json toJson(const Result& r) {
                 j["path"] = v.path;
                 j["q_size"] = v.q_size;
                 j["q_idx"] = v.q_idx;
+                j["version"] = v.version;
                 return j;
             } else if constexpr (std::is_same_v<T, QueueTracks>) {
                 ordered_json j;
@@ -1210,6 +1211,8 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j
                 s.q_size = j["q_size"].get<std::size_t>();
             if (j.contains("q_idx") && j["q_idx"].is_number())
                 s.q_idx = j["q_idx"].get<std::size_t>();
+            if (j.contains("version") && j["version"].is_string())
+                s.version = j["version"].get<std::string>();
             return Result{std::move(s)};
         }
         if (t == "QueueTracks") {

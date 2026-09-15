@@ -19,7 +19,6 @@ module;
 #include <variant>
 #include <vector>
 
-#include "caudio/version.hpp"
 #include "parse.hpp"
 
 #ifdef _WIN32
@@ -207,7 +206,7 @@ class App {
   public:
     explicit App(caudio::cli::Config cfg)
         : config_(std::move(cfg)), cli_("caudio - terminal player") {
-        cli_.set_version_flag("--version", std::string(caudio::kVersion));
+        cli_.set_version_flag("--version", std::string(caudio::utils::kVersionFull));
     }
     int run(int argc, char** argv);
 

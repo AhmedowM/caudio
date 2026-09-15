@@ -317,6 +317,22 @@ class Database final {
         return db_.get();
     }
     /**
+     * @brief Returns library version (full git tag).
+     * @ingroup caudio_db
+     * @return Version string (kVersionFull, e.g. "v0.25.4").
+     */
+    std::string_view version() const noexcept {
+        return caudio::utils::kVersionFull;
+    }
+    /**
+     * @brief Returns library version (static).
+     * @ingroup caudio_db
+     * @return Version string (kVersionFull).
+     */
+    static constexpr std::string_view staticVersion() noexcept {
+        return caudio::utils::kVersionFull;
+    }
+    /**
      * @brief Flushes the background WriterThread queue.
      * @ingroup caudio_db
      * @return Success or Error with StatusCode::Busy on 200 ms timeout.

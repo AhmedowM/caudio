@@ -96,9 +96,9 @@ if(CAUDIO_ENABLE_SANITIZERS)
   endif()
 endif()
 
-# Configure version header
+# Configure version header (template lives in cmake/ — canonical for CMake @ONLY files)
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/version.hpp.in
+  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.hpp.in
   ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version.hpp
   @ONLY
 )
@@ -290,7 +290,40 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio
 )
 
-# Packaging (CPack) — TGZ;ZIP like C
+install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# C++20 module sources for BMI rebuild (consumers need *.cppm to rebuild BMIs)
+install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/src FILES_MATCHING PATTERN "*.cppm")
+install(DIRECTORY cli/src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/cli FILES_MATCHING PATTERN "*.cppm")
+
+# Man page — roff source tracked at docs/man/caudio.1
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1")
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1"
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+endif()
+
+# Systemd user service
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/caudio.service")
+  install(FILES packaging/caudio.service DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/systemd/user)
+endif()
+
+# Packaging (CPack)
+set(CPACK_GENERATOR "TGZ;ZIP")
+if(UNIX AND NOT APPLE)
+  list(APPEND CPACK_GENERATOR "DEB;RPM")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libavcodec-extra | libavcodec59, libavformat59, libavutil57, libswresample4")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+  set(CPACK_RPM_PACKAGE_REQUIRES "ffmpeg-libs >= 6.0")
+  set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
+endif()
+if(WIN32)
+  list(APPEND CPACK_GENERATOR "NSIS;ZIP")
+  set(CPACK_NSIS_DISPLAY_NAME "caudio")
+endif()
+if(APPLE)
+  list(APPEND CPACK_GENERATOR "DragNDrop")
+endif()
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
@@ -299,7 +332,6 @@ set(CPACK_PACKAGE_CONTACT "caudio@example.com")
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" CPACK_SYSTEM_NAME)
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}")
 set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
-set(CPACK_GENERATOR "TGZ;ZIP")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
   set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 endif()

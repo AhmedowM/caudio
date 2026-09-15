@@ -1,6 +1,5 @@
 module;
 #include <string_view>
-#include "caudio/version.hpp"
 
 /**
  * @file caudio.cppm
@@ -67,7 +66,7 @@ export namespace caudio {
  * @ingroup caudio
  */
 constexpr std::string_view version() noexcept {
-    return CAUDIO_VERSION_FULL;
+    return caudio::utils::kVersionFull;
 }
 
 /**
@@ -75,7 +74,7 @@ constexpr std::string_view version() noexcept {
  * @ingroup caudio
  */
 constexpr std::string_view gitHash() noexcept {
-    return CAUDIO_VERSION_TWEAK;
+    return caudio::utils::kVersionCommit;
 }
 
 } // namespace caudio

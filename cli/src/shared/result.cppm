@@ -118,6 +118,12 @@ struct Status final {
      * @brief Index of the current track in the queue (0-based).
      */
     std::size_t q_idx{0};
+    /**
+     * @brief Daemon/library version (full git tag, e.g. "v0.25.4").
+     * @details Populated by service_detail::buildStatus from caudio::utils::kVersionFull.
+     * Default is kVersionFull so local builds without daemon still show version.
+     */
+    std::string version{caudio::utils::kVersionFull};
 };
 
 // ---------------------------------------------------------------------------

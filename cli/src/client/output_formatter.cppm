@@ -109,6 +109,9 @@ class OutputFormatter {
                         std::println(os, "Path: {}", truncateField(v.path, 80));
                     }
                     std::println(os, "Queue: {}/{}", v.q_idx, v.q_size);
+                    if (!v.version.empty()) {
+                        std::println(os, "Version: {}", v.version);
+                    }
                 } else if constexpr (std::is_same_v<T, caudio::cli::QueueTracks>) {
                     std::span<const caudio::db::Track> tracksSpan{v.tracks};
                     std::println(os, "Queue ({} tracks):", tracksSpan.size());

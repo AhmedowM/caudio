@@ -313,6 +313,7 @@ inline std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
 inline std::expected<caudio::cli::Status, caudio::utils::Error>
 buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
     caudio::cli::Status s{};
+    s.version = std::string(caudio::utils::kVersionFull);
     s.state = eng.state();
     s.pos = eng.position();
     s.dur = eng.duration();
