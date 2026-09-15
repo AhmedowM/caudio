@@ -102,7 +102,7 @@ class DecoderRegistry {
 
         // Try FFmpeg (handles all supported formats: OGG/FLAC/MP3/WAV/M4A/AAC/Opus/WMA)
         caudio::utils::Expected<std::unique_ptr<IDecoder>> result = std::unexpected(
-            caudio::utils::Error{caudio::utils::StatusCode::Unsupported, "no decoder matched"});
+            caudio::utils::Error{caudio::utils::StatusCode::Unsupported, std::string_view("no decoder matched")});
 
         if (FfmpegDecoder::probe(probeSpan)) {
             // FFmpeg init expects file at 0 (start of container). C's ca_decode.c

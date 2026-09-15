@@ -134,7 +134,7 @@ class Player {
         auto p = std::unique_ptr<Player>(new Player());
         if (!p->init(opts)) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Device, "player init failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Device, std::string_view("player init failed")});
         }
         return std::unique_ptr<Player>(std::move(p));
     }
@@ -179,7 +179,7 @@ class Player {
     ExpectedVoid open(std::string_view path) {
         if (path.empty()) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "empty path"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("empty path")});
         }
         auto readerResult = FileReader::open(path);
         if (!readerResult) {
@@ -209,7 +209,7 @@ class Player {
     ExpectedVoid openReader(std::unique_ptr<Reader> reader) {
         if (!reader) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "null reader"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("null reader")});
         }
 
         std::lock_guard<std::mutex> lk(openMutex_);
@@ -285,7 +285,7 @@ class Player {
     ExpectedVoid play() {
         if (!decoder_ || !output_ || !ring_) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::State, "not opened"});
+                caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not opened")});
         }
 
         State expected = State::Stopped;
@@ -294,7 +294,7 @@ class Player {
             if (!state_.compare_exchange_strong(expected, State::Playing,
                                                 std::memory_order_acq_rel)) {
                 return std::unexpected(
-                    caudio::utils::Error{caudio::utils::StatusCode::State, "already playing"});
+                    caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("already playing")});
             }
         }
 
@@ -330,7 +330,7 @@ class Player {
         State expected = State::Playing;
         if (!state_.compare_exchange_strong(expected, State::Paused, std::memory_order_acq_rel)) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::State, "not playing"});
+                caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not playing")});
         }
 
         isPlaying_.store(false, std::memory_order_release);
@@ -365,7 +365,7 @@ class Player {
         State expected = State::Paused;
         if (!state_.compare_exchange_strong(expected, State::Playing, std::memory_order_acq_rel)) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::State, "not paused"});
+                caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not paused")});
         }
 
         isPlaying_.store(true, std::memory_order_release);
@@ -417,11 +417,11 @@ class Player {
     ExpectedVoid seek(double seconds) {
         if (!decoder_ || !ring_) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::State, "not opened"});
+                caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not opened")});
         }
         if (seconds < 0.0 || std::isnan(seconds) || std::isinf(seconds)) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad seconds"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad seconds")});
         }
 
         auto seekRes = decoder_->seek(seconds);
@@ -482,7 +482,7 @@ class Player {
     ExpectedVoid setVolume(float volume) {
         if (std::isnan(volume) || std::isinf(volume)) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad volume"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad volume")});
         }
         float vol = clampVolume(volume);
         volume_.store(vol, std::memory_order_relaxed);

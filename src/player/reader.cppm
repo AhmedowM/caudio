@@ -186,7 +186,7 @@ class FileReader final : public Reader {
     open(const std::filesystem::path& path) {
         if (path.empty()) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "empty path"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("empty path")});
         }
         FILE* f = nullptr;
 #if defined(_WIN32)
@@ -202,23 +202,23 @@ class FileReader final : public Reader {
 #endif
         if (!f) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::NotFound, "cannot open file"});
+                caudio::utils::Error{caudio::utils::StatusCode::NotFound, std::string_view("cannot open file")});
         }
         if (detail::fseek64(f, 0, SEEK_END) != 0) {
             std::fclose(f);
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "fseek failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
         }
         int64_t sz = detail::ftell64(f);
         if (sz < 0) {
             std::fclose(f);
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "ftell failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("ftell failed")});
         }
         if (detail::fseek64(f, 0, SEEK_SET) != 0) {
             std::fclose(f);
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "fseek failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
         }
         // Wrap immediately in unique_ptr so FILE* is owned even if Expected construction throws
         auto holder = std::unique_ptr<FileReader>(new FileReader(f));
@@ -241,20 +241,20 @@ class FileReader final : public Reader {
     [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override {
         if (!file_)
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "null file"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("null file")});
         if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad whence"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
         }
         std::lock_guard<std::mutex> lock(seekMutex_);
         int64_t cur = detail::ftell64(file_);
         if (cur < 0)
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "ftell failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("ftell failed")});
         int64_t sz = fileSize_;
         if (sz < 0)
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "size not cached"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("size not cached")});
         int64_t base = 0;
         switch (whence) {
         case SEEK_SET:
@@ -268,16 +268,16 @@ class FileReader final : public Reader {
             break;
         default:
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad whence"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
         }
         int64_t newPos = base + offset;
         if (newPos < 0 || newPos > sz) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "seek out of range"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("seek out of range")});
         }
         if (detail::fseek64(file_, newPos, SEEK_SET) != 0) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, "fseek failed"});
+                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
         }
         return {};
     }
@@ -356,7 +356,7 @@ class MemoryReader final : public Reader {
                                                                   std::size_t len) {
         if (len > 0 && data == nullptr) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "null data"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("null data")});
         }
         return open(std::span<const std::byte>(data, len));
     }
@@ -376,7 +376,7 @@ class MemoryReader final : public Reader {
     [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override {
         if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad whence"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
         }
         int64_t base = 0;
         switch (whence) {
@@ -391,12 +391,12 @@ class MemoryReader final : public Reader {
             break;
         default:
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "bad whence"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
         }
         int64_t newPos = base + offset;
         if (newPos < 0 || newPos > static_cast<int64_t>(buf_.size())) {
             return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, "seek out of range"});
+                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("seek out of range")});
         }
         pos_ = static_cast<std::size_t>(newPos);
         return {};

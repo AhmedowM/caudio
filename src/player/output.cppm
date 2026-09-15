@@ -208,7 +208,7 @@ class AudioOutput {
         auto out = std::make_unique<AudioOutput>();
         if (!out->init(cfg)) {
             return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
-                                                        "miniaudio device init failed"});
+                                                        std::string_view("miniaudio device init failed")});
         }
         return out;
     }

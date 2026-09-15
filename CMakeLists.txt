@@ -42,6 +42,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 # Single compilation per C++23 module: static libs own the module BMIs,
 # shared variants link the static objects whole-archive (GCC -fmodules-ts
 # BMI CRC covers defines/flags, so recompiling the same sources with
