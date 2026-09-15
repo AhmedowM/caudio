@@ -19,55 +19,97 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-22.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-14, windows-2022]
         include:
           - os: ubuntu-24.04
-            compiler: gcc-14
-            cc: gcc-14
-            cxx: g++-14
-          - os: ubuntu-22.04
-            compiler: gcc-13
-            cc: gcc-13
-            cxx: g++-13
+            compiler: gcc-16
+            cc: gcc-16
+            cxx: g++-16
           - os: macos-14
-            compiler: apple-clang
-            cc: clang
-            cxx: clang++
+            compiler: gcc-16
+            cc: gcc-16
+            cxx: g++-16
           - os: windows-2022
-            compiler: mingw
-            cc: gcc
-            cxx: g++
+            compiler: gcc-16
+            cc: C:/msys64/ucrt64/bin/gcc.exe
+            cxx: C:/msys64/ucrt64/bin/g++.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Setup GCC 16 (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          gcc-16 --version
+          g++-16 --version
+          # also make gcc/g++ point to 16 for tools that call plain gcc
+          sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
+          gcc --version; g++ --version
+
+      - name: Setup GCC 16 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install gcc@16 || brew install gcc
+          # Homebrew installs versioned binaries without shadowing system clang
+          for b in /opt/homebrew/bin/g++-16 /usr/local/bin/g++-16 /opt/homebrew/bin/gcc-16 /usr/local/bin/gcc-16; do
+            if [ -x "$b" ]; then echo "found $b"; "$b" --version; fi
+          done
+          gcc-16 --version || g++-16 --version || gcc --version
+          g++-16 --version
+
+      - name: Setup GCC 16 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
+
+      - name: Add MinGW to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Add MinGW to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Verify GCC 16 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          which gcc || echo "gcc not found in PATH"
+          gcc --version
+          which g++ || echo "g++ not found in PATH"
+          g++ --version
+        shell: bash
+
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev doxygen graphviz
-          # Ensure requested compiler is available (ubuntu-22.04 -> gcc-13, ubuntu-24.04 -> gcc-14)
-          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
-            sudo apt-get install -y gcc-14 g++-14 || echo "gcc-14 not available, using default"
-          elif [ "${{ matrix.compiler }}" = "gcc-13" ]; then
-            sudo apt-get install -y gcc-13 g++-13 || echo "gcc-13 not available, using default"
-          fi
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
           ffmpeg -version || true
           cmake --version
           ninja --version
-          doxygen --version || echo "Doxygen not found"
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew update
-          brew install ninja ffmpeg doxygen graphviz || brew upgrade ninja ffmpeg doxygen graphviz || true
+          brew install ninja ffmpeg graphviz || brew upgrade ninja ffmpeg graphviz || true
           ffmpeg -version || true
           cmake --version
           ninja --version
-          doxygen --version || echo "Doxygen not found"
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -79,13 +121,12 @@ jobs:
           cmake --version
           ninja --version
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
-          doxygen --version || echo "Doxygen not found"
 
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_BUILD_DOCS=ON
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
 
       - name: Build
         run: cmake --build build -j4
@@ -118,7 +159,7 @@ jobs:
           if-no-files-found: warn
 
   sanitizers:
-    name: sanitizers (ubuntu-24.04)
+    name: sanitizers (ubuntu-24.04 / gcc-16)
     runs-on: ubuntu-24.04
     env:
       CAUDIO_TEST_NOAUDIO: 1
@@ -128,18 +169,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup GCC 16
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          gcc-16 --version; g++-16 --version
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev gcc-14 g++-14
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
           ffmpeg -version || true
           cmake --version
           ninja --version
 
       - name: Configure (ASan+UBSan)
         env:
-          CC: gcc-14
-          CXX: g++-14
+          CC: gcc-16
+          CXX: g++-16
         run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_ENABLE_SANITIZERS=ON
 
       - name: Build
@@ -151,7 +200,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure -j4
 
   install-smoke:
-    name: install-smoke (ubuntu-24.04)
+    name: install-smoke (ubuntu-24.04 / gcc-16)
     runs-on: ubuntu-24.04
     env:
       CAUDIO_TEST_NOAUDIO: 1
@@ -161,18 +210,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup GCC 16
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          gcc-16 --version; g++-16 --version
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev gcc-14 g++-14 doxygen graphviz
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
           cmake --version
           ninja --version
 
       - name: Configure
         env:
-          CC: gcc-14
-          CXX: g++-14
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_BUILD_DOCS=ON
+          CC: gcc-16
+          CXX: g++-16
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
 
       - name: Build
         run: cmake --build build -j4

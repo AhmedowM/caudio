@@ -131,7 +131,15 @@ public:
         if (fd < 0) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
-        std::unique_ptr<int, decltype(&::close)> guard(new int(fd), &::close);
+        struct FdDeleter {
+            void operator()(int* p) const noexcept {
+                if (p) {
+                    ::close(*p);
+                    delete p;
+                }
+            }
+        };
+        std::unique_ptr<int, FdDeleter> guard(new int(fd));
         sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         if (path.size() >= sizeof(addr.sun_path)) {
