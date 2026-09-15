@@ -14,6 +14,8 @@ jobs:
   build:
     name: build (${{ matrix.os }} / ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +91,8 @@ jobs:
         run: cmake --build build -j4
 
       - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
         run: ctest --test-dir build --output-on-failure -j4
 
       - name: Docs
@@ -116,6 +120,8 @@ jobs:
   sanitizers:
     name: sanitizers (ubuntu-24.04)
     runs-on: ubuntu-24.04
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -140,11 +146,15 @@ jobs:
         run: cmake --build build -j4
 
       - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
         run: ctest --test-dir build --output-on-failure -j4
 
   install-smoke:
     name: install-smoke (ubuntu-24.04)
     runs-on: ubuntu-24.04
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -168,6 +178,8 @@ jobs:
         run: cmake --build build -j4
 
       - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
         run: ctest --test-dir build --output-on-failure -j4
 
       - name: Install to /tmp/caudio-install

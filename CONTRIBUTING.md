@@ -46,6 +46,12 @@ ctest --test-dir build -j4 --output-on-failure
 ./build/caudio shutdown
 ```
 
+> **Audio tests beep:** `AudioOutput::create` (`ma_device_start`) beeps on desktop.
+> For silent/headless runs: `CAUDIO_TEST_NOAUDIO=1 ctest -j4` — tests that would beep
+> check `caudio::test::noAudio()` / `CAUDIO_SKIP_IF_NOAUDIO()` in `tests/common.hpp`
+> and `SKIP` when set. CI sets `CAUDIO_TEST_NOAUDIO=1` automatically. For silent
+> ring exercises without a device use `caudio::test::makeDummyRing()` (no `ma_device_init`).
+
 ### Documentation
 
 ```sh
