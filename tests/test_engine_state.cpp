@@ -15,6 +15,7 @@ using namespace caudio::utils;
 using namespace caudio::test_helpers;
 
 TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_state_rt").string();
     {
         auto dbRes = Database::open(dbPath);

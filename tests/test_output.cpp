@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include "common.hpp"
 #include <array>
 #include <cmath>
 #include <span>
@@ -6,6 +7,7 @@ import caudio.player;
 import caudio.utils;
 
 TEST_CASE("output callback no alloc") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 2};
     auto out = caudio::player::AudioOutput::create({48000, 2, &ring, 1.0f});
     REQUIRE(out);
@@ -16,6 +18,7 @@ TEST_CASE("output callback no alloc") {
 }
 
 TEST_CASE("output fillForTest pattern * volume and tail zero", "[output]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 2};
     // volume 0.5
     auto outRes = caudio::player::AudioOutput::create({48000, 2, &ring, 0.5f});
@@ -51,6 +54,7 @@ TEST_CASE("output fillForTest pattern * volume and tail zero", "[output]") {
 }
 
 TEST_CASE("output setVolume clamp", "[output]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{1024, 1};
     auto outRes = caudio::player::AudioOutput::create({48000, 1, &ring, 1.0f});
     REQUIRE(outRes.has_value());
@@ -68,6 +72,7 @@ TEST_CASE("output setVolume clamp", "[output]") {
 }
 
 TEST_CASE("output fillForTest volume 1.0 passthrough", "[output]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 1};
     auto outRes = caudio::player::AudioOutput::create({48000, 1, &ring, 1.0f});
     REQUIRE(outRes.has_value());

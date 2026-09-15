@@ -58,6 +58,7 @@ TEST_CASE("CAS exactly-once markedPlayed atomic", "[engine_history]") {
 }
 
 TEST_CASE("history insert increments play_count and last_played", "[engine_history]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_hist_inc").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());

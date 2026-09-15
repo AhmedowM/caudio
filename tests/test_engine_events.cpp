@@ -32,6 +32,7 @@ TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
 }
 
 TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_ev").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -77,6 +78,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
 }
 
 TEST_CASE("Engine drainEvents batch", "[engine_events]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_drain").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -120,6 +122,7 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
 }
 
 TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_cb").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());

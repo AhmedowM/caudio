@@ -54,6 +54,7 @@ option(CAUDIO_ENABLE_TESTS "build tests" OFF)
 option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
 option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
+option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 
 # Module path for FindFFmpeg
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -364,6 +365,10 @@ if(CAUDIO_ENABLE_TESTS)
   include(Catch)
   enable_testing()
 
+  if(CAUDIO_TEST_NOAUDIO)
+    add_compile_definitions(CAUDIO_TEST_NOAUDIO=1)
+  endif()
+
   function(caudio_add_test name src)
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE caudio::utils Catch2::Catch2WithMain)
@@ -373,6 +378,7 @@ if(CAUDIO_ENABLE_TESTS)
     endif()
     catch_discover_tests(${name})
     add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 4)
   endfunction()
 
 caudio_add_test(test_utils_result tests/test_utils_result.cpp)
@@ -394,6 +400,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
     endif()
     catch_discover_tests(${name})
     add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 4)
   endfunction()
   caudio_add_player_test(test_reader tests/test_reader.cpp)
   caudio_add_player_test(test_decoder tests/test_decoder.cpp)
@@ -409,6 +416,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   endif()
   catch_discover_tests(test_db)
   add_test(NAME test_db COMMAND test_db)
+  set_tests_properties(test_db PROPERTIES SKIP_RETURN_CODE 4)
 
   # Write thread tests
   add_executable(test_write_thread tests/test_write_thread.cpp)
@@ -420,6 +428,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   endif()
   catch_discover_tests(test_write_thread)
   add_test(NAME test_write_thread COMMAND test_write_thread)
+  set_tests_properties(test_write_thread PROPERTIES SKIP_RETURN_CODE 4)
 
   # Output tests
   add_executable(test_output tests/test_output.cpp)
@@ -430,6 +439,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   endif()
   catch_discover_tests(test_output)
   add_test(NAME test_output COMMAND test_output)
+  set_tests_properties(test_output PROPERTIES SKIP_RETURN_CODE 4)
 
   # Task 11: Engine parity
   function(caudio_add_engine_test name src)

@@ -30,6 +30,9 @@ namespace caudio::test {
  * @return true if `CAUDIO_TEST_NOAUDIO` is `1`/`true`/`True`.
  */
 inline bool noAudio() noexcept {
+#ifdef CAUDIO_TEST_NOAUDIO
+    return true;
+#endif
     const char* v = std::getenv("CAUDIO_TEST_NOAUDIO");
     return v && (std::string(v) == "1" || std::string(v) == "true" || std::string(v) == "True");
 }

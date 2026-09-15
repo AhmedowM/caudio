@@ -65,6 +65,7 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_off").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -120,6 +121,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_queue").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -172,6 +174,7 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_one").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -211,6 +214,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_persist").string();
     {
         auto dbRes = Database::open(dbPath);
@@ -304,6 +308,7 @@ TEST_CASE("shufflePerm production overload non-deterministic but valid perm", "[
 }
 
 TEST_CASE("engine play resumes when paused", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_play_pause").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -339,6 +344,7 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
 }
 
 TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_prev").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -370,6 +376,7 @@ TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
 }
 
 TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_persist_cursor").string();
     int64_t id0 = 0;
     {

@@ -49,6 +49,7 @@ TEST_CASE("player open invalid path returns NotFound", "[player_integration]") {
 }
 
 TEST_CASE("player seek and volume", "[player_integration]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     auto r = FileReader::open(fixturePath("sample.wav"));
     REQUIRE(r.has_value());
     auto dec = DecoderRegistry::open(**r);
@@ -72,6 +73,7 @@ TEST_CASE("player seek and volume", "[player_integration]") {
 }
 
 TEST_CASE("player position time-based via Engine steady_clock", "[player_integration]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("pl_pos").string();
     {
         auto dbRes = Database::open(dbPath);
@@ -146,6 +148,7 @@ TEST_CASE("player decode ogg via ffmpeg", "[player_integration]") {
 }
 
 TEST_CASE("player seek-while-playing race via Engine", "[player_integration][seek]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("seek_race").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -228,6 +231,7 @@ TEST_CASE("race player open concurrent", "[player_integration][race]") {
 }
 
 TEST_CASE("gapless via Player Engine 300ms lookahead", "[player_integration][gapless]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("gapless_player").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());

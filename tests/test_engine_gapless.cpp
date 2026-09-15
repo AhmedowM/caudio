@@ -16,6 +16,7 @@ using namespace caudio::utils;
 using namespace caudio::test_helpers;
 
 TEST_CASE("gapless CAS arms once via Engine", "[engine_gapless]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("gapless_cas").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -61,6 +62,7 @@ TEST_CASE("gapless CAS arms once via Engine", "[engine_gapless]") {
 }
 
 TEST_CASE("gapless 300ms lookahead triggers next once", "[engine_gapless]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("gapless").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
@@ -107,6 +109,7 @@ TEST_CASE("gapless 300ms lookahead triggers next once", "[engine_gapless]") {
 }
 
 TEST_CASE("gapless not triggered when remaining > gap", "[engine_gapless]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("gapless_notrig").string();
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
