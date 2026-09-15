@@ -1,7 +1,7 @@
 #caudio - cpp
 
-[![CI](https://github.com/anomalyco/caudio-cpp/actions/workflows/ci.yml/badge.svg)](https://github.com/anomalyco/caudio-cpp/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.25.4-blue)](CHANGELOG.md)
+[![CI](https://github.com/AhmedowM/caudio/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmedowM/caudio/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-v0.25.5-blue)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/CMake-%3E%3D3.28-red)](CMakeLists.txt)
@@ -26,6 +26,8 @@
 ## Quick Start
 
 ```sh
+git clone https://github.com/AhmedowM/caudio.git
+cd caudio
 cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
 cmake --build build -j4
 ctest --test-dir build -j4
@@ -108,7 +110,7 @@ Global options:
 | `--config <FILE>` | Config file path (default: XDG / `%LOCALAPPDATA%`) |
 | `--log-level trace|debug|info|warn|error` | Daemon log level |
 | `--device <DEVICE>` | Audio output device id |
-| `--version` | Show version (`caudio::kVersionFull`, e.g. `v0.25.4`) |
+| `--version` | Show version (`caudio::kVersionFull`, e.g. `v0.25.5`) |
 | `--help` / `-h` | Show help |
 
 ## Library Usage
@@ -135,7 +137,7 @@ import caudio.engine;
 #include "caudio/version.hpp"
 
 int main() {
-    std::println("caudio {}", caudio::kVersionFull); // v0.25.4
+    std::println("caudio {}", caudio::kVersionFull); // v0.25.5
 
     auto db = caudio::db::Database::open(":memory:").value();
     caudio::engine::EngineConfig cfg{.dbPath = ":memory:",
@@ -199,7 +201,7 @@ cmake --install build --prefix /usr/local
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
-CPack archives: `cpack --config build/CPackConfig.cmake` → `caudio-0.25.4-<system>.tar.gz` / `.zip`.
+CPack archives: `cpack --config build/CPackConfig.cmake` → `caudio-0.25.5-<system>.tar.gz` / `.zip`.
 
 C++ modules packaging caveat: downstream projects must have CMake ≥ 3.28 and a compiler with C++23 module support. The `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
 

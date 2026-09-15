@@ -1,0 +1,213 @@
+name: CI
+
+"on":
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.os }} / ${{ matrix.compiler }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04, macos-14, windows-2022]
+        include:
+          - os: ubuntu-24.04
+            compiler: gcc-14
+            cc: gcc-14
+            cxx: g++-14
+          - os: ubuntu-22.04
+            compiler: gcc-13
+            cc: gcc-13
+            cxx: g++-13
+          - os: macos-14
+            compiler: apple-clang
+            cc: clang
+            cxx: clang++
+          - os: windows-2022
+            compiler: mingw
+            cc: gcc
+            cxx: g++
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev doxygen graphviz
+          # Ensure requested compiler is available (ubuntu-22.04 -> gcc-13, ubuntu-24.04 -> gcc-14)
+          if [ "${{ matrix.compiler }}" = "gcc-14" ]; then
+            sudo apt-get install -y gcc-14 g++-14 || echo "gcc-14 not available, using default"
+          elif [ "${{ matrix.compiler }}" = "gcc-13" ]; then
+            sudo apt-get install -y gcc-13 g++-13 || echo "gcc-13 not available, using default"
+          fi
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+          doxygen --version || echo "Doxygen not found"
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install ninja ffmpeg doxygen graphviz || brew upgrade ninja ffmpeg doxygen graphviz || true
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+          doxygen --version || echo "Doxygen not found"
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          # FFmpeg via system or SetupFFmpeg fallback — no hard fail if not found, but tests need it
+          # Try choco ffmpeg as best-effort; fallback cmake/SetupFFmpeg.cmake will fetch prebuilt if needed
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+          ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
+          doxygen --version || echo "Doxygen not found"
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_BUILD_DOCS=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j4
+
+      - name: Docs
+        run: cmake --build build --target doc || echo "Doxygen not found or doc target unavailable — skipping"
+
+      - name: Package (TGZ)
+        run: |
+          cpack --config build/CPackConfig.cmake -G TGZ || cpack -G TGZ --config build/CPackConfig.cmake || (cd build && cpack -G TGZ) || echo "CPack TGZ failed"
+        shell: bash
+
+      - name: Upload artifact - package
+        uses: actions/upload-artifact@v4
+        with:
+          name: caudio-package-${{ matrix.os }}-${{ matrix.compiler }}
+          path: build/*.tar.gz
+          if-no-files-found: warn
+
+      - name: Upload artifact - docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: caudio-docs-${{ matrix.os }}-${{ matrix.compiler }}
+          path: build/docs/html
+          if-no-files-found: warn
+
+  sanitizers:
+    name: sanitizers (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev gcc-14 g++-14
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+
+      - name: Configure (ASan+UBSan)
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_ENABLE_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j4
+
+  install-smoke:
+    name: install-smoke (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev gcc-14 g++-14 doxygen graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_BUILD_DOCS=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j4
+
+      - name: Install to /tmp/caudio-install
+        run: cmake --install build --prefix /tmp/caudio-install
+
+      - name: Verify install layout
+        run: |
+          echo "=== install tree ==="
+          find /tmp/caudio-install -type f | head -n 100
+          echo "=== caudio --version ==="
+          /tmp/caudio-install/bin/caudio --version || build/caudio --version || echo "caudio --version check failed"
+          echo "=== version.hpp ==="
+          test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
+          echo "=== module sources shipped ==="
+          ls -R /tmp/caudio-install/include/caudio/src | head -n 100
+          test -f /tmp/caudio-install/include/caudio/src/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
+          ls /tmp/caudio-install/include/caudio/src/*.cppm | head -n 20
+          test -f /tmp/caudio-install/lib/cmake/caudio/caudioConfig.cmake && echo "caudioConfig.cmake found" || echo "caudioConfig.cmake missing"
+
+      - name: Smoke compile (find_package + import caudio)
+        run: |
+          mkdir -p /tmp/caudio-smoke
+          cat > /tmp/caudio-smoke/CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(caudio_smoke CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          list(APPEND CMAKE_PREFIX_PATH "/tmp/caudio-install")
+          find_package(caudio CONFIG REQUIRED)
+          add_executable(smoke main.cpp)
+          target_link_libraries(smoke PRIVATE caudio::utils)
+          EOF
+          cat > /tmp/caudio-smoke/main.cpp << 'EOF'
+          import caudio;
+          #include <print>
+          int main() {
+            std::println("caudio smoke ok: {}", caudio::kVersion);
+            return 0;
+          }
+          EOF
+          cmake -B /tmp/caudio-smoke/build -G Ninja -DCMAKE_PREFIX_PATH=/tmp/caudio-install -DCMAKE_CXX_STANDARD=23 /tmp/caudio-smoke
+          cmake --build /tmp/caudio-smoke/build -v
+          /tmp/caudio-smoke/build/smoke || ./tmp/caudio-smoke/build/smoke

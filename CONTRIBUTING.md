@@ -17,8 +17,8 @@
 ### Clone and Configure
 
 ```sh
-git clone https://github.com/anomalyco/caudio-cpp.git
-cd caudio-cpp
+git clone https://github.com/AhmedowM/caudio.git
+cd caudio
 
 #Recommended : Ninja + tests enabled
 cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug

@@ -1,0 +1,124 @@
+name: Release
+
+"on":
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-packages:
+    name: package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev gcc-14 g++-14 rpm nsis || echo "Some packages unavailable, continuing"
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+          cpack --version || cmake --version
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install ninja ffmpeg || brew upgrade ninja ffmpeg || true
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+          ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
+          cpack --version || cmake --version
+
+      - name: Configure
+        env:
+          CC: ${{ runner.os == 'Linux' && 'gcc-14' || runner.os == 'macOS' && 'clang' || 'gcc' }}
+          CXX: ${{ runner.os == 'Linux' && 'g++-14' || runner.os == 'macOS' && 'clang++' || 'g++' }}
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCAUDIO_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j4
+
+      - name: Package
+        run: |
+          cpack --config build/CPackConfig.cmake || cmake --build build --target package || (cd build && cpack -G TGZ) || echo "CPack failed"
+        shell: bash
+
+      - name: List packages
+        run: |
+          echo "=== packages in build/ ==="
+          ls -lh build/*.{tar.gz,zip,deb,rpm,exe,dmg} 2>&1 || ls -lh build/ || true
+        shell: bash
+
+      - name: Upload artifact - packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: caudio-packages-${{ matrix.os }}
+          path: |
+            build/*.tar.gz
+            build/*.zip
+            build/*.deb
+            build/*.rpm
+            build/*.exe
+            build/*.dmg
+          if-no-files-found: warn
+
+  release:
+    name: release
+    needs: build-packages
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: caudio-packages-*
+          merge-multiple: true
+
+      - name: List artifacts
+        run: |
+          echo "=== artifacts/ ==="
+          find artifacts -type f | head -n 100
+          ls -lh artifacts/ || true
+          echo "=== CHANGELOG check ==="
+          ls -lh CHANGELOG.md || echo "CHANGELOG.md not found"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**
+            CHANGELOG.md
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

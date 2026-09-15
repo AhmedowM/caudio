@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.25.5] - 2026-09-15
+
+### Added
+- `docs` + `man` + `service` packaging — `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/man/caudio.1` (roff), `packaging/caudio.service` (systemd user unit); Doxygen docs wiring via `docs/Doxyfile.in`
+- Packaging pipeline — install `caudio` binary, C++23 module sources (`src/` + `cli/src/` for BMI rebuild), man page, systemd unit; `CPack` per-platform generators (`TGZ`/`ZIP` + `DEB`/`RPM` on Linux, `NSIS` on Windows, `DragNDrop` on macOS)
+
+### Changed
+- Version wiring to `import caudio.utils` — `cmake/version.hpp.in` (moved from `version.hpp.in`), `src/utils/version.cppm` (`version()`/`versionString()`/`shortVersion()`/`versionCommit()`), `Engine::version()`/`Database::version()` + `staticVersion()`, `Status.version` via `service_detail::buildStatus` + `protocol` + `output_formatter`, CLI `--version` now `kVersionFull` (`v0.25.5`) (`301f7c8`)
+
+### Fixed
+- `cmake/version.hpp.in` clang-format fix
+
 ## [0.25.4] - 2026-09-14
 
 CLI feature-completeness + documentation release. No breaking API changes.
@@ -138,18 +150,19 @@ See `git log --oneline --tags` and `git tag -n` for history:
 - `v0.8.x–v0.9.x` — Module system introduction, `clang-format`
 - `v0.3.0-modules` — Initial C++23 module migration
 
-[0.25.4]: https://github.com/anomalyco/caudio-cpp/compare/v0.25.3...v0.25.4
-[0.25.3]: https://github.com/anomalyco/caudio-cpp/compare/v0.25.2...v0.25.3
-[0.25.2]: https://github.com/anomalyco/caudio-cpp/compare/v0.25.1...v0.25.2
-[0.25.1]: https://github.com/anomalyco/caudio-cpp/compare/v0.25.0...v0.25.1
-[0.25.0]: https://github.com/anomalyco/caudio-cpp/compare/v0.24.0...v0.25.0
-[0.24.0]: https://github.com/anomalyco/caudio-cpp/compare/v0.23.2...v0.24.0
-[0.23.2]: https://github.com/anomalyco/caudio-cpp/compare/v0.23.1...v0.23.2
-[0.23.1]: https://github.com/anomalyco/caudio-cpp/compare/v0.23.0...v0.23.1
-[0.23.0]: https://github.com/anomalyco/caudio-cpp/compare/v0.22.0...v0.23.0
-[0.22.0]: https://github.com/anomalyco/caudio-cpp/compare/v0.21.0...v0.22.0
-[0.21.0]: https://github.com/anomalyco/caudio-cpp/compare/v0.20.3...v0.21.0
-[0.20.3]: https://github.com/anomalyco/caudio-cpp/compare/v0.20.2...v0.20.3
-[0.20.2]: https://github.com/anomalyco/caudio-cpp/compare/v0.20.1...v0.20.2
-[0.20.1]: https://github.com/anomalyco/caudio-cpp/compare/v0.20.0...v0.20.1
-[0.20.0]: https://github.com/anomalyco/caudio-cpp/releases/tag/v0.20.0
+[0.25.5]: https://github.com/AhmedowM/caudio/releases/tag/v0.25.5
+[0.25.4]: https://github.com/AhmedowM/caudio/compare/v0.25.3...v0.25.4
+[0.25.3]: https://github.com/AhmedowM/caudio/compare/v0.25.2...v0.25.3
+[0.25.2]: https://github.com/AhmedowM/caudio/compare/v0.25.1...v0.25.2
+[0.25.1]: https://github.com/AhmedowM/caudio/compare/v0.25.0...v0.25.1
+[0.25.0]: https://github.com/AhmedowM/caudio/compare/v0.24.0...v0.25.0
+[0.24.0]: https://github.com/AhmedowM/caudio/compare/v0.23.2...v0.24.0
+[0.23.2]: https://github.com/AhmedowM/caudio/compare/v0.23.1...v0.23.2
+[0.23.1]: https://github.com/AhmedowM/caudio/compare/v0.23.0...v0.23.1
+[0.23.0]: https://github.com/AhmedowM/caudio/compare/v0.22.0...v0.23.0
+[0.22.0]: https://github.com/AhmedowM/caudio/compare/v0.21.0...v0.22.0
+[0.21.0]: https://github.com/AhmedowM/caudio/compare/v0.20.3...v0.21.0
+[0.20.3]: https://github.com/AhmedowM/caudio/compare/v0.20.2...v0.20.3
+[0.20.2]: https://github.com/AhmedowM/caudio/compare/v0.20.1...v0.20.2
+[0.20.1]: https://github.com/AhmedowM/caudio/compare/v0.20.0...v0.20.1
+[0.20.0]: https://github.com/AhmedowM/caudio/releases/tag/v0.20.0
