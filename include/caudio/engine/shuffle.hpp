@@ -39,9 +39,7 @@ namespace caudio::engine::detail {
  * `perm` is `QueueState::perm`.
  * @see shufflePerm(std::vector<int64_t>&)
  */
-inline void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng) {
-    std::ranges::shuffle(perm, rng);
-}
+void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng);
 
 /**
  * @brief Shuffles a permutation using a random_device-seeded engine.
@@ -54,10 +52,6 @@ inline void shufflePerm(std::vector<int64_t>& perm, std::mt19937& rng) {
  * No internal synchronization; caller must hold `queueMutex_`.
  * @see shufflePerm(std::vector<int64_t>&, std::mt19937&)
  */
-inline void shufflePerm(std::vector<int64_t>& perm) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    shufflePerm(perm, gen);
-}
+void shufflePerm(std::vector<int64_t>& perm);
 
 } // namespace caudio::engine::detail
