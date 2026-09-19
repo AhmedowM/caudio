@@ -1,0 +1,193 @@
+#pragma once
+#include <string>
+#include <string_view>
+
+#include "caudio/utils/utils.hpp"
+
+/**
+ * @file schema.hpp
+ * @brief SQLite schema, pragmas and migration helpers.
+ * @ingroup caudio_db
+ * @details Single source of truth for DDL. `kSchema` is executed as a
+ * single `sqlite3_exec` batch on `Database::open()`. The queue table
+ * enforces `UNIQUE(queue_id, position)` as a safety net for the
+ * single-writer invariant (all queue writes are serialized by
+ * `Database::dbMutex_`). See queue.hpp and db_core.hpp for lock
+ * ordering.
+ */
+
+namespace caudio::db {
+
+/**
+ * @brief Queue table UNIQUE invariant — single-writer guarantee.
+ * @ingroup caudio_db
+ * @details `queue` enforces `UNIQUE(queue_id, position)` and a unique
+ * index `idx_queue_queue_pos`. `Database::dbMutex_` serializes all queue
+ * writes; the UNIQUE is a safety net. For existing DBs created before
+ * the constraint, `IF NOT EXISTS` leaves the old table as-is; the
+ * `CREATE UNIQUE INDEX IF NOT EXISTS` may fail if duplicate positions
+ * exist — `Database::open()` handles that gracefully by ignoring the
+ * index-creation error and queue ops will normalize positions on next write.
+ * Position shifts use `UPDATE ... SET position=position+1` which under
+ * UNIQUE requires serialized access (guaranteed by `dbMutex_`); transient
+ * duplicates are avoided by single-writer.
+ */
+
+/**
+ * @brief Full DDL + pragmas executed on database open.
+ * @ingroup caudio_db
+ * @details Includes:
+ * - WAL / NORMAL / cache_size / foreign_keys pragmas.
+ * - Tables: libraries, tracks, playlists, playlist_items, queue, queues,
+ *   history, bookmarks, lyrics, eq_presets, engine_state and the
+ *   `tracks_fts` FTS5 virtual table with AI/AD/AU triggers.
+ * @par Thread safety
+ * Executed once under no lock (fresh handle in `Database::open()`).
+ * @see kSchemaDefaultLibrary
+ */
+constexpr std::string_view kSchema =
+    "PRAGMA journal_mode=WAL;"
+    "PRAGMA synchronous=NORMAL;"
+    "PRAGMA cache_size=-32768;"
+    "PRAGMA page_size=4096;"
+    "PRAGMA foreign_keys=ON;"
+    "CREATE TABLE IF NOT EXISTS libraries ("
+    "id INTEGER PRIMARY KEY,"
+    "path TEXT NOT NULL UNIQUE,"
+    "name TEXT,"
+    "date_added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "last_scanned DATETIME,"
+    "auto_scan BOOLEAN DEFAULT 1,"
+    "recursive BOOLEAN DEFAULT 1,"
+    "extensions TEXT DEFAULT 'mp3,flac,ogg,wav,m4a'"
+    ");"
+    "CREATE TABLE IF NOT EXISTS tracks ("
+    "id INTEGER PRIMARY KEY,"
+    "fingerprint BLOB(32) NOT NULL UNIQUE,"
+    "path TEXT NOT NULL,"
+    "deleted_at DATETIME,"
+    "size INTEGER,"
+    "mtime INTEGER,"
+    "duration REAL,"
+    "sample_rate INTEGER,"
+    "channels INTEGER,"
+    "bitrate INTEGER,"
+    "title TEXT,"
+    "artist TEXT,"
+    "album TEXT,"
+    "album_artist TEXT,"
+    "genre TEXT,"
+    "year INTEGER,"
+    "track_num INTEGER,"
+    "disc_num INTEGER,"
+    "cover_art_path TEXT,"
+    "rating INTEGER DEFAULT 0,"
+    "play_count INTEGER DEFAULT 0,"
+    "last_played DATETIME,"
+    "date_added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "last_scanned DATETIME,"
+    "dirty BOOLEAN DEFAULT 0,"
+    "library_id INTEGER DEFAULT 1 REFERENCES libraries(id)"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_tracks_fingerprint ON tracks(fingerprint);"
+    "CREATE INDEX IF NOT EXISTS idx_tracks_path ON tracks(path);"
+    "CREATE INDEX IF NOT EXISTS idx_tracks_artist_album ON tracks(artist, album);"
+    "CREATE INDEX IF NOT EXISTS idx_tracks_library ON tracks(library_id);"
+    "CREATE TABLE IF NOT EXISTS playlists ("
+    "id INTEGER PRIMARY KEY,"
+    "name TEXT NOT NULL,"
+    "type INTEGER NOT NULL DEFAULT 0,"
+    "smart_query TEXT,"
+    "created DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "modified DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "library_id INTEGER DEFAULT 1 REFERENCES libraries(id)"
+    ");"
+    "CREATE TABLE IF NOT EXISTS playlist_items ("
+    "playlist_id INTEGER REFERENCES playlists(id) ON DELETE CASCADE,"
+    "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
+    "position INTEGER NOT NULL,"
+    "added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "PRIMARY KEY (playlist_id, track_id)"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_playlist_items_pos ON playlist_items(playlist_id, position);"
+    "CREATE TABLE IF NOT EXISTS queue ("
+    "id INTEGER PRIMARY KEY,"
+    "queue_id INTEGER NOT NULL DEFAULT 1,"
+    "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
+    "position INTEGER NOT NULL,"
+    "added DATETIME DEFAULT CURRENT_TIMESTAMP,"
+    "UNIQUE(queue_id, position)"
+    ");"
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_queue_pos ON queue(queue_id, position);"
+    "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');"
+    "CREATE TABLE IF NOT EXISTS queues ("
+    "id INTEGER PRIMARY KEY,"
+    "name TEXT NOT NULL,"
+    "repeat_mode INTEGER DEFAULT 0,"
+    "library_id INTEGER DEFAULT 1 REFERENCES libraries(id)"
+    ");"
+    "INSERT OR IGNORE INTO queues (id, name, repeat_mode, library_id) VALUES (1, 'default', 0, 1);"
+    "CREATE TABLE IF NOT EXISTS history ("
+    "id INTEGER PRIMARY KEY,"
+    "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
+    "started_at DATETIME NOT NULL,"
+    "completed_at DATETIME,"
+    "position_ms INTEGER,"
+    "completion_pct REAL,"
+    "queue_id INTEGER DEFAULT 1"
+    ");"
+    "CREATE INDEX IF NOT EXISTS idx_history_track_started ON history(track_id, started_at);"
+    "CREATE TABLE IF NOT EXISTS bookmarks ("
+    "id INTEGER PRIMARY KEY,"
+    "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
+    "position_ms INTEGER NOT NULL,"
+    "note TEXT,"
+    "created DATETIME DEFAULT CURRENT_TIMESTAMP"
+    ");"
+    "CREATE TABLE IF NOT EXISTS lyrics ("
+    "id INTEGER PRIMARY KEY,"
+    "track_id INTEGER REFERENCES tracks(id) ON DELETE CASCADE,"
+    "lrc_text TEXT,"
+    "is_synced BOOLEAN DEFAULT 0,"
+    "source TEXT,"
+    "fetched_at DATETIME DEFAULT CURRENT_TIMESTAMP"
+    ");"
+    "CREATE TABLE IF NOT EXISTS eq_presets ("
+    "id INTEGER PRIMARY KEY,"
+    "name TEXT NOT NULL UNIQUE,"
+    "bands_json TEXT NOT NULL"
+    ");"
+    "CREATE VIRTUAL TABLE IF NOT EXISTS tracks_fts USING fts5("
+    "title, artist, album, album_artist, genre,"
+    "content='tracks', content_rowid='id', tokenize='porter unicode61'"
+    ");"
+    "CREATE TRIGGER IF NOT EXISTS tracks_ai AFTER INSERT ON tracks BEGIN "
+    "INSERT INTO tracks_fts(rowid, title, artist, album, album_artist, genre) "
+    "VALUES (new.id, new.title, new.artist, new.album, new.album_artist, new.genre);"
+    "END;"
+    "CREATE TRIGGER IF NOT EXISTS tracks_ad AFTER DELETE ON tracks BEGIN "
+    "INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album, album_artist, genre) "
+    "VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist, old.genre);"
+    "END;"
+    "CREATE TRIGGER IF NOT EXISTS tracks_au AFTER UPDATE ON tracks BEGIN "
+    "INSERT INTO tracks_fts(tracks_fts, rowid, title, artist, album, album_artist, genre) "
+    "VALUES ('delete', old.id, old.title, old.artist, old.album, old.album_artist, old.genre);"
+    "INSERT INTO tracks_fts(rowid, title, artist, album, album_artist, genre) "
+    "VALUES (new.id, new.title, new.artist, new.album, new.album_artist, new.genre);"
+    "END;"
+    "CREATE TABLE IF NOT EXISTS engine_state (id INTEGER PRIMARY KEY CHECK(id=1), "
+    "shuffle_enabled INTEGER DEFAULT 0, repeat_mode INTEGER DEFAULT 0, shuffle_perm BLOB, "
+    "cursor_pos INTEGER DEFAULT 0, current_track_id INTEGER DEFAULT 0, volume REAL DEFAULT 1.0, "
+    "active_queue_id INTEGER DEFAULT 1, "
+    "updated DATETIME DEFAULT CURRENT_TIMESTAMP);"
+    "INSERT OR IGNORE INTO engine_state(id) VALUES (1);";
+
+/**
+ * @brief Ensures the default library row exists.
+ * @ingroup caudio_db
+ * @details Executed after `kSchema`; idempotent via `INSERT OR IGNORE`.
+ */
+inline constexpr std::string_view kSchemaDefaultLibrary =
+    "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');";
+
+} // namespace caudio::db

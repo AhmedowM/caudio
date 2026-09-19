@@ -22,6 +22,7 @@ function(caudio_add_component NAME)
   add_library(caudio::${NAME} ALIAS ${NAME})
   target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${ARG_SOURCES})
   target_include_directories(${NAME} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   if(ARG_INCLUDES)

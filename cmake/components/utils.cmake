@@ -8,5 +8,5 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/thread.cppm
   src/utils/version.cppm
 )
-caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} DEPS Threads::Threads)
+caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} DEPS Threads::Threads INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/include)
 caudio_add_shared_variant(utils EXTRA_DEPS Threads::Threads)
