@@ -235,15 +235,7 @@ class Logger {
      * via `std::to_underlying`, copies callback to `out`. Caller invokes
      * outside the lock.
      */
-    bool getCallbackIfNeeded(LogLevel lvl, Callback& out) {
-        std::lock_guard lk(mutex_);
-        if (!callback_)
-            return false;
-        if (std::to_underlying(lvl) < std::to_underlying(minLevel_))
-            return false;
-        out = callback_;
-        return true;
-    }
+    bool getCallbackIfNeeded(LogLevel lvl, Callback& out);
 
     mutable std::mutex mutex_;         ///< Protects callback_ and minLevel_.
     Callback callback_;                ///< User-provided sink; null = disabled.

@@ -41,7 +41,7 @@ struct Error {
      * @param c Status code.
      * @param msg Diagnostic message view (copied).
      */
-    explicit Error(StatusCode c, std::string_view msg) : code(c), message(msg) {}
+    explicit Error(StatusCode c, std::string_view msg);
 
     /**
      * @brief Deprecated C-string overload.
@@ -51,8 +51,7 @@ struct Error {
      * @deprecated Use string_view overload.
      */
     [[deprecated("use string_view overload")]]
-    Error(StatusCode c, const char* msg)
-        : code(c), message(msg ? msg : "") {}
+    Error(StatusCode c, const char* msg);
 
     /**
      * @brief Equality comparison (compares code and message).
@@ -84,9 +83,7 @@ using Expected = std::expected<T, Error>;
  * @return Error instance with code and copied message.
  * @see Error
  */
-inline Error makeError(StatusCode c, std::string_view msg = {}) {
-    return Error{c, msg};
-}
+Error makeError(StatusCode c, std::string_view msg = {});
 
 } // namespace caudio::utils
 

@@ -52,47 +52,20 @@ namespace caudio::utils::detail {
  * @details Dynamically resolves SetThreadDescription from kernel32.dll; falls
  * back to success if unavailable. Converts UTF-8 via MultiByteToWideChar.
  */
-inline Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept {
-    HMODULE k32 = GetModuleHandleA("kernel32.dll");
-    if (k32) {
-        using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-function-type"
-        auto pSetDesc =
-            reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(k32, "SetThreadDescription"));
-#pragma GCC diagnostic pop
-        if (pSetDesc) {
-            int wlen = MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
-                                           nullptr, 0);
-            if (wlen > 0) {
-                std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
-                                    wbuf.data(), wlen);
-                HRESULT hr = pSetDesc(reinterpret_cast<HANDLE>(nativeHandle), wbuf.c_str());
-                (void)hr;
-                return {};
-            }
-        }
-    }
-    return {};
-}
+Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept;
 /**
  * @brief Sets current thread name on Windows.
  * @param name UTF-8 name view.
  * @return Expected<void> always success (compat).
  */
-inline Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept {
-    return setNativeHandleName(GetCurrentThread(), name);
-}
+Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept;
 #else
 /**
  * @brief Truncates name to 15 chars for pthread limit.
  * @param s Input view.
  * @return View of first 15 bytes (pthread limit is 16 inc. NUL).
  */
-constexpr std::string_view truncate15(std::string_view s) noexcept {
-    return s.substr(0, 15);
-}
+constexpr std::string_view truncate15(std::string_view s) noexcept;
 /**
  * @brief Sets pthread name with truncation and NUL termination.
  * @param th pthread_t handle.
@@ -101,14 +74,7 @@ constexpr std::string_view truncate15(std::string_view s) noexcept {
  * @details Copies truncated view into 16-byte buffer with NUL terminator,
  * calls pthread_setname_np.
  */
-inline int setPthreadName(pthread_t th, std::string_view name) noexcept {
-    std::string_view t = truncate15(name);
-    char buf[16]{};
-    if (!t.empty())
-        std::memcpy(buf, t.data(), t.size());
-    buf[t.size()] = '\0';
-    return pthread_setname_np(th, buf);
-}
+int setPthreadName(pthread_t th, std::string_view name) noexcept;
 #endif
 } // namespace caudio::utils::detail
 
