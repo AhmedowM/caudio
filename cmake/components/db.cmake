@@ -15,7 +15,21 @@ set(CAUDIO_DB_SOURCES
   src/db/fts.cppm
   src/db/stmt_helpers.cppm
 )
+
+set(CAUDIO_DB_IMPL_SOURCES
+  src/db/queue.cpp
+  src/db/scan.cpp
+  src/db/search.cpp
+  src/db/json.cpp
+  src/db/write_thread.cpp
+  src/db/statement.cpp
+  src/db/transaction.cpp
+  src/db/fingerprint.cpp
+  src/db/fts.cpp
+  src/db/stmt_helpers.cpp
+)
 caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} DEPS caudio::utils caudio::player Threads::Threads INCLUDES vendor WITH_FFMPEG)
+target_sources(db PRIVATE ${CAUDIO_DB_IMPL_SOURCES})
 target_include_directories(db PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 target_link_libraries(db PRIVATE caudio_sqlite blake3)
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)

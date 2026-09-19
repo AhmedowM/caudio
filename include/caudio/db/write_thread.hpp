@@ -80,13 +80,10 @@ class WriterThread final {
      * @ingroup caudio_db
      * @param writeBatchSize Queue capacity; 0 is normalized to 256.
      */
-    explicit WriterThread(std::size_t writeBatchSize = 256)
-        : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(
-              writeBatchSize > 0 ? writeBatchSize : 256)) {}
+    explicit WriterThread(std::size_t writeBatchSize = 256);
+
     /** @brief Closes the thread and drains the queue. @ingroup caudio_db */
-    ~WriterThread() {
-        close();
-    }
+    ~WriterThread();
 
     WriterThread(const WriterThread&) = delete;
     WriterThread& operator=(const WriterThread&) = delete;
@@ -96,26 +93,15 @@ class WriterThread final {
      * @ingroup caudio_db
      * @param o Source; left with null db and empty thread.
      */
-    WriterThread(WriterThread&& o) noexcept
-        : queue_(std::move(o.queue_)), db_(std::exchange(o.db_, nullptr)),
-          thread_(std::move(o.thread_)), in_flight_(o.in_flight_.load(std::memory_order_acquire)) {}
+    WriterThread(WriterThread&& o) noexcept;
+
     /**
      * @brief Move-assigns; closes current thread first.
      * @ingroup caudio_db
      * @param o Source.
      * @return *this
      */
-    WriterThread& operator=(WriterThread&& o) noexcept {
-        if (this != &o) {
-            close();
-            queue_ = std::move(o.queue_);
-            db_ = std::exchange(o.db_, nullptr);
-            thread_ = std::move(o.thread_);
-            in_flight_.store(o.in_flight_.load(std::memory_order_acquire),
-                             std::memory_order_release);
-        }
-        return *this;
-    }
+    WriterThread& operator=(WriterThread&& o) noexcept;
 
     /**
      * @brief Starts the background thread for the given handle.
@@ -125,12 +111,7 @@ class WriterThread final {
      * @par Thread safety
      * Not thread-safe with concurrent `open`/`close`; caller must serialize.
      */
-    void open(sqlite3* db) {
-        if (thread_.joinable())
-            return;
-        db_ = db;
-        thread_ = std::jthread{[this](std::stop_token st) { worker(st); }};
-    }
+    void open(sqlite3* db);
 
     /**
      * @brief Stops the thread and drains remaining ops.
@@ -138,19 +119,7 @@ class WriterThread final {
      * @details Requests stop, notifies `cv_`, joins. Remaining queued ops
      * are popped and destroyed (their statements finalized).
      */
-    void close() {
-        if (thread_.joinable()) {
-            thread_.request_stop();
-            cv_.notify_all();
-            thread_.join();
-        }
-        // drain remaining stmts - WriteOp destructor handles finalization
-        while (true) {
-            auto v = queue_->pop();
-            if (!v)
-                break;
-        }
-    }
+    void close();
 
     /**
      * @brief Enqueues a write operation.
@@ -164,14 +133,7 @@ class WriterThread final {
      */
     std::expected<void, caudio::utils::Error>
     push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
-         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
-        WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
-        auto r = queue_->push(std::move(op));
-        if (!r)
-            return std::unexpected{r.error()};
-        cv_.notify_one();
-        return {};
-    }
+         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb);
 
     /**
      * @brief Waits until the queue is empty and no op is in flight.
@@ -182,99 +144,24 @@ class WriterThread final {
      * @par Thread safety
      * Thread-safe; blocks caller.
      */
-    std::expected<void, caudio::utils::Error> flush() {
-        std::unique_lock<std::mutex> lk(mtx_);
-        bool done = cv_.wait_for(lk, std::chrono::milliseconds{200}, [this] {
-            return queue_->empty() && in_flight_.load(std::memory_order_acquire) == 0;
-        });
-        if (done)
-            return {};
-        // predicate false after timeout — re-check without race
-        if (queue_->empty() && in_flight_.load(std::memory_order_acquire) == 0)
-            return {};
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "flush timeout")};
-    }
+    std::expected<void, caudio::utils::Error> flush();
 
     /**
      * @brief Checks if the queue is empty.
      * @ingroup caudio_db
      * @return true if no pending ops.
      */
-    bool empty() const {
-        return queue_->empty();
-    }
+    bool empty() const;
+
     /**
      * @brief Returns number of pending ops.
      * @ingroup caudio_db
      * @return Queue size.
      */
-    std::size_t size() const {
-        return queue_->size();
-    }
+    std::size_t size() const;
 
   private:
-    /**
-     * @brief Worker loop: waits for work, executes one op at a time.
-     * @ingroup caudio_db
-     * @param st Stop token for cooperative cancellation.
-     * @details Pops outside the lock, increments `in_flight_`, executes
-     * `stmt->stepDone()` or `sqlite3_exec(sql)`, maps non-DONE/ROW/OK to
-     * `StatusCode::Corrupt`, decrements `in_flight_`, notifies `cv_`, then
-     * invokes the callback outside the lock. Sleeps 200 ms between polls.
-     */
-    void worker(std::stop_token st) {
-        while (!st.stop_requested()) {
-            std::unique_lock<std::mutex> lk(mtx_);
-            cv_.wait_for(lk, std::chrono::milliseconds{200},
-                         [this, &st] { return !queue_->empty() || st.stop_requested(); });
-            if (st.stop_requested() && queue_->empty())
-                break;
-            // pop all available up to batch? single for now; don't hold lock during exec
-            lk.unlock();
-            auto popped = queue_->pop();
-            if (!popped.has_value()) {
-                // if empty, continue waiting
-                if (st.stop_requested())
-                    break;
-                continue;
-            }
-            WriteOp op = std::move(popped.value());
-            in_flight_.fetch_add(1, std::memory_order_acq_rel);
-            caudio::utils::Error err{};
-            bool ok = true;
-            if (op.stmt) {
-                int rc = op.stmt->stepDone();
-                if (rc != SQLITE_DONE && rc != SQLITE_ROW && rc != SQLITE_OK) {
-                    err = caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
-                                                   sqlite3_errmsg(db_));
-                    ok = false;
-                }
-                // stmt finalized by unique_ptr destructor
-            } else if (!op.sql.empty() && db_) {
-                char* e = nullptr;
-                internal::SqliteErrGuard guard{e};
-                int rc = sqlite3_exec(db_, op.sql.c_str(), nullptr, nullptr, &e);
-                if (rc != SQLITE_OK) {
-                    err = caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
-                                                   e ? e : sqlite3_errmsg(db_));
-                    ok = false;
-                }
-            }
-            in_flight_.fetch_sub(1, std::memory_order_acq_rel);
-            {
-                std::lock_guard<std::mutex> lk(mtx_);
-                cv_.notify_all();
-            }
-            // callback outside lock (notify already sent)
-            if (op.cb) {
-                if (ok)
-                    op.cb(std::expected<void, caudio::utils::Error>{});
-                else
-                    op.cb(std::unexpected{err});
-            }
-        }
-    }
+    void worker(std::stop_token st);
 
     std::unique_ptr<caudio::utils::MpscQueue<WriteOp>> queue_;   ///< Bounded queue (capacity = batch size).
     sqlite3* db_{nullptr};                                        ///< Borrowed handle (not owned).
