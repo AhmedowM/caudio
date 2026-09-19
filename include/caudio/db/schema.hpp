@@ -45,7 +45,7 @@ namespace caudio::db {
  * Executed once under no lock (fresh handle in `Database::open()`).
  * @see kSchemaDefaultLibrary
  */
-constexpr std::string_view kSchema =
+inline constexpr std::string_view kSchema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
     "PRAGMA cache_size=-32768;"

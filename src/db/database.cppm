@@ -1,5 +1,9 @@
 module;
 #include <string_view>
+#include "caudio/db/db_types.hpp"
+#include "caudio/db/write_thread.hpp"
+#include "caudio/db/statement.hpp"
+#include "caudio/db/transaction.hpp"
 
 /**
  * @file database.cppm
@@ -21,6 +25,8 @@ export import :scan;
 export import :search;
 export import :json;
 export import :write_thread;
+export import :SqliteStatement;
+export import :DbTransaction;
 import :detail;
 import :fingerprint;
 import :fts;
@@ -32,4 +38,18 @@ import caudio.utils;
  * @brief Public namespace for all database APIs.
  * @ingroup caudio_db
  */
-export namespace caudio::db {} // namespace caudio::db
+export namespace caudio::db {
+  using ::caudio::db::Track;
+  using ::caudio::db::Playlist;
+  using ::caudio::db::QueueItem;
+  using ::caudio::db::Queue;
+  using ::caudio::db::HistoryEntry;
+  using ::caudio::db::Bookmark;
+  using ::caudio::db::Library;
+  using ::caudio::db::DbStats;
+  using ::caudio::db::LibraryStatsDetailedData;
+  using ::caudio::db::TrackQuery;
+  using ::caudio::db::HistoryQuery;
+  using ::caudio::db::WriteOp;
+  using ::caudio::db::WriterThread;
+} // namespace caudio::db

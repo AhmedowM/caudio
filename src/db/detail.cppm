@@ -1,14 +1,18 @@
 module;
-/**
- * @file detail.cppm
- * @brief Internal re-export hub for db helpers.
- * @ingroup caudio_db
- * @details Re-exports :fingerprint, :fts and :stmt_helpers into the
- * `caudio::db::internal` namespace for use by other partitions.
- * Not part of the public API.
- */
+#include "caudio/db/detail.hpp"
+
 module caudio.db:detail;
 
-import :fingerprint;
-import :fts;
-import :stmt_helpers;
+namespace caudio::db::internal {
+  using ::caudio::db::internal::kSample;
+  using ::caudio::db::internal::computeFingerprint;
+  using ::caudio::db::internal::fallbackFingerprint;
+  using ::caudio::db::internal::escapeLike;
+  using ::caudio::db::internal::toHex;
+  using ::caudio::db::internal::fromHex;
+  using ::caudio::db::internal::sanitizeFtsTerm;
+  using ::caudio::db::internal::kSelectTracksCols;
+  using ::caudio::db::internal::columnText;
+  using ::caudio::db::internal::SqliteErrGuard;
+  using ::caudio::db::internal::fillTrackFromStmt;
+}
