@@ -36,7 +36,15 @@ set(CAUDIO_SERVICE_SOURCES
   cli/src/service/ipc_channel_win.cpp
   cli/src/service/ipc_server.cppm
 )
+set(CAUDIO_SERVICE_IMPL_SOURCES
+  cli/src/service/ipc_channel.cpp
+  cli/src/service/ipc_server.cpp
+  cli/src/service/shm_status.cpp
+  cli/src/service/service_detail.cpp
+  cli/src/service/service_impl.cpp
+)
 caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} DEPS caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
+target_sources(service PRIVATE ${CAUDIO_SERVICE_IMPL_SOURCES})
 target_include_directories(service PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 if(NOT WIN32)
   find_library(LIBRT rt)
