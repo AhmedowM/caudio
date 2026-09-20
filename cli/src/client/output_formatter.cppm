@@ -113,7 +113,7 @@ class OutputFormatter {
                         std::println(os, "Version: {}", v.version);
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::QueueTracks>) {
-                    std::span<const caudio::db::Track> tracksSpan{v.tracks};
+                    std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                     std::println(os, "Queue ({} tracks):", tracksSpan.size());
                     std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
                                  "Dur");
@@ -149,7 +149,7 @@ class OutputFormatter {
                         }
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::Tracks>) {
-                    std::span<const caudio::db::Track> tracksSpan{v.tracks};
+                    std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                     std::println(os, "Tracks ({}):", tracksSpan.size());
                     std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
                                  "Dur");
@@ -160,7 +160,7 @@ class OutputFormatter {
                                      formatTime(t.duration));
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::Playlists>) {
-                    std::span<const caudio::db::Playlist> playlistSpan{v.playlists};
+                    std::span<const caudio::db::Playlist> playlistSpan(v.playlists.data(), v.playlists.size());
                     std::println(os, "Playlists ({}):", playlistSpan.size());
                     std::println(os, "{:>3} {:>6}  {:<40}", "#", "ID", "Name");
                     for (std::size_t i = 0; i < playlistSpan.size(); ++i) {
@@ -171,11 +171,11 @@ class OutputFormatter {
                     std::println(os, "{} = {}", v.key, v.value);
                 } else if constexpr (std::is_same_v<T, caudio::cli::ConfigValues>) {
                     std::println(os, "Config ({} entries):", v.values.size());
-                    for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values)) {
+                    for (const auto& cv : std::span<const caudio::cli::ConfigValue>(v.values.data(), v.values.size())) {
                         std::println(os, "{} = {}", cv.key, cv.value);
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::PlaylistData>) {
-                    std::span<const caudio::db::Track> tracksSpan{v.tracks};
+                    std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                     std::println(os, "Playlist ({} tracks, format: {}):", tracksSpan.size(), v.format);
                     std::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist", "Title",
                                  "Dur");
@@ -233,7 +233,7 @@ class OutputFormatter {
                         std::println(os, "  Last Played:  (never)");
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::History>) {
-                    std::span<const caudio::cli::HistoryEntry> entriesSpan{v.entries};
+                    std::span<const caudio::cli::HistoryEntry> entriesSpan(v.entries.data(), v.entries.size());
                     std::println(os, "History ({} entries):", entriesSpan.size());
                     std::println(os, "{:>3}  {:<20}  {:<40} {:<40} {:>10} {:>8}", "#", "Date", "Artist", "Title", "Pos", "Dur");
                     for (std::size_t i = 0; i < entriesSpan.size(); ++i) {
@@ -255,7 +255,7 @@ class OutputFormatter {
                                      truncateField(e.title, 40), posStr, durStr);
                     }
                 } else if constexpr (std::is_same_v<T, caudio::cli::Devices>) {
-                    std::span<const caudio::cli::DeviceInfo> devicesSpan{v.devices};
+                    std::span<const caudio::cli::DeviceInfo> devicesSpan(v.devices.data(), v.devices.size());
                     std::println(os, "Devices ({}):", devicesSpan.size());
                     std::println(os, "{:>3}  {:<40}  {:<60}  {}", "#", "ID", "Name", "Default");
                     for (std::size_t i = 0; i < devicesSpan.size(); ++i) {

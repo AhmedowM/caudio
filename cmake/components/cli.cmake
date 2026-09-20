@@ -15,7 +15,12 @@ set(CAUDIO_CLI_SHARED_SOURCES
   cli/src/shared/protocol.cppm
   cli/src/config.cppm
 )
-caudio_add_component(cli_shared SOURCES ${CAUDIO_CLI_SHARED_SOURCES} DEPS caudio::engine caudio::db caudio::utils caudio::json Threads::Threads INCLUDES vendor)
+caudio_add_component(cli_shared SOURCES ${CAUDIO_CLI_SHARED_SOURCES} DEPS caudio::engine caudio::db caudio::utils caudio::json Threads::Threads INCLUDES vendor WITH_FFMPEG)
+set(CAUDIO_CLI_SHARED_IMPL_SOURCES
+  cli/src/shared/protocol.cpp
+  cli/src/config.cpp
+)
+target_sources(cli_shared PRIVATE ${CAUDIO_CLI_SHARED_IMPL_SOURCES})
 target_include_directories(cli_shared PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(cli_shared)
 target_compile_options(cli_shared PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
@@ -31,7 +36,7 @@ set(CAUDIO_SERVICE_SOURCES
   cli/src/service/ipc_channel_win.cpp
   cli/src/service/ipc_server.cppm
 )
-caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} DEPS caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor)
+caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} DEPS caudio::cli_shared caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
 target_include_directories(service PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 if(NOT WIN32)
   find_library(LIBRT rt)
@@ -55,7 +60,7 @@ set(CAUDIO_CLIENT_SOURCES
   cli/src/client/client_impl.cppm
   cli/src/client/output_formatter.cppm
 )
-caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} DEPS caudio::cli_shared caudio::utils caudio::service Threads::Threads INCLUDES vendor)
+caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} DEPS caudio::cli_shared caudio::utils caudio::service Threads::Threads INCLUDES vendor WITH_FFMPEG)
 target_include_directories(client PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(client)
 target_compile_options(client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)

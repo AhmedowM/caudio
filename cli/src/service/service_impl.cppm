@@ -6,6 +6,18 @@
 module;
 // Service owns Engine/DB/Config/Logger/IpcServer and dispatches commands
 
+// Ensure cli headers are included first to avoid windows.h conflicts
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include "cli/shared/command.hpp"
+#include "cli/shared/result.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/config.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -37,6 +49,7 @@ import :ipc_channel;
 import :ipc_server;
 import :shm_status;
 import :detail;
+
 
 export namespace caudio::service {
 
@@ -408,6 +421,60 @@ class Service final {
     std::expected<caudio::cli::Result, caudio::utils::Error>
     dispatch(const caudio::cli::Command& cmd) {
         using namespace caudio::cli;
+        using caudio::cli::Play;
+        using caudio::cli::Pause;
+        using caudio::cli::Resume;
+        using caudio::cli::Restart;
+        using caudio::cli::Stop;
+        using caudio::cli::Next;
+        using caudio::cli::Prev;
+        using caudio::cli::Seek;
+        using caudio::cli::StatusReq;
+        using caudio::cli::VolumeSet;
+        using caudio::cli::QueueList;
+        using caudio::cli::QueueQueues;
+        using caudio::cli::QueueSwitch;
+        using caudio::cli::QueueAdd;
+        using caudio::cli::QueueRemove;
+        using caudio::cli::QueueMove;
+        using caudio::cli::QueueClear;
+        using caudio::cli::QueueShuffle;
+        using caudio::cli::QueueRepeat;
+        using caudio::cli::PlaylistList;
+        using caudio::cli::PlaylistTracks;
+        using caudio::cli::PlaylistLoad;
+        using caudio::cli::PlaylistSave;
+        using caudio::cli::PlaylistDelete;
+        using caudio::cli::PlaylistRename;
+        using caudio::cli::PlaylistExport;
+        using caudio::cli::PlaylistImport;
+        using caudio::cli::LibraryScan;
+        using caudio::cli::LibrarySearch;
+        using caudio::cli::LibraryStats;
+        using caudio::cli::LibraryStatsDetailed;
+        using caudio::cli::LibraryAdd;
+        using caudio::cli::LibraryRemove;
+        using caudio::cli::LibraryList;
+        using caudio::cli::TagEdit;
+        using caudio::cli::TagGet;
+        using caudio::cli::ConfigGet;
+        using caudio::cli::ConfigSet;
+        using caudio::cli::ConfigList;
+        using caudio::cli::ConfigExport;
+        using caudio::cli::ConfigImport;
+        using caudio::cli::ConfigReset;
+        using caudio::cli::HistoryList;
+        using caudio::cli::HistoryClear;
+        using caudio::cli::Shutdown;
+        using caudio::cli::Preview;
+        using caudio::cli::DeviceList;
+        using caudio::cli::DeviceSet;
+        using caudio::cli::DeviceTest;
+        using caudio::cli::Info;
+        using caudio::cli::QueueTracks;
+        using caudio::cli::VolumeInfo;
+        using caudio::cli::LibraryStatsData;
+        using caudio::cli::Result;
         // helper to build status
         auto statusResult = [&]() -> std::expected<Result, caudio::utils::Error> {
             auto st = detail::buildStatus(*engine_, *db_);
