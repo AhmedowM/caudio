@@ -181,119 +181,21 @@ class FileReader final : public Reader {
      *
      * Thread Safety: Thread-safe (no shared state during construction)
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>>
-    open(const std::filesystem::path& path) {
-        if (path.empty()) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("empty path")});
-        }
-        FILE* f = nullptr;
-#if defined(_WIN32)
-        f = _wfopen(path.wstring().c_str(), L"rb");
-        if (!f) {
-            // fallback to narrow
-            std::string s = path.string();
-            f = std::fopen(s.c_str(), "rb");
-        }
-#else
-        std::string s = path.string();
-        f = std::fopen(s.c_str(), "rb");
-#endif
-        if (!f) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::NotFound, std::string_view("cannot open file")});
-        }
-        if (detail::fseek64(f, 0, SEEK_END) != 0) {
-            std::fclose(f);
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
-        }
-        int64_t sz = detail::ftell64(f);
-        if (sz < 0) {
-            std::fclose(f);
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("ftell failed")});
-        }
-        if (detail::fseek64(f, 0, SEEK_SET) != 0) {
-            std::fclose(f);
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
-        }
-        // Wrap immediately in unique_ptr so FILE* is owned even if Expected construction throws
-        auto holder = std::unique_ptr<FileReader>(new FileReader(f));
-        holder->fileSize_ = sz;
-        std::unique_ptr<Reader> base = std::move(holder);
-        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
-    }
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
+        const std::filesystem::path& path);
 
-    ~FileReader() override {
-        if (file_)
-            std::fclose(file_);
-    }
+    ~FileReader() override;
 
-    std::size_t read(std::span<std::byte> dst) override {
-        if (!file_ || dst.empty())
-            return 0;
-        return std::fread(dst.data(), 1, dst.size(), file_);
-    }
+    std::size_t read(std::span<std::byte> dst) override;
 
-    [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override {
-        if (!file_)
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("null file")});
-        if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
-        }
-        std::lock_guard<std::mutex> lock(seekMutex_);
-        int64_t cur = detail::ftell64(file_);
-        if (cur < 0)
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("ftell failed")});
-        int64_t sz = fileSize_;
-        if (sz < 0)
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("size not cached")});
-        int64_t base = 0;
-        switch (whence) {
-        case SEEK_SET:
-            base = 0;
-            break;
-        case SEEK_CUR:
-            base = cur;
-            break;
-        case SEEK_END:
-            base = sz;
-            break;
-        default:
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
-        }
-        int64_t newPos = base + offset;
-        if (newPos < 0 || newPos > sz) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("seek out of range")});
-        }
-        if (detail::fseek64(file_, newPos, SEEK_SET) != 0) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("fseek failed")});
-        }
-        return {};
-    }
+    [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override;
 
-    [[nodiscard]] int64_t tell() noexcept override {
-        if (!file_)
-            return -1;
-        std::lock_guard<std::mutex> lock(seekMutex_);
-        return detail::ftell64(file_);
-    }
+    [[nodiscard]] int64_t tell() noexcept override;
 
-    [[nodiscard]] int64_t size() noexcept override {
-        return fileSize_;
-    }
+    [[nodiscard]] int64_t size() noexcept override;
 
   private:
-    explicit FileReader(FILE* f) : file_(f) {}
+    explicit FileReader(FILE* f);
     FILE* file_{nullptr};
     int64_t fileSize_{-1};
     mutable std::mutex seekMutex_{};
@@ -328,22 +230,16 @@ class MemoryReader final : public Reader {
      * Copies the input data to an internal buffer. The original data
      * can be freed after this call returns.
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>> open(std::span<const std::byte> data) {
-        // copy data to owned buffer — wrap immediately for exception safety
-        auto holder = std::unique_ptr<MemoryReader>(new MemoryReader(data));
-        std::unique_ptr<Reader> base = std::move(holder);
-        return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
-    }
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
+        std::span<const std::byte> data);
 
     /**
      * @brief Open a memory reader from a vector
      * @param data Input vector (copied)
      * @return Expected containing unique_ptr<Reader> on success
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>>
-    open(const std::vector<std::byte>& data) {
-        return open(std::span<const std::byte>(data.data(), data.size()));
-    }
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
+        const std::vector<std::byte>& data);
 
     /**
      * @brief Open a memory reader from raw pointer and length
@@ -352,64 +248,17 @@ class MemoryReader final : public Reader {
      * @return Expected containing unique_ptr<Reader> on success, Error if null data with len>0
      */
     static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::byte* data,
-                                                                   std::size_t len) {
-        if (len > 0 && data == nullptr) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("null data")});
-        }
-        return open(std::span<const std::byte>(data, len));
-    }
+                                                                   std::size_t len);
 
-    std::size_t read(std::span<std::byte> dst) override {
-        if (dst.empty())
-            return 0;
-        std::size_t avail = buf_.size() > pos_ ? buf_.size() - pos_ : 0;
-        std::size_t n = dst.size() < avail ? dst.size() : avail;
-        if (n > 0) {
-            std::memcpy(dst.data(), buf_.data() + pos_, n);
-            pos_ += n;
-        }
-        return n;
-    }
+    std::size_t read(std::span<std::byte> dst) override;
 
-    [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override {
-        if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
-        }
-        int64_t base = 0;
-        switch (whence) {
-        case SEEK_SET:
-            base = 0;
-            break;
-        case SEEK_CUR:
-            base = static_cast<int64_t>(pos_);
-            break;
-        case SEEK_END:
-            base = static_cast<int64_t>(buf_.size());
-            break;
-        default:
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad whence")});
-        }
-        int64_t newPos = base + offset;
-        if (newPos < 0 || newPos > static_cast<int64_t>(buf_.size())) {
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("seek out of range")});
-        }
-        pos_ = static_cast<std::size_t>(newPos);
-        return {};
-    }
+    [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override;
 
-    [[nodiscard]] int64_t tell() noexcept override {
-        return static_cast<int64_t>(pos_);
-    }
-    [[nodiscard]] int64_t size() noexcept override {
-        return static_cast<int64_t>(buf_.size());
-    }
+    [[nodiscard]] int64_t tell() noexcept override;
+    [[nodiscard]] int64_t size() noexcept override;
 
   private:
-    explicit MemoryReader(std::span<const std::byte> src) : buf_(src.begin(), src.end()), pos_(0) {}
+    explicit MemoryReader(std::span<const std::byte> src);
     std::vector<std::byte> buf_;
     std::size_t pos_{0};
 };

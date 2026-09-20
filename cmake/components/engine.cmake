@@ -6,6 +6,7 @@ set(CAUDIO_ENGINE_SOURCES
 )
 caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} DEPS caudio::db caudio::player caudio::utils Threads::Threads WITH_FFMPEG)
 target_sources(engine PRIVATE
+  src/engine/engine.cpp
   src/engine/history.cpp
   src/engine/shuffle.cpp
 )

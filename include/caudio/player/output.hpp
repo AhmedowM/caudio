@@ -102,37 +102,7 @@ struct DeviceList {
  * - Cleans up with ma_context_uninit()
  * - Only returns playback devices (capture devices ignored)
  */
-inline DeviceList enumerateDevices() {
-    DeviceList list;
-    ma_context context;
-    ma_context_config ctxConfig = ma_context_config_init();
-    ma_result res = ma_context_init(nullptr, 0, &ctxConfig, &context);
-    if (res != MA_SUCCESS) {
-        return list;
-    }
-
-    ma_device_info* pPlaybackInfos = nullptr;
-    ma_uint32 playbackCount = 0;
-    ma_device_info* pCaptureInfos = nullptr;
-    ma_uint32 captureCount = 0;
-
-    res = ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount);
-    if (res == MA_SUCCESS && pPlaybackInfos && playbackCount > 0) {
-        list.devices.reserve(playbackCount);
-        for (ma_uint32 i = 0; i < playbackCount; ++i) {
-            const auto& info = pPlaybackInfos[i];
-            DeviceInfo di;
-            di.name = info.name;
-            di.isDefault = info.isDefault;
-            // Use simple index-based ID for user-friendly CLI
-            di.id = std::to_string(i);
-            list.devices.push_back(std::move(di));
-        }
-    }
-
-    ma_context_uninit(&context);
-    return list;
-}
+DeviceList enumerateDevices();
 
 /**
  * @class AudioOutput
@@ -186,9 +156,7 @@ class AudioOutput {
 
     AudioOutput() = default;
 
-    ~AudioOutput() {
-        shutdown();
-    }
+    ~AudioOutput();
 
     /**
      * @brief Create and initialize an AudioOutput instance
@@ -203,14 +171,7 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe. Can be called from any thread.
      */
-    static Expected create(const Config& cfg) {
-        auto out = std::make_unique<AudioOutput>();
-        if (!out->init(cfg)) {
-            return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
-                                                        std::string_view("miniaudio device init failed")});
-        }
-        return out;
-    }
+    static Expected create(const Config& cfg);
 
     /**
      * @brief Clamp volume value to valid range [0.0, 1.0]
@@ -220,11 +181,7 @@ class AudioOutput {
      * Handles NaN/infinity by returning 0.0. Used internally for
      * volume sanitization before applying to audio output.
      */
-    static inline float clampVolume(float v) noexcept {
-        if (!std::isfinite(v))
-            return 0.0f;
-        return std::clamp(v, 0.0f, 1.0f);
-    }
+    static float clampVolume(float v) noexcept;
 
     /**
      * @brief Set playback volume
@@ -235,9 +192,7 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe (atomic store with relaxed ordering)
      */
-    void setVolume(float vol) {
-        volume_.store(clampVolume(vol), std::memory_order_relaxed);
-    }
+    void setVolume(float vol);
 
     /**
      * @brief Get current playback volume
@@ -245,14 +200,10 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe (atomic load with relaxed ordering)
      */
-    float volume() const noexcept {
-        return volume_.load(std::memory_order_relaxed);
-    }
+    float volume() const noexcept;
 
     // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
-    void testFill(std::span<float> buf) const noexcept {
-        std::ranges::fill(buf, 0.0f);
-    }
+    void testFill(std::span<float> buf) const noexcept;
 
     /**
      * @brief Fill output buffer from ring buffer with volume scaling
@@ -269,32 +220,12 @@ class AudioOutput {
      * single consumer). No internal locking.
      */
     static void fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
-                             uint32_t channels, float vol) noexcept {
-        if (out.empty())
-            return;
-        std::size_t totalSamples = out.size();
-        std::size_t generatedFrames = 0;
-        if (ring) {
-            generatedFrames = ring->read(std::span<float>(out.data(), totalSamples));
-        }
-        std::size_t generatedSamples = generatedFrames * channels;
-        if (generatedSamples < totalSamples) {
-            std::ranges::fill(out.subspan(generatedSamples), 0.0f);
-        }
-        if (vol != 1.0f) {
-            for (std::size_t i = 0; i < totalSamples; ++i)
-                out[i] *= vol;
-        }
-    }
+                             uint32_t channels, float vol) noexcept;
 
     // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
     // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
     // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
-    void fillForTest(std::span<float> out) noexcept {
-        uint32_t channels = cfg_.channels ? cfg_.channels : 1;
-        float vol = volume_.load(std::memory_order_relaxed);
-        fillFromRing(out, cfg_.ring, channels, vol);
-    }
+    void fillForTest(std::span<float> out) noexcept;
 
     /**
      * @brief Check if audio output is currently playing
@@ -302,9 +233,7 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe (atomic load with acquire ordering)
      */
-    bool isPlaying() const noexcept {
-        return running_.load(std::memory_order_acquire);
-    }
+    bool isPlaying() const noexcept;
 
     /**
      * @brief Start audio playback
@@ -315,14 +244,7 @@ class AudioOutput {
      * Thread Safety: Thread-safe (atomic compare_exchange)
      * Precondition: init() must have been called successfully
      */
-    void start() {
-        if (!initialized_.load(std::memory_order_acquire))
-            return;
-        bool expected = false;
-        if (running_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-            ma_device_start(&device_);
-        }
-    }
+    void start();
 
     /**
      * @brief Stop audio playback
@@ -332,12 +254,7 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe (atomic compare_exchange)
      */
-    void stop() {
-        bool expected = true;
-        if (running_.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
-            ma_device_stop(&device_);
-        }
-    }
+    void stop();
 
     /**
      * @brief Shutdown and release audio device resources
@@ -347,12 +264,7 @@ class AudioOutput {
      *
      * Thread Safety: Thread-safe (atomic exchange for initialized flag)
      */
-    void shutdown() noexcept {
-        stop();
-        if (initialized_.exchange(false, std::memory_order_acq_rel)) {
-            ma_device_uninit(&device_);
-        }
-    }
+    void shutdown() noexcept;
 
     /**
      * @brief Initialize the miniaudio playback device
@@ -374,31 +286,7 @@ class AudioOutput {
      * - Format: ma_format_f32 (float32)
      * - Callback: AudioOutput::dataCallback with this as pUserData
      */
-    bool init(const Config& cfg) {
-        if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
-            return false;
-        cfg_ = cfg;
-        float v = clampVolume(cfg.volume);
-        volume_.store(v, std::memory_order_relaxed);
-
-        ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
-        deviceConfig.playback.format = ma_format_f32;
-        deviceConfig.playback.channels = cfg.channels;
-        deviceConfig.sampleRate = cfg.sampleRate;
-        deviceConfig.dataCallback = &AudioOutput::dataCallback;
-        deviceConfig.pUserData = this;
-
-        ma_result res = ma_device_init(nullptr, &deviceConfig, &device_);
-        if (res != MA_SUCCESS) {
-            return false;
-        }
-        initialized_.store(true, std::memory_order_release);
-
-        // @pre caller must start() after preroll, cap/2 frames
-        running_.store(false, std::memory_order_release);
-
-        return true;
-    }
+    bool init(const Config& cfg);
 
     /**
      * @brief miniaudio data callback - fills output buffer from ring
@@ -415,19 +303,7 @@ class AudioOutput {
      * allocate, or call non-realtime-safe functions.
      */
     static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
-                             ma_uint32 frameCount) {
-        (void)pInput;
-        auto* self = static_cast<AudioOutput*>(pDevice->pUserData);
-        if (!self)
-            return;
-
-        float* output = static_cast<float*>(pOutput);
-        ma_uint32 channels = pDevice->playback.channels;
-        ma_uint32 totalSamples = frameCount * channels;
-        float vol = self->volume_.load(std::memory_order_relaxed);
-        // lock-free, no allocation
-        fillFromRing(std::span<float>(output, totalSamples), self->cfg_.ring, channels, vol);
-    }
+                             ma_uint32 frameCount);
 
   private:
     Config cfg_;

@@ -1,0 +1,1372 @@
+#include "caudio/engine/engine.hpp"
+
+namespace caudio::engine {
+
+Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
+        auto e = std::unique_ptr<Engine>(new Engine(cfg));
+        auto err = e->init();
+        if (err)
+            return std::unexpected(*err);
+        return e;
+    }
+
+Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& cfg) {
+        auto dbRes = caudio::db::Database::open(path);
+        if (!dbRes)
+            return std::unexpected(dbRes.error());
+        auto e = std::unique_ptr<Engine>(new Engine(cfg));
+        e->db_ = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
+        if (auto err = e->init())
+            return std::unexpected(*err);
+        (void)e->loadState();
+        if (e->output_)
+            e->output_->setVolume(e->state_.volume);
+        return e;
+    }
+
+Engine::ExpectedVoid Engine::attachDatabase(std::shared_ptr<caudio::db::Database> db) {
+        if (!db || !db->handle())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
+        db_ = std::move(db);
+        if (auto ec = loadState())
+            return std::unexpected(*ec);
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::attachDb(std::unique_ptr<caudio::db::Database> db) {
+        if (!db || !db->handle())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
+        auto shared = std::shared_ptr<caudio::db::Database>(std::move(db));
+        return attachDatabase(std::move(shared));
+    }
+
+Engine::~Engine() {
+        shutdown();
+    }
+
+void Engine::shutdown() {
+        // stop monitor
+        monRun_.store(false, std::memory_order_release);
+        monCv_.notify_all();
+        if (monitorThread_.joinable()) {
+            monitorThread_.request_stop();
+            monCv_.notify_all();
+            monitorThread_.join();
+        }
+        // stop decode
+        decodeRun_.store(false, std::memory_order_release);
+        decodeCv_.notify_all();
+        if (decodeThread_.joinable()) {
+            decodeThread_.request_stop();
+            decodeCv_.notify_all();
+            decodeThread_.join();
+        }
+        // persist state
+        if (db_ && db_->handle()) {
+            state_.cursorPos = (int64_t)queue_.cursor;
+            (void)saveState();
+        }
+        if (output_) {
+            output_->stop();
+            output_.reset();
+        }
+        decoder_.reset();
+        reader_.reset();
+        ring_.reset();
+    }
+
+Engine::ExpectedVoid Engine::play(int64_t queueId) {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        if (queueId == 0)
+            queueId = 1;
+        auto s = playbackState_.load(std::memory_order_acquire);
+        if (s == PlaybackState::Paused) {
+            // resume, don't dequeue
+            playStart_ = std::chrono::steady_clock::now();
+            playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+            if (output_)
+                output_->start();
+            decodeCv_.notify_all();
+            monCv_.notify_all();
+            return {};
+        }
+        if (s == PlaybackState::Playing) {
+            // already playing, restart current track (seek 0), don't dequeue
+            // serialize with decodeLoop (decoder_->decode / ring_->write) via decodeMtx_
+            std::unique_lock<std::mutex> lk(decodeMtx_);
+            if (decoder_) {
+                auto r = decoder_->seek(0);
+                if (!r)
+                    return std::unexpected(r.error());
+            }
+            if (ring_)
+                ring_->reset();
+            pausePos_ = 0;
+            playStart_ = std::chrono::steady_clock::now();
+            if (output_)
+                output_->start();
+            lk.unlock();
+            decodeCv_.notify_all();
+            monCv_.notify_all();
+            return {};
+        }
+        // Stopped -> start new track via cursor (not dequeue)
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+        queue_.queue_id = queueId;
+        caudio::db::Track t;
+        auto r = queueNextLocked(t);
+        if (!r) {
+            unlockQueue();
+            return std::unexpected(r.error());
+        }
+        auto pr = doPlayTrack(t);
+        unlockQueue();
+        if (!pr)
+            return std::unexpected(pr.error());
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::pause() {
+        auto s = playbackState_.load(std::memory_order_acquire);
+        if (s != PlaybackState::Playing)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "not playing"));
+        // record pause position
+        pausePos_ = currentPositionLocked();
+        playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+        if (output_)
+            output_->stop();
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::resume() {
+        auto s = playbackState_.load(std::memory_order_acquire);
+        if (s != PlaybackState::Paused)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "not paused"));
+        playStart_ = std::chrono::steady_clock::now();
+        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+        if (output_)
+            output_->start();
+        decodeCv_.notify_all();
+        monCv_.notify_all();
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::stop() {
+        playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+        if (output_)
+            output_->stop();
+        if (ring_)
+            ring_->reset();
+        pausePos_ = 0;
+        hasCurrent_.store(false, std::memory_order_release);
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::seek(double seconds) {
+        if (!hasCurrent_.load(std::memory_order_acquire))
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no track"));
+        if (!std::isfinite(seconds) || seconds < 0)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad seconds"));
+
+        // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
+        std::unique_lock<std::mutex> lk(decodeMtx_);
+        playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+        // snapshot for restore on error (Task 1: seek hardening)
+        double savedPause = pausePos_;
+        auto savedStart = playStart_;
+
+        if (decoder_) {
+            auto res = decoder_->seek(seconds);
+            if (!res) {
+                pausePos_ = savedPause;
+                playStart_ = savedStart;
+                playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+                return std::unexpected(res.error());
+            }
+        }
+
+        // adjust position tracking
+        double dur = duration_;
+        if (seconds > dur)
+            seconds = dur;
+        pausePos_ = seconds;
+        playStart_ = std::chrono::steady_clock::now();
+        if (ring_)
+            ring_->reset();
+
+        // Resume decode thread
+        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+        decodeCv_.notify_all();
+        return {};
+    }
+
+float Engine::clampVolume(float v) noexcept {
+        if (!std::isfinite(v))
+            return 0.0f;
+        return std::clamp(v, 0.0f, 1.0f);
+    }
+
+Engine::ExpectedVoid Engine::setVolume(float g) {
+        g = clampVolume(g);
+        state_.volume = g;
+        volume_.store(g, std::memory_order_relaxed);
+        if (output_)
+            output_->setVolume(g);
+        if (hasDb()) {
+            state_.cursorPos = (int64_t)queue_.cursor;
+            (void)saveState();
+        }
+        return {};
+    }
+
+float Engine::volume() const noexcept {
+        return volume_.load(std::memory_order_relaxed);
+    }
+
+PlaybackState Engine::state() const noexcept {
+        return playbackState_.load(std::memory_order_acquire);
+    }
+
+double Engine::duration() const noexcept {
+        return duration_;
+    }
+
+double Engine::position() const noexcept {
+        return currentPositionLocked();
+    }
+
+int64_t Engine::currentTrackId() const noexcept {
+        if (hasCurrent_.load(std::memory_order_acquire))
+            return currentTrack_.id;
+        return state_.currentTrackId;
+    }
+
+bool Engine::shuffle() const noexcept {
+        return queue_.shuffle;
+    }
+
+RepeatMode Engine::repeat() const noexcept {
+        return queue_.repeat;
+    }
+
+std::string_view Engine::version() const noexcept {
+        return caudio::utils::kVersionFull;
+    }
+
+std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        return db_->getStats();
+    }
+
+std::expected<std::vector<HistoryEntry>, caudio::utils::Error> Engine::listHistory(int limit) {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        caudio::engine::History hist(db_);
+        return hist.listHistory(limit);
+    }
+
+std::expected<void, caudio::utils::Error> Engine::clearHistory() {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        caudio::engine::History hist(db_);
+        return hist.clearHistory();
+    }
+
+std::string Engine::lastError() const {
+        if (!lastErr_.empty())
+            return lastErr_;
+        return "";
+    }
+
+Engine::ExpectedVoid Engine::setShuffle(bool on) {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        auto r = setShuffleLocked(on);
+        unlockQueue();
+        if (!r)
+            return std::unexpected(r.error());
+        // push queue changed event
+        EngineEvent ev;
+        ev.type = EngineEventType::QueueChanged;
+        ev.queue_id = queue_.queue_id;
+        pushEvent(ev);
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
+        if (m != RepeatMode::Off && m != RepeatMode::Queue && m != RepeatMode::One)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        queue_.repeat = m;
+        state_.repeatMode = m;
+        state_.cursorPos = (int64_t)queue_.cursor;
+        std::optional<caudio::utils::Error> err;
+        if (auto e = saveState(); !e)
+            err = e.error();
+        unlockQueue();
+        if (err)
+            return std::unexpected(*err);
+        return {};
+    }
+
+int64_t Engine::activeQueueId() const noexcept {
+        std::lock_guard<std::mutex> lk(queueMutex_);
+        return queue_.queue_id ? queue_.queue_id : state_.activeQueueId ? state_.activeQueueId : 1;
+    }
+
+Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
+        if (qid == 0)
+            qid = 1;
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        // validate queue exists (holds queueMutex_ -> dbMutex_ shared)
+        {
+            auto q = db_->getQueue(qid);
+            if (!q) {
+                unlockQueue();
+                return std::unexpected(q.error());
+            }
+        }
+        if (queue_.queue_id == qid) {
+            // already active, ensure cursor consistent with DB state but not error
+            unlockQueue();
+            return {};
+        }
+        // switch active queue: reset cursor, clear shuffle perm, update state
+        queue_.queue_id = qid;
+        queue_.cursor = 0;
+        queue_.perm.clear();
+        state_.activeQueueId = qid;
+        state_.cursorPos = 0;
+        // keep shuffle flag as-is but perm cleared; next shuffle will regenerate for new queue
+        std::optional<caudio::utils::Error> err;
+        if (auto e = saveState(); !e)
+            err = e.error();
+        // also persist via saveState includes active_queue_id, cursor_pos, shuffle_perm cleared
+        unlockQueue();
+        if (err)
+            return std::unexpected(*err);
+        EngineEvent ev;
+        ev.type = EngineEventType::QueueChanged;
+        ev.queue_id = qid;
+        pushEvent(ev);
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::next() {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
+        // && hasCurrent => seek 0 and play - serialize with decodeLoop via decodeMtx_
+        if (!queue_.shuffle && queue_.repeat == RepeatMode::One &&
+            hasCurrent_.load(std::memory_order_acquire)) {
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                if (decoder_) {
+                    auto r = decoder_->seek(0);
+                    if (!r)
+                        return std::unexpected(r.error());
+                }
+                if (ring_)
+                    ring_->reset();
+            }
+            pausePos_ = 0;
+            playStart_ = std::chrono::steady_clock::now();
+            playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+            markedPlayed_.store(false, std::memory_order_release);
+            gaplessArmed_.store(false, std::memory_order_release);
+            startedMs_ = (int64_t)detail::nowMs();
+            EngineEvent ev;
+            ev.type = EngineEventType::TrackStarted;
+            ev.track_id = currentTrack_.id;
+            ev.queue_id = queue_.queue_id;
+            ev.duration = duration_;
+            pushEvent(ev);
+            decodeCv_.notify_all();
+            return {};
+        }
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        caudio::db::Track t;
+        auto r = queueNextLocked(t);
+        if (!r) {
+            unlockQueue();
+            return std::unexpected(r.error());
+        }
+        auto pr = doPlayTrack(t);
+        unlockQueue();
+        if (!pr)
+            return std::unexpected(pr.error());
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::prev() {
+        if (!hasDb())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+        if (!tryLockQueue())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        caudio::db::Track t;
+        auto r = queuePrevLocked(t);
+        if (!r) {
+            unlockQueue();
+            return std::unexpected(r.error());
+        }
+        auto pr = doPlayTrack(t);
+        unlockQueue();
+        if (!pr)
+            return std::unexpected(pr.error());
+        return {};
+    }
+
+Engine::ExpectedVoid Engine::setCallbacks(const EngineCallbacks& cbs) {
+        std::lock_guard<std::mutex> lk(cbMutex_);
+        callbacks_ = cbs;
+        cfg_.callbacks = cbs;
+        return {};
+    }
+
+std::expected<EngineEvent, caudio::utils::Error> Engine::pollEvent() {
+        auto r = eventQueue_.pop();
+        if (!r)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no event"));
+        return r.value();
+    }
+
+Engine::ExpectedVoid Engine::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
+        if (!n)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null n"));
+        *n = 0;
+        if (!buf && cap != 0)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null buf"));
+        size_t got = 0;
+        while (got < cap) {
+            auto r = eventQueue_.pop();
+            if (!r)
+                break;
+            buf[got++] = r.value();
+        }
+        *n = got;
+        return {};
+    }
+
+std::vector<EngineEvent> Engine::drainAll() {
+        std::vector<EngineEvent> out;
+        while (true) {
+            auto r = eventQueue_.pop();
+            if (!r)
+                break;
+            out.push_back(r.value());
+        }
+        return out;
+    }
+
+PlaybackState Engine::getState() const noexcept {
+        return state();
+    }
+
+double Engine::getPosition() const noexcept {
+        return position();
+    }
+
+Engine::Engine(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
+        cfg_.pollMs = cfg.pollMs ? cfg.pollMs : 10;
+        cfg_.gaplessMs = cfg.gaplessMs ? cfg.gaplessMs : 300;
+        cfg_.historyThresholdPct = cfg.historyThresholdPct ? cfg.historyThresholdPct : 60;
+        cfg_.historyThresholdSecs = cfg.historyThresholdSecs ? cfg.historyThresholdSecs : 90;
+        state_.volume = 1.0f;
+        volume_.store(1.0f, std::memory_order_relaxed);
+        state_.repeatMode = RepeatMode::Off;
+        queue_.repeat = RepeatMode::Off;
+        queue_.queue_id = 1;
+        playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+        hasCurrent_.store(false, std::memory_order_release);
+        markedPlayed_.store(false, std::memory_order_release);
+        gaplessArmed_.store(false, std::memory_order_release);
+        lastProgressMs_.store(0, std::memory_order_release);
+        // callbacks from config
+        callbacks_ = cfg.callbacks;
+    }
+
+std::optional<caudio::utils::Error> Engine::init() {
+        // start decode thread
+        decodeRun_.store(true, std::memory_order_release);
+        decodeThread_ = std::jthread([this](std::stop_token st) { decodeLoop(st); });
+        // start monitor thread if enabled
+        if (cfg_.enableMonitorThread) {
+            monRun_.store(true, std::memory_order_release);
+            monitorThread_ = std::jthread([this](std::stop_token st) { monitorLoop(st); });
+        }
+        return std::nullopt;
+    }
+
+bool Engine::hasDb() const noexcept {
+        return db_ && db_->handle();
+    }
+
+bool Engine::tryLockQueue() noexcept {
+        return queueMutex_.try_lock();
+    }
+
+void Engine::unlockQueue() noexcept {
+        queueMutex_.unlock();
+    }
+
+double Engine::currentPositionLocked() const noexcept {
+        if (!hasCurrent_.load(std::memory_order_acquire))
+            return 0.0;
+        auto st = playbackState_.load(std::memory_order_acquire);
+        if (st == PlaybackState::Paused)
+            return pausePos_;
+        if (st != PlaybackState::Playing)
+            return pausePos_;
+        auto now = std::chrono::steady_clock::now();
+        double elapsed = std::chrono::duration<double>(now - playStart_).count();
+        double pos = pausePos_ + elapsed;
+        if (pos > duration_)
+            pos = duration_;
+        if (pos < 0)
+            pos = 0;
+        return pos;
+    }
+
+sqlite3* Engine::dbHandle() const noexcept {
+        if (db_)
+            return db_->handle();
+        return nullptr;
+    }
+
+std::shared_mutex* Engine::dbMutex() const noexcept {
+        if (db_)
+            return &db_->mutex();
+        return nullptr;
+    }
+
+std::optional<caudio::utils::Error> Engine::loadState() {
+        auto* h = dbHandle();
+        auto* m = dbMutex();
+        if (!h || !m)
+            return caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db");
+        std::unique_lock<std::shared_mutex> lk(*m);
+        // Try new schema with active_queue_id; fallback to old schema for migration
+        const char* sqlNew = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
+                             "volume, shuffle_perm, active_queue_id FROM engine_state WHERE id=1";
+        const char* sqlOld = "SELECT shuffle_enabled, repeat_mode, cursor_pos, current_track_id, "
+                             "volume, shuffle_perm FROM engine_state WHERE id=1";
+        sqlite3_stmt* raw = nullptr;
+        int rc = sqlite3_prepare_v2(h, sqlNew, -1, &raw, nullptr);
+        bool hasActiveCol = true;
+        if (rc != SQLITE_OK) {
+            // fallback to old schema without active_queue_id
+            sqlite3_finalize(raw);
+            raw = nullptr;
+            rc = sqlite3_prepare_v2(h, sqlOld, -1, &raw, nullptr);
+            hasActiveCol = false;
+            if (rc != SQLITE_OK) {
+                return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed");
+            }
+        }
+        StmtGuard stmt(raw);
+        raw = stmt.get();
+        rc = sqlite3_step(raw);
+        if (rc == SQLITE_ROW) {
+            state_.shuffleEnabled = sqlite3_column_int(raw, 0);
+            state_.repeatMode = (RepeatMode)sqlite3_column_int(raw, 1);
+            state_.cursorPos = sqlite3_column_int64(raw, 2);
+            state_.currentTrackId = sqlite3_column_int64(raw, 3);
+            state_.volume = (float)sqlite3_column_double(raw, 4);
+            if (state_.volume < 0 || state_.volume > 1)
+                state_.volume = 1.0f;
+            volume_.store(state_.volume, std::memory_order_relaxed);
+            const void* blob = sqlite3_column_blob(raw, 5);
+            int blobBytes = sqlite3_column_bytes(raw, 5);
+            if (hasActiveCol) {
+                state_.activeQueueId = sqlite3_column_int64(raw, 6);
+                if (state_.activeQueueId <= 0)
+                    state_.activeQueueId = 1;
+            } else {
+                state_.activeQueueId = 1;
+            }
+            queue_.perm.clear();
+            queue_.perm.shrink_to_fit();
+            queue_.cursor = 0;
+            if (blob && blobBytes > 0 && state_.shuffleEnabled) {
+                size_t n = (size_t)blobBytes / sizeof(int64_t);
+                queue_.perm.resize(n);
+                std::memcpy(queue_.perm.data(), blob, n * sizeof(int64_t));
+            } else {
+                queue_.perm.clear();
+            }
+            queue_.shuffle = state_.shuffleEnabled ? true : false;
+            queue_.repeat = state_.repeatMode;
+            if (state_.cursorPos < 0)
+                queue_.cursor = 0;
+            else {
+                queue_.cursor = (size_t)state_.cursorPos;
+                if (!queue_.perm.empty() && queue_.cursor >= queue_.perm.size())
+                    queue_.cursor = 0;
+                // for non-shuffle, keep cursor as stored (persistent queue via cursor)
+                // clamp later via queueCount if needed; don't reset to 0
+            }
+            queue_.queue_id = state_.activeQueueId;
+            // validate queue exists; fallback to 1 if not
+            {
+                sqlite3_stmt* chk = nullptr;
+                if (sqlite3_prepare_v2(h, "SELECT id FROM queues WHERE id=?", -1, &chk, nullptr) ==
+                    SQLITE_OK) {
+                    sqlite3_bind_int64(chk, 1, queue_.queue_id);
+                    int step = sqlite3_step(chk);
+                    if (step != SQLITE_ROW) {
+                        queue_.queue_id = 1;
+                        state_.activeQueueId = 1;
+                    }
+                    sqlite3_finalize(chk);
+                }
+            }
+            return std::nullopt;
+        }
+        if (rc == SQLITE_DONE) {
+            state_.shuffleEnabled = 0;
+            state_.repeatMode = RepeatMode::Off;
+            state_.cursorPos = 0;
+            state_.currentTrackId = 0;
+            state_.volume = 1.0f;
+            state_.activeQueueId = 1;
+            volume_.store(1.0f, std::memory_order_relaxed);
+            queue_.perm.clear();
+            queue_.cursor = 0;
+            queue_.shuffle = false;
+            queue_.repeat = RepeatMode::Off;
+            queue_.queue_id = 1;
+            return std::nullopt;
+        }
+        return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "load failed");
+    }
+
+std::expected<void, caudio::utils::Error> Engine::saveState() {
+        return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
+            // Try with active_queue_id column; fallback to old schema if missing
+            const char* sqlNew =
+                "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
+                "cursor_pos=?, current_track_id=?, volume=?, active_queue_id=?, "
+                "updated=CURRENT_TIMESTAMP WHERE id=1";
+            const char* sqlOld =
+                "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
+                "cursor_pos=?, current_track_id=?, volume=?, updated=CURRENT_TIMESTAMP WHERE id=1";
+            sqlite3_stmt* raw = nullptr;
+            int rc = sqlite3_prepare_v2(db, sqlNew, -1, &raw, nullptr);
+            bool hasActiveCol = true;
+            if (rc != SQLITE_OK) {
+                sqlite3_finalize(raw);
+                raw = nullptr;
+                rc = sqlite3_prepare_v2(db, sqlOld, -1, &raw, nullptr);
+                hasActiveCol = false;
+                if (rc != SQLITE_OK)
+                    return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                                    "prepare failed"));
+            }
+            StmtGuard stmt(raw);
+            raw = stmt.get();
+            sqlite3_bind_int(raw, 1, state_.shuffleEnabled);
+            sqlite3_bind_int(raw, 2, (int)state_.repeatMode);
+            if (queue_.shuffle && !queue_.perm.empty()) {
+                if (queue_.perm.size() >
+                    (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
+                    return std::unexpected(caudio::utils::makeError(
+                        caudio::utils::StatusCode::NoMem, "perm too large"));
+                }
+                sqlite3_bind_blob(raw, 3, queue_.perm.data(),
+                                   (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
+            } else
+                sqlite3_bind_null(raw, 3);
+            sqlite3_bind_int64(raw, 4, state_.cursorPos);
+            sqlite3_bind_int64(raw, 5, state_.currentTrackId);
+            sqlite3_bind_double(raw, 6, (double)state_.volume);
+            if (hasActiveCol) {
+                sqlite3_bind_int64(raw, 7, state_.activeQueueId ? state_.activeQueueId : queue_.queue_id);
+            }
+            rc = sqlite3_step(raw);
+            if (rc != SQLITE_DONE)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
+            return {};
+        });
+    }
+
+std::expected<void, caudio::utils::Error> Engine::persistShuffleBlobLocked() {
+        return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
+            const char* sql = "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, "
+                              "shuffle_enabled=? WHERE id=1";
+            sqlite3_stmt* raw = nullptr;
+            int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
+            StmtGuard stmt(raw);
+            if (rc != SQLITE_OK)
+                return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                                "prepare failed"));
+            raw = stmt.get();
+            if (queue_.shuffle && !queue_.perm.empty()) {
+                if (queue_.perm.size() >
+                    (size_t)(std::numeric_limits<int>::max() / (int)sizeof(int64_t))) {
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::StatusCode::NoMem, "perm large"));
+                }
+                sqlite3_bind_blob(raw, 1, queue_.perm.data(),
+                                  (int)(queue_.perm.size() * sizeof(int64_t)), SQLITE_TRANSIENT);
+            } else
+                sqlite3_bind_null(raw, 1);
+            sqlite3_bind_int64(raw, 2, (int64_t)queue_.cursor);
+            sqlite3_bind_int(raw, 3, queue_.shuffle ? 1 : 0);
+            rc = sqlite3_step(raw);
+            if (rc != SQLITE_DONE)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
+            // also update state
+            state_.shuffleEnabled = queue_.shuffle ? 1 : 0;
+            state_.cursorPos = (int64_t)queue_.cursor;
+            return {};
+        });
+    }
+
+std::expected<void, caudio::utils::Error> Engine::persistCursorLocked() {
+        return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
+            const char* sql = "UPDATE engine_state SET cursor_pos=? WHERE id=1";
+            sqlite3_stmt* raw = nullptr;
+            if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK)
+                return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                                "prepare failed"));
+            StmtGuard stmt(raw);
+            raw = stmt.get();
+            sqlite3_bind_int64(raw, 1, (int64_t)queue_.cursor);
+            int rc = sqlite3_step(raw);
+            if (rc != SQLITE_DONE)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
+            state_.cursorPos = (int64_t)queue_.cursor;
+            return {};
+        });
+    }
+
+std::expected<caudio::db::Track, caudio::utils::Error> Engine::fetchTrackByPosLocked(int64_t qid, int64_t pos) {
+        if (qid == 0)
+            qid = 1;
+        auto* h = dbHandle();
+        auto* m = dbMutex();
+        if (!h || !m)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
+        int64_t trackId = 0;
+        {
+            std::shared_lock<std::shared_mutex> lk(*m);
+            const char* sql =
+                "SELECT track_id FROM queue WHERE queue_id=? ORDER BY position LIMIT 1 OFFSET ?";
+            sqlite3_stmt* raw = nullptr;
+            if (sqlite3_prepare_v2(h, sql, -1, &raw, nullptr) != SQLITE_OK)
+                return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                                "prepare failed"));
+            StmtGuard stmt(raw);
+            raw = stmt.get();
+            sqlite3_bind_int64(raw, 1, qid);
+            sqlite3_bind_int64(raw, 2, pos);
+            int rc = sqlite3_step(raw);
+            if (rc != SQLITE_ROW) {
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "not found"));
+            }
+            trackId = sqlite3_column_int64(raw, 0);
+        }
+        auto tr = db_->getTrack(trackId);
+        if (!tr)
+            return std::unexpected(tr.error());
+        return tr.value();
+    }
+
+std::expected<void, caudio::utils::Error> Engine::setShuffleLocked(bool on) {
+        // assert: queueMutex_ locked by caller
+        bool want = on;
+        if (queue_.shuffle == want && !queue_.perm.empty())
+            return {};
+        if (want) {
+            queue_.perm.clear();
+            queue_.cursor = 0;
+            size_t cnt = db_->queueCountLocked(queue_.queue_id);
+            if (cnt == 0) {
+                queue_.shuffle = true;
+                queue_.perm.clear();
+                queue_.cursor = 0;
+                auto r = persistShuffleBlobLocked();
+                if (!r)
+                    return r;
+                state_.shuffleEnabled = 1;
+                return {};
+            }
+            queue_.perm.resize(cnt);
+            for (size_t i = 0; i < cnt; ++i)
+                queue_.perm[i] = (int64_t)i;
+            {
+                std::mt19937 rng{std::random_device{}()};
+                detail::shufflePerm(queue_.perm, rng);
+            }
+            queue_.shuffle = true;
+            queue_.cursor = 0;
+            auto r = persistShuffleBlobLocked();
+            if (!r)
+                return r;
+            state_.shuffleEnabled = 1;
+            return {};
+        } else {
+            queue_.perm.clear();
+            queue_.cursor = 0;
+            queue_.shuffle = false;
+            auto r = persistShuffleBlobLocked();
+            if (!r)
+                return r;
+            state_.shuffleEnabled = 0;
+            return {};
+        }
+    }
+
+std::expected<void, caudio::utils::Error> Engine::queueNextLocked(caudio::db::Track& out) {
+        if (queue_.queue_id == 0)
+            queue_.queue_id = 1;
+        if (queue_.shuffle) {
+            if (queue_.perm.empty()) {
+                size_t cnt = db_->queueCountLocked(queue_.queue_id);
+                if (cnt == 0)
+                    return std::unexpected(caudio::utils::makeError(
+                        caudio::utils::StatusCode::NotFound, "empty queue"));
+                auto sr = setShuffleLocked(true);
+                if (!sr)
+                    return std::unexpected(sr.error());
+                if (queue_.perm.empty())
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no perm"));
+            }
+            if (queue_.cursor >= queue_.perm.size()) {
+                if (queue_.repeat == RepeatMode::One) {
+                    size_t idx = queue_.perm.size() - 1;
+                    if (queue_.cursor > 0 && queue_.cursor <= queue_.perm.size())
+                        idx = queue_.cursor - 1;
+                    int64_t pos = queue_.perm[idx];
+                    auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
+                    if (!tr)
+                        return std::unexpected(tr.error());
+                    out = tr.value();
+                    return {};
+                } else {
+                    // wrap/reshuffle for both Off and Queue (shuffle on => new perm)
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                    (void)persistCursorLocked();
+                }
+            }
+            int64_t pos = queue_.perm[queue_.cursor];
+            queue_.cursor++;
+            (void)persistCursorLocked();
+            auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
+            if (!tr)
+                return std::unexpected(tr.error());
+            out = tr.value();
+            return {};
+        }
+        size_t cnt = db_->queueCountLocked(queue_.queue_id);
+        if (cnt == 0)
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
+        if (queue_.cursor >= cnt) {
+            if (queue_.repeat == RepeatMode::One) {
+                size_t idx = cnt - 1;
+                if (queue_.cursor > 0 && queue_.cursor <= cnt)
+                    idx = queue_.cursor - 1;
+                auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)idx);
+                if (!tr)
+                    return std::unexpected(tr.error());
+                out = tr.value();
+                return {};
+            } else {
+                // wrap for both Off and Queue; reshuffle if shuffle on
+                if (queue_.shuffle) {
+                    auto sr = setShuffleLocked(true);
+                    if (!sr)
+                        return std::unexpected(sr.error());
+                    queue_.cursor = 0;
+                } else {
+                    queue_.cursor = 0;
+                }
+                (void)persistCursorLocked();
+            }
+        }
+        auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)queue_.cursor);
+        if (!tr)
+            return std::unexpected(tr.error());
+        queue_.cursor++;
+        (void)persistCursorLocked();
+        out = tr.value();
+        return {};
+    }
+
+std::expected<void, caudio::utils::Error> Engine::queuePrevLocked(caudio::db::Track& out) {
+        if (!queue_.shuffle) {
+            size_t cnt = db_->queueCountLocked(queue_.queue_id);
+            if (cnt == 0)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
+            if (queue_.cursor <= 1) {
+                if (queue_.cursor == 0)
+                    return std::unexpected(
+                        caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "at start"));
+                queue_.cursor = 0;
+            } else {
+                queue_.cursor -= 2;
+                if (queue_.cursor >= cnt)
+                    queue_.cursor = cnt - 1;
+            }
+            auto tr = fetchTrackByPosLocked(queue_.queue_id, (int64_t)queue_.cursor);
+            if (!tr)
+                return std::unexpected(tr.error());
+            queue_.cursor++;
+            (void)persistCursorLocked();
+            out = tr.value();
+            return {};
+        }
+        if (queue_.perm.empty())
+            return std::unexpected(
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no perm"));
+        if (queue_.cursor <= 1) {
+            if (queue_.cursor == 0)
+                return std::unexpected(
+                    caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "at start"));
+            queue_.cursor = 0;
+        } else {
+            queue_.cursor -= 2;
+            if (queue_.cursor >= queue_.perm.size())
+                queue_.cursor = queue_.perm.size() - 1;
+        }
+        int64_t pos = queue_.perm[queue_.cursor];
+        queue_.cursor++;
+        (void)persistCursorLocked();
+        auto tr = fetchTrackByPosLocked(queue_.queue_id, pos);
+        if (!tr)
+            return std::unexpected(tr.error());
+        out = tr.value();
+        return {};
+    }
+
+std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track& t) {
+        // try to open decoder path
+        std::string path = t.path;
+        // reset previous
+        decoder_.reset();
+        reader_.reset();
+        ring_.reset();
+        if (output_) {
+            output_->stop();
+            output_.reset();
+        }
+
+        // attempt to open reader & decoder if file exists; otherwise fallback to simulated
+        bool opened = false;
+        if (!path.empty()) {
+            auto rRes = caudio::player::FileReader::open(path);
+            if (rRes) {
+                reader_ = std::move(rRes.value());
+                auto dRes = caudio::player::DecoderRegistry::open(*reader_);
+                if (dRes) {
+                    decoder_ = std::move(dRes.value());
+                    opened = true;
+                    duration_ = decoder_->totalFrames() ? (double)decoder_->totalFrames() /
+                                                              (double)decoder_->sampleRate()
+                                                        : t.duration;
+                    if (duration_ <= 0)
+                        duration_ = t.duration > 0 ? t.duration : 1.0;
+                    // create ring and output
+                    uint32_t sr = decoder_->sampleRate();
+                    uint32_t ch = decoder_->channels();
+                    if (sr == 0)
+                        sr = 48000;
+                    if (ch == 0)
+                        ch = 2;
+                    ring_ = std::make_unique<caudio::utils::SpscRing<float>>(8192 * ch, ch);
+                    caudio::player::AudioOutput::Config cfg;
+                    cfg.sampleRate = sr;
+                    cfg.channels = ch;
+                    cfg.ring = ring_.get();
+                    cfg.volume = volume_.load(std::memory_order_relaxed);
+                    auto oRes = caudio::player::AudioOutput::create(cfg);
+                    if (oRes) {
+                        output_ = std::move(oRes.value());
+                        // preroll: decode some frames before start
+                        preroll();
+                        output_->start();
+                    } else {
+                        lastErr_ = oRes.error().message;
+                    }
+                } else {
+                    lastErr_ = dRes.error().message;
+                }
+            } else {
+                lastErr_ = rRes.error().message;
+            }
+        }
+        if (!opened) {
+            // fallback to track metadata duration
+            duration_ = t.duration > 0 ? t.duration : 1.0;
+            // no ring/output needed for simulated playback
+        }
+        currentTrack_ = t;
+        // update state
+        hasCurrent_.store(true, std::memory_order_release);
+        markedPlayed_.store(false, std::memory_order_release);
+        gaplessArmed_.store(false, std::memory_order_release);
+        startedMs_ = (int64_t)detail::nowMs();
+        state_.currentTrackId = t.id;
+        state_.cursorPos = (int64_t)queue_.cursor;
+        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+        playStart_ = std::chrono::steady_clock::now();
+        pausePos_ = 0;
+        if (hasDb())
+            (void)saveState();
+        EngineEvent ev;
+        ev.type = EngineEventType::TrackStarted;
+        ev.track_id = t.id;
+        ev.queue_id = queue_.queue_id;
+        ev.duration = duration_;
+        ev.position = 0;
+        pushEvent(ev);
+        decodeCv_.notify_all();
+        monCv_.notify_all();
+        return {};
+    }
+
+void Engine::preroll() {
+        if (!decoder_ || !ring_)
+            return;
+        uint32_t ch = decoder_->channels();
+        if (ch == 0)
+            ch = 2;
+        // preroll cap/2 frames like Player (ring capacity is in frames)
+        size_t need = ring_->availableWrite() / 2;
+        if (need == 0)
+            return;
+        size_t chunkFrames = 1024;
+        size_t maxChunk = 2048 / ch;
+        if (chunkFrames > maxChunk)
+            chunkFrames = maxChunk;
+        std::vector<float> tmp(chunkFrames * ch);
+        while (need > 0 && ring_->availableWrite() >= tmp.size() / ch) {
+            size_t frames = decoder_->decode(std::span<float>(tmp.data(), tmp.size()));
+            if (frames == 0)
+                break;
+            size_t samples = frames * ch;
+            size_t writtenFrames = ring_->write(std::span<float>(tmp.data(), samples));
+            if (writtenFrames < frames)
+                break;
+            if (need > frames)
+                need -= frames;
+            else
+                break;
+        }
+    }
+
+void Engine::pushEvent(const EngineEvent& ev) {
+        // MpscQueue cap 64 drop policy
+        auto r = eventQueue_.push(ev);
+        if (!r)
+            return; // drop if full
+        // dispatch callbacks outside queue lock
+        EngineCallbacks cbsCopy;
+        {
+            std::lock_guard<std::mutex> lk(cbMutex_);
+            cbsCopy = callbacks_;
+        }
+        if (ev.type == EngineEventType::TrackStarted && cbsCopy.on_track_started) {
+            cbsCopy.on_track_started(ev.track_id);
+        } else if (ev.type == EngineEventType::TrackEnded && cbsCopy.on_track_ended) {
+            double pct = 0;
+            if (ev.duration > 0) {
+                pct = (ev.position / ev.duration) * 100;
+                if (pct < 0)
+                    pct = 0;
+                if (pct > 100)
+                    pct = 100;
+            }
+            cbsCopy.on_track_ended(ev.track_id, pct);
+        } else if (ev.type == EngineEventType::QueueChanged && cbsCopy.on_queue_changed) {
+            cbsCopy.on_queue_changed(ev.queue_id);
+        } else if (ev.type == EngineEventType::Error && cbsCopy.on_error) {
+            cbsCopy.on_error(caudio::utils::StatusCode::Internal, ev.msg);
+        }
+    }
+
+void Engine::doHistoryMark() {
+        if (!hasDb())
+            return;
+        if (!hasCurrent_.load(std::memory_order_acquire))
+            return;
+        if (markedPlayed_.load(std::memory_order_acquire))
+            return;
+        double dur = duration_;
+        double pos = currentPositionLocked();
+        int pct = cfg_.historyThresholdPct ? cfg_.historyThresholdPct : 60;
+        int secs = cfg_.historyThresholdSecs ? cfg_.historyThresholdSecs : 90;
+        if (!detail::shouldMarkPlayedEx(dur, pos, false, pct, secs))
+            return;
+        bool expected = false;
+        bool desired = true;
+        // CAS exactly-once
+        bool exchanged = markedPlayed_.compare_exchange_strong(
+            expected, desired, std::memory_order_acq_rel, std::memory_order_acquire);
+        if (!exchanged)
+            return;
+        // transaction
+        auto* h = dbHandle();
+        auto* m = dbMutex();
+        if (!h || !m) {
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        std::unique_lock<std::shared_mutex> lk(*m);
+        char* err = nullptr;
+        int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        SqliteErrGuard errGuard{err};
+        if (rc != SQLITE_OK) {
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        // fetch track
+        bool ok = true;
+        int64_t playCount = 0;
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* selSql = "SELECT id, play_count FROM tracks WHERE id=?";
+            rc = sqlite3_prepare_v2(h, selSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
+                ok = false;
+            else {
+                raw = guard.get();
+                sqlite3_bind_int64(raw, 1, currentTrack_.id);
+                if (sqlite3_step(raw) == SQLITE_ROW)
+                    playCount = sqlite3_column_int64(raw, 1);
+                else
+                    ok = false;
+            }
+        }
+        if (!ok) {
+            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        // update track
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* updSql = "UPDATE tracks SET play_count=?, last_played=? WHERE id=?";
+            rc = sqlite3_prepare_v2(h, updSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
+                ok = false;
+            else {
+                raw = guard.get();
+                int64_t nowSec = (int64_t)(detail::nowMs() / 1000);
+                sqlite3_bind_int64(raw, 1, playCount + 1);
+                sqlite3_bind_int64(raw, 2, nowSec);
+                sqlite3_bind_int64(raw, 3, currentTrack_.id);
+                rc = sqlite3_step(raw);
+                if (rc != SQLITE_DONE)
+                    ok = false;
+            }
+        }
+        if (!ok) {
+            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        // history insert
+        {
+            sqlite3_stmt* raw = nullptr;
+            const char* insSql = "INSERT INTO history (track_id, started_at, completed_at, "
+                                 "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
+            rc = sqlite3_prepare_v2(h, insSql, -1, &raw, nullptr);
+            StmtGuard guard(raw);
+            if (rc != SQLITE_OK)
+                ok = false;
+            else {
+                raw = guard.get();
+                int64_t posMs = (int64_t)(pos * 1000.0);
+                double compPct = 0;
+                if (dur > 0) {
+                    compPct = (pos / dur) * 100;
+                    if (compPct > 100)
+                        compPct = 100;
+                }
+                sqlite3_bind_int64(raw, 1, currentTrack_.id);
+                sqlite3_bind_int64(raw, 2, startedMs_);
+                sqlite3_bind_int64(raw, 3, (int64_t)detail::nowMs());
+                sqlite3_bind_int64(raw, 4, posMs);
+                sqlite3_bind_double(raw, 5, compPct);
+                sqlite3_bind_int64(raw, 6, queue_.queue_id ? queue_.queue_id : 1);
+                rc = sqlite3_step(raw);
+                if (rc != SQLITE_DONE)
+                    ok = false;
+            }
+        }
+        if (!ok) {
+            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        char* commitErr = nullptr;
+        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+        SqliteErrGuard commitGuard{commitErr};
+        if (rc != SQLITE_OK) {
+            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+            markedPlayed_.store(false, std::memory_order_release);
+            return;
+        }
+        // success keep marked true
+    }
+
+void Engine::engineTick() {
+        doHistoryMark();
+        auto st = playbackState_.load(std::memory_order_acquire);
+        if (st == PlaybackState::Playing) {
+            uint64_t now = detail::nowMs();
+            uint64_t last = lastProgressMs_.load(std::memory_order_acquire);
+            if (now - last >= 500) {
+                lastProgressMs_.store(now, std::memory_order_release);
+                EngineEvent ev;
+                ev.type = EngineEventType::Progress;
+                ev.track_id = hasCurrent_.load(std::memory_order_acquire) ? currentTrack_.id
+                                                                          : state_.currentTrackId;
+                ev.queue_id = queue_.queue_id ? queue_.queue_id : 1;
+                ev.position = currentPositionLocked();
+                ev.duration = duration_;
+                pushEvent(ev);
+            }
+            if (duration_ > 0) {
+                double pos = currentPositionLocked();
+                double remaining = duration_ - pos;
+                double gapS = (double)cfg_.gaplessMs / 1000.0;
+                if (remaining <= gapS && remaining >= 0.0) {
+                    if (hasCurrent_.load(std::memory_order_acquire)) {
+                        // gaplessArmed 0→1 CAS, 300ms preroll
+                        bool expected = false;
+                        if (gaplessArmed_.compare_exchange_strong(expected, true,
+                                                                  std::memory_order_acq_rel,
+                                                                  std::memory_order_acquire)) {
+                            auto nr = next();
+                            if (!nr)
+                                gaplessArmed_.store(false, std::memory_order_release);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+void Engine::monitorLoop(std::stop_token st) {
+        int poll = cfg_.pollMs ? cfg_.pollMs : 10;
+        if (poll <= 0)
+            poll = 10;
+        std::unique_lock<std::mutex> lk(monMtx_);
+        while (!st.stop_requested() && monRun_.load(std::memory_order_acquire)) {
+            lk.unlock();
+            engineTick();
+            lk.lock();
+            monCv_.wait_for(lk, std::chrono::milliseconds(poll), [&st, this] {
+                return st.stop_requested() || !monRun_.load(std::memory_order_acquire);
+            });
+        }
+    }
+
+void Engine::decodeLoop(std::stop_token st) {
+        constexpr std::size_t kMaxChunkFrames = 1024;
+        while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
+            auto ps = playbackState_.load(std::memory_order_acquire);
+            if (ps != PlaybackState::Playing || !decoder_ || !ring_) {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                decodeCv_.wait_for(lk, std::chrono::milliseconds(10), [&st, this] {
+                    return st.stop_requested() ||
+                           playbackState_.load(std::memory_order_acquire) == PlaybackState::Playing;
+                });
+                continue;
+            }
+            size_t avail = ring_->availableWrite();
+            if (avail == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                continue;
+            }
+            uint32_t ch = decoder_->channels();
+            if (ch == 0)
+                ch = 2;
+            size_t maxFrames = avail / ch;
+            if (maxFrames > kMaxChunkFrames)
+                maxFrames = kMaxChunkFrames;
+            size_t maxChunkByCh = 2048 / ch;
+            if (maxFrames > maxChunkByCh)
+                maxFrames = maxChunkByCh;
+            if (maxFrames == 0)
+                maxFrames = 1;
+
+            std::vector<float> buf(maxFrames * ch);
+            size_t frames;
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                // Re-check state under lock to avoid race with seek()
+                if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+                    continue;
+                frames = decoder_->decode(std::span<float>(buf.data(), buf.size()));
+            }
+            if (frames == 0) {
+                // EOF reached - wait a bit, let monitor handle next (gapless) or stop
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+            size_t samples = frames * ch;
+            size_t writtenFrames;
+            {
+                std::unique_lock<std::mutex> lk(decodeMtx_);
+                // Re-check state under lock to avoid race with seek() ring reset
+                if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+                    continue;
+                writtenFrames = ring_->write(std::span<float>(buf.data(), samples));
+            }
+            if (writtenFrames < frames) {
+                // Ring full, will retry next iteration
+            }
+        }
+    }
+
+} // namespace caudio::engine

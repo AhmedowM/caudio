@@ -17,6 +17,7 @@ set(CAUDIO_DB_SOURCES
 )
 
 set(CAUDIO_DB_IMPL_SOURCES
+  src/db/db_core.cpp
   src/db/queue.cpp
   src/db/scan.cpp
   src/db/search.cpp
