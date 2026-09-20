@@ -68,7 +68,13 @@ set(CAUDIO_CLIENT_SOURCES
   cli/src/client/client_impl.cppm
   cli/src/client/output_formatter.cppm
 )
+set(CAUDIO_CLIENT_IMPL_SOURCES
+  cli/src/client/ipc_client.cpp
+  cli/src/client/client_impl.cpp
+  cli/src/client/output_formatter.cpp
+)
 caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} DEPS caudio::cli_shared caudio::utils caudio::service Threads::Threads INCLUDES vendor WITH_FFMPEG)
+target_sources(client PRIVATE ${CAUDIO_CLIENT_IMPL_SOURCES})
 target_include_directories(client PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(client)
 target_compile_options(client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
