@@ -1,5 +1,6 @@
 #pragma once
 #include <sqlite3.h>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -14,12 +15,12 @@
 #include <string>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
+#include "caudio/db/db_core.hpp"
 #include "caudio/db/db_types.hpp"
 #include "caudio/db/detail.hpp"
-#include "caudio/db/db_core.hpp"
 #include "caudio/db/statement.hpp"
 #include "caudio/db/transaction.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::db {
 

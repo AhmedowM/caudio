@@ -3,5 +3,4 @@ module;
 
 export module caudio.player:decoder_common;
 
-export namespace caudio::player::detail {
-}
+export namespace caudio::player::detail {}

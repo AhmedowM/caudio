@@ -8,4 +8,4 @@ using ::caudio::client::Client;
 using ::caudio::client::Config;
 using ::caudio::client::IpcClient;
 using ::caudio::client::OutputFormatter;
-}
+} // namespace caudio::client

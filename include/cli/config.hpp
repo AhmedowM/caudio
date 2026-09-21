@@ -16,8 +16,8 @@
 #include <string>
 #include <string_view>
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/json/json.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::cli {
 
@@ -30,10 +30,8 @@ namespace caudio::cli {
  * ~/.local/share/caudio
  */
 caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
-caudio::utils::Expected<std::filesystem::path>
-pidPathFor(const std::filesystem::path& dbPath);
-caudio::utils::Expected<std::filesystem::path>
-lockPathFor(const std::filesystem::path& dbPath);
+caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath);
+caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath);
 
 /**
  * @brief User-facing configuration loaded from config.json.
@@ -134,7 +132,7 @@ struct RawConfigValue {
  * @return Value string (JSON string, "null", or JSON dump) on success, Error on failure.
  */
 caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
-                                                          std::string_view key);
+                                                  std::string_view key);
 
 /**
  * @brief Set a raw config value in JSON file.
@@ -145,8 +143,8 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
  * @param value Value to write (JSON-parsed if valid JSON).
  * @return void on success, Error on failure.
  */
-caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
-                                                   std::string_view key, std::string_view value);
+caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key,
+                                           std::string_view value);
 
 /**
  * @brief List all config key-value pairs from JSON file.
@@ -154,8 +152,7 @@ caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
  * @param p Config file path.
  * @return Vector of RawConfigValue on success, Error on failure.
  */
-caudio::utils::Expected<std::vector<RawConfigValue>>
-configListRaw(const std::filesystem::path& p);
+caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p);
 
 /**
  * @brief Delete a config key from JSON file.
@@ -163,8 +160,7 @@ configListRaw(const std::filesystem::path& p);
  * @param key Key to delete.
  * @return void on success, Error on failure (not found, corrupt, IO).
  */
-caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
-                                                       std::string_view key);
+caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p, std::string_view key);
 
 /**
  * @brief Reset entire config (delete config file).

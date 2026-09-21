@@ -1,6 +1,7 @@
 /**
  * @file service_impl.hpp
- * @brief Service implementation: owns Engine, Database, Logger, IPC server, and dispatches commands.
+ * @brief Service implementation: owns Engine, Database, Logger, IPC server, and dispatches
+ * commands.
  * @ingroup caudio_service
  */
 
@@ -13,11 +14,6 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-
-#include "cli/shared/command.hpp"
-#include "cli/shared/result.hpp"
-#include "cli/shared/protocol.hpp"
-#include "cli/config.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -38,14 +34,18 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/database.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/json/json.hpp"
+#include "caudio/utils/utils.hpp"
+#include "cli/config.hpp"
 #include "cli/service/ipc_channel.hpp"
 #include "cli/service/ipc_server.hpp"
-#include "cli/service/shm_status.hpp"
 #include "cli/service/service_detail.hpp"
+#include "cli/service/shm_status.hpp"
+#include "cli/shared/command.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/shared/result.hpp"
 
 namespace caudio::service {
 
@@ -76,8 +76,9 @@ namespace caudio::service {
  * on its own thread and calls dispatch() serially. External callers should not invoke
  * Service methods concurrently with server->run().
  *
- * Lifetime: Created via create(), runs via run(stop_token), cleaned up via shutdown() in destructor.
- * Uses RAII for all resources (DB, Engine, IPC server, PID file, lock file, shared memory).
+ * Lifetime: Created via create(), runs via run(stop_token), cleaned up via shutdown() in
+ * destructor. Uses RAII for all resources (DB, Engine, IPC server, PID file, lock file, shared
+ * memory).
  */
 class Service final {
   public:

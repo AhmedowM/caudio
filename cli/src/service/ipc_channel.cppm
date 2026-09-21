@@ -4,8 +4,8 @@ module;
 export module caudio.service:ipc_channel;
 
 export namespace caudio::service {
-  using ::caudio::service::IpcChannel;
-  using ::caudio::service::socketPathFor;
-  using ::caudio::service::frameMessage;
-  using ::caudio::service::deframeMessage;
-}
+using ::caudio::service::deframeMessage;
+using ::caudio::service::frameMessage;
+using ::caudio::service::IpcChannel;
+using ::caudio::service::socketPathFor;
+} // namespace caudio::service

@@ -1,5 +1,6 @@
 #pragma once
 #include <sqlite3.h>
+
 #include <cstring>
 #include <expected>
 #include <functional>
@@ -14,14 +15,14 @@
 #include <unordered_map>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/db/db_types.hpp"
-#include "caudio/db/schema.hpp"
+#include "caudio/db/detail.hpp"
 #include "caudio/db/queue.hpp"
-#include "caudio/db/write_thread.hpp"
+#include "caudio/db/schema.hpp"
 #include "caudio/db/statement.hpp"
 #include "caudio/db/transaction.hpp"
-#include "caudio/db/detail.hpp"
+#include "caudio/db/write_thread.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::db {
 
@@ -30,7 +31,8 @@ namespace caudio::db {
  * @ingroup caudio_db
  */
 struct DbOpts {
-    std::size_t writeBatchSize = 256; ///< Queue capacity / batch size for WriterThread (default 256).
+    std::size_t writeBatchSize =
+        256; ///< Queue capacity / batch size for WriterThread (default 256).
 };
 
 /**
@@ -57,7 +59,8 @@ class Database final {
      * @ingroup caudio_db
      * @param opts Options; writeBatchSize forwarded to WriterThread.
      */
-    explicit Database(const DbOpts& opts) : writer_(opts.writeBatchSize), db_(nullptr, &sqlite3_close) {}
+    explicit Database(const DbOpts& opts)
+        : writer_(opts.writeBatchSize), db_(nullptr, &sqlite3_close) {}
     /**
      * @brief Closes the writer, clears the statement cache and resets the handle.
      * @ingroup caudio_db
@@ -451,8 +454,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<Track, caudio::utils::Error>
-    findByFingerprint(const std::array<uint8_t, 32>& fp);
+    std::expected<Track, caudio::utils::Error> findByFingerprint(const std::array<uint8_t, 32>& fp);
     /**
      * @brief Finds a track by path.
      * @ingroup caudio_db
@@ -544,9 +546,8 @@ class Database final {
     std::expected<void, caudio::utils::Error> renamePlaylist(int64_t id, std::string_view newName);
     std::expected<int64_t, caudio::utils::Error>
     createPlaylistFromTracks(std::string_view name, std::span<const int64_t> trackIds);
-    std::expected<int64_t, caudio::utils::Error> createPlaylistLocked(std::string_view name,
-                                                                      int type = 0,
-                                                                      std::string_view smart_query = {});
+    std::expected<int64_t, caudio::utils::Error>
+    createPlaylistLocked(std::string_view name, int type = 0, std::string_view smart_query = {});
     std::expected<void, caudio::utils::Error> playlistAddTrackLocked(int64_t pid, int64_t tid,
                                                                      int64_t pos = -1);
     /**
@@ -756,7 +757,8 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock + cacheMutex_.
      */
-    std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error> libraryStatsDetailed();
+    std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error>
+    libraryStatsDetailed();
 
     // insert overload for legacy database.cppm signature
     std::expected<void, caudio::utils::Error> insertTrackLegacy(int64_t libraryId,

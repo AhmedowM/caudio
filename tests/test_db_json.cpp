@@ -127,9 +127,3 @@ TEST_CASE("trackFromJson invalid fingerprint falls back", "[db_json]") {
             allZero = false;
     REQUIRE(!allZero);
 }
-
-
-
-
-
-

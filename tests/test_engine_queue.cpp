@@ -92,7 +92,8 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 2);
         sqlite3_finalize(stc);
@@ -110,7 +111,8 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 2);
         sqlite3_finalize(stc);
@@ -149,7 +151,8 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 2);
         sqlite3_finalize(stc);
@@ -161,7 +164,8 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 2);
         sqlite3_finalize(stc);
@@ -272,8 +276,8 @@ TEST_CASE("engine queue invalid repeat returns InvalidArg", "[engine_queue]") {
 }
 
 TEST_CASE("shufflePerm deterministic with mt19937 seed 42", "[engine_queue][shuffle]") {
-    std::vector<int64_t> a{0,1,2,3,4,5,6,7,8,9};
-    std::vector<int64_t> b{0,1,2,3,4,5,6,7,8,9};
+    std::vector<int64_t> a{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<int64_t> b{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     std::mt19937 rng1{42};
     std::mt19937 rng2{42};
     caudio::engine::detail::shufflePerm(a, rng1);
@@ -281,10 +285,11 @@ TEST_CASE("shufflePerm deterministic with mt19937 seed 42", "[engine_queue][shuf
     REQUIRE(a == b);
     // ensure it's a permutation
     std::set<int64_t> s(a.begin(), a.end());
-    REQUIRE(s.size()==10);
-    for (int i=0;i<10;++i) REQUIRE(s.count(i)==1);
+    REQUIRE(s.size() == 10);
+    for (int i = 0; i < 10; ++i)
+        REQUIRE(s.count(i) == 1);
     // different seed should give different perm (with high probability)
-    std::vector<int64_t> c{0,1,2,3,4,5,6,7,8,9};
+    std::vector<int64_t> c{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     std::mt19937 rng3{43};
     caudio::engine::detail::shufflePerm(c, rng3);
     REQUIRE(c != a);
@@ -295,16 +300,18 @@ TEST_CASE("shufflePerm deterministic with mt19937 seed 42", "[engine_queue][shuf
     REQUIRE(empty.empty());
     std::vector<int64_t> one{42};
     caudio::engine::detail::shufflePerm(one, rng4);
-    REQUIRE(one.size()==1);
-    REQUIRE(one[0]==42);
+    REQUIRE(one.size() == 1);
+    REQUIRE(one[0] == 42);
 }
 
-TEST_CASE("shufflePerm production overload non-deterministic but valid perm", "[engine_queue][shuffle]") {
-    std::vector<int64_t> v{0,1,2,3,4};
+TEST_CASE("shufflePerm production overload non-deterministic but valid perm",
+          "[engine_queue][shuffle]") {
+    std::vector<int64_t> v{0, 1, 2, 3, 4};
     caudio::engine::detail::shufflePerm(v); // calls random_device overload
     std::set<int64_t> s(v.begin(), v.end());
-    REQUIRE(s.size()==5);
-    for (int i=0;i<5;++i) REQUIRE(s.count(i)==1);
+    REQUIRE(s.size() == 5);
+    for (int i = 0; i < 5; ++i)
+        REQUIRE(s.count(i) == 1);
 }
 
 TEST_CASE("engine play resumes when paused", "[engine_queue]") {
@@ -317,7 +324,8 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
         Track t;
         t.path = "resume" + std::to_string(i) + ".wav";
         t.duration = 10.0;
-        for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x60 + i * 32 + b);
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0x60 + i * 32 + b);
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
@@ -353,7 +361,8 @@ TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
         Track t;
         t.path = "prev" + std::to_string(i) + ".wav";
         t.duration = 1.0;
-        for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x70 + i * 32 + b);
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0x70 + i * 32 + b);
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
@@ -387,10 +396,12 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
             Track t;
             t.path = "persist_cursor" + std::to_string(i) + ".wav";
             t.duration = 1.0;
-            for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(0x80 + i * 32 + b);
+            for (int b = 0; b < 32; ++b)
+                t.fingerprint[b] = (uint8_t)(0x80 + i * 32 + b);
             auto r = db->insertTrack(t);
             REQUIRE(r.has_value());
-            if (i==0) id0 = *r;
+            if (i == 0)
+                id0 = *r;
             REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
         }
         EngineConfig cfg;
@@ -405,7 +416,8 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 4);
         sqlite3_finalize(stc);
@@ -417,12 +429,14 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         sqlite3* ch = nullptr;
         REQUIRE(sqlite3_open_v2(dbPath.c_str(), &ch, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
         sqlite3_stmt* stc = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT COUNT(*) FROM queue WHERE queue_id=1", -1, &stc,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(stc) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int(stc, 0) == 4);
         sqlite3_finalize(stc);
         sqlite3_stmt* st2 = nullptr;
-        REQUIRE(sqlite3_prepare_v2(ch, "SELECT cursor_pos FROM engine_state WHERE id=1", -1, &st2, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_prepare_v2(ch, "SELECT cursor_pos FROM engine_state WHERE id=1", -1, &st2,
+                                   nullptr) == SQLITE_OK);
         REQUIRE(sqlite3_step(st2) == SQLITE_ROW);
         REQUIRE(sqlite3_column_int64(st2, 0) == 2);
         sqlite3_finalize(st2);
@@ -436,9 +450,3 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
     eng2.reset();
     safeRemoveDb(dbPath);
 }
-
-
-
-
-
-

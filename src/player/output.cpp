@@ -16,7 +16,8 @@ DeviceList enumerateDevices() {
     ma_device_info* pCaptureInfos = nullptr;
     ma_uint32 captureCount = 0;
 
-    res = ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos, &captureCount);
+    res = ma_context_get_devices(&context, &pPlaybackInfos, &playbackCount, &pCaptureInfos,
+                                 &captureCount);
     if (res == MA_SUCCESS && pPlaybackInfos && playbackCount > 0) {
         list.devices.reserve(playbackCount);
         for (ma_uint32 i = 0; i < playbackCount; ++i) {
@@ -41,8 +42,8 @@ AudioOutput::~AudioOutput() {
 AudioOutput::Expected AudioOutput::create(const Config& cfg) {
     auto out = std::make_unique<AudioOutput>();
     if (!out->init(cfg)) {
-        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
-                                                    std::string_view("miniaudio device init failed")});
+        return std::unexpected(caudio::utils::Error{
+            caudio::utils::StatusCode::Device, std::string_view("miniaudio device init failed")});
     }
     return out;
 }

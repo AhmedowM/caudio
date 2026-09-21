@@ -1,9 +1,10 @@
-#include <catch2/catch_test_macros.hpp>
+#include <sqlite3.h>
+
 #include <array>
+#include <catch2/catch_test_macros.hpp>
+#include <expected>
 #include <filesystem>
 #include <string>
-#include <sqlite3.h>
-#include <expected>
 #include <string_view>
 #include <thread>
 
@@ -19,7 +20,8 @@ static Track makeTrack(int idx, const std::string& pathOverride = "") {
     t.title = "Title" + std::to_string(idx);
     t.artist = "Artist" + std::to_string(idx);
     t.album = "Album" + std::to_string(idx);
-    for (int b = 0; b < 32; ++b) t.fingerprint[b] = (uint8_t)(idx * 37 + b * 7);
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(idx * 37 + b * 7);
     t.duration = 1.0 + idx;
     t.library_id = 1;
     return t;
@@ -41,7 +43,8 @@ TEST_CASE("insertTrack duplicate AlreadyExists", "[db]") {
     REQUIRE(r2.error().code == StatusCode::AlreadyExists);
     // same path with different fingerprint should succeed (path not unique)
     Track t3 = makeTrack(99, t.path);
-    for (int b=0;b<32;++b) t3.fingerprint[b] = (uint8_t)(0xFF - b);
+    for (int b = 0; b < 32; ++b)
+        t3.fingerprint[b] = (uint8_t)(0xFF - b);
     auto r3 = db->insertTrack(t3);
     // this should succeed because fingerprint differs and path allows duplicates
     REQUIRE(r3.has_value());
@@ -100,8 +103,8 @@ TEST_CASE("listTracks pagination limit/offset", "[db]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    for (int i=0;i<5;++i) {
-        Track t = makeTrack(10+i);
+    for (int i = 0; i < 5; ++i) {
+        Track t = makeTrack(10 + i);
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
     }
@@ -159,7 +162,7 @@ TEST_CASE("findByFingerprint and findByPath", "[db]") {
     REQUIRE(byFp.has_value());
     REQUIRE(byFp->id == *ins);
     // findByFingerprint missing
-    std::array<uint8_t,32> wrong{};
+    std::array<uint8_t, 32> wrong{};
     wrong.fill(0xFF);
     auto byFpMiss = db->findByFingerprint(wrong);
     REQUIRE(!byFpMiss.has_value());
@@ -245,9 +248,3 @@ TEST_CASE("listTracks after schema init", "[db]") {
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 }
-
-
-
-
-
-

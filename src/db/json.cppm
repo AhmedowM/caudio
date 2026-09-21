@@ -4,11 +4,11 @@ module;
 export module caudio.db:json;
 
 export namespace caudio::db {
-  using ::caudio::db::ordered_json;
-  using ::caudio::db::fingerprintToHex;
-  using ::caudio::db::hexToFingerprint;
-  using ::caudio::db::trackToJson;
-  using ::caudio::db::trackFromJson;
-  using ::caudio::db::exportJson;
-  using ::caudio::db::importJson;
-}
+using ::caudio::db::exportJson;
+using ::caudio::db::fingerprintToHex;
+using ::caudio::db::hexToFingerprint;
+using ::caudio::db::importJson;
+using ::caudio::db::ordered_json;
+using ::caudio::db::trackFromJson;
+using ::caudio::db::trackToJson;
+} // namespace caudio::db

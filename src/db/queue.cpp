@@ -1,13 +1,14 @@
 #include "caudio/db/queue.hpp"
 
+#include <sqlite3.h>
+
 #include <caudio/db/statement.hpp>
 #include <caudio/utils/utils.hpp>
-#include <sqlite3.h>
 
 namespace caudio::db {
 
-std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_t qid,
-                                                             int64_t tid, int64_t pos) {
+std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_t qid, int64_t tid,
+                                                             int64_t pos) {
     if (tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (qid == 0)
@@ -18,7 +19,8 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
     if (pos < 0) {
         SqliteStatement ms;
         if (auto e =
-                ms.prepare(db, "SELECT COALESCE(MAX(position), -1)+1 FROM queue WHERE queue_id=?"); e) {
+                ms.prepare(db, "SELECT COALESCE(MAX(position), -1)+1 FROM queue WHERE queue_id=?");
+            e) {
             ms.bindInt(1, qid);
             if (ms.step())
                 pos = ms.columnInt(0);
@@ -30,7 +32,8 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
     } else {
         SqliteStatement ss;
         if (auto e = ss.prepare(
-                db, "UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?"); e) {
+                db, "UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?");
+            e) {
             ss.bindInt(1, qid);
             ss.bindInt(2, pos);
             (void)ss.stepDone();
@@ -84,7 +87,8 @@ std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, i
     {
         SqliteStatement sh;
         if (auto se = sh.prepare(
-                db, "UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?"); se) {
+                db, "UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?");
+            se) {
             sh.bindInt(1, qid);
             sh.bindInt(2, it.position);
             (void)sh.stepDone();
@@ -118,8 +122,7 @@ std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int6
     return it;
 }
 
-std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid,
-                                                            int64_t pos) {
+std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -140,7 +143,8 @@ std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t
     {
         SqliteStatement sh;
         if (auto se = sh.prepare(
-                db, "UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?"); se) {
+                db, "UPDATE queue SET position=position-1 WHERE queue_id=? AND position>?");
+            se) {
             sh.bindInt(1, qid);
             sh.bindInt(2, pos);
             (void)sh.stepDone();
@@ -251,8 +255,8 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
     return out;
 }
 
-std::expected<int64_t, caudio::utils::Error>
-createQueueLocked(sqlite3* db, std::string_view name, int64_t library_id) {
+std::expected<int64_t, caudio::utils::Error> createQueueLocked(sqlite3* db, std::string_view name,
+                                                               int64_t library_id) {
     if (name.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db)
@@ -302,7 +306,7 @@ std::expected<void, caudio::utils::Error> deleteQueueLocked(sqlite3* db, int64_t
 }
 
 std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int64_t qid,
-                                                                int repeat_mode) {
+                                                               int repeat_mode) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -323,8 +327,8 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
     return {};
 }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error>
-getQueueItemsLocked(sqlite3* db, int64_t qid) {
+std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
+                                                                                int64_t qid) {
     return queueListLocked(db, qid);
 }
 

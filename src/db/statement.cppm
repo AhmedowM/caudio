@@ -4,5 +4,5 @@ module;
 export module caudio.db:SqliteStatement;
 
 export namespace caudio::db {
-  using ::caudio::db::SqliteStatement;
+using ::caudio::db::SqliteStatement;
 }

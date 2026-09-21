@@ -142,9 +142,12 @@ struct StatusReq final {};
  *
  * @json_example {"type": "VolumeSet", "level": 50.0, "mute": false, "deltaPct": 10}
  *
- * @param level Absolute volume level as a percentage (0-100). If omitted, current level is preserved unless modified by deltaPct.
- * @param mute Mute state. If true, volume is set to 0. If false and volume was 0, restores to 50% (or level if provided).
- * @param deltaPct Relative volume change in percentage points (-100 to +100). Applied on top of current or specified level.
+ * @param level Absolute volume level as a percentage (0-100). If omitted, current level is
+ * preserved unless modified by deltaPct.
+ * @param mute Mute state. If true, volume is set to 0. If false and volume was 0, restores to 50%
+ * (or level if provided).
+ * @param deltaPct Relative volume change in percentage points (-100 to +100). Applied on top of
+ * current or specified level.
  */
 struct VolumeSet final {
     /**
@@ -290,7 +293,8 @@ struct QueueClear final {};
  *
  * @json_example {"type": "QueueShuffle", "on": true}
  *
- * @param on If set, explicitly enable (true) or disable (false). If omitted, toggles the current state.
+ * @param on If set, explicitly enable (true) or disable (false). If omitted, toggles the current
+ * state.
  * @return Status object with updated shuffle state.
  */
 struct QueueShuffle final {
@@ -494,8 +498,10 @@ struct PlaylistImport final {
  *
  * @json_example {"type": "LibraryScan", "path": "/music", "mode": "sampled"}
  *
- * @param path Root directory to scan. If omitted, uses the music directory adjacent to the database.
- * @param mode Scan mode: "sampled" (fast, first/last 64KB) or "full" (entire file). Defaults to "sampled".
+ * @param path Root directory to scan. If omitted, uses the music directory adjacent to the
+ * database.
+ * @param mode Scan mode: "sampled" (fast, first/last 64KB) or "full" (entire file). Defaults to
+ * "sampled".
  * @return Empty (success with no data).
  */
 struct LibraryScan final {
@@ -599,7 +605,8 @@ struct LibraryRemove final {
  * @brief List library tracks with optional filtering and pagination.
  * @ingroup caudio_cli
  *
- * @json_example {"type": "LibraryList", "query": "rock", "limit": 20, "offset": 0, "artist": "Beatles", "album": "Abbey Road", "genre": "Rock"}
+ * @json_example {"type": "LibraryList", "query": "rock", "limit": 20, "offset": 0, "artist":
+ * "Beatles", "album": "Abbey Road", "genre": "Rock"}
  *
  * @param query Optional search query.
  * @param limit Maximum results to return.
@@ -648,7 +655,8 @@ struct LibraryList final {
  * @json_example {"type": "TagEdit", "id": 123, "field": "artist", "value": "New Artist"}
  *
  * @param id Track ID.
- * @param field Tag field name (e.g., "title", "artist", "album", "genre", "year", "track_number", "disc_number", "album_artist").
+ * @param field Tag field name (e.g., "title", "artist", "album", "genre", "year", "track_number",
+ * "disc_number", "album_artist").
  * @param value New value for the tag.
  * @return Empty (success with no data).
  */
@@ -930,9 +938,10 @@ using Command =
                  QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
                  QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
-                 LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd, LibraryRemove, LibraryList, TagEdit,
-                 TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport, ConfigImport, ConfigReset,
-                 HistoryList, HistoryClear, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
+                 LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd,
+                 LibraryRemove, LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList,
+                 ConfigExport, ConfigImport, ConfigReset, HistoryList, HistoryClear, Shutdown,
+                 Preview, DeviceList, DeviceSet, DeviceTest, Info>;
 
 // helper concepts
 /**
@@ -953,11 +962,12 @@ concept CommandAlternative = requires {
         std::is_same<T, QueueRepeat>, std::is_same<T, PlaylistList>,
         std::is_same<T, PlaylistTracks>, std::is_same<T, PlaylistLoad>,
         std::is_same<T, PlaylistSave>, std::is_same<T, PlaylistDelete>,
-        std::is_same<T, PlaylistRename>, std::is_same<T, PlaylistExport>, std::is_same<T, PlaylistImport>,
-        std::is_same<T, LibraryScan>, std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
-        std::is_same<T, LibraryStatsDetailed>, std::is_same<T, LibraryAdd>, std::is_same<T, LibraryRemove>,
-        std::is_same<T, LibraryList>, std::is_same<T, TagEdit>, std::is_same<T, TagGet>,
-        std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
+        std::is_same<T, PlaylistRename>, std::is_same<T, PlaylistExport>,
+        std::is_same<T, PlaylistImport>, std::is_same<T, LibraryScan>,
+        std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
+        std::is_same<T, LibraryStatsDetailed>, std::is_same<T, LibraryAdd>,
+        std::is_same<T, LibraryRemove>, std::is_same<T, LibraryList>, std::is_same<T, TagEdit>,
+        std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
         std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
         std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
         std::is_same<T, Shutdown>, std::is_same<T, Preview>, std::is_same<T, DeviceList>,

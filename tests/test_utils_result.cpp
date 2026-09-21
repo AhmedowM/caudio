@@ -87,9 +87,3 @@ TEST_CASE("StatusCode enum values sequential 0..12", "[utils][StatusCode]") {
 TEST_CASE("StatusCode toString noexcept", "[utils][StatusCode]") {
     REQUIRE(result_noexcept_check());
 }
-
-
-
-
-
-

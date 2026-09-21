@@ -97,7 +97,7 @@ enum class PlaybackState : int { Stopped = 0, Ready = 1, Playing = 2, Paused = 3
  * @see Engine::pollEvent
  */
 enum class EngineEventType : int {
-    None = 0,        ///< No event.
+    None = 0,         ///< No event.
     TrackStarted = 1, ///< New track started (pushEvent from doPlayTrack / next).
     TrackEnded = 2,   ///< Reserved (emitted via callbacks with pct).
     QueueChanged = 3, ///< Queue/shuffle switched (setShuffle/switchQueue).
@@ -114,11 +114,11 @@ enum class EngineEventType : int {
  */
 struct EngineEvent {
     EngineEventType type{EngineEventType::None}; ///< Event kind.
-    int64_t track_id{0};  ///< Affected track id (if any).
-    int64_t queue_id{1};  ///< Active queue id at emission.
-    double position{0.0}; ///< Position in seconds (Progress/TrackEnded).
-    double duration{0.0}; ///< Duration in seconds.
-    std::string msg{};    ///< Error text for Error events.
+    int64_t track_id{0};                         ///< Affected track id (if any).
+    int64_t queue_id{1};                         ///< Active queue id at emission.
+    double position{0.0};                        ///< Position in seconds (Progress/TrackEnded).
+    double duration{0.0};                        ///< Duration in seconds.
+    std::string msg{};                           ///< Error text for Error events.
 };
 
 /**
@@ -131,9 +131,11 @@ struct EngineEvent {
  */
 struct EngineCallbacks {
     std::function<void(int64_t track_id)> on_track_started{}; ///< Fired on TrackStarted.
-    std::function<void(int64_t track_id, double pct)> on_track_ended{}; ///< Fired on TrackEnded with completion pct.
+    std::function<void(int64_t track_id, double pct)>
+        on_track_ended{}; ///< Fired on TrackEnded with completion pct.
     std::function<void(int64_t queue_id)> on_queue_changed{}; ///< Fired on QueueChanged.
-    std::function<void(caudio::utils::StatusCode err, std::string_view msg)> on_error{}; ///< Fired on Error.
+    std::function<void(caudio::utils::StatusCode err, std::string_view msg)>
+        on_error{};      ///< Fired on Error.
     void* user{nullptr}; // unused — reserved
 };
 
@@ -166,11 +168,11 @@ struct EngineConfig {
  * or hold the mutex.
  */
 struct QueueState {
-    bool shuffle{false};              ///< Whether shuffle is enabled.
+    bool shuffle{false};                ///< Whether shuffle is enabled.
     RepeatMode repeat{RepeatMode::Off}; ///< Repeat mode.
-    std::vector<int64_t> perm{};      ///< Shuffle permutation (positions, not track_ids).
-    size_t cursor{0};                 ///< Next position index in perm or linear queue.
-    int64_t queue_id{1};              ///< Active queue id.
+    std::vector<int64_t> perm{};        ///< Shuffle permutation (positions, not track_ids).
+    size_t cursor{0};                   ///< Next position index in perm or linear queue.
+    int64_t queue_id{1};                ///< Active queue id.
 };
 
 /**
@@ -185,12 +187,12 @@ struct QueueState {
  * @see Engine::saveState
  */
 struct EngineState {
-    int shuffleEnabled{0};               ///< Persisted shuffle flag (0/1).
+    int shuffleEnabled{0};                  ///< Persisted shuffle flag (0/1).
     RepeatMode repeatMode{RepeatMode::Off}; ///< Persisted repeat mode.
-    int64_t cursorPos{0};                ///< Persisted cursor (QueueState::cursor).
-    int64_t currentTrackId{0};           ///< Last current track id.
-    float volume{1.0f};                  ///< Persisted volume [0,1].
-    int64_t activeQueueId{1};            ///< Persisted active queue id.
+    int64_t cursorPos{0};                   ///< Persisted cursor (QueueState::cursor).
+    int64_t currentTrackId{0};              ///< Last current track id.
+    float volume{1.0f};                     ///< Persisted volume [0,1].
+    int64_t activeQueueId{1};               ///< Persisted active queue id.
 };
 
 } // namespace caudio::engine

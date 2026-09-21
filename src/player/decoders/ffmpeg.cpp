@@ -8,17 +8,20 @@ namespace caudio::player {
 caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     AVFormatContext* fmt = avformat_alloc_context();
     if (!fmt) {
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::NoMem, "avformat_alloc_context failed"));
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::NoMem,
+                                                        "avformat_alloc_context failed"));
     }
 
     if (avformat_open_input(&fmt, path.data(), nullptr, nullptr) < 0) {
         avformat_free_context(fmt);
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_open_input failed"));
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_open_input failed"));
     }
 
     if (avformat_find_stream_info(fmt, nullptr) < 0) {
         avformat_close_input(&fmt);
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_find_stream_info failed"));
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                        "avformat_find_stream_info failed"));
     }
 
     TrackMetadata meta;
@@ -35,13 +38,22 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     meta.genre = getDict(fmt->metadata, "genre");
 
     if (auto dateStr = getDict(fmt->metadata, "date"); !dateStr.empty()) {
-        try { meta.year = std::stoi(dateStr.substr(0, 4)); } catch (...) {}
+        try {
+            meta.year = std::stoi(dateStr.substr(0, 4));
+        } catch (...) {
+        }
     }
     if (auto trackStr = getDict(fmt->metadata, "track"); !trackStr.empty()) {
-        try { meta.track_num = std::stoi(trackStr); } catch (...) {}
+        try {
+            meta.track_num = std::stoi(trackStr);
+        } catch (...) {
+        }
     }
     if (auto discStr = getDict(fmt->metadata, "disc"); !discStr.empty()) {
-        try { meta.disc_num = std::stoi(discStr); } catch (...) {}
+        try {
+            meta.disc_num = std::stoi(discStr);
+        } catch (...) {
+        }
     }
 
     int audioStreamIdx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
@@ -75,8 +87,8 @@ caudio::utils::Expected<std::unique_ptr<IDecoder>> FfmpegDecoder::create(Reader&
     p->reader_ = &reader;
 
     if (!p->init()) {
-        return std::unexpected(
-            caudio::utils::Error{caudio::utils::StatusCode::Unsupported, std::string_view("FFmpeg init failed")});
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                                    std::string_view("FFmpeg init failed")});
     }
 
     return caudio::utils::Expected<std::unique_ptr<IDecoder>>{
@@ -180,13 +192,13 @@ std::size_t FfmpegDecoder::decode(std::span<float> out) {
 
 caudio::utils::Expected<void> FfmpegDecoder::seek(double seconds) {
     if (seconds < 0.0 || !std::isfinite(seconds) || !fmt_ || !dec_ || audioStreamIdx_ < 0) {
-        return std::unexpected(
-            caudio::utils::Error{caudio::utils::StatusCode::InvalidArg, std::string_view("bad seconds")});
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("bad seconds")});
     }
     AVStream* stream = fmt_->streams[audioStreamIdx_];
     if (!stream)
-        return std::unexpected(
-            caudio::utils::Error{caudio::utils::StatusCode::Internal, std::string_view("no stream")});
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Internal,
+                                                    std::string_view("no stream")});
     // Use stream time_base for seeking - dec time_base is codec, not correct for container
     int64_t seekTarget = av_rescale_q(static_cast<int64_t>(seconds * AV_TIME_BASE),
                                       AVRational{1, AV_TIME_BASE}, stream->time_base);
@@ -203,8 +215,8 @@ caudio::utils::Expected<void> FfmpegDecoder::seek(double seconds) {
         // Fallback to simple av_seek_frame
         ret = av_seek_frame(fmt_, audioStreamIdx_, seekTarget, AVSEEK_FLAG_BACKWARD);
         if (ret < 0)
-            return std::unexpected(
-                caudio::utils::Error{caudio::utils::StatusCode::Io, std::string_view("seek failed")});
+            return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Io,
+                                                        std::string_view("seek failed")});
     }
     avcodec_flush_buffers(dec_);
     // flush resampler as well
@@ -219,15 +231,15 @@ FfmpegDecoder::~FfmpegDecoder() {
 }
 
 int FfmpegDecoder::convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
-                 std::size_t frames) noexcept {
+                                std::size_t frames) noexcept {
     uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
     int outSamples = static_cast<int>(frames - totalDecoded);
-    return swr_convert(swr_, outPtrs, outSamples,
-                       const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
+    return swr_convert(swr_, outPtrs, outSamples, const_cast<const uint8_t**>(frame->extended_data),
+                       frame->nb_samples);
 }
 
 int FfmpegDecoder::flushResampler(std::span<float> out, std::size_t totalDecoded,
-                   std::size_t frames) noexcept {
+                                  std::size_t frames) noexcept {
     uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
     int outSamples = static_cast<int>(frames - totalDecoded);
     return swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
@@ -293,8 +305,8 @@ bool FfmpegDecoder::init() {
         return false;
     }
 
-    avio_ = avio_alloc_context(avioBuffer, static_cast<int>(kBufferSize), 0, this,
-                               &readCallback, nullptr, &seekCallback);
+    avio_ = avio_alloc_context(avioBuffer, static_cast<int>(kBufferSize), 0, this, &readCallback,
+                               nullptr, &seekCallback);
     if (!avio_) {
         av_free(avioBuffer);
         avformat_free_context(fmt_);

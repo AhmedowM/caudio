@@ -146,9 +146,3 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
         std::filesystem::remove(dbPath + "-shm", ec);
     }
 }
-
-
-
-
-
-

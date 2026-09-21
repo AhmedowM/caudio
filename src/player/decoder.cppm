@@ -4,5 +4,5 @@ module;
 export module caudio.player:decoder;
 
 export namespace caudio::player {
-  using ::caudio::player::DecoderRegistry;
+using ::caudio::player::DecoderRegistry;
 }

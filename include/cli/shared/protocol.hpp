@@ -75,10 +75,10 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/db_types.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/json/json.hpp"
+#include "caudio/utils/utils.hpp"
 #include "cli/shared/command.hpp"
 #include "cli/shared/result.hpp"
 
@@ -199,8 +199,7 @@ ordered_json playlistToJson(const caudio::db::Playlist& p);
  * @param j JSON object with playlist fields.
  * @return Playlist struct, or error if parsing fails.
  */
-std::expected<caudio::db::Playlist, caudio::utils::Error>
-playlistFromJson(const ordered_json& j);
+std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const ordered_json& j);
 
 /**
  * @brief Convert Error struct to JSON object.
@@ -216,8 +215,7 @@ ordered_json errorToJson(const caudio::utils::Error& e);
  * @param j JSON object with code/code_value and message fields.
  * @return Error struct, or error if parsing fails.
  */
-std::expected<caudio::utils::Error, caudio::utils::Error>
-errorFromJson(const ordered_json& j);
+std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const ordered_json& j);
 
 } // namespace detail
 

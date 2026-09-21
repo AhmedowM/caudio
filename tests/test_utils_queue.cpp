@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -177,9 +177,3 @@ TEST_CASE("MpscQueue MPSC thread producers", "[utils][queue]") {
 TEST_CASE("MpscQueue 10k loop stress", "[utils][queue]") {
     REQUIRE(queue_10k_loop());
 }
-
-
-
-
-
-

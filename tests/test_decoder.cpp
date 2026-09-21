@@ -95,8 +95,3 @@ TEST_CASE("decoder FileReader probe 32B with real wav", "[decoder]") {
     // File pos after open is at AVIO offset (headers consumed), not 0 — allow >=0
     REQUIRE((**r).tell() >= 0);
 }
-
-
-
-
-

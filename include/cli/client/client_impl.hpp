@@ -24,13 +24,13 @@
 #endif
 
 #include "caudio/utils/utils.hpp"
-#include "cli/shared/command.hpp"
-#include "cli/shared/result.hpp"
-#include "cli/shared/protocol.hpp"
+#include "cli/client/ipc_client.hpp"
 #include "cli/config.hpp"
 #include "cli/service/ipc_channel.hpp"
-#include "cli/client/ipc_client.hpp"
 #include "cli/service/shm_status.hpp"
+#include "cli/shared/command.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/shared/result.hpp"
 
 namespace caudio::client {
 

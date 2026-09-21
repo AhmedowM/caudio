@@ -4,6 +4,6 @@ module;
 export module caudio.db:write_thread;
 
 export namespace caudio::db {
-  using ::caudio::db::WriteOp;
-  using ::caudio::db::WriterThread;
-}
+using ::caudio::db::WriteOp;
+using ::caudio::db::WriterThread;
+} // namespace caudio::db

@@ -237,8 +237,8 @@ class Logger {
      */
     bool getCallbackIfNeeded(LogLevel lvl, Callback& out);
 
-    mutable std::mutex mutex_;         ///< Protects callback_ and minLevel_.
-    Callback callback_;                ///< User-provided sink; null = disabled.
+    mutable std::mutex mutex_;           ///< Protects callback_ and minLevel_.
+    Callback callback_;                  ///< User-provided sink; null = disabled.
     LogLevel minLevel_{LogLevel::Debug}; ///< Minimum level to emit.
 };
 

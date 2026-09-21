@@ -52,8 +52,3 @@ TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {
     REQUIRE(!dec.has_value());
     REQUIRE(dec.error().code == StatusCode::Unsupported);
 }
-
-
-
-
-

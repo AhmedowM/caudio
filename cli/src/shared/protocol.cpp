@@ -170,8 +170,7 @@ ordered_json playlistToJson(const caudio::db::Playlist& p) {
     return j;
 }
 
-std::expected<caudio::db::Playlist, caudio::utils::Error>
-playlistFromJson(const ordered_json& j) {
+std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const ordered_json& j) {
     try {
         caudio::db::Playlist p{};
         if (j.contains("id") && j["id"].is_number())
@@ -204,8 +203,7 @@ ordered_json errorToJson(const caudio::utils::Error& e) {
     return j;
 }
 
-std::expected<caudio::utils::Error, caudio::utils::Error>
-errorFromJson(const ordered_json& j) {
+std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const ordered_json& j) {
     try {
         std::string codeStr;
         std::string msg;

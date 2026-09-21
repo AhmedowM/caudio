@@ -1,8 +1,8 @@
 #include "cli/client/ipc_client.hpp"
 
 #include <caudio/utils/utils.hpp>
-#include <cli/shared/protocol.hpp>
 #include <cli/config.hpp>
+#include <cli/shared/protocol.hpp>
 #include <cstring>
 
 namespace caudio::client {
@@ -24,13 +24,12 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
     w.reserve(path.size());
     for (char c : path)
         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting,
-                             0, nullptr);
+    HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting, 0,
+                             nullptr);
     if (h == kInvalidHandle) {
         DWORD err = ::GetLastError();
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                     "CreateFileW connect failed: " + std::to_string(err))};
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::Io, "CreateFileW connect failed: " + std::to_string(err))};
     }
     DWORD mode = kPipeReadmodeByte;
     ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
@@ -173,8 +172,8 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
     }
     std::size_t sent = 0;
     while (sent < data.size()) {
-        ::ssize_t n = ::send(fd_, reinterpret_cast<const char*>(data.data()) + sent,
-                             data.size() - sent, 0);
+        ::ssize_t n =
+            ::send(fd_, reinterpret_cast<const char*>(data.data()) + sent, data.size() - sent, 0);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
@@ -225,9 +224,8 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
                              static_cast<DWORD>(len - got), &r, nullptr);
         if (ok == 0) {
             DWORD err = ::GetLastError();
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                         "ReadFile payload failed: " + std::to_string(err))};
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io, "ReadFile payload failed: " + std::to_string(err))};
         }
         if (r == 0)
             return std::unexpected{

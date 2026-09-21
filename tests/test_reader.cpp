@@ -1,11 +1,11 @@
 #include <array>
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <span>
 #include <vector>
-#include <atomic>
 
 import caudio.player;
 import caudio.utils;
@@ -17,7 +17,8 @@ using namespace caudio::utils;
 static std::filesystem::path makeTempFile(const std::string& name, std::vector<std::byte> data) {
     // Use test-specific subdir to avoid parallel test race on shared directory
     static std::atomic<int> testId{0};
-    auto dir = std::filesystem::temp_directory_path() / "caudio_reader_tests" / std::to_string(testId.fetch_add(1));
+    auto dir = std::filesystem::temp_directory_path() / "caudio_reader_tests" /
+               std::to_string(testId.fetch_add(1));
     std::filesystem::create_directories(dir);
     auto p = dir / name;
     std::ofstream out(p, std::ios::binary);
@@ -156,9 +157,3 @@ TEST_CASE("FileReader tell and read", "[reader]") {
     }
     std::filesystem::remove(path);
 }
-
-
-
-
-
-

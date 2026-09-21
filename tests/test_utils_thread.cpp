@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -71,7 +71,8 @@ bool thread_setname_jthread() {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
     });
     auto r = setThreadName(jt, "worker-1");
-    if (!r.has_value() && r.error().code != StatusCode::Unsupported && r.error().code != StatusCode::State)
+    if (!r.has_value() && r.error().code != StatusCode::Unsupported &&
+        r.error().code != StatusCode::State)
         return false;
     jt.request_stop();
     jt.join();
@@ -143,9 +144,3 @@ TEST_CASE("Thread 100 stress", "[utils][thread]") {
 TEST_CASE("Thread sleepForMs wrapper", "[utils][thread]") {
     REQUIRE(thread_sleepForMs());
 }
-
-
-
-
-
-

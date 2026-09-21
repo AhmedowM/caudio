@@ -1,6 +1,6 @@
 Checks: '-*,clang-analyzer-*,modernize-*,bugprone-*,concurrency-*,cppcoreguidelines-*,performance-*,readability-*'
 WarningsAsErrors: ''
-HeaderFilterRegex: 'src/.*'
+HeaderFilterRegex: '(src|include|cli/src)/.*'
 CheckOptions:
   - key: modernize-use-auto
     value: 0

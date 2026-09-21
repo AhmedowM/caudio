@@ -1,7 +1,8 @@
 #include "caudio/db/stmt_helpers.hpp"
 
-#include <caudio/utils/utils.hpp>
 #include <sqlite3.h>
+
+#include <caudio/utils/utils.hpp>
 #include <cstring>
 #include <string>
 

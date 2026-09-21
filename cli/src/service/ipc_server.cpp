@@ -73,13 +73,14 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     addr.sun_family = AF_UNIX;
     std::string sockPath = socketPath_;
     if (sockPath.size() >= sizeof(addr.sun_path))
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "socket path too long")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "socket path too long")};
     std::memcpy(addr.sun_path, sockPath.c_str(), sockPath.size() + 1);
     listenFd_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (listenFd_ < 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "socket() failed: " + std::string(std::strerror(errno)))};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                     "socket() failed: " + std::string(std::strerror(errno)))};
     ::unlink(sockPath.c_str());
     if (::bind(listenFd_, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
         ::close(listenFd_);
@@ -90,8 +91,9 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     if (::listen(listenFd_, 8) < 0) {
         ::close(listenFd_);
         listenFd_ = -1;
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "listen() failed: " + std::string(std::strerror(errno)))};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                     "listen() failed: " + std::string(std::strerror(errno)))};
     }
     return {};
 #endif
@@ -100,8 +102,8 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
 caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
 #ifdef _WIN32
     if (!pipeHandle_ || pipeHandle_ == kInvalidHandle)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "pipe not initialized")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "pipe not initialized")};
     std::wstring w;
     w.reserve(socketPath_.size());
     for (char c : socketPath_)
@@ -109,8 +111,8 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
     HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
                                   kPipeUnlimited, 65536, 65536, 0, nullptr);
     if (h == kInvalidHandle)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "CreateNamedPipeW failed for accept")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                        "CreateNamedPipeW failed for accept")};
     if (!::ConnectNamedPipe(h, nullptr)) {
         DWORD err = ::GetLastError();
         if (err != 535) // ERROR_PIPE_CONNECTED
@@ -120,20 +122,22 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
     return std::unique_ptr<IpcChannel>{std::make_unique<WinPipeChannel>(h)};
 #else
     if (listenFd_ < 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "socket not initialized")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "socket not initialized")};
     struct sockaddr_un addr{};
     socklen_t addrlen = sizeof(addr);
     int fd = ::accept(listenFd_, reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
     if (fd < 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "accept() failed: " + std::string(std::strerror(errno)))};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                     "accept() failed: " + std::string(std::strerror(errno)))};
     return std::unique_ptr<IpcChannel>{std::make_unique<UnixChannel>(fd)};
 #endif
 }
 
-void IpcServer::run(std::stop_token st,
-                    std::function<caudio::cli::ReplyExpected(const caudio::cli::Command&)> dispatch) {
+void IpcServer::run(
+    std::stop_token st,
+    std::function<caudio::cli::ReplyExpected(const caudio::cli::Command&)> dispatch) {
     running_.store(true);
     while (!st.stop_requested()) {
         auto chanRes = accept();
@@ -197,8 +201,8 @@ UnixChannel::~UnixChannel() {
 
 caudio::utils::Expected<void> UnixChannel::send(std::span<const std::byte> data) {
     if (fd_ < 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "channel closed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
     std::size_t total = data.size();
     std::size_t sent = 0;
     while (sent < total) {
@@ -206,8 +210,9 @@ caudio::utils::Expected<void> UnixChannel::send(std::span<const std::byte> data)
         if (n <= 0) {
             if (errno == EINTR)
                 continue;
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io, "write failed: " + std::string(std::strerror(errno)))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                         "write failed: " + std::string(std::strerror(errno)))};
         }
         sent += static_cast<std::size_t>(n);
     }
@@ -216,14 +221,14 @@ caudio::utils::Expected<void> UnixChannel::send(std::span<const std::byte> data)
 
 caudio::utils::Expected<std::vector<std::byte>> UnixChannel::recv() {
     if (fd_ < 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "channel closed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
     std::vector<std::byte> buf(4096);
     ssize_t n = ::read(fd_, buf.data(), buf.size());
     if (n <= 0) {
         if (n == 0)
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io, "connection closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "connection closed")};
         if (errno == EINTR)
             return std::vector<std::byte>{};
         return std::unexpected{caudio::utils::makeError(
@@ -250,14 +255,13 @@ WinPipeChannel::~WinPipeChannel() {
 
 caudio::utils::Expected<void> WinPipeChannel::send(std::span<const std::byte> data) {
     if (!handle_ || handle_ == kInvalidHandle)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "channel closed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
     std::size_t total = data.size();
     std::size_t sent = 0;
     while (sent < total) {
         DWORD written = 0;
-        BOOL ok = ::WriteFile(handle_,
-                              reinterpret_cast<const void*>(data.data() + sent),
+        BOOL ok = ::WriteFile(handle_, reinterpret_cast<const void*>(data.data() + sent),
                               static_cast<DWORD>(std::min<std::size_t>(total - sent, 0xFFFFFFFF)),
                               &written, nullptr);
         if (!ok) {
@@ -275,22 +279,22 @@ caudio::utils::Expected<void> WinPipeChannel::send(std::span<const std::byte> da
 
 caudio::utils::Expected<std::vector<std::byte>> WinPipeChannel::recv() {
     if (!handle_ || handle_ == kInvalidHandle)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "channel closed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
     std::vector<std::byte> buf(4096);
     DWORD read = 0;
     BOOL ok = ::ReadFile(handle_, buf.data(), static_cast<DWORD>(buf.size()), &read, nullptr);
     if (!ok) {
         DWORD err = ::GetLastError();
         if (err == 109 || err == 232) // ERROR_BROKEN_PIPE, ERROR_NO_DATA
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io, "connection closed")};
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "ReadFile failed: " + std::to_string(err))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "connection closed")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                        "ReadFile failed: " + std::to_string(err))};
     }
     if (read == 0)
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "connection closed")};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "connection closed")};
     buf.resize(static_cast<std::size_t>(read));
     return buf;
 }

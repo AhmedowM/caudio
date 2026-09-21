@@ -179,9 +179,3 @@ TEST_CASE("Engine drainEvents null checks", "[engine_events]") {
     REQUIRE(eng->drainEvents(nullptr, 0, &n).has_value());
     REQUIRE(n == 0);
 }
-
-
-
-
-
-

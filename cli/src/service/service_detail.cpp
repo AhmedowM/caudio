@@ -61,13 +61,17 @@ struct OVERLAPPED {
     void* Internal{nullptr};
     void* InternalHigh{nullptr};
     union {
-        struct { DWORD Offset; DWORD OffsetHigh; } DUMMYSTRUCTNAME;
+        struct {
+            DWORD Offset;
+            DWORD OffsetHigh;
+        } DUMMYSTRUCTNAME;
         void* Pointer;
     } DUMMYUNIONNAME;
     HANDLE hEvent{nullptr};
 };
 extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
+                                                   DWORD, DWORD, HANDLE);
 __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL __stdcall LockFileEx(HANDLE, DWORD, DWORD, DWORD, DWORD, LPOVERLAPPED);
 __declspec(dllimport) BOOL __stdcall UnlockFileEx(HANDLE, DWORD, DWORD, DWORD, LPOVERLAPPED);
@@ -117,11 +121,11 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #endif
 #endif
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/database.hpp"
-#include "cli/cli.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/player/player.hpp"
+#include "caudio/utils/utils.hpp"
+#include "cli/cli.hpp"
 
 namespace caudio::service::detail {
 
@@ -307,8 +311,8 @@ std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
     return pid;
 }
 
-std::expected<caudio::cli::Status, caudio::utils::Error>
-buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db) {
+std::expected<caudio::cli::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
+                                                                     caudio::db::Database& db) {
     caudio::cli::Status s{};
     s.version = std::string(caudio::utils::kVersionFull);
     s.state = eng.state();
@@ -363,13 +367,13 @@ std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
     return tmp / "caudio" / "config.json";
 }
 
-std::expected<std::string, caudio::utils::Error>
-readConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
+std::expected<std::string, caudio::utils::Error> readConfigValueRaw(const std::filesystem::path& p,
+                                                                    std::string_view key) {
     return caudio::cli::configGetRaw(p, key);
 }
 
-caudio::utils::Expected<void>
-writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::string_view value) {
+caudio::utils::Expected<void> writeConfigValueRaw(const std::filesystem::path& p,
+                                                  std::string_view key, std::string_view value) {
     return caudio::cli::configSetRaw(p, key, value);
 }
 
@@ -385,8 +389,8 @@ listConfigValuesRaw(const std::filesystem::path& p) {
     return out;
 }
 
-caudio::utils::Expected<void>
-deleteConfigValueRaw(const std::filesystem::path& p, std::string_view key) {
+caudio::utils::Expected<void> deleteConfigValueRaw(const std::filesystem::path& p,
+                                                   std::string_view key) {
     return caudio::cli::configDeleteRaw(p, key);
 }
 

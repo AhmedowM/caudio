@@ -38,10 +38,10 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/player/reader.hpp"
-#include "caudio/player/decoders/decoder_interface.hpp"
 #include "caudio/player/decoders/decoder_common.hpp"
+#include "caudio/player/decoders/decoder_interface.hpp"
+#include "caudio/player/reader.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::player {
 
@@ -105,8 +105,7 @@ class FfmpegDecoder final : public IDecoder {
 
     int convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
                      std::size_t frames) noexcept;
-    int flushResampler(std::span<float> out, std::size_t totalDecoded,
-                       std::size_t frames) noexcept;
+    int flushResampler(std::span<float> out, std::size_t totalDecoded, std::size_t frames) noexcept;
 
     FfmpegDecoder() = default;
 

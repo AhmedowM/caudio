@@ -4,5 +4,5 @@ module;
 export module caudio.utils:mpsc_queue;
 
 export namespace caudio::utils {
-  using ::caudio::utils::MpscQueue;
+using ::caudio::utils::MpscQueue;
 }

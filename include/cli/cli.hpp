@@ -11,14 +11,13 @@
  * - config: Config paths and load/save helpers
  */
 
-#include "cli/shared/command.hpp"
-#include "cli/shared/result.hpp"
-#include "cli/shared/protocol.hpp"
-#include "cli/config.hpp"
-
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/database.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/json/json.hpp"
+#include "caudio/utils/utils.hpp"
+#include "cli/config.hpp"
+#include "cli/shared/command.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/shared/result.hpp"
 
 namespace caudio::cli {} // namespace caudio::cli

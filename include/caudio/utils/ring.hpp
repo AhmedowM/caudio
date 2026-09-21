@@ -21,15 +21,10 @@ namespace caudio::utils {
 /**
  * @brief Cache-line size used to pad atomics against false sharing.
  * @ingroup caudio_utils
- * @details Uses `std::hardware_destructive_interference_size` when available,
- * otherwise 64 bytes (common x86-64 line size). Must be power-of-two.
+ * @details Uses default 64 bytes (common x86-64 line size). Must be power-of-two.
  */
-#ifdef __cpp_lib_hardware_interference_size
-inline constexpr std::size_t kRingCacheLine = std::hardware_destructive_interference_size;
-#else
-inline constexpr std::size_t kRingCacheLine = 64uz;
+inline constexpr std::size_t kRingCacheLine = 64UZ;
 static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must be power-of-2");
-#endif
 
 /**
  * @brief Single-producer single-consumer ring buffer for trivially copyable types.
@@ -248,9 +243,9 @@ class SpscRing {
     }
 
   private:
-    std::size_t cap_{0};                               ///< Capacity in frames.
-    std::uint32_t channels_{1};                        ///< Channels per frame.
-    std::vector<T> buf_{};                             ///< Interleaved storage [cap_*channels].
+    std::size_t cap_{0};        ///< Capacity in frames.
+    std::uint32_t channels_{1}; ///< Channels per frame.
+    std::vector<T> buf_{};      ///< Interleaved storage [cap_*channels].
     alignas(kRingCacheLine) std::atomic<std::size_t> wr_{0}; ///< Producer index (monotonic).
     alignas(kRingCacheLine) std::atomic<std::size_t> rd_{0}; ///< Consumer index (monotonic).
 };

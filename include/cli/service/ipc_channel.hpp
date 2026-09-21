@@ -29,7 +29,6 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
 // framing helpers shared by channel and protocol
 std::vector<std::byte> frameMessage(std::span<const std::byte> payload);
 
-caudio::utils::Expected<std::vector<std::byte>>
-deframeMessage(std::span<const std::byte> framed);
+caudio::utils::Expected<std::vector<std::byte>> deframeMessage(std::span<const std::byte> framed);
 
 } // namespace caudio::service

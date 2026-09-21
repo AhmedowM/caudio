@@ -1,10 +1,12 @@
 #include "cli/app/core.hpp"
+
 #include "cli/app/parse.hpp"
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-// Avoid including <windows.h> — causes HMODULE conflict with caudio::utils (like service_detail.cpp)
-// thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide missing decls.
+// Avoid including <windows.h> — causes HMODULE conflict with caudio::utils (like
+// service_detail.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
+// missing decls.
 using BOOL = int;
 using LPCWSTR = const wchar_t*;
 using LPSECURITY_ATTRIBUTES = void*;
@@ -47,7 +49,9 @@ extern "C" {
 __declspec(dllimport) DWORD __stdcall GetModuleFileNameW(HANDLE, LPWSTR, DWORD);
 __declspec(dllimport) DWORD __stdcall GetLastError();
 __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, void*, LPCWSTR, STARTUPINFOW*, PROCESS_INFORMATION*);
+__declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_ATTRIBUTES,
+                                                    LPSECURITY_ATTRIBUTES, BOOL, DWORD, void*,
+                                                    LPCWSTR, STARTUPINFOW*, PROCESS_INFORMATION*);
 }
 #else
 #include <windows.h>
@@ -63,8 +67,8 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <charconv>
 #include <chrono>
 #include <cmath>
-#include <ctime>
 #include <cstdint>
+#include <ctime>
 #include <expected>
 #include <filesystem>
 #include <format>
@@ -80,20 +84,19 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <variant>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "cli/config.hpp"
-#include "cli/shared/command.hpp"
-#include "cli/shared/result.hpp"
-#include "cli/shared/protocol.hpp"
 #include "caudio/db/database.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/json/json.hpp"
+#include "caudio/player/player.hpp"
+#include "caudio/utils/utils.hpp"
 #include "cli/client/client.hpp"
 #include "cli/client/ipc_client.hpp"
 #include "cli/client/output_formatter.hpp"
+#include "cli/config.hpp"
 #include "cli/service/service.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/player/player.hpp"
-
+#include "cli/shared/command.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/shared/result.hpp"
 
 namespace caudio::app {
 
@@ -199,7 +202,8 @@ std::chrono::duration<double> parseDuration(std::string_view s) {
     return std::chrono::duration<double>{*t};
 }
 
-void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks, std::string_view format) {
+void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
+                       std::string_view format) {
     if (format == "m3u") {
         os << "#EXTM3U\n";
         for (const auto& t : tracks) {
@@ -248,12 +252,9 @@ using detail::parseSeek;
 using detail::parseTime;
 using detail::parseVolume;
 
-App::App(caudio::cli::Config cfg)
-    : config_(std::move(cfg)), cli_("caudio - terminal player") {
+App::App(caudio::cli::Config cfg) : config_(std::move(cfg)), cli_("caudio - terminal player") {
     cli_.set_version_flag("--version", std::string(caudio::utils::kVersionFull));
 }
-
-
 
 std::filesystem::path App::pidPathForConfig() const {
     // Canonical pid path — single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
@@ -610,7 +611,8 @@ int App::run(int argc, char** argv) {
     auto* plExport = plCmd->add_subcommand("export", "Export playlist to file");
     plExport->add_option("pid", plExportPid, "Playlist id")->required();
     plExport->add_option("path", plExportPath, "Output file path")->required();
-    plExport->add_option("--format", plExportFormat, "Format: m3u|pls|json")->check(CLI::IsMember({"m3u", "pls", "json"}));
+    plExport->add_option("--format", plExportFormat, "Format: m3u|pls|json")
+        ->check(CLI::IsMember({"m3u", "pls", "json"}));
     std::string plImportPath;
     std::string plImportName;
     auto* plImport = plCmd->add_subcommand("import", "Import playlist from file");
@@ -633,7 +635,8 @@ int App::run(int argc, char** argv) {
     bool libStatsDetailed = false;
     auto* libStats = libCmd->add_subcommand("stats", "Library stats");
     libStats->add_flag("--json", libStatsJson, "JSON output");
-    libStats->add_flag("--detailed", libStatsDetailed, "Show detailed stats (most played, total play time)");
+    libStats->add_flag("--detailed", libStatsDetailed,
+                       "Show detailed stats (most played, total play time)");
     std::string libAddPath;
     bool libAddRecursive = false;
     auto* libAdd = libCmd->add_subcommand("add", "Add file or directory to library");
@@ -663,7 +666,12 @@ int App::run(int argc, char** argv) {
     std::string tagEditValue;
     auto* tagEdit = tagCmd->add_subcommand("edit", "Edit track tag");
     tagEdit->add_option("id", tagEditId, "Track id")->required();
-    tagEdit->add_option("field", tagEditField, "Field (title,artist,album,album_artist,genre,year,track_number,disc_number)")->required()->check(CLI::IsMember({"title","artist","album","album_artist","genre","year","track_number","disc_number"}));
+    tagEdit
+        ->add_option("field", tagEditField,
+                     "Field (title,artist,album,album_artist,genre,year,track_number,disc_number)")
+        ->required()
+        ->check(CLI::IsMember({"title", "artist", "album", "album_artist", "genre", "year",
+                               "track_number", "disc_number"}));
     tagEdit->add_option("value", tagEditValue, "New value")->required();
     std::int64_t tagGetId = 0;
     bool tagGetJson = false;
@@ -680,7 +688,8 @@ int App::run(int argc, char** argv) {
     std::string previewFile;
     auto* previewCmd = cli_.add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
-    auto* tuiCmd = cli_.add_subcommand("tui", "Launch TUI (preview: shows status, full TUI coming soon)");
+    auto* tuiCmd =
+        cli_.add_subcommand("tui", "Launch TUI (preview: shows status, full TUI coming soon)");
     auto* cfgCmd = cli_.add_subcommand("config", "Config operations");
     std::string cfgGetKey;
     auto* cfgGet = cfgCmd->add_subcommand("get", "Get config value");
@@ -869,8 +878,8 @@ int App::run(int argc, char** argv) {
             caudio::client::OutputFormatter fmt{jsonFlag};
             while (true) {
                 caudio::client::Client client{config_.dbPath, config_.socketPath};
-                auto res = client.send(caudio::cli::Command{caudio::cli::StatusReq{}},
-                                       milliseconds{2000});
+                auto res =
+                    client.send(caudio::cli::Command{caudio::cli::StatusReq{}}, milliseconds{2000});
                 if (!res) {
                     caudio::cli::Result errRes{res.error()};
                     if (jsonFlag) {
@@ -1004,7 +1013,8 @@ int App::run(int argc, char** argv) {
             return sendViaClient(cmd, false);
         }
         if (plExport->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistExport{plExportPid, plExportPath, plExportFormat}};
+            caudio::cli::Command cmd{
+                caudio::cli::PlaylistExport{plExportPid, plExportPath, plExportFormat}};
             caudio::client::Client client{config_.dbPath, config_.socketPath};
             auto timeout = std::chrono::milliseconds{5000};
             auto cliRes = client.send(cmd, timeout);
@@ -1013,7 +1023,8 @@ int App::run(int argc, char** argv) {
                 return 1;
             }
             if (std::holds_alternative<caudio::utils::Error>(*cliRes)) {
-                std::println(std::cerr, "export: {}", std::get<caudio::utils::Error>(*cliRes).message);
+                std::println(std::cerr, "export: {}",
+                             std::get<caudio::utils::Error>(*cliRes).message);
                 return 1;
             }
             if (std::holds_alternative<caudio::cli::PlaylistData>(*cliRes)) {
@@ -1036,7 +1047,9 @@ int App::run(int argc, char** argv) {
             return 1;
         }
         if (plImport->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistImport{plImportPath, plImportName.empty() ? std::optional<std::string>{} : std::optional<std::string>{plImportName}}};
+            caudio::cli::Command cmd{caudio::cli::PlaylistImport{
+                plImportPath, plImportName.empty() ? std::optional<std::string>{}
+                                                   : std::optional<std::string>{plImportName}}};
             return sendViaClient(cmd, false);
         }
         std::cout << plCmd->help() << "\n";
@@ -1064,13 +1077,15 @@ int App::run(int argc, char** argv) {
         }
         if (libList->parsed()) {
             caudio::cli::Command cmd{caudio::cli::LibraryList{
-                libListQuery.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListQuery},
-                libListLimit,
-                libListOffset,
-                libListArtist.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListArtist},
-                libListAlbum.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListAlbum},
-                libListGenre.empty() ? std::optional<std::string>{} : std::optional<std::string>{libListGenre}
-            }};
+                libListQuery.empty() ? std::optional<std::string>{}
+                                     : std::optional<std::string>{libListQuery},
+                libListLimit, libListOffset,
+                libListArtist.empty() ? std::optional<std::string>{}
+                                      : std::optional<std::string>{libListArtist},
+                libListAlbum.empty() ? std::optional<std::string>{}
+                                     : std::optional<std::string>{libListAlbum},
+                libListGenre.empty() ? std::optional<std::string>{}
+                                     : std::optional<std::string>{libListGenre}}};
             return sendViaClient(cmd, libListJson);
         }
         if (libAdd->parsed()) {
@@ -1128,7 +1143,8 @@ int App::run(int argc, char** argv) {
         std::println(std::cout, "");
         std::println(std::cout, "TUI is not yet implemented.");
         std::println(std::cout, "  - Try `caudio status --watch` for live polling");
-        std::println(std::cout, "  - Try `caudio status --watch --interval 200` for faster refresh");
+        std::println(std::cout,
+                     "  - Try `caudio status --watch --interval 200` for faster refresh");
         std::println(std::cout, "  - Full TUI (ratatui) planned for v0.28.0");
         return 0;
     }

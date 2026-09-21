@@ -11,14 +11,13 @@
 #include <string_view>
 #include <vector>
 
-#include "cli/app/parse.hpp"
-
+#include "caudio/db/database.hpp"
+#include "caudio/json/json.hpp"
 #include "caudio/utils/utils.hpp"
+#include "cli/app/parse.hpp"
 #include "cli/config.hpp"
 #include "cli/shared/command.hpp"
 #include "cli/shared/result.hpp"
-#include "caudio/db/database.hpp"
-#include "caudio/json/json.hpp"
 
 namespace caudio::app {
 
@@ -29,7 +28,8 @@ std::expected<double, caudio::utils::Error> parseSeek(std::string_view s);
 std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s);
 std::chrono::duration<double> parseDuration(std::string_view s);
 
-void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks, std::string_view format);
+void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
+                       std::string_view format);
 void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks);
 
 } // namespace detail
@@ -39,11 +39,11 @@ using detail::parseTime;
 using detail::parseVolume;
 
 class App {
-public:
+  public:
     explicit App(caudio::cli::Config cfg);
     int run(int argc, char** argv);
 
-private:
+  private:
     int handleStart(bool foreground);
     int handleShutdown();
     int handlePreview(const std::string& file);

@@ -7,8 +7,8 @@
 #include <utility>
 #include <vector>
 
-#include "caudio/utils/result.hpp"
 #include "caudio/utils/error.hpp"
+#include "caudio/utils/result.hpp"
 
 /**
  * @file mpsc_queue.hpp
@@ -195,12 +195,12 @@ class MpscQueue {
     }
 
   private:
-    std::size_t cap_;                          ///< Fixed capacity (normalized).
-    std::vector<std::optional<T>> buf_;        ///< Circular storage [cap_].
-    std::size_t wr_{0};                        ///< Monotonic write counter (mutex-protected).
-    std::size_t rd_{0};                        ///< Monotonic read counter (mutex-protected).
-    mutable std::mutex mutex_;                 ///< Protects cap_/buf_/wr_/rd_.
-    std::condition_variable_any cv_;           ///< Notified on push/emplace.
+    std::size_t cap_;                   ///< Fixed capacity (normalized).
+    std::vector<std::optional<T>> buf_; ///< Circular storage [cap_].
+    std::size_t wr_{0};                 ///< Monotonic write counter (mutex-protected).
+    std::size_t rd_{0};                 ///< Monotonic read counter (mutex-protected).
+    mutable std::mutex mutex_;          ///< Protects cap_/buf_/wr_/rd_.
+    std::condition_variable_any cv_;    ///< Notified on push/emplace.
 };
 
 } // namespace caudio::utils

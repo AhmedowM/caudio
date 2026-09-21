@@ -34,8 +34,10 @@ inline constexpr DWORD kErrorMoreData = 234UL;
 inline constexpr int kFalse = 0;
 inline const HANDLE kInvalidHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD, HANDLE);
-__declspec(dllimport) HANDLE __stdcall CreateNamedPipeW(LPCWSTR, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, LPVOID);
+__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD,
+                                                   HANDLE);
+__declspec(dllimport) HANDLE __stdcall CreateNamedPipeW(LPCWSTR, DWORD, DWORD, DWORD, DWORD, DWORD,
+                                                        DWORD, LPVOID);
 __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, LPVOID, DWORD, LPDWORD, LPVOID);
 __declspec(dllimport) BOOL __stdcall WriteFile(HANDLE, const void*, DWORD, LPDWORD, LPVOID);
@@ -74,11 +76,12 @@ inline caudio::utils::Expected<void> writeAll(HANDLE h, std::span<const std::byt
                               static_cast<DWORD>(data.size() - sent), &written, nullptr);
         if (ok == kFalse) {
             DWORD err = ::GetLastError();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                             "WriteFile failed: " + std::to_string(err))};
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io, "WriteFile failed: " + std::to_string(err))};
         }
         if (written == 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "WriteFile: zero bytes")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "WriteFile: zero bytes")};
         }
         sent += written;
     }
@@ -97,11 +100,12 @@ inline caudio::utils::Expected<void> readExact(HANDLE h, std::span<std::byte> ou
                 got += r;
                 continue;
             }
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                             "ReadFile failed: " + std::to_string(err))};
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io, "ReadFile failed: " + std::to_string(err))};
         }
         if (r == 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "ReadFile: peer closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "ReadFile: peer closed")};
         }
         got += r;
     }
@@ -111,13 +115,17 @@ inline caudio::utils::Expected<void> readExact(HANDLE h, std::span<std::byte> ou
 } // namespace detail
 
 class NamedPipeChannel final : public IpcChannel {
-public:
+  public:
     explicit NamedPipeChannel(HANDLE h) noexcept : handle_(h) {}
-    ~NamedPipeChannel() override { close(); }
+    ~NamedPipeChannel() override {
+        close();
+    }
 
     NamedPipeChannel(const NamedPipeChannel&) = delete;
     NamedPipeChannel& operator=(const NamedPipeChannel&) = delete;
-    NamedPipeChannel(NamedPipeChannel&& other) noexcept : handle_(other.handle_) { other.handle_ = nullptr; }
+    NamedPipeChannel(NamedPipeChannel&& other) noexcept : handle_(other.handle_) {
+        other.handle_ = nullptr;
+    }
     NamedPipeChannel& operator=(NamedPipeChannel&& other) noexcept {
         if (this != &other) {
             close();
@@ -129,14 +137,16 @@ public:
 
     caudio::utils::Expected<void> send(std::span<const std::byte> data) override {
         if (!handle_ || handle_ == kInvalidHandle) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "pipe closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "pipe closed")};
         }
         return detail::writeAll(handle_, data);
     }
 
     caudio::utils::Expected<std::vector<std::byte>> recv() override {
         if (!handle_ || handle_ == kInvalidHandle) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "pipe closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "pipe closed")};
         }
         std::array<std::byte, 4> hdr{};
         if (auto r = detail::readExact(handle_, std::span<std::byte>(hdr)); !r) {
@@ -147,7 +157,8 @@ public:
                             (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
                             static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
         if (len > (16 * 1024 * 1024)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
         }
         std::vector<std::byte> payload(len);
         if (len > 0) {
@@ -165,9 +176,12 @@ public:
         }
     }
 
-    HANDLE native() const noexcept { return handle_; }
+    HANDLE native() const noexcept {
+        return handle_;
+    }
 
-    static caudio::utils::Expected<std::unique_ptr<NamedPipeChannel>> connectTo(const std::string& pipeName) {
+    static caudio::utils::Expected<std::unique_ptr<NamedPipeChannel>>
+    connectTo(const std::string& pipeName) {
         std::wstring w;
         w.reserve(pipeName.size());
         for (char c : pipeName) {
@@ -177,8 +191,8 @@ public:
                                  0, nullptr);
         if (h == kInvalidHandle) {
             DWORD err = ::GetLastError();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                             "CreateFileW failed: " + std::to_string(err))};
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io, "CreateFileW failed: " + std::to_string(err))};
         }
         DWORD mode = kPipeReadmodeByte;
         ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
@@ -192,17 +206,17 @@ public:
         for (char c : pipeName) {
             w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
         }
-        HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait, kPipeUnlimited,
-                                      65536, 65536, 0, nullptr);
+        HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
+                                      kPipeUnlimited, 65536, 65536, 0, nullptr);
         if (h == kInvalidHandle) {
             DWORD err = ::GetLastError();
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                             "CreateNamedPipeW failed: " + std::to_string(err))};
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io, "CreateNamedPipeW failed: " + std::to_string(err))};
         }
         return h;
     }
 
-private:
+  private:
     HANDLE handle_{nullptr};
 };
 
@@ -214,7 +228,8 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeNamedPipeChannel(HANDLE
 
 caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeNamedPipeClient(const std::string& path) {
     auto r = NamedPipeChannel::connectTo(path);
-    if (!r) return std::unexpected{r.error()};
+    if (!r)
+        return std::unexpected{r.error()};
     std::unique_ptr<IpcChannel> base = std::move(*r);
     return base;
 }
@@ -222,28 +237,28 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeNamedPipeClient(const s
 #else // ! _WIN32 stub
 
 class NamedPipeChannel final : public IpcChannel {
-public:
+  public:
     caudio::utils::Expected<void> send(std::span<const std::byte>) override {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Named pipes not supported on this platform")};
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::Unsupported, "Named pipes not supported on this platform")};
     }
     caudio::utils::Expected<std::vector<std::byte>> recv() override {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Named pipes not supported on this platform")};
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::Unsupported, "Named pipes not supported on this platform")};
     }
     void close() noexcept override {}
 };
 
 caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeNamedPipeChannel(void*) {
-    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Named pipes not supported")};
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                    "Named pipes not supported")};
 }
 
 caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeNamedPipeClient(const std::string&) {
-    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Named pipes not supported")};
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                    "Named pipes not supported")};
 }
 
 #endif
 
 } // namespace caudio::service
-
-
-
-

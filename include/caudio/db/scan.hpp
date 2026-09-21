@@ -1,5 +1,6 @@
 #pragma once
 #include <sqlite3.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -18,13 +19,13 @@
 #include <string>
 #include <system_error>
 #include <vector>
-#include "blake3.h"
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/player/player.hpp"
+#include "blake3.h"
+#include "caudio/db/db_core.hpp"
 #include "caudio/db/db_types.hpp"
 #include "caudio/db/detail.hpp"
-#include "caudio/db/db_core.hpp"
+#include "caudio/player/player.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::db {
 
@@ -71,8 +72,7 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
  * @see scanDirectory
  * @see scanLibrary
  */
-std::generator<Track> scan(const std::filesystem::path& root,
-                           ScanMode mode = ScanMode::Sampled);
+std::generator<Track> scan(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
 
 /**
  * @brief Scans a directory and collects all tracks into a vector.

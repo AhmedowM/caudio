@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <array>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <span>
 #include <thread>
@@ -268,9 +268,3 @@ TEST_CASE("SpscRing 10k loop stress", "[utils][ring]") {
 TEST_CASE("SpscRing concurrent SPSC", "[utils][ring]") {
     REQUIRE(ring_concurrent_spsc());
 }
-
-
-
-
-
-

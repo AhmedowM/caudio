@@ -34,9 +34,7 @@ if(GIT_TAG)
   set(CAUDIO_VERSION_FULL "${GIT_TAG}")
 endif()
 
-project(caudio VERSION ${PROJECT_VERSION} LANGUAGES CXX)
-
-enable_language(C)
+project(caudio VERSION ${PROJECT_VERSION} LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,6 +54,29 @@ option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
 option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
+option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
+option(CAUDIO_ENABLE_CCACHE "enable ccache for faster rebuilds" ON)
+
+# ccache for faster rebuilds
+if(CAUDIO_ENABLE_CCACHE)
+  find_program(CCACHE_PROGRAM ccache)
+  if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
+  endif()
+endif()
+
+# clang-tidy integration (requires compile_commands.json)
+if(CAUDIO_ENABLE_CLANG_TIDY)
+  find_program(CLANG_TIDY_PROGRAM clang-tidy)
+  if(CLANG_TIDY_PROGRAM)
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_PROGRAM})
+    message(STATUS "clang-tidy enabled: ${CLANG_TIDY_PROGRAM}")
+  else()
+    message(WARNING "CAUDIO_ENABLE_CLANG_TIDY=ON but clang-tidy not found")
+  endif()
+endif()
 
 # Module path for FindFFmpeg
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")

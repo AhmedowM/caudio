@@ -122,25 +122,31 @@ TEST_CASE("search phrase Abbey Road", "[db_search]") {
     t.title = "Abbey Road";
     t.artist = "Beatles";
     t.album = "Abbey Road";
-    for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xA0+b);
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0xA0 + b);
     REQUIRE(db->insertTrack(t).has_value());
     Track t2;
     t2.path = "/tmp/other.mp3";
     t2.title = "Abbeville";
     t2.artist = "Other";
-    for (int b=0;b<32;++b) t2.fingerprint[b]=(uint8_t)(0xB0+b);
+    for (int b = 0; b < 32; ++b)
+        t2.fingerprint[b] = (uint8_t)(0xB0 + b);
     REQUIRE(db->insertTrack(t2).has_value());
     // quoted phrase should be sanitized but still match Abbey Road via FTS or LIKE
     auto r = search(*db, "\"Abbey Road\"", 10);
     REQUIRE(r.has_value());
-    bool found=false;
-    for (auto& tt: *r) if (tt.title=="Abbey Road") found=true;
+    bool found = false;
+    for (auto& tt : *r)
+        if (tt.title == "Abbey Road")
+            found = true;
     REQUIRE(found);
     // without quotes also finds
     auto r2 = search(*db, "Abbey Road", 10);
     REQUIRE(r2.has_value());
-    found=false;
-    for (auto& tt: *r2) if (tt.title=="Abbey Road") found=true;
+    found = false;
+    for (auto& tt : *r2)
+        if (tt.title == "Abbey Road")
+            found = true;
     REQUIRE(found);
 }
 
@@ -152,9 +158,11 @@ TEST_CASE("search injection OR AND NOT", "[db_search]") {
     t.path = "/tmp/inject.mp3";
     t.title = "Hello World";
     t.artist = "Artist";
-    for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xC0+b);
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0xC0 + b);
     REQUIRE(db->insertTrack(t).has_value());
-    // these queries contain FTS operators that should be sanitized, not cause syntax errors or injection
+    // these queries contain FTS operators that should be sanitized, not cause syntax errors or
+    // injection
     auto r1 = search(*db, "Hello OR World", 10);
     REQUIRE(r1.has_value());
     auto r2 = search(*db, "Hello AND World", 10);
@@ -166,8 +174,10 @@ TEST_CASE("search injection OR AND NOT", "[db_search]") {
     // all should not crash and should still find Hello World via sanitized terms (hello world)
     // At least one of them should find it; if none found, ensure no exception thrown is enough
     // But ensure r1 finds via like fallback: sanitized "Hello World" -> should match
-    bool found1=false;
-    for (auto& tt: *r1) if (tt.title=="Hello World") found1=true;
+    bool found1 = false;
+    for (auto& tt : *r1)
+        if (tt.title == "Hello World")
+            found1 = true;
     // tolerate not found if FTS ranking empty but like fallback should find; require found
     REQUIRE(found1);
 }
@@ -179,7 +189,8 @@ TEST_CASE("search very long query", "[db_search]") {
     Track t;
     t.path = "/tmp/long.mp3";
     t.title = "Short";
-    for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xD0+b);
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0xD0 + b);
     REQUIRE(db->insertTrack(t).has_value());
     std::string longQ(5000, 'a');
     longQ += " Short ";
@@ -196,12 +207,13 @@ TEST_CASE("search limit=0 defaults to 50", "[db_search]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    for (int i=0;i<3;++i) {
+    for (int i = 0; i < 3; ++i) {
         Track t;
-        t.path = "/tmp/lim"+std::to_string(i)+".mp3";
+        t.path = "/tmp/lim" + std::to_string(i) + ".mp3";
         t.title = "Limited";
-        t.artist = "Artist"+std::to_string(i);
-        for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xE0+i*16+b);
+        t.artist = "Artist" + std::to_string(i);
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0xE0 + i * 16 + b);
         REQUIRE(db->insertTrack(t).has_value());
     }
     auto r = search(*db, "Limited", 0);
@@ -222,39 +234,36 @@ TEST_CASE("search COLLATE NOCASE variation", "[db_search]") {
     t.artist = "MixedCase";
     t.album = "AlbumX";
     t.genre = "RoCk";
-    for (int b=0;b<32;++b) t.fingerprint[b]=(uint8_t)(0xF1+b);
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0xF1 + b);
     REQUIRE(db->insertTrack(t).has_value());
     auto r1 = searchLike(*db, "casetest", 10);
     REQUIRE(r1.has_value());
-    REQUIRE(r1->size()==1);
+    REQUIRE(r1->size() == 1);
     auto r2 = searchLike(*db, "CASETEST", 10);
     REQUIRE(r2.has_value());
-    REQUIRE(r2->size()==1);
+    REQUIRE(r2->size() == 1);
     auto r3 = searchLike(*db, "mixedcase", 10);
     REQUIRE(r3.has_value());
-    REQUIRE(r3->size()==1);
+    REQUIRE(r3->size() == 1);
     auto r4 = searchLike(*db, "rock", 10);
     REQUIRE(r4.has_value());
-    REQUIRE(r4->size()==1);
+    REQUIRE(r4->size() == 1);
     auto r5 = searchLike(*db, "ROCK", 10);
     REQUIRE(r5.has_value());
-    REQUIRE(r5->size()==1);
+    REQUIRE(r5->size() == 1);
     // search via FTS also should be case-insensitive (porter unicode61)
     auto r6 = search(*db, "casetest", 10);
     REQUIRE(r6.has_value());
-    bool found=false;
-    for (auto& tt: *r6) if (tt.title=="CaSeTeSt") found=true;
+    bool found = false;
+    for (auto& tt : *r6)
+        if (tt.title == "CaSeTeSt")
+            found = true;
     // FTS may be case-insensitive; ensure at least like fallback would have found; tolerate either
     if (!found) {
         auto r7 = searchLike(*db, "casetest", 10);
-        REQUIRE(r7->size()==1);
+        REQUIRE(r7->size() == 1);
     } else {
         REQUIRE(found);
     }
 }
-
-
-
-
-
-

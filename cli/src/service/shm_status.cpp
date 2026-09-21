@@ -12,8 +12,8 @@
 #include <string_view>
 #include <thread>
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/engine/engine.hpp"
+#include "caudio/utils/utils.hpp"
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -67,21 +67,19 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
         if (::ftruncate(fd, sizeof(AtomicShmStatus)) != 0) {
             ::close(fd);
             ::shm_unlink(handle.name_.c_str());
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io,
-                "ftruncate failed: " + std::string(std::strerror(errno)))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                         "ftruncate failed: " + std::string(std::strerror(errno)))};
         }
     }
 
-    void* ptr =
-        ::mmap(nullptr, sizeof(AtomicShmStatus), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void* ptr = ::mmap(nullptr, sizeof(AtomicShmStatus), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED) {
         ::close(fd);
         if (create)
             ::shm_unlink(handle.name_.c_str());
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                     "mmap failed: " + std::string(std::strerror(errno)))};
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::Io, "mmap failed: " + std::string(std::strerror(errno)))};
     }
     handle.map_ = static_cast<AtomicShmStatus*>(ptr);
     handle.size_ = sizeof(AtomicShmStatus);
@@ -112,9 +110,9 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
     void* ptr = ::MapViewOfFile(hMap, access, 0, 0, sizeof(AtomicShmStatus));
     if (!ptr) {
         ::CloseHandle(hMap);
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                        "MapViewOfFile failed: " +
-                                                            std::to_string(::GetLastError()))};
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                     "MapViewOfFile failed: " + std::to_string(::GetLastError()))};
     }
     handle.map_ = static_cast<AtomicShmStatus*>(ptr);
     handle.size_ = sizeof(AtomicShmStatus);
@@ -132,8 +130,7 @@ ShmStatusHandle::~ShmStatusHandle() {
 }
 
 ShmStatusHandle::ShmStatusHandle(ShmStatusHandle&& other) noexcept
-    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)),
-      create_(other.create_)
+    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)), create_(other.create_)
 #ifndef _WIN32
       ,
       fd_(other.fd_)

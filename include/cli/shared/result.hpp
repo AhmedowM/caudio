@@ -32,9 +32,9 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/db_types.hpp"
+#include "caudio/engine/engine.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::cli {
 
@@ -47,7 +47,9 @@ namespace caudio::cli {
  * @brief Current playback status returned by StatusReq and most mutating commands.
  * @ingroup caudio_cli
  *
- * @json_example {"type": "Status", "state": "Playing", "pos": 120.5, "dur": 240.0, "vol": 0.8, "muted": false, "shuffle": true, "repeat": "Off", "track_id": 123, "title": "Song", "artist": "Artist", "path": "/music/song.mp3", "q_size": 10, "q_idx": 0}
+ * @json_example {"type": "Status", "state": "Playing", "pos": 120.5, "dur": 240.0, "vol": 0.8,
+ * "muted": false, "shuffle": true, "repeat": "Off", "track_id": 123, "title": "Song", "artist":
+ * "Artist", "path": "/music/song.mp3", "q_size": 10, "q_idx": 0}
  *
  * @param state Current playback state.
  * @param pos Current playback position in seconds.
@@ -208,7 +210,8 @@ struct LibraryStatsData final {
  * @brief Detailed library statistics including play history (returned by LibraryStatsDetailed).
  * @ingroup caudio_cli
  *
- * @json_example {"type": "LibraryStatsDetailed", "tracks": 1000, "queues": 5, "playlists": 20, "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
+ * @json_example {"type": "LibraryStatsDetailed", "tracks": 1000, "queues": 5, "playlists": 20,
+ * "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
  *
  * @param tracks Total number of tracks in the library.
  * @param queues Total number of queues.
@@ -367,7 +370,8 @@ struct SingleTrack final {
  * @brief Track with play statistics (returned by Info command).
  * @ingroup caudio_cli
  *
- * @json_example {"type": "TrackInfo", "track": {...}, "play_count": 42, "last_played": 1699999999000}
+ * @json_example {"type": "TrackInfo", "track": {...}, "play_count": 42, "last_played":
+ * 1699999999000}
  *
  * @param track Track metadata.
  * @param play_count Number of times this track has been played.
@@ -397,7 +401,9 @@ struct TrackInfo final {
  * @brief Single playback history entry.
  * @ingroup caudio_cli
  *
- * @json_example {"type": "HistoryEntry", "id": 1, "track_id": 123, "started_at": 1699999999000, "completed_at": 1699999999240, "position_ms": 240000, "completion_pct": 100.0, "queue_id": 1, "title": "Song", "artist": "Artist", "path": "/music/song.mp3", "duration": 240.0}
+ * @json_example {"type": "HistoryEntry", "id": 1, "track_id": 123, "started_at": 1699999999000,
+ * "completed_at": 1699999999240, "position_ms": 240000, "completion_pct": 100.0, "queue_id": 1,
+ * "title": "Song", "artist": "Artist", "path": "/music/song.mp3", "duration": 240.0}
  *
  * @param id History entry ID.
  * @param track_id Track ID that was played.
@@ -509,7 +515,8 @@ struct DeviceInfo final {
  * @brief List of audio output devices (returned by DeviceList).
  * @ingroup caudio_cli
  *
- * @json_example {"type": "Devices", "devices": [{"id": "hw:0,0", "name": "Built-in Audio", "isDefault": true}, ...]}
+ * @json_example {"type": "Devices", "devices": [{"id": "hw:0,0", "name": "Built-in Audio",
+ * "isDefault": true}, ...]}
  *
  * @param devices Vector of device information.
  */
@@ -550,9 +557,10 @@ using CliError = caudio::utils::Error;
  * @see resultFromJson for deserialization
  * @see protocol.cppm for IPC framing
  */
-using Result = std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData, Tracks, Playlists,
-                            PlaylistData, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError,
-                            Devices>;
+using Result =
+    std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData,
+                 Tracks, Playlists, PlaylistData, ConfigValue, ConfigValues, SingleTrack, TrackInfo,
+                 History, Empty, CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

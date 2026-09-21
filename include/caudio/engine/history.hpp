@@ -1,10 +1,11 @@
 #pragma once
+#include <sqlite3.h>
+
 #include <chrono>
 #include <cstdint>
 #include <expected>
 #include <mutex>
 #include <shared_mutex>
-#include <sqlite3.h>
 #include <string>
 #include <vector>
 
@@ -78,8 +79,7 @@ uint64_t nowMs() noexcept;
  * @see Engine::doHistoryMark
  * @see EngineConfig
  */
-bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr,
-                        int secsThr) noexcept;
+bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept;
 /**
  * @brief Deprecated wrapper for shouldMarkPlayedEx with 60%/90s defaults.
  * @ingroup caudio_engine
@@ -108,7 +108,8 @@ namespace caudio::engine {
 class History final {
   public:
     using ExpectedVoid = std::expected<void, caudio::utils::Error>; ///< Void or Error.
-    using ExpectedEntries = std::expected<std::vector<HistoryEntry>, caudio::utils::Error>; ///< Entries or Error.
+    using ExpectedEntries =
+        std::expected<std::vector<HistoryEntry>, caudio::utils::Error>; ///< Entries or Error.
 
     /**
      * @brief Constructs a History helper.

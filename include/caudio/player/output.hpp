@@ -43,9 +43,8 @@
 #include <thread>
 #include <vector>
 
-#include "miniaudio.h"
-
 #include "caudio/utils/utils.hpp"
+#include "miniaudio.h"
 
 namespace caudio::player {
 

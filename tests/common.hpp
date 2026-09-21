@@ -47,8 +47,8 @@ inline bool noAudio() noexcept {
  * `ma_device_init`/`ma_device_start`, so no beep. Example:
  * `auto ring = caudio::test::makeDummyRing(48000, 2);`
  */
-inline caudio::utils::SpscRing<float> makeDummyRing(uint32_t sampleRate = 48000, uint32_t channels = 2,
-                                                     size_t frames = 8192) {
+inline caudio::utils::SpscRing<float> makeDummyRing(uint32_t sampleRate = 48000,
+                                                    uint32_t channels = 2, size_t frames = 8192) {
     (void)sampleRate;
     return caudio::utils::SpscRing<float>{frames, channels};
 }
@@ -63,21 +63,22 @@ inline caudio::utils::SpscRing<float> makeDummyRing(uint32_t sampleRate = 48000,
 #define CAUDIO_SKIP_IF_NOAUDIO()                                                                   \
     do {                                                                                           \
         if (caudio::test::noAudio()) {                                                             \
-            SKIP("CAUDIO_TEST_NOAUDIO=1 - audio device test skipped (no beep)");                  \
+            SKIP("CAUDIO_TEST_NOAUDIO=1 - audio device test skipped (no beep)");                   \
         }                                                                                          \
     } while (0)
 
 namespace caudio::test_helpers {
 
-inline std::filesystem::path tempDbPath(const std::string &prefix) {
+inline std::filesystem::path tempDbPath(const std::string& prefix) {
     static std::atomic<int> ctr{0};
     auto dir = std::filesystem::temp_directory_path();
     std::string name = prefix + "_" + std::to_string(ctr.fetch_add(1)) + "_" +
-                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".db";
+                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                       ".db";
     return dir / name;
 }
 
-inline std::filesystem::path tempDirPath(const std::string &prefix) {
+inline std::filesystem::path tempDirPath(const std::string& prefix) {
     static std::atomic<int> ctr2{1000};
     auto dir = std::filesystem::temp_directory_path();
     std::string name = prefix + "_" + std::to_string(ctr2.fetch_add(1));
@@ -86,11 +87,13 @@ inline std::filesystem::path tempDirPath(const std::string &prefix) {
     return p;
 }
 
-inline void busyWaitUntil(std::function<bool()> pred, std::chrono::milliseconds timeout = std::chrono::milliseconds{2000},
+inline void busyWaitUntil(std::function<bool()> pred,
+                          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000},
                           std::chrono::milliseconds interval = std::chrono::milliseconds{10}) {
     auto start = std::chrono::steady_clock::now();
     while (!pred()) {
-        if (std::chrono::steady_clock::now() - start > timeout) break;
+        if (std::chrono::steady_clock::now() - start > timeout)
+            break;
         std::this_thread::sleep_for(interval);
     }
 }

@@ -9,15 +9,14 @@
  * :stmt_helpers are available separately but not included here.
  */
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/db/schema.hpp"
 #include "caudio/db/db_core.hpp"
+#include "caudio/db/db_types.hpp"
+#include "caudio/db/json.hpp"
 #include "caudio/db/queue.hpp"
 #include "caudio/db/scan.hpp"
+#include "caudio/db/schema.hpp"
 #include "caudio/db/search.hpp"
-#include "caudio/db/json.hpp"
 #include "caudio/db/write_thread.hpp"
-
 #include "caudio/utils/utils.hpp"
 
 /**

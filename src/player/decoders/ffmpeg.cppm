@@ -4,7 +4,7 @@ module;
 export module caudio.player:ffmpeg;
 
 export namespace caudio::player {
-  using ::caudio::player::TrackMetadata;
-  using ::caudio::player::extractMetadata;
-  using ::caudio::player::FfmpegDecoder;
-}
+using ::caudio::player::extractMetadata;
+using ::caudio::player::FfmpegDecoder;
+using ::caudio::player::TrackMetadata;
+} // namespace caudio::player

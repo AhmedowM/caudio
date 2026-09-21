@@ -1,22 +1,23 @@
 module;
 #ifndef _WIN32
-#include <cerrno>
-#include <cstring>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#include <cerrno>
+#include <cstring>
 #endif
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <expected>
 #include <memory>
 #include <span>
 #include <string>
 #include <utility>
 #include <vector>
-#include <cstring>
 
 module caudio.service:ipc_channel_unix;
 
@@ -32,16 +33,18 @@ namespace detail {
 inline caudio::utils::Expected<void> sendAll(int fd, std::span<const std::byte> data) {
     std::size_t sent = 0;
     while (sent < data.size()) {
-        ::ssize_t n = ::send(fd, reinterpret_cast<const char*>(data.data()) + sent,
-                             data.size() - sent, 0);
+        ::ssize_t n =
+            ::send(fd, reinterpret_cast<const char*>(data.data()) + sent, data.size() - sent, 0);
         if (n < 0) {
             if (errno == EINTR) {
                 continue;
             }
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
         if (n == 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "send: peer closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "send: peer closed")};
         }
         sent += static_cast<std::size_t>(n);
     }
@@ -56,10 +59,12 @@ inline caudio::utils::Expected<void> recvExact(int fd, std::span<std::byte> out)
             if (errno == EINTR) {
                 continue;
             }
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
         if (n == 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "recv: peer closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "recv: peer closed")};
         }
         got += static_cast<std::size_t>(n);
     }
@@ -69,13 +74,17 @@ inline caudio::utils::Expected<void> recvExact(int fd, std::span<std::byte> out)
 } // namespace detail
 
 class UnixSocketChannel final : public IpcChannel {
-public:
+  public:
     explicit UnixSocketChannel(int fd) noexcept : fd_(fd) {}
-    ~UnixSocketChannel() override { close(); }
+    ~UnixSocketChannel() override {
+        close();
+    }
 
     UnixSocketChannel(const UnixSocketChannel&) = delete;
     UnixSocketChannel& operator=(const UnixSocketChannel&) = delete;
-    UnixSocketChannel(UnixSocketChannel&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+    UnixSocketChannel(UnixSocketChannel&& other) noexcept : fd_(other.fd_) {
+        other.fd_ = -1;
+    }
     UnixSocketChannel& operator=(UnixSocketChannel&& other) noexcept {
         if (this != &other) {
             close();
@@ -87,14 +96,16 @@ public:
 
     caudio::utils::Expected<void> send(std::span<const std::byte> data) override {
         if (fd_ < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
         }
         return detail::sendAll(fd_, data);
     }
 
     caudio::utils::Expected<std::vector<std::byte>> recv() override {
         if (fd_ < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::State, "channel closed")};
         }
         std::array<std::byte, 4> hdr{};
         if (auto r = detail::recvExact(fd_, std::span<std::byte>(hdr)); !r) {
@@ -105,7 +116,8 @@ public:
                             (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
                             static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
         if (len > (16 * 1024 * 1024)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too large")};
         }
         std::vector<std::byte> payload(len);
         if (len > 0) {
@@ -123,13 +135,16 @@ public:
         }
     }
 
-    int native() const noexcept { return fd_; }
+    int native() const noexcept {
+        return fd_;
+    }
 
-    static caudio::utils::Expected<std::unique_ptr<UnixSocketChannel>> connectTo(
-        const std::string& path) {
+    static caudio::utils::Expected<std::unique_ptr<UnixSocketChannel>>
+    connectTo(const std::string& path) {
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
         struct FdDeleter {
             void operator()(int* p) const noexcept {
@@ -143,11 +158,13 @@ public:
         sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         if (path.size() >= sizeof(addr.sun_path)) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "socket path too long")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                            "socket path too long")};
         }
         std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
         guard.release();
         auto ch = std::make_unique<UnixSocketChannel>(fd);
@@ -157,30 +174,34 @@ public:
     static caudio::utils::Expected<int> listenOn(const std::string& path) {
         int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd < 0) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(errno))};
         }
         ::unlink(path.c_str());
         sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         if (path.size() >= sizeof(addr.sun_path)) {
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "socket path too long")};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                            "socket path too long")};
         }
         std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
         if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
             int e = errno;
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(e))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(e))};
         }
         if (::listen(fd, 16) != 0) {
             int e = errno;
             ::close(fd);
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(e))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, std::strerror(e))};
         }
         return fd;
     }
 
-private:
+  private:
     int fd_{-1};
 };
 
@@ -193,25 +214,24 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeUnixChannel(int fd) {
 #else // _WIN32 stub
 
 class UnixSocketChannel final : public IpcChannel {
-public:
+  public:
     UnixSocketChannel() = default;
     caudio::utils::Expected<void> send(std::span<const std::byte>) override {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Unix sockets not supported on Windows")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                        "Unix sockets not supported on Windows")};
     }
     caudio::utils::Expected<std::vector<std::byte>> recv() override {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Unix sockets not supported on Windows")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                        "Unix sockets not supported on Windows")};
     }
     void close() noexcept override {}
 };
 
 caudio::utils::Expected<std::unique_ptr<IpcChannel>> makeUnixChannel(int) {
-    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "Unix sockets not supported on Windows")};
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                    "Unix sockets not supported on Windows")};
 }
 
 #endif
 
 } // namespace caudio::service
-
-
-
-

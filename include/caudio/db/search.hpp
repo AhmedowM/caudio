@@ -1,5 +1,6 @@
 #pragma once
 #include <sqlite3.h>
+
 #include <array>
 #include <cctype>
 #include <cstdint>
@@ -11,10 +12,10 @@
 #include <string_view>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
+#include "caudio/db/db_core.hpp"
 #include "caudio/db/db_types.hpp"
 #include "caudio/db/detail.hpp"
-#include "caudio/db/db_core.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::db {
 
@@ -35,7 +36,8 @@ inline void fillTrackSearch(sqlite3_stmt* s, Track& out);
  * @param query Already-sanitized FTS5 query text.
  * @param limit Maximum rows (<=0 defaults to 50).
  * @return Vector of matching Tracks, or `Error` on prepare failure.
- * @details SQL: `SELECT ... FROM tracks JOIN tracks_fts ON id=rowid WHERE tracks_fts MATCH ? ORDER BY rank LIMIT ?`.
+ * @details SQL: `SELECT ... FROM tracks JOIN tracks_fts ON id=rowid WHERE tracks_fts MATCH ? ORDER
+ * BY rank LIMIT ?`.
  * @par Thread safety
  * Caller must hold `Database::mutex()` (shared or exclusive).
  * @see sanitizeFtsTerm
@@ -99,7 +101,7 @@ std::string sanitizeFtsTerm(std::string_view term);
  * Thread-safe (delegates to `searchFts`).
  * @see searchFts
  */
-std::expected<std::vector<Track>, caudio::utils::Error>
-search(Database& db, std::string_view query, int limit = 50);
+std::expected<std::vector<Track>, caudio::utils::Error> search(Database& db, std::string_view query,
+                                                               int limit = 50);
 
 } // namespace caudio::db

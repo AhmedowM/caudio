@@ -28,32 +28,32 @@ namespace caudio::db {
  * soft-deleted. `library_id` defaults to 1 (the built-in default library).
  */
 struct Track {
-    int64_t id{};                                ///< Row id (PK, 0 = not yet persisted).
-    std::array<uint8_t, 32> fingerprint{};       ///< BLAKE3-256 content fingerprint (UNIQUE).
-    std::string path;                            ///< Absolute filesystem path (NOT NULL).
-    int64_t size{};                              ///< File size in bytes.
-    int64_t mtime{};                             ///< Last write time (filesystem epoch).
-    double duration{};                           ///< Duration in seconds.
-    uint32_t sample_rate{};                      ///< Sample rate in Hz.
-    uint32_t channels{};                         ///< Channel count.
-    int32_t bitrate{};                           ///< Bitrate in bps.
-    std::string title;                           ///< Title tag.
-    std::string artist;                          ///< Artist tag.
-    std::string album;                           ///< Album tag.
-    std::string album_artist;                    ///< Album-artist tag.
-    std::string genre;                           ///< Genre tag.
-    int32_t year{};                              ///< Year tag.
-    int32_t track_num{};                         ///< Track number within disc.
-    int32_t disc_num{};                          ///< Disc number.
-    std::string cover_art_path;                  ///< Path to cover art file.
-    int32_t rating{};                            ///< User rating (0..5).
-    int64_t play_count{};                        ///< Number of plays.
-    int64_t last_played{};                       ///< Timestamp of last play (unix seconds).
-    int64_t date_added{};                        ///< Timestamp when inserted.
-    int64_t last_scanned{};                      ///< Timestamp of last scan.
-    bool dirty{false};                           ///< True if metadata needs re-scan.
-    int64_t deleted_at{};                        ///< Soft-delete timestamp (0 = live).
-    int64_t library_id{1};                       ///< Owning library id (FK -> libraries.id).
+    int64_t id{};                          ///< Row id (PK, 0 = not yet persisted).
+    std::array<uint8_t, 32> fingerprint{}; ///< BLAKE3-256 content fingerprint (UNIQUE).
+    std::string path;                      ///< Absolute filesystem path (NOT NULL).
+    int64_t size{};                        ///< File size in bytes.
+    int64_t mtime{};                       ///< Last write time (filesystem epoch).
+    double duration{};                     ///< Duration in seconds.
+    uint32_t sample_rate{};                ///< Sample rate in Hz.
+    uint32_t channels{};                   ///< Channel count.
+    int32_t bitrate{};                     ///< Bitrate in bps.
+    std::string title;                     ///< Title tag.
+    std::string artist;                    ///< Artist tag.
+    std::string album;                     ///< Album tag.
+    std::string album_artist;              ///< Album-artist tag.
+    std::string genre;                     ///< Genre tag.
+    int32_t year{};                        ///< Year tag.
+    int32_t track_num{};                   ///< Track number within disc.
+    int32_t disc_num{};                    ///< Disc number.
+    std::string cover_art_path;            ///< Path to cover art file.
+    int32_t rating{};                      ///< User rating (0..5).
+    int64_t play_count{};                  ///< Number of plays.
+    int64_t last_played{};                 ///< Timestamp of last play (unix seconds).
+    int64_t date_added{};                  ///< Timestamp when inserted.
+    int64_t last_scanned{};                ///< Timestamp of last scan.
+    bool dirty{false};                     ///< True if metadata needs re-scan.
+    int64_t deleted_at{};                  ///< Soft-delete timestamp (0 = live).
+    int64_t library_id{1};                 ///< Owning library id (FK -> libraries.id).
 };
 
 /**
@@ -64,13 +64,13 @@ struct Track {
  * the filter expression.
  */
 struct Playlist {
-    int64_t id{};                ///< Row id (PK).
-    std::string name;            ///< Display name (NOT NULL).
-    int32_t type{};              ///< Playlist type (0 = manual).
-    std::string smart_query;     ///< Smart-playlist filter (empty for manual).
-    int64_t created{};           ///< Creation timestamp.
-    int64_t modified{};          ///< Last modification timestamp.
-    int64_t library_id{1};       ///< Owning library id.
+    int64_t id{};            ///< Row id (PK).
+    std::string name;        ///< Display name (NOT NULL).
+    int32_t type{};          ///< Playlist type (0 = manual).
+    std::string smart_query; ///< Smart-playlist filter (empty for manual).
+    int64_t created{};       ///< Creation timestamp.
+    int64_t modified{};      ///< Last modification timestamp.
+    int64_t library_id{1};   ///< Owning library id.
 };
 
 /**
@@ -81,11 +81,11 @@ struct Playlist {
  * `Database::dbMutex_` (see schema.hpp and queue.hpp).
  */
 struct QueueItem {
-    int64_t id{};            ///< Row id (PK).
-    int64_t queue_id{1};     ///< Owning queue id (FK -> queues.id).
-    int64_t track_id{};      ///< Referenced track id (FK -> tracks.id).
-    int64_t position{};      ///< Zero-based position within the queue (UNIQUE per queue_id).
-    int64_t added{};         ///< Timestamp when enqueued.
+    int64_t id{};        ///< Row id (PK).
+    int64_t queue_id{1}; ///< Owning queue id (FK -> queues.id).
+    int64_t track_id{};  ///< Referenced track id (FK -> tracks.id).
+    int64_t position{};  ///< Zero-based position within the queue (UNIQUE per queue_id).
+    int64_t added{};     ///< Timestamp when enqueued.
 };
 
 /**
@@ -94,10 +94,10 @@ struct QueueItem {
  * @details Maps to `queues`. Separate from `queue` (items) table.
  */
 struct Queue {
-    int64_t id{};                ///< Row id (PK).
-    std::string name;            ///< Display name.
-    int32_t repeat_mode{};       ///< Repeat mode (0 = off).
-    int64_t library_id{1};       ///< Owning library id.
+    int64_t id{};          ///< Row id (PK).
+    std::string name;      ///< Display name.
+    int32_t repeat_mode{}; ///< Repeat mode (0 = off).
+    int64_t library_id{1}; ///< Owning library id.
 };
 
 /**
@@ -106,13 +106,13 @@ struct Queue {
  * @details Maps to `history`. Records a single play session.
  */
 struct HistoryEntry {
-    int64_t id{};                ///< Row id (PK).
-    int64_t track_id{};          ///< Played track id.
-    int64_t started_at{};        ///< Start timestamp.
-    int64_t completed_at{};      ///< Completion timestamp (0 if not completed).
-    int64_t position_ms{};       ///< Position reached in milliseconds.
-    double completion_pct{};     ///< Completion percentage [0,1].
-    int64_t queue_id{1};         ///< Queue context.
+    int64_t id{};            ///< Row id (PK).
+    int64_t track_id{};      ///< Played track id.
+    int64_t started_at{};    ///< Start timestamp.
+    int64_t completed_at{};  ///< Completion timestamp (0 if not completed).
+    int64_t position_ms{};   ///< Position reached in milliseconds.
+    double completion_pct{}; ///< Completion percentage [0,1].
+    int64_t queue_id{1};     ///< Queue context.
 };
 
 /**
@@ -121,11 +121,11 @@ struct HistoryEntry {
  * @details Maps to `bookmarks`.
  */
 struct Bookmark {
-    int64_t id{};                ///< Row id (PK).
-    int64_t track_id{};          ///< Bookmarked track id.
-    int64_t position_ms{};       ///< Saved position in milliseconds.
-    std::string note;            ///< Optional user note.
-    int64_t created{};           ///< Creation timestamp.
+    int64_t id{};          ///< Row id (PK).
+    int64_t track_id{};    ///< Bookmarked track id.
+    int64_t position_ms{}; ///< Saved position in milliseconds.
+    std::string note;      ///< Optional user note.
+    int64_t created{};     ///< Creation timestamp.
 };
 
 /**
@@ -134,14 +134,14 @@ struct Bookmark {
  * @details Maps to `libraries`. Id 1 is the default library with empty path.
  */
 struct Library {
-    int64_t id{};                                    ///< Row id (PK).
-    std::string path;                                ///< Root directory path (UNIQUE).
-    std::string name;                                ///< Display name.
-    int64_t date_added{};                            ///< Creation timestamp.
-    int64_t last_scanned{};                          ///< Last scan timestamp.
-    bool auto_scan{true};                            ///< Whether to auto-scan on startup.
-    bool recursive{true};                            ///< Whether to scan recursively.
-    std::string extensions{"mp3,flac,ogg,wav,m4a"};  ///< Comma-separated allowed extensions.
+    int64_t id{};                                   ///< Row id (PK).
+    std::string path;                               ///< Root directory path (UNIQUE).
+    std::string name;                               ///< Display name.
+    int64_t date_added{};                           ///< Creation timestamp.
+    int64_t last_scanned{};                         ///< Last scan timestamp.
+    bool auto_scan{true};                           ///< Whether to auto-scan on startup.
+    bool recursive{true};                           ///< Whether to scan recursively.
+    std::string extensions{"mp3,flac,ogg,wav,m4a"}; ///< Comma-separated allowed extensions.
 };
 
 /**
@@ -165,12 +165,12 @@ struct DbStats {
  * @details Returned by `Database::libraryStatsDetailed()`.
  */
 struct LibraryStatsDetailedData {
-    std::size_t tracks{0};               ///< Total live tracks.
-    std::size_t queues{0};               ///< Total queue items.
-    std::size_t playlists{0};            ///< Total playlists.
-    int64_t total_duration_ms{0};        ///< Sum of durations (ms).
-    int64_t total_play_time_ms{0};       ///< Sum of play_count * duration (ms).
-    std::vector<Track> most_played{};    ///< Top 10 most-played tracks ordered by play_count DESC.
+    std::size_t tracks{0};            ///< Total live tracks.
+    std::size_t queues{0};            ///< Total queue items.
+    std::size_t playlists{0};         ///< Total playlists.
+    int64_t total_duration_ms{0};     ///< Sum of durations (ms).
+    int64_t total_play_time_ms{0};    ///< Sum of play_count * duration (ms).
+    std::vector<Track> most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
 };
 
 /**
@@ -197,10 +197,10 @@ struct TrackQuery {
  * @ingroup caudio_db
  */
 struct HistoryQuery {
-    std::optional<int64_t> track_id{};   ///< Filter by track.
-    std::optional<int64_t> queue_id{};   ///< Filter by queue.
-    int limit{};                         ///< Max rows (0 = unlimited).
-    int offset{};                        ///< Row offset.
+    std::optional<int64_t> track_id{}; ///< Filter by track.
+    std::optional<int64_t> queue_id{}; ///< Filter by queue.
+    int limit{};                       ///< Max rows (0 = unlimited).
+    int offset{};                      ///< Row offset.
 };
 
 } // namespace caudio::db

@@ -4,5 +4,5 @@ module;
 export module caudio.engine:shuffle;
 
 export namespace caudio::engine::detail {
-  using ::caudio::engine::detail::shufflePerm;
+using ::caudio::engine::detail::shufflePerm;
 }

@@ -22,8 +22,8 @@
 #include <memory>
 #include <span>
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/player/reader.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::player {
 

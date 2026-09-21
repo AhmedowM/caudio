@@ -84,8 +84,7 @@ std::vector<std::byte> frameMessage(std::span<const std::byte> payload) {
     return out;
 }
 
-caudio::utils::Expected<std::vector<std::byte>>
-deframeMessage(std::span<const std::byte> framed) {
+caudio::utils::Expected<std::vector<std::byte>> deframeMessage(std::span<const std::byte> framed) {
     if (framed.size() < 4) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "frame too small")};

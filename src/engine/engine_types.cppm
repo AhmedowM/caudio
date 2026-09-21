@@ -4,14 +4,13 @@ module;
 export module caudio.engine:types;
 
 export namespace caudio::engine {
-  using ::caudio::engine::RepeatMode;
-  using ::caudio::engine::ShuffleMode;
-  using ::caudio::engine::PlaybackState;
-  using ::caudio::engine::EngineEventType;
-  using ::caudio::engine::EngineEvent;
-  using ::caudio::engine::EngineCallbacks;
-  using ::caudio::engine::EngineConfig;
-  using ::caudio::engine::QueueState;
-  using ::caudio::engine::EngineState;
-}
-
+using ::caudio::engine::EngineCallbacks;
+using ::caudio::engine::EngineConfig;
+using ::caudio::engine::EngineEvent;
+using ::caudio::engine::EngineEventType;
+using ::caudio::engine::EngineState;
+using ::caudio::engine::PlaybackState;
+using ::caudio::engine::QueueState;
+using ::caudio::engine::RepeatMode;
+using ::caudio::engine::ShuffleMode;
+} // namespace caudio::engine

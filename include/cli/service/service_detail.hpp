@@ -45,11 +45,11 @@
 // Windows-specific API usage is in the .cpp with proper extern "C" declarations.
 #endif
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/engine/engine.hpp"
 #include "caudio/db/database.hpp"
-#include "cli/cli.hpp"
+#include "caudio/engine/engine.hpp"
 #include "caudio/player/player.hpp"
+#include "caudio/utils/utils.hpp"
+#include "cli/cli.hpp"
 
 namespace caudio::service::detail {
 
@@ -146,8 +146,8 @@ std::optional<int> readPidFile(const std::filesystem::path& pidPath);
  * @param db Database reference.
  * @return Status on success, Error on failure.
  */
-std::expected<caudio::cli::Status, caudio::utils::Error>
-buildStatus(caudio::engine::Engine& eng, caudio::db::Database& db);
+std::expected<caudio::cli::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
+                                                                     caudio::db::Database& db);
 
 /**
  * @brief Resolve config file path.
@@ -166,8 +166,8 @@ std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
  * @param key Config key to read.
  * @return Value string on success, Error on failure.
  */
-std::expected<std::string, caudio::utils::Error>
-readConfigValueRaw(const std::filesystem::path& p, std::string_view key);
+std::expected<std::string, caudio::utils::Error> readConfigValueRaw(const std::filesystem::path& p,
+                                                                    std::string_view key);
 
 /**
  * @brief Write a single config value to JSON file.
@@ -177,8 +177,8 @@ readConfigValueRaw(const std::filesystem::path& p, std::string_view key);
  * @param value Value to write (JSON-parsed if valid JSON, else string).
  * @return void on success, Error on failure.
  */
-caudio::utils::Expected<void>
-writeConfigValueRaw(const std::filesystem::path& p, std::string_view key, std::string_view value);
+caudio::utils::Expected<void> writeConfigValueRaw(const std::filesystem::path& p,
+                                                  std::string_view key, std::string_view value);
 
 /**
  * @brief List all config key-value pairs from JSON file.
@@ -196,8 +196,8 @@ listConfigValuesRaw(const std::filesystem::path& p);
  * @param key Config key to delete.
  * @return void on success, Error on failure.
  */
-caudio::utils::Expected<void>
-deleteConfigValueRaw(const std::filesystem::path& p, std::string_view key);
+caudio::utils::Expected<void> deleteConfigValueRaw(const std::filesystem::path& p,
+                                                   std::string_view key);
 
 /**
  * @brief Reset entire config file (delete it).

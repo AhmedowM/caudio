@@ -181,8 +181,7 @@ class FileReader final : public Reader {
      *
      * Thread Safety: Thread-safe (no shared state during construction)
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
-        const std::filesystem::path& path);
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::filesystem::path& path);
 
     ~FileReader() override;
 
@@ -230,16 +229,15 @@ class MemoryReader final : public Reader {
      * Copies the input data to an internal buffer. The original data
      * can be freed after this call returns.
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
-        std::span<const std::byte> data);
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(std::span<const std::byte> data);
 
     /**
      * @brief Open a memory reader from a vector
      * @param data Input vector (copied)
      * @return Expected containing unique_ptr<Reader> on success
      */
-    static caudio::utils::Expected<std::unique_ptr<Reader>> open(
-        const std::vector<std::byte>& data);
+    static caudio::utils::Expected<std::unique_ptr<Reader>>
+    open(const std::vector<std::byte>& data);
 
     /**
      * @brief Open a memory reader from raw pointer and length
@@ -248,7 +246,7 @@ class MemoryReader final : public Reader {
      * @return Expected containing unique_ptr<Reader> on success, Error if null data with len>0
      */
     static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::byte* data,
-                                                                   std::size_t len);
+                                                                 std::size_t len);
 
     std::size_t read(std::span<std::byte> dst) override;
 

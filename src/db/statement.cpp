@@ -1,8 +1,9 @@
 #include "caudio/db/statement.hpp"
 
-#include <caudio/utils/utils.hpp>
 #include <sqlite3.h>
+
 #include <algorithm>
+#include <caudio/utils/utils.hpp>
 #include <limits>
 #include <string>
 
@@ -28,15 +29,14 @@ SqliteStatement& SqliteStatement::operator=(SqliteStatement&& o) noexcept {
 }
 
 std::expected<void, caudio::utils::Error> SqliteStatement::prepare(sqlite3* db,
-                                                                    std::string_view sql) {
+                                                                   std::string_view sql) {
     if (stmt_)
         sqlite3_finalize(stmt_);
     stmt_ = nullptr;
     int rc = sqlite3_prepare_v2(db, sql.data(), static_cast<int>(sql.size()), &stmt_, nullptr);
     if (rc != SQLITE_OK) {
         std::string msg = db ? sqlite3_errmsg(db) : "prepare failed";
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg)};
     }
     return {};
 }
@@ -61,8 +61,7 @@ void SqliteStatement::bindText(int idx, std::string_view v) {
 
 void SqliteStatement::bindBlob(int idx, std::span<const std::byte> data) {
     if (stmt_)
-        sqlite3_bind_blob(stmt_, idx, data.data(), static_cast<int>(data.size()),
-                          SQLITE_TRANSIENT);
+        sqlite3_bind_blob(stmt_, idx, data.data(), static_cast<int>(data.size()), SQLITE_TRANSIENT);
 }
 
 void SqliteStatement::bindBlob(int idx, const void* data, int n) {

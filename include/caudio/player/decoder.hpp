@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/player/decoders/decoder_interface.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::player {
 
@@ -67,7 +67,7 @@ class DecoderRegistry {
      * @retval StatusCode::Io FFmpeg initialization failed
      * @retval StatusCode::InvalidArg Reader seek/tell returned invalid values
      */
-     [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader);
+    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<IDecoder>> open(Reader& reader);
 };
 
 } // namespace caudio::player

@@ -69,7 +69,8 @@ class DbTransaction final {
     /**
      * @brief Rolls back the transaction.
      * @ingroup caudio_db
-     * @return Success or Error with StatusCode::Internal if no active transaction or ROLLBACK fails.
+     * @return Success or Error with StatusCode::Internal if no active transaction or ROLLBACK
+     * fails.
      */
     [[nodiscard]] std::expected<void, caudio::utils::Error> rollback();
 

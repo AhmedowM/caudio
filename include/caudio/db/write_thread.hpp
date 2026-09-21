@@ -35,9 +35,10 @@ namespace caudio::db {
  * the worker lock after execution with success or `Corrupt` on failure.
  */
 struct WriteOp {
-    std::string sql;                                                                    ///< Raw SQL (used when `stmt` is null).
-    std::unique_ptr<SqliteStatement> stmt;                                              ///< Prepared statement to step.
-    std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb;         ///< Completion callback.
+    std::string sql;                       ///< Raw SQL (used when `stmt` is null).
+    std::unique_ptr<SqliteStatement> stmt; ///< Prepared statement to step.
+    std::move_only_function<void(std::expected<void, caudio::utils::Error>)>
+        cb; ///< Completion callback.
 
     WriteOp() = default;
     /**
@@ -163,12 +164,13 @@ class WriterThread final {
   private:
     void worker(std::stop_token st);
 
-    std::unique_ptr<caudio::utils::MpscQueue<WriteOp>> queue_;   ///< Bounded queue (capacity = batch size).
-    sqlite3* db_{nullptr};                                        ///< Borrowed handle (not owned).
-    std::jthread thread_{};                                       ///< Worker thread.
-    std::mutex mtx_;                                              ///< Protects cv_/flush coordination.
-    std::condition_variable cv_;                                  ///< Notified on push and op completion.
-    std::atomic<int> in_flight_{0};                               ///< Ops currently executing.
+    std::unique_ptr<caudio::utils::MpscQueue<WriteOp>>
+        queue_;                     ///< Bounded queue (capacity = batch size).
+    sqlite3* db_{nullptr};          ///< Borrowed handle (not owned).
+    std::jthread thread_{};         ///< Worker thread.
+    std::mutex mtx_;                ///< Protects cv_/flush coordination.
+    std::condition_variable cv_;    ///< Notified on push and op completion.
+    std::atomic<int> in_flight_{0}; ///< Ops currently executing.
 };
 
 } // namespace caudio::db

@@ -174,7 +174,8 @@ TEST_CASE("scanDirectory filters by audio extensions case-insensitively", "[db_s
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
     std::filesystem::create_directories(dir);
-    // Create files with various extensions - use unique base names to avoid case-insensitive FS collisions
+    // Create files with various extensions - use unique base names to avoid case-insensitive FS
+    // collisions
     std::ofstream(dir / "a.MP3", std::ios::binary) << "audio";
     std::ofstream(dir / "b.mp3", std::ios::binary) << "audio";
     std::ofstream(dir / "c.Mp3", std::ios::binary) << "audio";
@@ -199,17 +200,18 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
     auto p = dir / "large.wav";
     // 200 KiB file ( >128 KiB = 2*64K )
     std::vector<uint8_t> data(200 * 1024);
-    for (size_t i=0;i<data.size();++i) data[i]=(uint8_t)(i*13 & 0xFF);
+    for (size_t i = 0; i < data.size(); ++i)
+        data[i] = (uint8_t)(i * 13 & 0xFF);
     {
         std::ofstream f(p, std::ios::binary);
         f.write((char*)data.data(), data.size());
     }
     auto sampled = scanDirectory(dir, ScanMode::Sampled);
     REQUIRE(sampled.has_value());
-    REQUIRE(sampled->size()==1);
+    REQUIRE(sampled->size() == 1);
     auto full = scanDirectory(dir, ScanMode::Full);
     REQUIRE(full.has_value());
-    REQUIRE(full->size()==1);
+    REQUIRE(full->size() == 1);
     // Sampled uses head+tail+size, Full uses BLAKE3 of entire file -> should differ for large file
     REQUIRE(sampled->front().fingerprint != full->front().fingerprint);
     // But re-scanning same mode is deterministic
@@ -217,10 +219,10 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
     REQUIRE(sampled2->front().fingerprint == sampled->front().fingerprint);
     auto full2 = scanDirectory(dir, ScanMode::Full);
     REQUIRE(full2->front().fingerprint == full->front().fingerprint);
-    // Modify middle byte only (not in head/tail 64K) -> Sampled should stay same, Full should change
-    // For 200K file, head 64K = [0,64K), tail 64K = [136K,200K), middle [64K,136K)
+    // Modify middle byte only (not in head/tail 64K) -> Sampled should stay same, Full should
+    // change For 200K file, head 64K = [0,64K), tail 64K = [136K,200K), middle [64K,136K)
     std::vector<uint8_t> dataMod = data;
-    dataMod[100*1024] ^= 0xFF;
+    dataMod[100 * 1024] ^= 0xFF;
     auto p2 = dir / "large2.wav";
     // overwrite original with modified middle
     {
@@ -229,10 +231,11 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
     }
     auto sampledMod = scanDirectory(dir, ScanMode::Sampled);
     REQUIRE(sampledMod.has_value());
-    REQUIRE(sampledMod->size()==1);
+    REQUIRE(sampledMod->size() == 1);
     // sampled should be same as before because middle not covered (unless size changed? size same)
     // For this file, change is in middle so sampled stays same, but full changes
-    // Note: if sampled differs, still valid test; we check full definitely differs from original full
+    // Note: if sampled differs, still valid test; we check full definitely differs from original
+    // full
     auto fullMod = scanDirectory(dir, ScanMode::Full);
     REQUIRE(fullMod.has_value());
     REQUIRE(fullMod->front().fingerprint != full->front().fingerprint);
@@ -243,8 +246,9 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
 TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     auto dir = tempDirPath("scan_preserve");
     auto p = dir / "song.mp3";
-    std::vector<uint8_t> d1(10*1024, 0x11);
-    for (size_t i=0;i<d1.size();++i) d1[i]=(uint8_t)(i & 0xFF);
+    std::vector<uint8_t> d1(10 * 1024, 0x11);
+    for (size_t i = 0; i < d1.size(); ++i)
+        d1[i] = (uint8_t)(i & 0xFF);
     {
         std::ofstream f(p, std::ios::binary);
         f.write((char*)d1.data(), d1.size());
@@ -258,9 +262,10 @@ TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     REQUIRE(scanLibrary(*db, libId).has_value());
     auto tracks = db->listTracks(nullptr);
     REQUIRE(tracks.has_value());
-    REQUIRE(tracks->size()==1);
+    REQUIRE(tracks->size() == 1);
     int64_t tid = tracks->front().id;
-    // set play_count and rating, then modify file content (same path, different fingerprint) and rescan
+    // set play_count and rating, then modify file content (same path, different fingerprint) and
+    // rescan
     {
         auto t = db->getTrack(tid);
         REQUIRE(t.has_value());
@@ -269,9 +274,11 @@ TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
         t->title = "Custom Title";
         REQUIRE(db->updateTrack(*t).has_value());
     }
-    // modify file to trigger content-changed path: change size as well to guarantee early-exit fails (size != trk.size)
-    std::vector<uint8_t> d2(12*1024, 0x22);
-    for (size_t i=0;i<d2.size();++i) d2[i]=(uint8_t)((i*3) & 0xFF);
+    // modify file to trigger content-changed path: change size as well to guarantee early-exit
+    // fails (size != trk.size)
+    std::vector<uint8_t> d2(12 * 1024, 0x22);
+    for (size_t i = 0; i < d2.size(); ++i)
+        d2[i] = (uint8_t)((i * 3) & 0xFF);
     // ensure different fingerprint from d1
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     {
@@ -288,9 +295,3 @@ TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }
-
-
-
-
-
-

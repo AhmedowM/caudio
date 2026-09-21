@@ -13,10 +13,10 @@
  * - version: version constants and helpers
  */
 
-#include "caudio/utils/result.hpp"
 #include "caudio/utils/error.hpp"
 #include "caudio/utils/log.hpp"
-#include "caudio/utils/ring.hpp"
 #include "caudio/utils/mpsc_queue.hpp"
+#include "caudio/utils/result.hpp"
+#include "caudio/utils/ring.hpp"
 #include "caudio/utils/thread.hpp"
 #include "caudio/utils/version.hpp"

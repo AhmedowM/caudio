@@ -34,8 +34,7 @@ History::History(std::shared_ptr<caudio::db::Database> db) : db_(std::move(db)) 
 
 History::ExpectedEntries History::listHistory(int limit) {
     if (!db_ || !db_->handle())
-        return std::unexpected(caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "no db"));
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
 
     std::string sql = "SELECT h.id, h.track_id, h.started_at, h.completed_at, h.position_ms, "
                       "h.completion_pct, h.queue_id, t.title, t.artist, t.path, t.duration "
@@ -53,12 +52,15 @@ History::ExpectedEntries History::listHistory(int limit) {
     sqlite3_stmt* raw = nullptr;
     int rc = sqlite3_prepare_v2(h, sql.c_str(), -1, &raw, nullptr);
     if (rc != SQLITE_OK)
-        return std::unexpected(caudio::utils::makeError(
-            caudio::utils::StatusCode::Internal, sqlite3_errmsg(h)));
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(h)));
 
     struct StmtGuard {
         sqlite3_stmt* s;
-        ~StmtGuard() { if (s) sqlite3_finalize(s); }
+        ~StmtGuard() {
+            if (s)
+                sqlite3_finalize(s);
+        }
     } guard(raw);
 
     if (hasLimit)
@@ -75,9 +77,15 @@ History::ExpectedEntries History::listHistory(int limit) {
         e.position_ms = sqlite3_column_int64(raw, 4);
         e.completion_pct = sqlite3_column_double(raw, 5);
         e.queue_id = sqlite3_column_int64(raw, 6);
-        e.title = sqlite3_column_text(raw, 7) ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 7)) : "";
-        e.artist = sqlite3_column_text(raw, 8) ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 8)) : "";
-        e.path = sqlite3_column_text(raw, 9) ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 9)) : "";
+        e.title = sqlite3_column_text(raw, 7)
+                      ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 7))
+                      : "";
+        e.artist = sqlite3_column_text(raw, 8)
+                       ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 8))
+                       : "";
+        e.path = sqlite3_column_text(raw, 9)
+                     ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 9))
+                     : "";
         e.duration = sqlite3_column_double(raw, 10);
         out.push_back(std::move(e));
     }
@@ -86,8 +94,7 @@ History::ExpectedEntries History::listHistory(int limit) {
 
 History::ExpectedVoid History::clearHistory() {
     if (!db_ || !db_->handle())
-        return std::unexpected(caudio::utils::makeError(
-            caudio::utils::StatusCode::State, "no db"));
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
 
     std::unique_lock lk(db_->mutex());
     sqlite3* h = db_->handle();
@@ -96,10 +103,10 @@ History::ExpectedVoid History::clearHistory() {
     if (rc != SQLITE_OK) {
         std::string msg = err ? std::string(err) : "clear history failed";
         sqlite3_free(err);
-        return std::unexpected(caudio::utils::makeError(
-            caudio::utils::StatusCode::Internal, msg));
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
     }
-    if (err) sqlite3_free(err);
+    if (err)
+        sqlite3_free(err);
     return {};
 }
 

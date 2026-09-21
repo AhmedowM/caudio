@@ -20,7 +20,8 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
     REQUIRE(!r.has_value());
     REQUIRE(r.error().code == caudio::utils::StatusCode::Busy);
 
-    // Real WriterThread: capacity 2, do NOT open so queue never drains -> flush should timeout after ~200ms with Busy
+    // Real WriterThread: capacity 2, do NOT open so queue never drains -> flush should timeout
+    // after ~200ms with Busy
     {
         caudio::db::WriterThread wt(2);
         // push two ops without opening thread -> queue stays full
@@ -35,7 +36,8 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         REQUIRE(pr3.error().code == caudio::utils::StatusCode::Busy);
         auto start = std::chrono::steady_clock::now();
         auto fr = wt.flush();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
         REQUIRE(!fr.has_value());
         REQUIRE(fr.error().code == caudio::utils::StatusCode::Busy);
         REQUIRE(elapsed.count() >= 190);
@@ -52,32 +54,36 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         auto start = std::chrono::steady_clock::now();
         auto fr = wt2.flush();
         REQUIRE(fr.has_value());
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start);
         REQUIRE(elapsed.count() < 50);
     }
     // After open, flush drains within 200ms (worker processes)
     {
-        sqlite3* db=nullptr;
-        REQUIRE(sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE|SQLITE_OPEN_CREATE, nullptr)==SQLITE_OK);
-        REQUIRE(sqlite3_exec(db,"CREATE TABLE t(id INTEGER)",nullptr,nullptr,nullptr)==SQLITE_OK);
+        sqlite3* db = nullptr;
+        REQUIRE(sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                                nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_exec(db, "CREATE TABLE t(id INTEGER)", nullptr, nullptr, nullptr) ==
+                SQLITE_OK);
         caudio::db::WriterThread wt(4);
         wt.open(db);
         // push an insert using SQL string (stmt=nullptr)
         std::atomic<bool> cbCalled{false};
-        auto pr = wt.push("INSERT INTO t(id) VALUES (1)", nullptr, [&](std::expected<void, caudio::utils::Error> e){ cbCalled.store(true); (void)e; });
+        auto pr = wt.push("INSERT INTO t(id) VALUES (1)", nullptr,
+                          [&](std::expected<void, caudio::utils::Error> e) {
+                              cbCalled.store(true);
+                              (void)e;
+                          });
         REQUIRE(pr.has_value());
         auto fr = wt.flush();
         REQUIRE(fr.has_value());
         // wait for callback outside lock (worker calls cb)
         auto start = std::chrono::steady_clock::now();
-        while(!cbCalled.load() && std::chrono::steady_clock::now() - start < std::chrono::milliseconds(500)) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        while (!cbCalled.load() &&
+               std::chrono::steady_clock::now() - start < std::chrono::milliseconds(500))
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
         REQUIRE(cbCalled.load());
         wt.close();
         sqlite3_close(db);
     }
 }
-
-
-
-
-

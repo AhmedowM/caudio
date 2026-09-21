@@ -1,10 +1,10 @@
 #pragma once
 #include <string_view>
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/player/player.hpp"
 #include "caudio/db/database.hpp"
 #include "caudio/engine/engine.hpp"
+#include "caudio/player/player.hpp"
+#include "caudio/utils/utils.hpp"
 
 /**
  * @file caudio.hpp

@@ -53,7 +53,7 @@ std::string_view columnText(sqlite3_stmt* stmt, int col) noexcept;
  * Non-copyable.
  */
 struct SqliteErrGuard {
-    char*& ref;                                     ///< Reference to the error pointer.
+    char*& ref; ///< Reference to the error pointer.
     /**
      * @brief Constructs guard for the given error pointer.
      * @ingroup caudio_db

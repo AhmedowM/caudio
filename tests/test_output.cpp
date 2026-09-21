@@ -1,8 +1,9 @@
-#include <catch2/catch_test_macros.hpp>
-#include "common.hpp"
 #include <array>
+#include <catch2/catch_test_macros.hpp>
 #include <cmath>
 #include <span>
+
+#include "common.hpp"
 import caudio.player;
 import caudio.utils;
 
@@ -33,24 +34,27 @@ TEST_CASE("output fillForTest pattern * volume and tail zero", "[output]") {
 
     std::array<float, 16> buf{};
     // fill with sentinel
-    for (auto& v : buf) v = 99.0f;
+    for (auto& v : buf)
+        v = 99.0f;
     out.fillForTest(buf);
 
     // first 8 samples should be pattern * 0.5
-    for (size_t i=0;i<pattern.size();++i) {
+    for (size_t i = 0; i < pattern.size(); ++i) {
         float expected = pattern[i] * 0.5f;
         REQUIRE(std::abs(buf[i] - expected) < 1e-6f);
     }
     // tail (8 samples) should be zero-filled then multiplied by volume (still 0)
-    for (size_t i=pattern.size(); i<buf.size(); ++i) {
+    for (size_t i = pattern.size(); i < buf.size(); ++i) {
         REQUIRE(buf[i] == 0.0f);
     }
 
     // second fill with empty ring should be all zeros
     std::array<float, 8> buf2{};
-    for (auto& v: buf2) v = 5.0f;
+    for (auto& v : buf2)
+        v = 5.0f;
     out.fillForTest(buf2);
-    for (auto v: buf2) REQUIRE(v == 0.0f);
+    for (auto v : buf2)
+        REQUIRE(v == 0.0f);
 }
 
 TEST_CASE("output setVolume clamp", "[output]") {
@@ -81,12 +85,8 @@ TEST_CASE("output fillForTest volume 1.0 passthrough", "[output]") {
     ring.write(pat);
     std::array<float, 8> buf{};
     out.fillForTest(buf);
-    for (size_t i=0;i<4;++i) REQUIRE(std::abs(buf[i]-pat[i])<1e-6f);
-    for (size_t i=4;i<8;++i) REQUIRE(buf[i]==0.0f);
+    for (size_t i = 0; i < 4; ++i)
+        REQUIRE(std::abs(buf[i] - pat[i]) < 1e-6f);
+    for (size_t i = 4; i < 8; ++i)
+        REQUIRE(buf[i] == 0.0f);
 }
-
-
-
-
-
-

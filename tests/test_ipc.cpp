@@ -1,10 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
-#include <thread>
 #include <filesystem>
-#include <vector>
-#include <variant>
 #include <iostream>
+#include <thread>
+#include <variant>
+#include <vector>
 
 #include "common.hpp"
 
@@ -54,14 +54,16 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
     auto statusRes = client.send(StatusReq{});
     REQUIRE(statusRes.has_value());
     bool hasStatus = false;
-    std::visit([&](auto&& v) {
-        using U = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<U, Status>) {
-            hasStatus = true;
-            REQUIRE(v.state == PlaybackState::Stopped);
-            REQUIRE(v.q_size == 0);
-        }
-    }, statusRes.value());
+    std::visit(
+        [&](auto&& v) {
+            using U = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<U, Status>) {
+                hasStatus = true;
+                REQUIRE(v.state == PlaybackState::Stopped);
+                REQUIRE(v.q_size == 0);
+            }
+        },
+        statusRes.value());
     REQUIRE(hasStatus);
 
     // Shutdown via new connection (Windows named pipes are single-use)
@@ -70,7 +72,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
     auto client2 = std::move(clientRes2.value());
     auto shutdownRes = client2.send(Shutdown{});
     REQUIRE(shutdownRes.has_value());
-    
+
     svcThread.request_stop();
     svcThread.join();
 
@@ -111,14 +113,16 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
     auto volRes = client.send(VolumeSet{.level = 75.0f});
     REQUIRE(volRes.has_value());
     bool hasVol = false;
-    std::visit([&](auto&& v) {
-        using U = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<U, VolumeInfo>) {
-            hasVol = true;
-            // Volume is stored as 0.0-1.0, input is 0-100
-            REQUIRE(v.vol == 0.75f);
-        }
-    }, volRes.value());
+    std::visit(
+        [&](auto&& v) {
+            using U = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<U, VolumeInfo>) {
+                hasVol = true;
+                // Volume is stored as 0.0-1.0, input is 0-100
+                REQUIRE(v.vol == 0.75f);
+            }
+        },
+        volRes.value());
     REQUIRE(hasVol);
 
     // Shutdown
@@ -126,7 +130,7 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
     REQUIRE(clientRes2.has_value());
     auto client2 = std::move(clientRes2.value());
     (void)client2.send(Shutdown{});
-    
+
     svcThread.request_stop();
     svcThread.join();
 
@@ -167,14 +171,16 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     auto statusRes = client.send(StatusReq{});
     REQUIRE(statusRes.has_value());
     bool hasStatus = false;
-    std::visit([&](auto&& v) {
-        using U = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<U, Status>) {
-            hasStatus = true;
-            REQUIRE(v.state == PlaybackState::Stopped);
-            REQUIRE(v.q_size == 0);
-        }
-    }, statusRes.value());
+    std::visit(
+        [&](auto&& v) {
+            using U = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<U, Status>) {
+                hasStatus = true;
+                REQUIRE(v.state == PlaybackState::Stopped);
+                REQUIRE(v.q_size == 0);
+            }
+        },
+        statusRes.value());
     REQUIRE(hasStatus);
 
     // Shutdown
@@ -182,7 +188,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     REQUIRE(clientRes2.has_value());
     auto client2 = std::move(clientRes2.value());
     (void)client2.send(Shutdown{});
-    
+
     svcThread.request_stop();
     svcThread.join();
 
@@ -192,8 +198,3 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     std::filesystem::remove(dbPath.string() + "-shm", ec);
     std::filesystem::remove(cfg.configPath, ec);
 }
-
-
-
-
-

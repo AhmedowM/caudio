@@ -43,8 +43,8 @@ namespace caudio::db {
  * @par Thread safety
  * Caller must hold Database::mutex().
  */
-std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_t qid,
-                                                             int64_t tid, int64_t pos = -1);
+std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_t qid, int64_t tid,
+                                                             int64_t pos = -1);
 
 /**
  * @brief Dequeues the head item (caller holds DB mutex).
@@ -82,8 +82,7 @@ std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int6
  * @par Thread safety
  * Caller must hold Database::mutex() exclusively.
  */
-std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid,
-                                                            int64_t pos);
+std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid, int64_t pos);
 
 /**
  * @brief Clears all items in a queue (caller holds DB mutex).
@@ -150,8 +149,8 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
  * @par Thread safety
  * Caller must hold Database::mutex() exclusively.
  */
-std::expected<int64_t, caudio::utils::Error>
-createQueueLocked(sqlite3* db, std::string_view name, int64_t library_id = 1);
+std::expected<int64_t, caudio::utils::Error> createQueueLocked(sqlite3* db, std::string_view name,
+                                                               int64_t library_id = 1);
 
 /**
  * @brief Deletes a queue container and its items (caller holds DB mutex).
@@ -176,7 +175,7 @@ std::expected<void, caudio::utils::Error> deleteQueueLocked(sqlite3* db, int64_t
  * Caller must hold Database::mutex() exclusively.
  */
 std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int64_t qid,
-                                                                int repeat_mode);
+                                                               int repeat_mode);
 
 /**
  * @brief Alias for queueListLocked (caller holds DB mutex).
@@ -188,7 +187,7 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
  * Caller must hold Database::mutex().
  * @see queueListLocked
  */
-std::expected<std::vector<QueueItem>, caudio::utils::Error>
-getQueueItemsLocked(sqlite3* db, int64_t qid);
+std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
+                                                                                int64_t qid);
 
 } // namespace caudio::db

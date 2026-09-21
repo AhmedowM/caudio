@@ -23,8 +23,9 @@ bool log_injected() {
 
 bool log_level_filter() {
     std::vector<std::pair<LogLevel, std::string>> out;
-    Logger logger([&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
-                  LogLevel::Warn);
+    Logger logger(
+        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+        LogLevel::Warn);
     logger.log(LogLevel::Debug, "debug msg");
     logger.log(LogLevel::Info, "info msg");
     if (!out.empty())
@@ -131,9 +132,3 @@ TEST_CASE("Logger null callback safe", "[utils][log]") {
 TEST_CASE("Logger toString LogLevel", "[utils][log]") {
     REQUIRE(log_toString_level());
 }
-
-
-
-
-
-

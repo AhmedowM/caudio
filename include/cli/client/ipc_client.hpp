@@ -61,11 +61,11 @@ __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LP
 #endif
 
 #include "caudio/utils/utils.hpp"
-#include "cli/shared/command.hpp"
-#include "cli/shared/result.hpp"
-#include "cli/shared/protocol.hpp"
 #include "cli/config.hpp"
 #include "cli/service/ipc_channel.hpp"
+#include "cli/shared/command.hpp"
+#include "cli/shared/protocol.hpp"
+#include "cli/shared/result.hpp"
 
 namespace caudio::client {
 
@@ -115,7 +115,8 @@ class IpcClient {
     /**
      * @brief Send a command and receive the response (synchronous RPC).
      * @param cmd Command to send.
-     * @return Result variant on success, Error on failure (connection, serialization, or service error).
+     * @return Result variant on success, Error on failure (connection, serialization, or service
+     * error).
      *
      * Serializes command to JSON, frames with 4-byte BE length prefix, sends,
      * receives framed response, deserializes, and returns Result.

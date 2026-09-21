@@ -15,8 +15,8 @@
 #include <thread>
 #include <utility>
 
-#include "caudio/utils/result.hpp"
 #include "caudio/utils/error.hpp"
+#include "caudio/utils/result.hpp"
 
 #if defined(_WIN32) || defined(_WIN64)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
@@ -94,7 +94,7 @@ namespace caudio::utils {
  * @param d Duration to sleep.
  * @details Thin wrapper around `std::this_thread::sleep_for`; noexcept.
  */
- // convenience wrapper
+// convenience wrapper
 template <typename Rep, typename Period>
 inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
     std::this_thread::sleep_for(d);
@@ -106,7 +106,7 @@ inline void sleepFor(std::chrono::duration<Rep, Period> d) noexcept {
  * @param ms Milliseconds to sleep.
  * @details Delegates to sleepFor(std::chrono::milliseconds).
  */
- // convenience wrapper
+// convenience wrapper
 inline void sleepForMs(std::uint32_t ms) noexcept {
     sleepFor(std::chrono::milliseconds(ms));
 }
@@ -145,18 +145,21 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     buf[t.size()] = '\0';
     int rc = pthread_setname_np(buf);
     if (rc != 0) {
-        return std::unexpected(Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
     }
     return {};
 #elif defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__)
     int rc = detail::setPthreadName(pthread_self(), name);
     if (rc != 0) {
-        return std::unexpected(Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
     }
     return {};
 #else
     (void)name;
-    return std::unexpected(Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
+    return std::unexpected(
+        Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
 #endif
 #endif
 }
@@ -196,17 +199,20 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     (void)th;
     (void)name;
     return std::unexpected(
-        Error{StatusCode::Unsupported, std::string_view("setThreadName with jthread not supported on macOS")});
+        Error{StatusCode::Unsupported,
+              std::string_view("setThreadName with jthread not supported on macOS")});
 #elif defined(__linux__)
     int rc = detail::setPthreadName(th, name);
     if (rc != 0) {
-        return std::unexpected(Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
     }
     return {};
 #else
     (void)th;
     (void)name;
-    return std::unexpected(Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
+    return std::unexpected(
+        Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
 #endif
 #endif
 }
@@ -225,7 +231,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
  * through to generic unsupported). Name truncated to 15 chars on Linux.
  * @see setThreadName(std::jthread&, std::string_view)
  */
- // Convenience for std::thread as well
+// Convenience for std::thread as well
 [[nodiscard]] inline Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
     if (!t.joinable()) {
         return std::unexpected(Error{StatusCode::State, std::string_view("thread not joinable")});
@@ -241,7 +247,8 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
     pthread_t th = t.native_handle();
     int rc = detail::setPthreadName(th, name);
     if (rc != 0)
-        return std::unexpected(Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
     return {};
 #else
     (void)t;

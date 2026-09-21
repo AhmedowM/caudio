@@ -53,11 +53,11 @@
 #include <thread>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/player/reader.hpp"
 #include "caudio/player/decoder.hpp"
 #include "caudio/player/decoders/decoder_interface.hpp"
 #include "caudio/player/output.hpp"
+#include "caudio/player/reader.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::player {
 

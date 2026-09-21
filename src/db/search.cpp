@@ -1,9 +1,10 @@
 #include "caudio/db/search.hpp"
 
-#include <caudio/db/statement.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/utils/utils.hpp>
 #include <sqlite3.h>
+
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils/utils.hpp>
 #include <string>
 
 namespace caudio::db {
@@ -125,8 +126,8 @@ std::string sanitizeFtsTerm(std::string_view term) {
     return internal::sanitizeFtsTerm(term);
 }
 
-std::expected<std::vector<Track>, caudio::utils::Error>
-search(Database& db, std::string_view query, int limit) {
+std::expected<std::vector<Track>, caudio::utils::Error> search(Database& db, std::string_view query,
+                                                               int limit) {
     return searchFts(db, query, limit);
 }
 

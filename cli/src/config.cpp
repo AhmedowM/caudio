@@ -211,8 +211,7 @@ caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& 
     }
 }
 
-caudio::utils::Expected<std::filesystem::path>
-pidPathFor(const std::filesystem::path& dbPath) {
+caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath) {
     try {
         std::string hex = detail_paths::hex8ForDb(dbPath);
         auto base = detail_paths::baseDirForSocket();
@@ -225,8 +224,7 @@ pidPathFor(const std::filesystem::path& dbPath) {
     }
 }
 
-caudio::utils::Expected<std::filesystem::path>
-lockPathFor(const std::filesystem::path& dbPath) {
+caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath) {
     try {
         std::string hex = detail_paths::hex8ForDb(dbPath);
         auto base = detail_paths::baseDirForSocket();
@@ -240,7 +238,7 @@ lockPathFor(const std::filesystem::path& dbPath) {
 }
 
 caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
-                                                          std::string_view key) {
+                                                  std::string_view key) {
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) {
         return std::unexpected{
@@ -277,8 +275,8 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
     }
 }
 
-caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
-                                                   std::string_view key, std::string_view value) {
+caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key,
+                                           std::string_view value) {
     caudio::json::ordered_json j = caudio::json::ordered_json::object();
     std::error_code ec;
     if (std::filesystem::exists(p, ec)) {
@@ -333,8 +331,7 @@ caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
     }
 }
 
-caudio::utils::Expected<std::vector<RawConfigValue>>
-configListRaw(const std::filesystem::path& p) {
+caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p) {
     std::error_code ec;
     if (!std::filesystem::exists(p, ec))
         return std::vector<RawConfigValue>{};
@@ -372,7 +369,7 @@ configListRaw(const std::filesystem::path& p) {
 }
 
 caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
-                                                       std::string_view key) {
+                                              std::string_view key) {
     if (key.empty()) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty key")};
@@ -388,18 +385,18 @@ caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
     std::string content = std::move(*fileRes);
     if (content.empty()) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
-                                                         "key not found: " + std::string(key))};
+                                                        "key not found: " + std::string(key))};
     }
     try {
         auto j = caudio::json::ordered_json::parse(content);
         if (!j.is_object()) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
-                                                             "config is not an object")};
+                                                            "config is not an object")};
         }
         std::string k(key);
         if (!j.contains(k)) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
-                                                             "key not found: " + k)};
+                                                            "key not found: " + k)};
         }
         j.erase(k);
         auto parent = p.parent_path();

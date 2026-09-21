@@ -33,7 +33,8 @@ inline constexpr DWORD kFileMapWriteW = 0x0002UL;
 inline constexpr DWORD kPageReadWriteW = 0x04UL;
 inline const HANDLE kInvalidHandleValueW = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileMappingW(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR);
+__declspec(dllimport) HANDLE __stdcall CreateFileMappingW(HANDLE, LPSECURITY_ATTRIBUTES, DWORD,
+                                                          DWORD, DWORD, LPCWSTR);
 __declspec(dllimport) HANDLE __stdcall OpenFileMappingW(DWORD, BOOL, LPCWSTR);
 __declspec(dllimport) LPVOID __stdcall MapViewOfFile(HANDLE, DWORD, DWORD, DWORD, std::size_t);
 __declspec(dllimport) BOOL __stdcall UnmapViewOfFile(LPCVOID);
@@ -45,8 +46,8 @@ __declspec(dllimport) DWORD __stdcall GetLastError();
 #endif
 #endif
 
-#include "caudio/utils/utils.hpp"
 #include "caudio/engine/engine.hpp"
+#include "caudio/utils/utils.hpp"
 
 namespace caudio::service {
 

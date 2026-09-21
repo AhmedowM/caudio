@@ -1,16 +1,16 @@
 #include "caudio/db/scan.hpp"
 
-#include <caudio/db/statement.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/utils/utils.hpp>
-#include <sqlite3.h>
-#include <fstream>
 #include <blake3.h>
+#include <sqlite3.h>
+
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils/utils.hpp>
+#include <fstream>
 
 namespace caudio::db {
 
-std::generator<Track> scan(const std::filesystem::path& root,
-                           ScanMode mode) {
+std::generator<Track> scan(const std::filesystem::path& root, ScanMode mode) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         co_return;
@@ -175,18 +175,54 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.deleted_at = 0;
             bool hasMeta = false;
             if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
-                if (!meta->title.empty()) { upd.title = std::move(meta->title); hasMeta = true; }
-                if (!meta->artist.empty()) { upd.artist = std::move(meta->artist); hasMeta = true; }
-                if (!meta->album.empty()) { upd.album = std::move(meta->album); hasMeta = true; }
-                if (!meta->album_artist.empty()) { upd.album_artist = std::move(meta->album_artist); hasMeta = true; }
-                if (!meta->genre.empty()) { upd.genre = std::move(meta->genre); hasMeta = true; }
-                if (meta->year != 0) { upd.year = meta->year; hasMeta = true; }
-                if (meta->track_num != 0) { upd.track_num = meta->track_num; hasMeta = true; }
-                if (meta->disc_num != 0) { upd.disc_num = meta->disc_num; hasMeta = true; }
-                if (meta->duration > 0) { upd.duration = meta->duration; hasMeta = true; }
-                if (meta->sample_rate != 0) { upd.sample_rate = static_cast<uint32_t>(meta->sample_rate); hasMeta = true; }
-                if (meta->channels != 0) { upd.channels = static_cast<uint32_t>(meta->channels); hasMeta = true; }
-                if (meta->bitrate != 0) { upd.bitrate = meta->bitrate; hasMeta = true; }
+                if (!meta->title.empty()) {
+                    upd.title = std::move(meta->title);
+                    hasMeta = true;
+                }
+                if (!meta->artist.empty()) {
+                    upd.artist = std::move(meta->artist);
+                    hasMeta = true;
+                }
+                if (!meta->album.empty()) {
+                    upd.album = std::move(meta->album);
+                    hasMeta = true;
+                }
+                if (!meta->album_artist.empty()) {
+                    upd.album_artist = std::move(meta->album_artist);
+                    hasMeta = true;
+                }
+                if (!meta->genre.empty()) {
+                    upd.genre = std::move(meta->genre);
+                    hasMeta = true;
+                }
+                if (meta->year != 0) {
+                    upd.year = meta->year;
+                    hasMeta = true;
+                }
+                if (meta->track_num != 0) {
+                    upd.track_num = meta->track_num;
+                    hasMeta = true;
+                }
+                if (meta->disc_num != 0) {
+                    upd.disc_num = meta->disc_num;
+                    hasMeta = true;
+                }
+                if (meta->duration > 0) {
+                    upd.duration = meta->duration;
+                    hasMeta = true;
+                }
+                if (meta->sample_rate != 0) {
+                    upd.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+                    hasMeta = true;
+                }
+                if (meta->channels != 0) {
+                    upd.channels = static_cast<uint32_t>(meta->channels);
+                    hasMeta = true;
+                }
+                if (meta->bitrate != 0) {
+                    upd.bitrate = meta->bitrate;
+                    hasMeta = true;
+                }
             }
             if (!hasMeta) {
                 upd.title.clear();
@@ -220,18 +256,54 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.deleted_at = 0;
             bool hasMeta = false;
             if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
-                if (!meta->title.empty()) { upd.title = std::move(meta->title); hasMeta = true; }
-                if (!meta->artist.empty()) { upd.artist = std::move(meta->artist); hasMeta = true; }
-                if (!meta->album.empty()) { upd.album = std::move(meta->album); hasMeta = true; }
-                if (!meta->album_artist.empty()) { upd.album_artist = std::move(meta->album_artist); hasMeta = true; }
-                if (!meta->genre.empty()) { upd.genre = std::move(meta->genre); hasMeta = true; }
-                if (meta->year != 0) { upd.year = meta->year; hasMeta = true; }
-                if (meta->track_num != 0) { upd.track_num = meta->track_num; hasMeta = true; }
-                if (meta->disc_num != 0) { upd.disc_num = meta->disc_num; hasMeta = true; }
-                if (meta->duration > 0) { upd.duration = meta->duration; hasMeta = true; }
-                if (meta->sample_rate != 0) { upd.sample_rate = static_cast<uint32_t>(meta->sample_rate); hasMeta = true; }
-                if (meta->channels != 0) { upd.channels = static_cast<uint32_t>(meta->channels); hasMeta = true; }
-                if (meta->bitrate != 0) { upd.bitrate = meta->bitrate; hasMeta = true; }
+                if (!meta->title.empty()) {
+                    upd.title = std::move(meta->title);
+                    hasMeta = true;
+                }
+                if (!meta->artist.empty()) {
+                    upd.artist = std::move(meta->artist);
+                    hasMeta = true;
+                }
+                if (!meta->album.empty()) {
+                    upd.album = std::move(meta->album);
+                    hasMeta = true;
+                }
+                if (!meta->album_artist.empty()) {
+                    upd.album_artist = std::move(meta->album_artist);
+                    hasMeta = true;
+                }
+                if (!meta->genre.empty()) {
+                    upd.genre = std::move(meta->genre);
+                    hasMeta = true;
+                }
+                if (meta->year != 0) {
+                    upd.year = meta->year;
+                    hasMeta = true;
+                }
+                if (meta->track_num != 0) {
+                    upd.track_num = meta->track_num;
+                    hasMeta = true;
+                }
+                if (meta->disc_num != 0) {
+                    upd.disc_num = meta->disc_num;
+                    hasMeta = true;
+                }
+                if (meta->duration > 0) {
+                    upd.duration = meta->duration;
+                    hasMeta = true;
+                }
+                if (meta->sample_rate != 0) {
+                    upd.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+                    hasMeta = true;
+                }
+                if (meta->channels != 0) {
+                    upd.channels = static_cast<uint32_t>(meta->channels);
+                    hasMeta = true;
+                }
+                if (meta->bitrate != 0) {
+                    upd.bitrate = meta->bitrate;
+                    hasMeta = true;
+                }
             }
             if (!hasMeta) {
                 upd.title.clear();

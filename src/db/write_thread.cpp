@@ -1,15 +1,16 @@
 #include "caudio/db/write_thread.hpp"
 
+#include <sqlite3.h>
+
 #include <caudio/db/detail.hpp>
 #include <caudio/utils/utils.hpp>
-#include <sqlite3.h>
 #include <chrono>
 
 namespace caudio::db {
 
 WriterThread::WriterThread(std::size_t writeBatchSize)
-    : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(
-          writeBatchSize > 0 ? writeBatchSize : 256)) {}
+    : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(writeBatchSize > 0 ? writeBatchSize
+                                                                                    : 256)) {}
 
 WriterThread::~WriterThread() {
     close();
@@ -25,8 +26,7 @@ WriterThread& WriterThread::operator=(WriterThread&& o) noexcept {
         queue_ = std::move(o.queue_);
         db_ = std::exchange(o.db_, nullptr);
         thread_ = std::move(o.thread_);
-        in_flight_.store(o.in_flight_.load(std::memory_order_acquire),
-                         std::memory_order_release);
+        in_flight_.store(o.in_flight_.load(std::memory_order_acquire), std::memory_order_release);
     }
     return *this;
 }
