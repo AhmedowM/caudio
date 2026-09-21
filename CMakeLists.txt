@@ -159,7 +159,9 @@ add_executable(caudio
   cli/src/main.cpp
 )
 target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/core.cppm)
+target_sources(caudio PRIVATE cli/src/app/core.cpp)
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
+target_include_directories(caudio BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cli11_wrapper)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::cli_shared CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)

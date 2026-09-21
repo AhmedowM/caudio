@@ -21,26 +21,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #else
-using HANDLE = void*;
-using DWORD = unsigned long;
-using BOOL = int;
-using LPCWSTR = const wchar_t*;
-using LPVOID = void*;
-using LPCVOID = const void*;
-using LPDWORD = DWORD*;
-using LPSECURITY_ATTRIBUTES = void*;
+// HANDLE etc are already defined in shm_status.hpp — do not redefine
 inline constexpr DWORD kFileMapRead = 0x0004UL;
 inline constexpr DWORD kFileMapWrite = 0x0002UL;
 inline constexpr DWORD kPageReadWrite = 0x04UL;
-inline constexpr HANDLE kInvalidHandleValue = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
-extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileMappingW(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR);
-__declspec(dllimport) HANDLE __stdcall OpenFileMappingW(DWORD, BOOL, LPCWSTR);
-__declspec(dllimport) LPVOID __stdcall MapViewOfFile(HANDLE, DWORD, DWORD, DWORD, std::size_t);
-__declspec(dllimport) BOOL __stdcall UnmapViewOfFile(LPCVOID);
-__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) DWORD __stdcall GetLastError();
-}
+inline const HANDLE kInvalidHandleValue = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+inline constexpr BOOL kFalse = 0;
 #endif
 
 namespace caudio::service {
@@ -113,7 +99,7 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
         hMap = ::CreateFileMappingW(kInvalidHandleValue, nullptr, protect, 0,
                                     sizeof(AtomicShmStatus), wname.c_str());
     } else {
-        hMap = ::OpenFileMappingW(access, FALSE, wname.c_str());
+        hMap = ::OpenFileMappingW(access, kFalse, wname.c_str());
     }
 
     if (!hMap) {

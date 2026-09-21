@@ -24,10 +24,6 @@
 
 #include <cerrno>
 #include <cstring>
-#else
-#include "caudio/utils/utils.hpp"
-#include "cli/cli.hpp"
-#include "cli/service/ipc_channel.hpp"
 #endif
 
 #include "caudio/utils/utils.hpp"
@@ -106,16 +102,12 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
     if (!pipeHandle_ || pipeHandle_ == kInvalidHandle)
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::State, "pipe not initialized")};
-    HANDLE h = ::CreateNamedPipeW(
-        [&]() {
-            std::wstring w;
-            w.reserve(socketPath_.size());
-            for (char c : socketPath_)
-                w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-            return w.c_str();
-        }(),
-        kPipeAccessDuplex, kPipeTypeByte | kPipeWait, kPipeUnlimited,
-        65536, 65536, 0, nullptr);
+    std::wstring w;
+    w.reserve(socketPath_.size());
+    for (char c : socketPath_)
+        w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+    HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
+                                  kPipeUnlimited, 65536, 65536, 0, nullptr);
     if (h == kInvalidHandle)
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "CreateNamedPipeW failed for accept")};
@@ -125,7 +117,7 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Io, "ConnectNamedPipe failed: " + std::to_string(err))};
     }
-    return std::make_unique<WinPipeChannel>(h);
+    return std::unique_ptr<IpcChannel>{std::make_unique<WinPipeChannel>(h)};
 #else
     if (listenFd_ < 0)
         return std::unexpected{caudio::utils::makeError(
@@ -136,12 +128,12 @@ caudio::utils::Expected<std::unique_ptr<IpcChannel>> IpcServer::accept() {
     if (fd < 0)
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "accept() failed: " + std::string(std::strerror(errno)))};
-    return std::make_unique<UnixChannel>(fd);
+    return std::unique_ptr<IpcChannel>{std::make_unique<UnixChannel>(fd)};
 #endif
 }
 
 void IpcServer::run(std::stop_token st,
-                    const std::function<caudio::cli::ReplyExpected(const caudio::cli::Command&)>& dispatcher) {
+                    std::function<caudio::cli::ReplyExpected(const caudio::cli::Command&)> dispatch) {
     running_.store(true);
     while (!st.stop_requested()) {
         auto chanRes = accept();
@@ -151,18 +143,24 @@ void IpcServer::run(std::stop_token st,
         auto recvRes = chan->recv();
         if (!recvRes)
             continue;
-        auto req = caudio::cli::deserializeRequest(recvRes.value());
-        if (!req)
-            continue;
-        auto replyExpected = dispatcher(req->cmd);
-        caudio::cli::Result result;
-        if (replyExpected.has_value())
-            result = std::move(*replyExpected);
-        else
-            result = replyExpected.error();
-        caudio::cli::IpcReply reply{req->id, replyExpected.has_value(), result};
-        auto frame = caudio::cli::frame(reply);
-        chan->send(frame);
+        // Convert vector<byte> payload to string for JSON deserialize
+        std::string reqStr;
+        reqStr.reserve(recvRes->size());
+        for (auto b : *recvRes)
+            reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
+        auto reqExp = caudio::cli::deserializeRequest(reqStr);
+        caudio::cli::IpcReply reply;
+        if (!reqExp) {
+            reply.id = 0;
+            reply.result = std::unexpected{reqExp.error()};
+        } else {
+            reply.id = reqExp->id;
+            auto resExp = dispatch(reqExp->cmd);
+            reply.result = std::move(resExp);
+        }
+        std::string repJson = caudio::cli::serializeReply(reply);
+        auto framed = caudio::cli::frame(repJson);
+        (void)chan->send(framed);
     }
     running_.store(false);
 }
@@ -190,7 +188,6 @@ IpcServer::~IpcServer() {
     shutdown();
 }
 
-// UnixChannel implementation
 #ifndef _WIN32
 UnixChannel::UnixChannel(int fd) noexcept : fd_(fd) {}
 
@@ -205,7 +202,7 @@ caudio::utils::Expected<void> UnixChannel::send(std::span<const std::byte> data)
     std::size_t total = data.size();
     std::size_t sent = 0;
     while (sent < total) {
-        ssize_t n = ::write(fd_, static_cast<const char*>(data.data()) + sent, total - sent);
+        ssize_t n = ::write(fd_, reinterpret_cast<const char*>(data.data()) + sent, total - sent);
         if (n <= 0) {
             if (errno == EINTR)
                 continue;
@@ -244,7 +241,6 @@ void UnixChannel::close() noexcept {
 }
 #endif
 
-// WinPipeChannel implementation
 #ifdef _WIN32
 WinPipeChannel::WinPipeChannel(HANDLE h) noexcept : handle_(h) {}
 
@@ -261,7 +257,7 @@ caudio::utils::Expected<void> WinPipeChannel::send(std::span<const std::byte> da
     while (sent < total) {
         DWORD written = 0;
         BOOL ok = ::WriteFile(handle_,
-                              reinterpret_cast<const char*>(data.data()) + sent,
+                              reinterpret_cast<const void*>(data.data() + sent),
                               static_cast<DWORD>(std::min<std::size_t>(total - sent, 0xFFFFFFFF)),
                               &written, nullptr);
         if (!ok) {

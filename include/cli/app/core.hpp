@@ -14,9 +14,9 @@
 #include "cli/app/parse.hpp"
 
 #include "caudio/utils/utils.hpp"
-#include "caudio/cli/config.hpp"
-#include "caudio/cli/shared/command.hpp"
-#include "caudio/cli/shared/result.hpp"
+#include "cli/config.hpp"
+#include "cli/shared/command.hpp"
+#include "cli/shared/result.hpp"
 #include "caudio/db/database.hpp"
 #include "caudio/json/json.hpp"
 

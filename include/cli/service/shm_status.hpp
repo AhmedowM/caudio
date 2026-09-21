@@ -17,6 +17,32 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#else
+// Lightweight Windows forward decls — avoid including windows.h (HMODULE conflict)
+#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
+using HANDLE = void*;
+using DWORD = unsigned long;
+using BOOL = int;
+using LPCWSTR = const wchar_t*;
+using LPVOID = void*;
+using LPCVOID = const void*;
+using LPDWORD = DWORD*;
+using LPSECURITY_ATTRIBUTES = void*;
+inline constexpr DWORD kFileMapReadW = 0x0004UL;
+inline constexpr DWORD kFileMapWriteW = 0x0002UL;
+inline constexpr DWORD kPageReadWriteW = 0x04UL;
+inline const HANDLE kInvalidHandleValueW = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+extern "C" {
+__declspec(dllimport) HANDLE __stdcall CreateFileMappingW(HANDLE, LPSECURITY_ATTRIBUTES, DWORD, DWORD, DWORD, LPCWSTR);
+__declspec(dllimport) HANDLE __stdcall OpenFileMappingW(DWORD, BOOL, LPCWSTR);
+__declspec(dllimport) LPVOID __stdcall MapViewOfFile(HANDLE, DWORD, DWORD, DWORD, std::size_t);
+__declspec(dllimport) BOOL __stdcall UnmapViewOfFile(LPCVOID);
+__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
+__declspec(dllimport) DWORD __stdcall GetLastError();
+}
+#else
+#include <windows.h>
+#endif
 #endif
 
 #include "caudio/utils/utils.hpp"

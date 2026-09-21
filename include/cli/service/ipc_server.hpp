@@ -31,12 +31,15 @@
 #include <cerrno>
 #include <cstring>
 #else
+#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 using HANDLE = void*;
 using DWORD = unsigned long;
 using BOOL = int;
 using LPCWSTR = const wchar_t*;
+using LPCVOID = const void*;
 using LPVOID = void*;
 using LPDWORD = DWORD*;
+namespace caudio::service {
 inline constexpr DWORD kGenericRead = 0x80000000UL;
 inline constexpr DWORD kGenericWrite = 0x40000000UL;
 inline constexpr DWORD kOpenExisting = 3UL;
@@ -45,6 +48,7 @@ inline constexpr DWORD kPipeTypeByte = 0x00000000UL;
 inline constexpr DWORD kPipeWait = 0x00000000UL;
 inline constexpr DWORD kPipeUnlimited = 255UL;
 inline const HANDLE kInvalidHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+} // namespace caudio::service
 extern "C" {
 __declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD,
                                                    HANDLE);
@@ -52,6 +56,7 @@ __declspec(dllimport) HANDLE __stdcall CreateNamedPipeW(LPCWSTR, DWORD, DWORD, D
                                                         DWORD, LPVOID);
 __declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
 __declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, LPVOID, DWORD, LPDWORD, LPVOID);
+__declspec(dllimport) BOOL __stdcall WriteFile(HANDLE, LPCVOID, DWORD, LPDWORD, LPVOID);
 __declspec(dllimport) DWORD __stdcall GetLastError();
 __declspec(dllimport) BOOL __stdcall ConnectNamedPipe(HANDLE, LPVOID);
 __declspec(dllimport) BOOL __stdcall DisconnectNamedPipe(HANDLE);
@@ -59,6 +64,9 @@ __declspec(dllimport) BOOL __stdcall FlushFileBuffers(HANDLE);
 __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
 __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 }
+#else
+#include <windows.h>
+#endif
 #endif
 
 #include "caudio/utils/utils.hpp"
@@ -113,36 +121,33 @@ class IpcServer {
 #endif
 };
 
-} // namespace caudio::service
-
+  // Channel implementations — inside caudio::service namespace
 #ifndef _WIN32
-// UnixChannel implementation for POSIX
-class UnixChannel final : public IpcChannel {
-  public:
-    explicit UnixChannel(int fd) noexcept;
-    ~UnixChannel() override;
+  class UnixChannel final : public IpcChannel {
+    public:
+      explicit UnixChannel(int fd) noexcept;
+      ~UnixChannel() override;
 
-    caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
-    caudio::utils::Expected<std::vector<std::byte>> recv() override;
-    void close() noexcept override;
+      caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
+      caudio::utils::Expected<std::vector<std::byte>> recv() override;
+      void close() noexcept override;
 
-  private:
-    int fd_{-1};
-};
+    private:
+      int fd_{-1};
+  };
 #else
-// WinPipeChannel implementation for Windows named pipes
-class WinPipeChannel final : public IpcChannel {
-  public:
-    explicit WinPipeChannel(HANDLE h) noexcept;
-    ~WinPipeChannel() override;
+  class WinPipeChannel final : public IpcChannel {
+    public:
+      explicit WinPipeChannel(HANDLE h) noexcept;
+      ~WinPipeChannel() override;
 
-    caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
-    caudio::utils::Expected<std::vector<std::byte>> recv() override;
-    void close() noexcept override;
+      caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
+      caudio::utils::Expected<std::vector<std::byte>> recv() override;
+      void close() noexcept override;
 
-  private:
-    HANDLE handle_{nullptr};
-};
+    private:
+      HANDLE handle_{nullptr};
+  };
 #endif
 
 } // namespace caudio::service

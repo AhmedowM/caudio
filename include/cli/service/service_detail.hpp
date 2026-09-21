@@ -41,7 +41,8 @@
 #include <cstring>
 #else
 #include <process.h>
-#include <windows.h>
+// Do NOT include windows.h here — causes HMODULE/HANDLE conflicts with caudio::utils
+// Windows-specific API usage is in the .cpp with proper extern "C" declarations.
 #endif
 
 #include "caudio/utils/utils.hpp"

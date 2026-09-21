@@ -34,6 +34,7 @@
 #include <cerrno>
 #include <cstring>
 #else
+#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 using HANDLE = void*;
 using DWORD = unsigned long;
 using BOOL = int;
@@ -54,6 +55,9 @@ __declspec(dllimport) BOOL __stdcall WriteFile(HANDLE, const void*, DWORD, LPDWO
 __declspec(dllimport) DWORD __stdcall GetLastError();
 __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
 }
+#else
+#include <windows.h>
+#endif
 #endif
 
 #include "caudio/utils/utils.hpp"

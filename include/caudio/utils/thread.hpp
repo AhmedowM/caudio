@@ -19,6 +19,7 @@
 #include "caudio/utils/error.hpp"
 
 #if defined(_WIN32) || defined(_WIN64)
+#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 using HANDLE = void*;
 using HMODULE = void*;
 using HRESULT = long;
@@ -30,16 +31,21 @@ using UINT = unsigned int;
 using DWORD = unsigned long;
 using FARPROC = long long int (*)();
 inline constexpr UINT kCpUtf8 = 65001;
+#ifndef WINAPI
 #define WINAPI __stdcall
+#endif
+#endif
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
+#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 extern "C" {
 __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
 __declspec(dllimport) FARPROC __stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT, DWORD, LPCCH, int, LPWSTR, int);
 __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
 }
+#endif
 #endif
 
 namespace caudio::utils::detail {
