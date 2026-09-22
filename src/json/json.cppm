@@ -1,5 +1,5 @@
 module;
-#include "caudio/json/json.hpp"
+#include "caudio/json.hpp"
 
 export module caudio.json;
 

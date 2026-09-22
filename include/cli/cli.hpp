@@ -1,8 +1,8 @@
-// TODO(Audit Directive 2, Appendix C §2.2): split umbrella — IPC parts → include/caudio/ipc/*, config → include/caudio/config.hpp. Keep include/cli/cli.hpp as deprecated shim for one release.
+// TODO(Audit Directive 2, Appendix C Â§2.2): split umbrella â€” IPC parts â†’ include/caudio/ipc/*, config â†’ include/caudio/config.hpp. Keep include/cli/cli.hpp as deprecated shim for one release.
 #pragma once
 /**
  * @file cli.hpp
- * @brief Umbrella header for caudio.cli — CLI IPC protocol.
+ * @brief Umbrella header for caudio.cli â€” CLI IPC protocol.
  * @ingroup caudio_cli
  *
  * Aggregates all partitions:
@@ -14,11 +14,11 @@
 
 #include "caudio/db/database.hpp"
 #include "caudio/engine/engine.hpp"
-#include "caudio/json/json.hpp"
+#include "caudio/json.hpp"
 #include "caudio/utils/utils.hpp"
-#include "cli/config.hpp"
-#include "cli/shared/command.hpp"
-#include "cli/shared/protocol.hpp"
-#include "cli/shared/result.hpp"
+#include "caudio/config.hpp"
+#include "caudio/ipc/command.hpp"
+#include "caudio/ipc/protocol.hpp"
+#include "caudio/ipc/result.hpp"
 
 namespace caudio::cli {} // namespace caudio::cli

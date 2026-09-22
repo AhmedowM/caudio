@@ -7,7 +7,7 @@
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-// Avoid including <windows.h> — causes HMODULE conflict with caudio::utils (like
+// Avoid including <windows.h> â€” causes HMODULE conflict with caudio::utils (like
 // service_detail.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
 // missing decls.
 using BOOL = int;
@@ -89,17 +89,17 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 
 #include "caudio/db/database.hpp"
 #include "caudio/engine/engine.hpp"
-#include "caudio/json/json.hpp"
+#include "caudio/json.hpp"
 #include "caudio/player/player.hpp"
 #include "caudio/utils/utils.hpp"
-#include "cli/client/client.hpp"
-#include "cli/client/ipc_client.hpp"
-#include "cli/client/output_formatter.hpp"
-#include "cli/config.hpp"
-#include "cli/service/service.hpp"
-#include "cli/shared/command.hpp"
-#include "cli/shared/protocol.hpp"
-#include "cli/shared/result.hpp"
+#include "caudio/client/client.hpp"
+#include "caudio/client/ipc_client.hpp"
+#include "caudio/client/output_formatter.hpp"
+#include "caudio/config.hpp"
+#include "caudio/service/service.hpp"
+#include "caudio/ipc/command.hpp"
+#include "caudio/ipc/protocol.hpp"
+#include "caudio/ipc/result.hpp"
 
 namespace caudio::app {
 
@@ -199,7 +199,7 @@ App::App(caudio::cli::Config cfg)
 App::~App() = default;
 
 std::filesystem::path App::pidPathForConfig() const {
-    // Canonical pid path — single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
+    // Canonical pid path â€” single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
     auto r = caudio::cli::pidPathFor(config_.dbPath);
     if (r)
         return *r;
@@ -370,7 +370,7 @@ int App::handleStart(bool foreground) {
                          config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
-        // Poll for pipe readiness: 1500ms total, 100ms interval ×15
+        // Poll for pipe readiness: 1500ms total, 100ms interval Ã—15
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {
