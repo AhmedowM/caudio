@@ -1,3 +1,4 @@
+# // combined is library-only (utils/player/db/engine); CLI IPC (json/cli_shared/service/client) is separate, not part of libcaudio — see audit §B13
 add_library(combined SHARED)
 set_target_properties(combined PROPERTIES OUTPUT_NAME caudio)
 target_sources(combined PRIVATE src/_stub/shared_stub.cpp)

@@ -1,3 +1,6 @@
+#include <CLI/CLI.hpp>
+#include <memory>
+
 #include "cli/app/core.hpp"
 
 #include "cli/app/parse.hpp"
@@ -110,89 +113,25 @@ std::expected<double, caudio::utils::Error> parseTime(std::string_view s) {
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
     return *r;
 }
-// TODO: dedup with parse.hpp:90
+// Single source: delegate to caudio::app::parse::parseSeek and adapt error type.
 std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
-        s.remove_prefix(1);
-    }
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) {
-        s.remove_suffix(1);
-    }
-    if (s.empty()) {
+    auto r = caudio::app::parse::parseSeek(s);
+    if (!r)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty seek")};
-    }
-    bool relative = false;
-    bool neg = false;
-    std::string_view core = s;
-    if (core.front() == '+' || core.front() == '-') {
-        relative = true;
-        neg = (core.front() == '-');
-        core.remove_prefix(1);
-        if (core.empty()) {
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
-                                                            "missing seek value")};
-        }
-    }
-    auto t = parseTime(core);
-    if (!t)
-        return std::unexpected{t.error()};
-    double v = *t;
-    if (relative) {
-        if (neg)
-            v = -v;
-        return v;
-    }
-    return v;
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
+    return *r;
 }
-// TODO: dedup with parse.hpp:90
+// Single source: delegate to caudio::app::parse::parseVolume and adapt error type.
 std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) {
-        s.remove_prefix(1);
-    }
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) {
-        s.remove_suffix(1);
-    }
-    caudio::cli::VolumeSet vs{};
-    if (s.empty())
-        return vs;
-    if (s == "mute") {
-        vs.mute = true;
-        return vs;
-    }
-    if (s == "unmute") {
-        vs.mute = false;
-        return vs;
-    }
-    if (s.front() == '+' || s.front() == '-') {
-        bool n = s.front() == '-';
-        std::string_view num = s.substr(1);
-        if (num.empty()) {
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid delta")};
-        }
-        int iv = 0;
-        auto r = std::from_chars(num.data(), num.data() + num.size(), iv);
-        if (r.ec != std::errc{} || r.ptr != num.data() + num.size()) {
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid delta")};
-        }
-        if (n)
-            iv = -iv;
-        vs.deltaPct = iv;
-        return vs;
-    }
-    int iv = 0;
-    auto r = std::from_chars(s.data(), s.data() + s.size(), iv);
-    if (r.ec != std::errc{} || r.ptr != s.data() + s.size()) {
+    auto r = caudio::app::parse::parseVolume(s);
+    if (!r)
         return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "invalid volume")};
-    }
-    if (iv < 0 || iv > 100) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
-                                                        "volume out of range 0-100")};
-    }
-    vs.level = static_cast<float>(iv);
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
+    caudio::app::parse::ParsedVolume pv = *r;
+    caudio::cli::VolumeSet vs{};
+    vs.level = pv.level;
+    vs.mute = pv.mute;
+    vs.deltaPct = pv.deltaPct;
     return vs;
 }
 std::chrono::duration<double> parseDuration(std::string_view s) {
@@ -252,9 +191,12 @@ using detail::parseSeek;
 using detail::parseTime;
 using detail::parseVolume;
 
-App::App(caudio::cli::Config cfg) : config_(std::move(cfg)), cli_("caudio - terminal player") {
-    cli_.set_version_flag("--version", std::string(caudio::utils::kVersionFull));
+App::App(caudio::cli::Config cfg)
+    : config_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
+    cli_->set_version_flag("--version", std::string(caudio::utils::kVersionFull));
 }
+
+App::~App() = default;
 
 std::filesystem::path App::pidPathForConfig() const {
     // Canonical pid path — single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
@@ -521,39 +463,39 @@ int App::run(int argc, char** argv) {
     std::string configPathStr;
     std::string logLevelStr;
     std::string deviceStr;
-    cli_.add_option("--config", configPathStr, "Config file");
-    cli_.add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
-    cli_.add_option("--device", deviceStr, "Audio output device");
+    cli_->add_option("--config", configPathStr, "Config file");
+    cli_->add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
+    cli_->add_option("--device", deviceStr, "Audio output device");
     bool daemonFlag = false;
-    cli_.add_flag("--daemon", daemonFlag, "Internal daemon flag")->group("");
+    cli_->add_flag("--daemon", daemonFlag, "Internal daemon flag")->group("");
     bool globalFg = false;
-    cli_.add_flag("--foreground", globalFg, "")->group("");
+    cli_->add_flag("--foreground", globalFg, "")->group("");
     bool fg = false;
-    auto* startCmd = cli_.add_subcommand("start", "Start daemon");
+    auto* startCmd = cli_->add_subcommand("start", "Start daemon");
     startCmd->add_flag("--foreground", fg, "Run in foreground");
-    auto* shutdownCmd = cli_.add_subcommand("shutdown", "Stop daemon");
-    auto* playCmd = cli_.add_subcommand("play", "Play current queue");
-    auto* pauseCmd = cli_.add_subcommand("pause", "Pause playback");
-    auto* resumeCmd = cli_.add_subcommand("resume", "Resume playback");
-    auto* restartCmd = cli_.add_subcommand("restart", "Restart current track");
-    auto* stopCmd = cli_.add_subcommand("stop", "Stop playback");
-    auto* nextCmd = cli_.add_subcommand("next", "Next track");
-    auto* prevCmd = cli_.add_subcommand("prev", "Prev track");
+    auto* shutdownCmd = cli_->add_subcommand("shutdown", "Stop daemon");
+    auto* playCmd = cli_->add_subcommand("play", "Play current queue");
+    auto* pauseCmd = cli_->add_subcommand("pause", "Pause playback");
+    auto* resumeCmd = cli_->add_subcommand("resume", "Resume playback");
+    auto* restartCmd = cli_->add_subcommand("restart", "Restart current track");
+    auto* stopCmd = cli_->add_subcommand("stop", "Stop playback");
+    auto* nextCmd = cli_->add_subcommand("next", "Next track");
+    auto* prevCmd = cli_->add_subcommand("prev", "Prev track");
     std::string seekStr;
-    auto* seekCmd = cli_.add_subcommand("seek", "Seek to position");
+    auto* seekCmd = cli_->add_subcommand("seek", "Seek to position");
     seekCmd->add_option("time", seekStr, "mm:ss or seconds or +N/-N")->required();
     bool jsonFlag = false;
     bool statusWatch = false;
     int statusInterval = 1000;
-    auto* statusCmd = cli_.add_subcommand("status", "Show status");
+    auto* statusCmd = cli_->add_subcommand("status", "Show status");
     statusCmd->add_flag("--json", jsonFlag, "JSON output");
     statusCmd->add_flag("--watch", statusWatch, "Continuous polling");
     statusCmd->add_flag("--follow", statusWatch, "Alias for --watch");
     statusCmd->add_option("--interval", statusInterval, "Poll interval in ms");
     std::string volumeArg;
-    auto* volumeCmd = cli_.add_subcommand("volume", "Get/set volume");
+    auto* volumeCmd = cli_->add_subcommand("volume", "Get/set volume");
     volumeCmd->add_option("level", volumeArg, "0-100|+N|-N|mute|unmute");
-    auto* queueCmd = cli_.add_subcommand("queue", "Queue operations");
+    auto* queueCmd = cli_->add_subcommand("queue", "Queue operations");
     bool qJson = false;
     auto* qList = queueCmd->add_subcommand("list", "List queue tracks");
     qList->add_flag("--json", qJson, "JSON output");
@@ -580,7 +522,7 @@ int App::run(int argc, char** argv) {
     std::string qRepeatArg;
     auto* qRepeat = queueCmd->add_subcommand("repeat", "Set repeat");
     qRepeat->add_option("mode", qRepeatArg, "off|one|all");
-    auto* plCmd = cli_.add_subcommand("playlist", "Playlist operations");
+    auto* plCmd = cli_->add_subcommand("playlist", "Playlist operations");
     bool plJson = false;
     auto* plList = plCmd->add_subcommand("list", "List playlists");
     plList->add_flag("--json", plJson, "JSON output");
@@ -618,7 +560,7 @@ int App::run(int argc, char** argv) {
     auto* plImport = plCmd->add_subcommand("import", "Import playlist from file");
     plImport->add_option("path", plImportPath, "Input file path")->required();
     plImport->add_option("--name", plImportName, "Playlist name (default: filename)");
-    auto* libCmd = cli_.add_subcommand("library", "Library operations");
+    auto* libCmd = cli_->add_subcommand("library", "Library operations");
     std::string libScanPath;
     std::string libScanMode = "sampled";
     auto* libScan = libCmd->add_subcommand("scan", "Scan library");
@@ -660,7 +602,7 @@ int App::run(int argc, char** argv) {
     libList->add_option("--limit", libListLimit, "Limit results");
     libList->add_option("--offset", libListOffset, "Offset for pagination");
     libList->add_flag("--json", libListJson, "JSON output");
-    auto* tagCmd = cli_.add_subcommand("tag", "Tag operations");
+    auto* tagCmd = cli_->add_subcommand("tag", "Tag operations");
     std::int64_t tagEditId = 0;
     std::string tagEditField;
     std::string tagEditValue;
@@ -678,7 +620,7 @@ int App::run(int argc, char** argv) {
     auto* tagGet = tagCmd->add_subcommand("get", "Get track tags");
     tagGet->add_option("id", tagGetId, "Track id")->required();
     tagGet->add_flag("--json", tagGetJson, "JSON output");
-    auto* historyCmd = cli_.add_subcommand("history", "Playback history operations");
+    auto* historyCmd = cli_->add_subcommand("history", "Playback history operations");
     bool historyJson = false;
     int historyLimit = 50;
     auto* historyList = historyCmd->add_subcommand("list", "List playback history");
@@ -686,11 +628,11 @@ int App::run(int argc, char** argv) {
     historyList->add_option("--limit", historyLimit, "Limit entries");
     auto* historyClear = historyCmd->add_subcommand("clear", "Clear playback history");
     std::string previewFile;
-    auto* previewCmd = cli_.add_subcommand("preview", "Preview file (ephemeral)");
+    auto* previewCmd = cli_->add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
     auto* tuiCmd =
-        cli_.add_subcommand("tui", "Launch TUI (preview: shows status, full TUI coming soon)");
-    auto* cfgCmd = cli_.add_subcommand("config", "Config operations");
+        cli_->add_subcommand("tui", "Launch TUI (preview: shows status, full TUI coming soon)");
+    auto* cfgCmd = cli_->add_subcommand("config", "Config operations");
     std::string cfgGetKey;
     auto* cfgGet = cfgCmd->add_subcommand("get", "Get config value");
     cfgGet->add_option("key", cfgGetKey, "Key")->required();
@@ -711,7 +653,7 @@ int App::run(int argc, char** argv) {
     auto* cfgReset = cfgCmd->add_subcommand("reset", "Reset config to defaults");
     cfgReset->add_option("key", cfgResetKey, "Key to reset (omit to reset all)");
     // Device commands
-    auto* deviceCmd = cli_.add_subcommand("device", "Audio device operations");
+    auto* deviceCmd = cli_->add_subcommand("device", "Audio device operations");
     bool devJson = false;
     auto* devList = deviceCmd->add_subcommand("list", "List audio output devices");
     devList->add_flag("--json", devJson, "JSON output");
@@ -722,12 +664,12 @@ int App::run(int argc, char** argv) {
     auto* devTest = deviceCmd->add_subcommand("test", "Test audio device (play tone)");
     devTest->add_option("--id", devTestId, "Device ID (default: current config)");
     bool infoJson = false;
-    auto* infoCmd = cli_.add_subcommand("info", "Show current track info");
+    auto* infoCmd = cli_->add_subcommand("info", "Show current track info");
     infoCmd->add_flag("--json", infoJson, "JSON output");
     try {
-        cli_.parse(argc, argv);
+        cli_->parse(argc, argv);
     } catch (const CLI::ParseError& e) {
-        return cli_.exit(e);
+        return cli_->exit(e);
     }
     if (!configPathStr.empty())
         config_.configPath = std::filesystem::path(configPathStr);
@@ -1207,7 +1149,7 @@ int App::run(int argc, char** argv) {
         caudio::cli::Command cmd{caudio::cli::Info{}};
         return sendViaClient(cmd, infoJson);
     }
-    std::cout << cli_.help() << "\n";
+    std::cout << cli_->help() << "\n";
     return 0;
 }
 

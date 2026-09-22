@@ -190,8 +190,12 @@ void IpcServer::run(std::stop_token st,
                     std::string repJson = caudio::cli::serializeReply(reply);
                     auto framed = caudio::cli::frame(repJson);
                     DWORD w2 = 0;
-                    ::WriteFile(clientHandle, framed.data(), static_cast<DWORD>(framed.size()), &w2,
-                                nullptr);
+                    BOOL okW = ::WriteFile(clientHandle, framed.data(),
+                                           static_cast<DWORD>(framed.size()), &w2, nullptr);
+                    if (!okW) {
+                        ::CloseHandle(clientHandle);
+                        return;
+                    }
                     ::FlushFileBuffers(clientHandle);
                     ::DisconnectNamedPipe(clientHandle);
                     ::CloseHandle(clientHandle);
@@ -294,7 +298,10 @@ void IpcServer::run(std::stop_token st,
                     }
                     std::string repJson = caudio::cli::serializeReply(reply);
                     auto framed = caudio::cli::frame(repJson);
-                    sendAll(framed);
+                    if (!sendAll(framed)) {
+                        ::close(cfd);
+                        return;
+                    }
                     ::close(cfd);
                 });
             }

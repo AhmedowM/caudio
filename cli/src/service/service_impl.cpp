@@ -547,7 +547,12 @@ Service::dispatch(const caudio::cli::Command& cmd) {
                 if (!qa.search) {
                     std::filesystem::path p(qa.query);
                     std::error_code ec;
-                    if (std::filesystem::exists(p, ec) && !ec && detail::hasAudioExt(p)) {
+                    bool exists = std::filesystem::exists(p, ec);
+                    if (!ec && detail::hasAudioExt(p)) {
+                        if (!exists) {
+                            return std::unexpected{caudio::utils::makeError(
+                                caudio::utils::StatusCode::NotFound, "track not found: " + qa.query)};
+                        }
                         auto fpRes = detail::computeFingerprint(p);
                         if (!fpRes)
                             return std::unexpected{fpRes.error()};

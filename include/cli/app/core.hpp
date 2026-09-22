@@ -1,10 +1,10 @@
 // TODO(Audit Directive 2 / B9, Appendix C §B9 & §2.2): remove <CLI/CLI.hpp> from public header — pulls 800+ KB macro-heavy CLI11 into every consumer (GUI/tests) and pollutes min/max macros. Forward-declare namespace CLI { class App; } and use std::unique_ptr<CLI::App> pImpl; keep CLI11 include only in cli/src/app/core.cpp. Subagent already tried but reverted; document for Phase 3 move to cli/src/app/core.hpp (private). See AUDIT_REPORT.md §B9, §3.2.
 #pragma once
 
-#include <CLI/CLI.hpp>
 #include <chrono>
 #include <expected>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <span>
@@ -19,6 +19,10 @@
 #include "cli/config.hpp"
 #include "cli/shared/command.hpp"
 #include "cli/shared/result.hpp"
+
+namespace CLI {
+class App;
+}
 
 namespace caudio::app {
 
@@ -42,6 +46,7 @@ using detail::parseVolume;
 class App {
   public:
     explicit App(caudio::cli::Config cfg);
+    ~App();
     int run(int argc, char** argv);
 
   private:
@@ -52,7 +57,7 @@ class App {
     std::filesystem::path pidPathForConfig() const;
 
     caudio::cli::Config config_;
-    CLI::App cli_;
+    std::unique_ptr<CLI::App> cli_;
     std::string argv0_;
 };
 
