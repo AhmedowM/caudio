@@ -162,7 +162,7 @@ class Service final {
     Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
             std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
-            std::string socketPath, int lockFd,
+            std::string socketPath, std::intptr_t lockFd,
             std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName);
 
     /**
@@ -193,7 +193,7 @@ class Service final {
     std::unique_ptr<caudio::utils::Logger> logger_;
     std::filesystem::path pidPath_;
     std::string socketPath_;
-    int lockFd_{-1};
+    std::intptr_t lockFd_{-1};
     std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle_;
     std::string shmName_;
     std::atomic<bool> running_{false};

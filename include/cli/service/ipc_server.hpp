@@ -85,22 +85,13 @@ class IpcServer {
     IpcServer(IpcServer&&) = delete;
     IpcServer& operator=(IpcServer&&) = delete;
 
-    // listen binds the pipe/socket. If socketPathOverride is non-empty it is honored
-    // (Config::socketPath), otherwise the canonical caudio::cli::socketPathFor(dbPath) is used.
-    // Preserves public API via default arg.
     caudio::utils::Expected<void> listen(const std::filesystem::path& dbPath,
                                          std::string_view socketPathOverride = {});
 
-    // accept waits for a new client connection and returns an IpcChannel.
-    // Returns Error if not initialized or on I/O failure.
-    caudio::utils::Expected<std::unique_ptr<IpcChannel>> accept();
-
-    // run() stop semantics: accept loop exits when ANY of (external st, internal stopSource_,
-    // !running_) is signaled. running_ is the primary guard (exchange true on entry, false on
-    // shutdown); stopSource_ allows shutdown() to wake the loop without needing the external token;
-    // st is the caller's Service::run token. Documented union.
     void run(std::stop_token st,
-             std::function<caudio::cli::ReplyExpected(const caudio::cli::Command&)> dispatch);
+             std::function<std::expected<caudio::cli::Result, caudio::utils::Error>(
+                 const caudio::cli::Command&)>
+                 dispatch);
 
     void shutdown();
 
@@ -119,34 +110,5 @@ class IpcServer {
     int listenFd_{-1};
 #endif
 };
-
-// Channel implementations — inside caudio::service namespace
-#ifndef _WIN32
-class UnixChannel final : public IpcChannel {
-  public:
-    explicit UnixChannel(int fd) noexcept;
-    ~UnixChannel() override;
-
-    caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
-    caudio::utils::Expected<std::vector<std::byte>> recv() override;
-    void close() noexcept override;
-
-  private:
-    int fd_{-1};
-};
-#else
-class WinPipeChannel final : public IpcChannel {
-  public:
-    explicit WinPipeChannel(HANDLE h) noexcept;
-    ~WinPipeChannel() override;
-
-    caudio::utils::Expected<void> send(std::span<const std::byte> data) override;
-    caudio::utils::Expected<std::vector<std::byte>> recv() override;
-    void close() noexcept override;
-
-  private:
-    HANDLE handle_{nullptr};
-};
-#endif
 
 } // namespace caudio::service

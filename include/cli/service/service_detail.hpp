@@ -112,7 +112,7 @@ bool probeSocketAlive(const std::string& sp);
  * @param outFd Output file descriptor/handle (set on success).
  * @return true if lock acquired, false if already held or error.
  */
-bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd);
+bool tryAcquireLock(const std::filesystem::path& lockPath, std::intptr_t& outFd);
 
 /**
  * @brief Release a previously acquired lock.
@@ -120,7 +120,7 @@ bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd);
  * POSIX: flock(LOCK_UN) + close().
  * @param fd File descriptor/handle returned by tryAcquireLock.
  */
-void releaseLock(int fd);
+void releaseLock(std::intptr_t fd);
 
 /**
  * @brief Check if a process ID is alive.

@@ -52,7 +52,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // Single-instance enforcement via flock lock file
     std::filesystem::path lockPath =
         detail::lockPathForSocket(cfg.dbPath, cfg.socketPath.empty() ? spStr : cfg.socketPath);
-    int lockFd = -1;
+    std::intptr_t lockFd = -1;
     if (!detail::tryAcquireLock(lockPath, lockFd)) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists,
                                                         "service already running (lock held)")};
@@ -161,10 +161,8 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     }
 
     // Create shared memory status block for TUI 10fps polling
-    // Derive hash from dbPath for shm name
-    std::string dbStr = cfg.dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    std::string shmName = std::to_string(hash);
+    // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
+    std::string shmName = caudio::cli::detail_paths::hex8ForDb(cfg.dbPath);
     auto shmRes = caudio::service::createShmStatus(shmName, true);
     if (!shmRes) {
         // Non-fatal: log but continue without shm
@@ -182,7 +180,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
 Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
                  std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                  std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
-                 std::string socketPath, int lockFd,
+                 std::string socketPath, std::intptr_t lockFd,
                  std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName)
     : config_(cfg), db_(std::move(db)), engine_(std::move(eng)), server_(std::move(srv)),
       logger_(std::move(logger)), pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)),
@@ -224,8 +222,7 @@ void Service::shutdown() {
             if (!s.starts_with("\\\\") && !s.empty()) {
                 std::filesystem::path sp(s);
                 if (std::filesystem::exists(sp, ec)) {
-                    // only unlink if we own it (server already did unlink on shutdown)
-                    // keep attempt
+                    std::filesystem::remove(sp, ec);
                 }
             }
         }

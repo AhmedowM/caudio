@@ -100,10 +100,8 @@ caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Com
 // Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
 caudio::utils::Expected<caudio::cli::Result> Client::snapshotStatus() {
     // Try to connect to shared memory status block
-    // Derive hash from dbPath for shm name
-    std::string dbStr = config_.dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    std::string shmName = std::to_string(hash);
+    // Derive shm name via canonical hex8 (consistent with service)
+    std::string shmName = caudio::cli::detail_paths::hex8ForDb(config_.dbPath);
 
     auto shmRes = caudio::service::ShmStatusHandle::openReadOnly(shmName);
     if (shmRes) {

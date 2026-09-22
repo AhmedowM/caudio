@@ -141,33 +141,30 @@ std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
 }
 
 std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                        const std::string& /*socketPath*/) {
+                                         const std::string& /*socketPath*/) {
     auto r = caudio::cli::lockPathFor(dbPath);
     if (r)
         return *r;
+    std::string hex = caudio::cli::detail_paths::hex8ForDb(dbPath);
     auto pidPath = pidPathForSocket(dbPath, "");
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return pidPath.parent_path() / ("caudio-" + std::to_string(hash) + ".lock");
+    return pidPath.parent_path() / ("caudio-" + hex + ".lock");
 }
 
 std::string socketPathForDb(const std::filesystem::path& dbPath) {
     auto r = caudio::cli::socketPathFor(dbPath);
     if (r)
         return *r;
+    // Fallback uses canonical hex8 encoding (consistent with primary socketPathFor)
+    std::string hex = caudio::cli::detail_paths::hex8ForDb(dbPath);
 #ifdef _WIN32
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return "\\\\.\\pipe\\caudio-" + std::to_string(hash);
+    return std::string("\\\\.\\pipe\\caudio-") + hex;
 #else
     auto pp = dbPath.parent_path();
     if (pp.empty())
         pp = std::filesystem::current_path();
     std::error_code ec;
     std::filesystem::create_directories(pp, ec);
-    std::string dbStr = dbPath.generic_string();
-    std::size_t hash = std::hash<std::string>{}(dbStr);
-    return (pp / ("caudio-" + std::to_string(hash) + ".sock")).generic_string();
+    return (pp / ("caudio-" + hex + ".sock")).generic_string();
 #endif
 }
 
@@ -217,7 +214,7 @@ bool probeSocketAlive(const std::string& sp) {
 #endif
 }
 
-bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
+bool tryAcquireLock(const std::filesystem::path& lockPath, std::intptr_t& outFd) {
 #ifdef _WIN32
     std::error_code ec;
     auto parent = lockPath.parent_path();
@@ -266,7 +263,7 @@ bool tryAcquireLock(const std::filesystem::path& lockPath, int& outFd) {
 #endif
 }
 
-void releaseLock(int fd) {
+void releaseLock(std::intptr_t fd) {
     if (fd < 0)
         return;
 #ifdef _WIN32
