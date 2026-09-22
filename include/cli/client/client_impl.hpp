@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/client/client_impl.hpp — client SDK, not CLI-specific. Keep include/cli/client/client_impl.hpp as deprecated shim for one release: #include "caudio/client/client_impl.hpp".
 /**
  * @file client_impl.hpp
  * @brief Client implementation for caudio CLI.

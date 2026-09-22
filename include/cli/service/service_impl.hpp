@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/service/service_impl.hpp — daemon runtime, not CLI-specific. Keep include/cli/service/service_impl.hpp as deprecated shim for one release: #include "caudio/service/service_impl.hpp".
 /**
  * @file service_impl.hpp
  * @brief Service implementation: owns Engine, Database, Logger, IPC server, and dispatches

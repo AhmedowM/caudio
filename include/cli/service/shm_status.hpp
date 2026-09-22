@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/service/shm_status.hpp — daemon runtime, not CLI-specific. Keep include/cli/service/shm_status.hpp as deprecated shim for one release: #include "caudio/service/shm_status.hpp".
 #pragma once
 
 #include <atomic>

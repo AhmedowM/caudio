@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/service/ipc_server.hpp — daemon runtime, not CLI-specific. Keep include/cli/service/ipc_server.hpp as deprecated shim for one release: #include "caudio/service/ipc_server.hpp".
 #pragma once
 
 #ifndef WIN32_LEAN_AND_MEAN

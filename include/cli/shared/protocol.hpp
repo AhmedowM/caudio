@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/ipc/protocol.hpp — reusable IPC, not CLI-specific. Keep include/cli/shared/protocol.hpp as deprecated shim for one release: #include "caudio/ipc/protocol.hpp".
 #pragma once
 /**
  * @file protocol.hpp

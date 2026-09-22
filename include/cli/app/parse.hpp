@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): move to cli/src/app/parse.hpp (private) — CLI-only, must not be installed. Remove from install(DIRECTORY include/). See §B14 dedup.
 #pragma once
 #include <charconv>
 #include <chrono>

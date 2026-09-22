@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): split umbrella — IPC parts → include/caudio/ipc/*, config → include/caudio/config.hpp. Keep include/cli/cli.hpp as deprecated shim for one release.
 #pragma once
 /**
  * @file cli.hpp

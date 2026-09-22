@@ -1,3 +1,10 @@
+# TODO(Audit Directive 2, Appendix C §2.2-2.3): decouple cli/ kitchen sink — split into
+#   components/ipc.cmake    (caudio::ipc     = shared/command+result+protocol, no engine runtime)
+#   components/service.cmake(caudio::service = IpcServer/IpcChannel/Service/ShmStatus)
+#   components/client.cmake (caudio::client  = IpcClient/Client/OutputFormatter)
+# Current targets cli_shared/service/client stay under cli/ for build stability; promote headers
+# include/cli/shared/* → include/caudio/ipc/*, include/cli/service/* → include/caudio/service/*,
+# include/cli/client/* → include/caudio/client/* with one-release deprecated shims. See AUDIT_REPORT.md §2.2.
 # cli.cmake — caudio::json + caudio::cli_shared + caudio::service + caudio::client
 
 set(CAUDIO_JSON_SOURCES

@@ -1,3 +1,4 @@
+// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/config.hpp — canonical paths are global, not CLI-specific. Keep include/cli/config.hpp as deprecated shim for one release: #include "caudio/config.hpp".
 #pragma once
 /**
  * @file config.hpp

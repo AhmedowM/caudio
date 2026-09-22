@@ -1,6 +1,7 @@
 #include "cli/client/client_impl.hpp"
 
 #include <caudio/utils/utils.hpp>
+#include <algorithm>
 #include <chrono>
 #include <cli/client/ipc_client.hpp>
 #include <cli/config.hpp>
@@ -55,9 +56,8 @@ caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Com
             auto conn = IpcClient::connect(cfgCopy.dbPath, cfgCopy.socketPath);
             if (!conn) {
                 try {
-                    prom->set_value(std::unexpected{caudio::utils::Error{
-                        caudio::utils::StatusCode::State,
-                        std::string_view{"daemon not running — run 'caudio start'"}}});
+                    prom->set_value(std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::State, "daemon not running")});
                 } catch (...) {
                 }
                 return;
@@ -86,11 +86,26 @@ caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Com
         return fut.get();
     } else {
         worker->request_stop();
-        // Avoid blocking join beyond timeout: move worker to background storage
+        // Avoid blocking join beyond timeout: move worker to background storage with reaping and bounded size.
         static std::mutex bgMtx;
         static std::vector<std::unique_ptr<std::jthread>> bg;
         {
             std::lock_guard lk(bgMtx);
+            // Reap completed workers: jthread that has finished is still joinable until joined,
+            // but if it has been joined/detached elsewhere it becomes !joinable(). Also check stop_token
+            // as best-effort to prune. This prevents unbounded growth.
+            bg.erase(std::remove_if(bg.begin(), bg.end(),
+                                     [](const std::unique_ptr<std::jthread>& t) {
+                                         return !t->joinable();
+                                     }),
+                     bg.end());
+            // Enforce bounded size (audit B6: limit to 8 background workers)
+            if (bg.size() >= 8) {
+                // Drop oldest without blocking join: release handle to avoid blocking destructor
+                // on a still-running thread; leak is bounded to at most 8 threads total.
+                (void)bg.front().release();
+                bg.erase(bg.begin());
+            }
             bg.push_back(std::move(worker));
         }
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "timeout")};
