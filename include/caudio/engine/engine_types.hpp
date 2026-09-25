@@ -1,18 +1,18 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
+#include <caudio/utils.hpp>
 
 /**
  * @file engine_types.hpp
  * @brief Core value types for the caudio playback engine.
  * @ingroup caudio_engine
  * @defgroup caudio_engine caudio engine
- * @brief Playback engine — state machine, shuffle/history, gapless and persistence.
+ * @brief Playback engine â€” state machine, shuffle/history, gapless and persistence.
  *
  * @details The caudio_engine module group aggregates the playback state
  * machine, queue/shuffle permutation, gapless transition, history
@@ -67,7 +67,7 @@ namespace caudio::engine {
 enum class RepeatMode : int { Off = 0, Queue = 1, One = 2 };
 
 /**
- * @brief Deprecated shuffle toggle — use QueueState::shuffle.
+ * @brief Deprecated shuffle toggle â€” use QueueState::shuffle.
  * @ingroup caudio_engine
  * @deprecated Unused; kept for ABI compat. Use QueueState::shuffle
  * and Engine::setShuffle(). Will be removed in the next major.
@@ -136,7 +136,7 @@ struct EngineCallbacks {
     std::function<void(int64_t queue_id)> on_queue_changed{}; ///< Fired on QueueChanged.
     std::function<void(caudio::utils::StatusCode err, std::string_view msg)>
         on_error{};      ///< Fired on Error.
-    void* user{nullptr}; // unused — reserved
+    void* user{nullptr}; // unused â€” reserved
 };
 
 /**
@@ -180,7 +180,7 @@ struct QueueState {
  * @ingroup caudio_engine
  * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
  * current_track_id, volume, shuffle_perm (BLOB), active_queue_id`.
- * `active_queue_id` may be missing on old DBs — loadState falls back
+ * `active_queue_id` may be missing on old DBs â€” loadState falls back
  * to `1` and saveState tries `sqlNew` then `sqlOld`. `shuffle_perm`
  * is `perm` serialized as `int64_t` blob.
  * @see Engine::loadState

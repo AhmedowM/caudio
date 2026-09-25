@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <format>
 #include <functional>
 #include <mutex>
@@ -6,7 +6,7 @@
 #include <string_view>
 #include <utility>
 
-#include "caudio/utils/result.hpp"
+#include <caudio/utils/result.hpp>
 
 /**
  * @file log.hpp

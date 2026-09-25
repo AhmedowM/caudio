@@ -1,5 +1,5 @@
-module;
-#include "caudio/client/output_formatter.hpp"
+﻿module;
+#include <caudio/client/output_formatter.hpp>
 
 export module caudio.client:output_formatter;
 

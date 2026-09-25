@@ -1,8 +1,8 @@
-#include "caudio/db/fingerprint.hpp"
+﻿#include <caudio/db/fingerprint.hpp>
 
 #include <blake3.h>
 
-#include <caudio/utils/utils.hpp>
+#include <caudio/utils.hpp>
 #include <fstream>
 #include <thread>
 

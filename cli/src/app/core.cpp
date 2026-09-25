@@ -1,13 +1,13 @@
-#include <CLI/CLI.hpp>
+﻿#include <CLI/CLI.hpp>
 #include <memory>
 
-#include "cli/app/core.hpp"
+#include <core.hpp>
 
-#include "cli/app/parse.hpp"
+#include <parse.hpp>
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-// Avoid including <windows.h> â€” causes HMODULE conflict with caudio::utils (like
+// Avoid including <windows.h> Ã¢â‚¬â€ causes HMODULE conflict with caudio::utils (like
 // service_detail.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
 // missing decls.
 using BOOL = int;
@@ -87,19 +87,19 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <variant>
 #include <vector>
 
-#include "caudio/db/database.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/json.hpp"
-#include "caudio/player/player.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/client/client.hpp"
-#include "caudio/client/ipc_client.hpp"
-#include "caudio/client/output_formatter.hpp"
-#include "caudio/config.hpp"
-#include "caudio/service/service.hpp"
-#include "caudio/ipc/command.hpp"
-#include "caudio/ipc/protocol.hpp"
-#include "caudio/ipc/result.hpp"
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <nlohmann/json.hpp>
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/client.hpp>
+#include <caudio/client/ipc_client.hpp>
+#include <caudio/client/output_formatter.hpp>
+#include <caudio/config.hpp>
+#include <caudio/service.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
 
 namespace caudio::app {
 
@@ -176,10 +176,10 @@ void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& t
 }
 
 void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks) {
-    caudio::json::ordered_json j;
+    nlohmann::ordered_json j;
     j["format"] = "caudio-playlist";
     j["version"] = 1;
-    j["tracks"] = caudio::json::ordered_json::array();
+    j["tracks"] = nlohmann::ordered_json::array();
     for (const auto& t : tracks) {
         j["tracks"].push_back(caudio::cli::detail::trackToJson(t));
     }
@@ -193,13 +193,13 @@ using detail::parseVolume;
 
 App::App(caudio::cli::Config cfg)
     : config_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
-    cli_->set_version_flag("--version", std::string(caudio::utils::kVersionFull));
+    cli_->set_version_flag("--version", std::string(caudio::versionFull));
 }
 
 App::~App() = default;
 
 std::filesystem::path App::pidPathForConfig() const {
-    // Canonical pid path â€” single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
+    // Canonical pid path Ã¢â‚¬â€ single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
     auto r = caudio::cli::pidPathFor(config_.dbPath);
     if (r)
         return *r;
@@ -370,7 +370,7 @@ int App::handleStart(bool foreground) {
                          config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
-        // Poll for pipe readiness: 1500ms total, 100ms interval Ã—15
+        // Poll for pipe readiness: 1500ms total, 100ms interval Ãƒâ€”15
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {

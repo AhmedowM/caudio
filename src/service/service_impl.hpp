@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/service/service_impl.hpp â€” daemon runtime, not CLI-specific. Keep include/cli/service/service_impl.hpp as deprecated shim for one release: #include "caudio/service/service_impl.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/service/service_impl.hpp Ã¢â‚¬â€ daemon runtime, not CLI-specific. Keep include/cli/service/service_impl.hpp as deprecated shim for one release: #include <caudio/service/service_impl.hpp>.
 /**
  * @file service_impl.hpp
  * @brief Service implementation: owns Engine, Database, Logger, IPC server, and dispatches
@@ -35,18 +35,18 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/db/database.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/json.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/config.hpp"
-#include "caudio/service/ipc_channel.hpp"
-#include "caudio/service/ipc_server.hpp"
-#include "caudio/service/service_detail.hpp"
-#include "caudio/service/shm_status.hpp"
-#include "caudio/ipc/command.hpp"
-#include "caudio/ipc/protocol.hpp"
-#include "caudio/ipc/result.hpp"
+#include <caudio/db.hpp>
+#include <caudio/db/json.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/config.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/service/ipc_server.hpp>
+#include <caudio/service/service_detail.hpp>
+#include <caudio/service/shm_status.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
 
 namespace caudio::service {
 

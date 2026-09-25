@@ -1,5 +1,5 @@
-module;
-#include "caudio/utils/ring.hpp"
+﻿module;
+#include <caudio/utils/ring.hpp>
 
 export module caudio.utils:ring;
 

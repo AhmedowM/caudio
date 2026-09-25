@@ -110,7 +110,7 @@ Global options:
 | `--config <FILE>` | Config file path (default: XDG / `%LOCALAPPDATA%`) |
 | `--log-level trace|debug|info|warn|error` | Daemon log level |
 | `--device <DEVICE>` | Audio output device id |
-| `--version` | Show version (`caudio::kVersionFull`, e.g. `v0.25.5`) |
+| `--version` | Show version (`caudio::versionFull`, e.g. `v0.25.5`) |
 | `--help` / `-h` | Show help |
 
 ## Library Usage
@@ -137,7 +137,7 @@ import caudio.engine;
 #include "caudio/version.hpp"
 
 int main() {
-    std::println("caudio {}", caudio::kVersionFull); // v0.25.5
+    std::println("caudio {}", caudio::versionFull); // v0.25.5
 
     auto db = caudio::db::Database::open(":memory:").value();
     caudio::engine::EngineConfig cfg{.dbPath = ":memory:",

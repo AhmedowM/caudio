@@ -1,5 +1,5 @@
-module;
-#include "caudio/db/db_core.hpp"
+﻿module;
+#include <caudio/db/db_core.hpp>
 
 export module caudio.db:core;
 

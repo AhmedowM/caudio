@@ -1,5 +1,5 @@
-module;
-#include "caudio/ipc.hpp"
+﻿module;
+#include <caudio/ipc.hpp>
 
 export module caudio.cli;
 export import :command;

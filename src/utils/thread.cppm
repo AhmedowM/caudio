@@ -1,5 +1,5 @@
-module;
-#include "caudio/utils/thread.hpp"
+﻿module;
+#include <caudio/utils/thread.hpp>
 
 export module caudio.utils:thread;
 

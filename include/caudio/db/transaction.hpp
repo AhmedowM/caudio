@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <expected>
@@ -6,8 +6,8 @@
 #include <string_view>
 #include <utility>
 
-#include "caudio/db/detail.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/detail.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file transaction.hpp

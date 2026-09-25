@@ -1,4 +1,4 @@
-#include "caudio/service/ipc_server.hpp"
+﻿#include <caudio/service/ipc_server.hpp>
 
 #include <array>
 #include <chrono>
@@ -19,9 +19,10 @@
 #include <cstring>
 #endif
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/ipc.hpp"
-#include "caudio/service/ipc_channel.hpp"
+#include <caudio/config.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/ipc.hpp>
+#include <caudio/service/ipc_channel.hpp>
 
 namespace caudio::service {
 

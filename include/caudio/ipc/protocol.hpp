@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/ipc/protocol.hpp â€” reusable IPC, not CLI-specific. Keep include/cli/shared/protocol.hpp as deprecated shim for one release: #include "caudio/ipc/protocol.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/ipc/protocol.hpp Ã¢â‚¬â€ reusable IPC, not CLI-specific. Keep include/cli/shared/protocol.hpp as deprecated shim for one release: #include <caudio/ipc/protocol.hpp>.
 #pragma once
 /**
  * @file protocol.hpp
@@ -76,16 +76,17 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/json.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/ipc/command.hpp"
-#include "caudio/ipc/result.hpp"
+#include <nlohmann/json.hpp>
+
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
 
 namespace caudio::cli {
 
-using ordered_json = caudio::json::ordered_json;
+using ordered_json = nlohmann::ordered_json;
 
 /**
  * @struct IpcRequest

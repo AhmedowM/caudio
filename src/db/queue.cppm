@@ -1,5 +1,5 @@
-module;
-#include "caudio/db/queue.hpp"
+﻿module;
+#include <caudio/db/queue.hpp>
 
 export module caudio.db:queue;
 

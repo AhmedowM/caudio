@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file reader.hpp
  * @brief Input reader abstractions for audio data sources
  * @ingroup caudio_player
@@ -41,7 +41,7 @@
 #include <string_view>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
+#include <caudio/utils.hpp>
 
 namespace caudio::player {
 

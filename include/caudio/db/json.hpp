@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <array>
@@ -15,12 +15,12 @@
 #include <string>
 #include <vector>
 
-#include "caudio/db/db_core.hpp"
-#include "caudio/db/db_types.hpp"
-#include "caudio/db/detail.hpp"
-#include "caudio/db/statement.hpp"
-#include "caudio/db/transaction.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/db/transaction.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::db {
 
@@ -30,7 +30,7 @@ namespace caudio::db {
  */
 using ordered_json = nlohmann::ordered_json;
 
-// DRY: canonical hex helpers live in caudio.db:detail — thin wrappers for backwards compat
+// DRY: canonical hex helpers live in caudio.db:detail â€” thin wrappers for backwards compat
 /**
  * @brief Converts a 32-byte fingerprint to a 64-char lowercase hex string.
  * @ingroup caudio_db

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ffmpeg.hpp
  * @brief FFmpeg-based audio decoder implementation
  * @ingroup caudio_player
@@ -38,10 +38,10 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 
-#include "caudio/player/decoders/decoder_common.hpp"
-#include "caudio/player/decoders/decoder_interface.hpp"
-#include "caudio/player/reader.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/player/decoders/decoder_common.hpp>
+#include <caudio/player/decoders/decoder_interface.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::player {
 

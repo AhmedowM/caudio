@@ -1,12 +1,9 @@
 module;
-#include "caudio/utils/version.hpp"
+#include <caudio/version.hpp>
 
 export module caudio.utils:version;
 
 export namespace caudio::utils {
-using ::caudio::utils::kVersion;
-using ::caudio::utils::kVersionCommit;
-using ::caudio::utils::kVersionFull;
 using ::caudio::utils::shortVersion;
 using ::caudio::utils::version;
 using ::caudio::utils::versionCommit;
@@ -17,7 +14,10 @@ using ::caudio::utils::versionString;
 } // namespace caudio::utils
 
 export namespace caudio {
-using ::caudio::kVersion;
-using ::caudio::kVersionCommit;
-using ::caudio::kVersionFull;
+using ::caudio::shortVersion;
+using ::caudio::versionCommit;
+using ::caudio::versionFull;
+using ::caudio::versionMajor;
+using ::caudio::versionMinor;
+using ::caudio::versionPatch;
 } // namespace caudio

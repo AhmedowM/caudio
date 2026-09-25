@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #if defined(_WIN32) || defined(_WIN64)
 // No windows.h here to avoid intrin conflict; Win32 decls go after export module
 #else
@@ -15,8 +15,8 @@
 #include <thread>
 #include <utility>
 
-#include "caudio/utils/error.hpp"
-#include "caudio/utils/result.hpp"
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 
 #if defined(_WIN32) || defined(_WIN64)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)

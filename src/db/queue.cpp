@@ -1,9 +1,9 @@
-#include "caudio/db/queue.hpp"
+﻿#include <caudio/db/queue.hpp>
 
 #include <sqlite3.h>
 
 #include <caudio/db/statement.hpp>
-#include <caudio/utils/utils.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::db {
 

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 
-#include "common.hpp"
+#include <common.hpp>
 
 import caudio.db;
 import caudio.utils;

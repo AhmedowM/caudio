@@ -1,6 +1,9 @@
-#include "caudio/player/player_core.hpp"
+﻿#include <caudio/player/player_core.hpp>
+#include <caudio/player/decoders/decoder_interface.hpp>
 
 namespace caudio::player {
+
+Player::Player() = default;
 
 Player::ExpectedPlayer Player::create(const PlayerOpts& opts) {
     auto p = std::unique_ptr<Player>(new Player());

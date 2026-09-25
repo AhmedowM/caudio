@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/client/ipc_client.hpp â€” client SDK, not CLI-specific. Keep include/cli/client/ipc_client.hpp as deprecated shim for one release: #include "caudio/client/ipc_client.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/client/ipc_client.hpp Ã¢â‚¬â€ client SDK, not CLI-specific. Keep include/cli/client/ipc_client.hpp as deprecated shim for one release: #include <caudio/client/ipc_client.hpp>.
 /**
  * @file ipc_client.hpp
  * @brief IPC client for connecting to caudio service via Unix socket or Windows named pipe.
@@ -61,12 +61,12 @@ __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LP
 #endif
 #endif
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/config.hpp"
-#include "caudio/service/ipc_channel.hpp"
-#include "caudio/ipc/command.hpp"
-#include "caudio/ipc/protocol.hpp"
-#include "caudio/ipc/result.hpp"
+#include <caudio/utils.hpp>
+#include <caudio/config.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
 
 namespace caudio::client {
 

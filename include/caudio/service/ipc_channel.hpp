@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/service/ipc_channel.hpp — daemon runtime, not CLI-specific. Keep include/cli/service/ipc_channel.hpp as deprecated shim for one release: #include "caudio/service/ipc_channel.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/service/ipc_channel.hpp â€” daemon runtime, not CLI-specific. Keep include/cli/service/ipc_channel.hpp as deprecated shim for one release: #include <caudio/service/ipc_channel.hpp>.
 #pragma once
 
 #include <array>
@@ -13,7 +13,7 @@
 #include <utility>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
+#include <caudio/utils.hpp>
 
 namespace caudio::service {
 

@@ -1,5 +1,5 @@
-module;
-#include "caudio/player/decoders/decoder_interface.hpp"
+﻿module;
+#include <caudio/player/decoders/decoder_interface.hpp>
 
 export module caudio.player:decoder_interface;
 

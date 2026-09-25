@@ -1,4 +1,4 @@
-#include "caudio/config.hpp"
+﻿#include <caudio/config.hpp>
 
 namespace caudio::cli::detail {
 
@@ -86,7 +86,7 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
         return cfg;
     }
     try {
-        auto j = caudio::json::ordered_json::parse(content);
+        auto j = nlohmann::ordered_json::parse(content);
         if (j.contains("dbPath") && j["dbPath"].is_string()) {
             std::string s = j["dbPath"].get<std::string>();
             if (!s.empty())
@@ -129,7 +129,7 @@ caudio::utils::Expected<void> saveConfig(const Config& cfg) {
             std::error_code ec;
             std::filesystem::create_directories(dir, ec);
         }
-        caudio::json::ordered_json j;
+        nlohmann::ordered_json j;
         j["dbPath"] = cfg.dbPath.generic_string();
         j["device"] = cfg.device;
         j["logLevel"] = cfg.logLevel;
@@ -253,7 +253,7 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
                                                         "key not found: " + std::string(key))};
     }
     try {
-        auto j = caudio::json::ordered_json::parse(content);
+        auto j = nlohmann::ordered_json::parse(content);
         if (!j.is_object()) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                             "config is not an object")};
@@ -277,7 +277,7 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
 
 caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key,
                                            std::string_view value) {
-    caudio::json::ordered_json j = caudio::json::ordered_json::object();
+    nlohmann::ordered_json j = nlohmann::ordered_json::object();
     std::error_code ec;
     if (std::filesystem::exists(p, ec)) {
         auto fileRes = detail::readFileString(p);
@@ -285,23 +285,23 @@ caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::
             std::string content = std::move(*fileRes);
             if (!content.empty()) {
                 try {
-                    auto parsed = caudio::json::ordered_json::parse(content);
+                    auto parsed = nlohmann::ordered_json::parse(content);
                     if (parsed.is_object())
                         j = std::move(parsed);
                     else
-                        j = caudio::json::ordered_json::object();
+                        j = nlohmann::ordered_json::object();
                 } catch (...) {
-                    j = caudio::json::ordered_json::object();
+                    j = nlohmann::ordered_json::object();
                 }
             }
         }
     }
     std::string k(key);
-    caudio::json::ordered_json v;
+    nlohmann::ordered_json v;
     bool parsedAsJson = false;
     if (!value.empty()) {
         try {
-            auto tmp = caudio::json::ordered_json::parse(value);
+            auto tmp = nlohmann::ordered_json::parse(value);
             v = std::move(tmp);
             parsedAsJson = true;
         } catch (...) {
@@ -342,7 +342,7 @@ caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::fi
     if (content.empty())
         return std::vector<RawConfigValue>{};
     try {
-        auto j = caudio::json::ordered_json::parse(content);
+        auto j = nlohmann::ordered_json::parse(content);
         if (!j.is_object())
             return std::vector<RawConfigValue>{};
         std::vector<RawConfigValue> out;
@@ -388,7 +388,7 @@ caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
                                                         "key not found: " + std::string(key))};
     }
     try {
-        auto j = caudio::json::ordered_json::parse(content);
+        auto j = nlohmann::ordered_json::parse(content);
         if (!j.is_object()) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                             "config is not an object")};

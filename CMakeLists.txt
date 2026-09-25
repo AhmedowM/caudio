@@ -122,7 +122,7 @@ endif()
 # Configure version header (template lives in cmake/ — canonical for CMake @ONLY files)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.hpp.in
-  ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version.hpp
+  ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp
   @ONLY
 )
 
@@ -183,7 +183,7 @@ target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src
 target_sources(caudio PRIVATE cli/src/app/core.cpp)
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cli11_wrapper)
-target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include)
+target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::cli_shared CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio)
@@ -282,7 +282,6 @@ install(
     player player_shared
     db db_shared
     engine engine_shared
-    json json_shared
     cli_shared
     client client_shared
     service service_shared
@@ -295,7 +294,7 @@ install(
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   FILE_SET CXX_MODULES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio
 )
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 
@@ -458,6 +457,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   # Output tests
   add_executable(test_output tests/test_output.cpp)
   target_link_libraries(test_output PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
+  target_include_directories(test_output PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   target_compile_features(test_output PRIVATE cxx_std_23)
   if(CAUDIO_ENABLE_SANITIZERS)
     caudio_apply_sanitizers(test_output)
@@ -470,7 +470,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   function(caudio_add_engine_test name src)
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-    target_include_directories(${name} PRIVATE vendor)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
     if(CAUDIO_ENABLE_SANITIZERS)
       caudio_apply_sanitizers(${name})
@@ -486,7 +486,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   # DB scan/search/json
   add_executable(test_db_scan tests/test_db_scan.cpp)
   target_link_libraries(test_db_scan PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db_scan PRIVATE vendor)
+  target_include_directories(test_db_scan PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
   target_compile_features(test_db_scan PRIVATE cxx_std_23)
   if(CAUDIO_ENABLE_SANITIZERS)
     caudio_apply_sanitizers(test_db_scan)
@@ -504,7 +504,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
 
   add_executable(test_db_json tests/test_db_json.cpp)
   target_link_libraries(test_db_json PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db_json PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+  target_include_directories(test_db_json PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
   target_compile_features(test_db_json PRIVATE cxx_std_23)
   if(CAUDIO_ENABLE_SANITIZERS)
     caudio_apply_sanitizers(test_db_json)
@@ -514,7 +514,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   # Player integration
   add_executable(test_player_integration tests/test_player_integration.cpp)
   target_link_libraries(test_player_integration PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_player_integration PRIVATE vendor)
+  target_include_directories(test_player_integration PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
   target_compile_features(test_player_integration PRIVATE cxx_std_23)
   if(CAUDIO_ENABLE_SANITIZERS)
     caudio_apply_sanitizers(test_player_integration)
@@ -524,7 +524,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
   # IPC/Cli integration tests
   add_executable(test_ipc tests/test_ipc.cpp)
   target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::cli_shared caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_ipc PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+  target_include_directories(test_ipc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
   target_compile_features(test_ipc PRIVATE cxx_std_23)
   target_link_options(test_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
   if(CAUDIO_ENABLE_SANITIZERS)

@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/service/ipc_server.hpp â€” daemon runtime, not CLI-specific. Keep include/cli/service/ipc_server.hpp as deprecated shim for one release: #include "caudio/service/ipc_server.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/service/ipc_server.hpp Ã¢â‚¬â€ daemon runtime, not CLI-specific. Keep include/cli/service/ipc_server.hpp as deprecated shim for one release: #include <caudio/service/ipc_server.hpp>.
 #pragma once
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -70,9 +70,9 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #endif
 #endif
 
-#include "caudio/utils/utils.hpp"
-#include "caudio/ipc.hpp"
-#include "caudio/service/ipc_channel.hpp"
+#include <caudio/utils.hpp>
+#include <caudio/ipc.hpp>
+#include <caudio/service/ipc_channel.hpp>
 
 namespace caudio::service {
 

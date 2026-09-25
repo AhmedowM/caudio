@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <condition_variable>
 #include <cstddef>
 #include <expected>
@@ -7,8 +7,8 @@
 #include <utility>
 #include <vector>
 
-#include "caudio/utils/error.hpp"
-#include "caudio/utils/result.hpp"
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 
 /**
  * @file mpsc_queue.hpp

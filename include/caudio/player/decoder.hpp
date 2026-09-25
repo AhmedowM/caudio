@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file decoder.hpp
  * @brief Decoder registry and format probing for audio file decoding
  * @ingroup caudio_player
@@ -16,10 +16,12 @@
 
 #include <memory>
 
-#include "caudio/player/decoders/decoder_interface.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::player {
+
+class IDecoder;
 
 /**
  * @class DecoderRegistry

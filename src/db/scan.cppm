@@ -1,5 +1,5 @@
-module;
-#include "caudio/db/scan.hpp"
+﻿module;
+#include <caudio/db/scan.hpp>
 
 export module caudio.db:scan;
 

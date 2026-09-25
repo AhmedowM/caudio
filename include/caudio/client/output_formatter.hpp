@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/client/output_formatter.hpp â€” client SDK, not CLI-specific. Keep include/cli/client/output_formatter.hpp as deprecated shim for one release: #include "caudio/client/output_formatter.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/client/output_formatter.hpp Ã¢â‚¬â€ client SDK, not CLI-specific. Keep include/cli/client/output_formatter.hpp as deprecated shim for one release: #include <caudio/client/output_formatter.hpp>.
 /**
  * @file output_formatter.hpp
  * @brief Output formatting for CLI results: table and JSON output.
@@ -18,13 +18,13 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/config.hpp"
-#include "caudio/ipc/command.hpp"
-#include "caudio/ipc/protocol.hpp"
-#include "caudio/ipc/result.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/config.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
 
 namespace caudio::client {
 

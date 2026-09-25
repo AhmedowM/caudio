@@ -1,6 +1,6 @@
-#include "caudio/client/client_impl.hpp"
+﻿#include <caudio/client/client_impl.hpp>
 
-#include <caudio/utils/utils.hpp>
+#include <caudio/utils.hpp>
 #include <algorithm>
 #include <chrono>
 #include <caudio/client/ipc_client.hpp>
@@ -81,7 +81,7 @@ caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Com
             }
         });
 
-    // Handle timeout via chrono::milliseconds â€” uses future::wait_for.
+    // Handle timeout via chrono::milliseconds Ã¢â‚¬â€ uses future::wait_for.
     if (fut.wait_for(timeout) == std::future_status::ready) {
         return fut.get();
     } else {

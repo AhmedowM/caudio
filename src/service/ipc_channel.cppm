@@ -1,5 +1,5 @@
-module;
-#include "caudio/service/ipc_channel.hpp"
+﻿module;
+#include <caudio/service/ipc_channel.hpp>
 
 export module caudio.service:ipc_channel;
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <chrono>
@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "caudio/db/database.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file history.hpp

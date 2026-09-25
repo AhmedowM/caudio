@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <array>
@@ -12,10 +12,10 @@
 #include <string_view>
 #include <vector>
 
-#include "caudio/db/db_core.hpp"
-#include "caudio/db/db_types.hpp"
-#include "caudio/db/detail.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::db {
 

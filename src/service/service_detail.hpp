@@ -1,9 +1,9 @@
-// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/service/service_detail.hpp â€” daemon runtime, not CLI-specific. Keep include/cli/service/service_detail.hpp as deprecated shim for one release: #include "caudio/service/service_detail.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/service/service_detail.hpp Ã¢â‚¬â€ daemon runtime, not CLI-specific. Keep include/cli/service/service_detail.hpp as deprecated shim for one release: #include <caudio/service/service_detail.hpp>.
 #pragma once
 
 /**
  * @file service_detail.hpp
- * @brief Internal helpers for caudio.service â€” not exported. Contains path utilities,
+ * @brief Internal helpers for caudio.service Ã¢â‚¬â€ not exported. Contains path utilities,
  * locking, PID management, SHM status building, config helpers, and audio file utilities.
  * @ingroup caudio_service
  */
@@ -30,7 +30,7 @@
 #include <variant>
 #include <vector>
 
-#include "blake3.h"
+#include <blake3.h>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -42,15 +42,15 @@
 #include <cstring>
 #else
 #include <process.h>
-// Do NOT include windows.h here â€” causes HMODULE/HANDLE conflicts with caudio::utils
+// Do NOT include windows.h here Ã¢â‚¬â€ causes HMODULE/HANDLE conflicts with caudio::utils
 // Windows-specific API usage is in the .cpp with proper extern "C" declarations.
 #endif
 
-#include "caudio/db/database.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/player/player.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/ipc.hpp"
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/ipc.hpp>
 
 namespace caudio::service::detail {
 

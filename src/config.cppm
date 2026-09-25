@@ -1,5 +1,5 @@
-module;
-#include "caudio/config.hpp"
+﻿module;
+#include <caudio/config.hpp>
 
 export module caudio.cli:config;
 

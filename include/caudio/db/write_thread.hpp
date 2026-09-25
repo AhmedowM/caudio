@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <atomic>
@@ -12,9 +12,9 @@
 #include <thread>
 #include <utility>
 
-#include "caudio/db/detail.hpp"
-#include "caudio/db/statement.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file write_thread.hpp

@@ -1,4 +1,4 @@
-// TODO(Audit Directive 2, Appendix C §2.2): promote to include/caudio/ipc/result.hpp — reusable IPC, not CLI-specific. Keep include/cli/shared/result.hpp as deprecated shim for one release: #include "caudio/ipc/result.hpp".
+﻿// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/ipc/result.hpp â€” reusable IPC, not CLI-specific. Keep include/cli/shared/result.hpp as deprecated shim for one release: #include <caudio/ipc/result.hpp>.
 #pragma once
 /**
  * @file result.hpp
@@ -33,9 +33,9 @@
 #include <variant>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::cli {
 
@@ -121,10 +121,10 @@ struct Status final {
     std::size_t q_idx{0};
     /**
      * @brief Daemon/library version (full git tag, e.g. "v0.25.4").
-     * @details Populated by service_detail::buildStatus from caudio::utils::kVersionFull.
-     * Default is kVersionFull so local builds without daemon still show version.
+     * @details Populated by service_detail::buildStatus from caudio::versionFull.
+     * Default is versionFull so local builds without daemon still show version.
      */
-    std::string version{caudio::utils::kVersionFull};
+    std::string version{caudio::versionFull};
 };
 
 // ---------------------------------------------------------------------------

@@ -67,7 +67,7 @@ export namespace caudio {
  * @ingroup caudio
  */
 constexpr std::string_view version() noexcept {
-    return caudio::utils::kVersionFull;
+    return caudio::versionFull;
 }
 
 /**
@@ -75,7 +75,7 @@ constexpr std::string_view version() noexcept {
  * @ingroup caudio
  */
 constexpr std::string_view gitHash() noexcept {
-    return caudio::utils::kVersionCommit;
+    return caudio::versionCommit;
 }
 
 } // namespace caudio

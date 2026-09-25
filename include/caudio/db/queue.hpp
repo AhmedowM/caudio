@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <cstdint>
@@ -8,21 +8,21 @@
 #include <string_view>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/db/detail.hpp"
-#include "caudio/db/statement.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file queue.hpp
  * @brief Queue table helpers (single-writer invariant).
  * @ingroup caudio_db
- * @details All helpers are `*Locked` — the caller must hold the
+ * @details All helpers are `*Locked` â€” the caller must hold the
  * Database mutex (dbMutex_) exclusively for mutating ops and at least
  * shared for reads. The `queue` table enforces UNIQUE(queue_id, position)
  * (see schema.hpp); position shifts use
  * `UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?`
- * which requires serialized access — guaranteed by the single-writer lock.
+ * which requires serialized access â€” guaranteed by the single-writer lock.
  * Every function normalizes qid == 0 to 1 (default queue).
  */
 

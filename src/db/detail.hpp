@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 /**
  * @file detail.hpp
  * @brief Internal re-export hub for db helpers.
@@ -8,6 +8,6 @@
  * Not part of the public API.
  */
 
-#include "caudio/db/fingerprint.hpp"
-#include "caudio/db/fts.hpp"
-#include "caudio/db/stmt_helpers.hpp"
+#include <caudio/db/fingerprint.hpp>
+#include <caudio/db/fts.hpp>
+#include <caudio/db/stmt_helpers.hpp>

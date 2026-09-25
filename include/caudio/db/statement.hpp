@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <cstddef>
@@ -10,7 +10,7 @@
 #include <string>
 #include <string_view>
 
-#include "caudio/utils/utils.hpp"
+#include <caudio/utils.hpp>
 
 /**
  * @file statement.hpp
@@ -19,7 +19,7 @@
  * @details Non-copyable, movable. Owns a sqlite3_stmt* and finalizes on
  * destruction/move. Provides prepare/bind/step/column/reset helpers.
  * All operations are thin wrappers over the SQLite C API; no locking is
- * performed here — callers must hold the appropriate Database mutex.
+ * performed here â€” callers must hold the appropriate Database mutex.
  */
 
 namespace caudio::db {
@@ -89,7 +89,7 @@ class SqliteStatement final {
      * @param data Bytes to copy.
      */
     void bindBlob(int idx, std::span<const std::byte> data);
-    /** @brief Deprecated C-pointer overload — use span overload. @ingroup caudio_db */
+    /** @brief Deprecated C-pointer overload â€” use span overload. @ingroup caudio_db */
     [[deprecated("use span overload")]] void bindBlob(int idx, const void* data, int n);
     /**
      * @brief Binds NULL at 1-based index.

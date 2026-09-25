@@ -1,4 +1,5 @@
-#include "caudio/engine/engine.hpp"
+﻿#include <caudio/engine.hpp>
+#include <caudio/player/decoders/decoder_interface.hpp>
 
 namespace caudio::engine {
 
@@ -259,7 +260,7 @@ RepeatMode Engine::repeat() const noexcept {
 }
 
 std::string_view Engine::version() const noexcept {
-    return caudio::utils::kVersionFull;
+    return caudio::versionFull;
 }
 
 std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
@@ -1270,7 +1271,7 @@ void Engine::engineTick() {
             double gapS = (double)cfg_.gaplessMs / 1000.0;
             if (remaining <= gapS && remaining >= 0.0) {
                 if (hasCurrent_.load(std::memory_order_acquire)) {
-                    // gaplessArmed 0→1 CAS, 300ms preroll
+                    // gaplessArmed 0â†’1 CAS, 300ms preroll
                     bool expected = false;
                     if (gaplessArmed_.compare_exchange_strong(
                             expected, true, std::memory_order_acq_rel, std::memory_order_acquire)) {

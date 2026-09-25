@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <blake3.h>
 
 #include <algorithm>
@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file fingerprint.hpp

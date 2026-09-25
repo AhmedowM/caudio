@@ -1,4 +1,4 @@
-#include "caudio/db/db_core.hpp"
+﻿#include <caudio/db/db_core.hpp>
 
 namespace caudio::db {
 
@@ -69,7 +69,7 @@ SqliteStatement* Database::getCachedLocked(std::string_view sql) const {
     // Caller must hold stmtCacheMutex_ (cacheMutex_); delegate to expected API.
     auto r = getCachedForUse(sql);
     if (!r)
-        return nullptr; // error — caller of deprecated API must check nullptr
+        return nullptr; // error â€” caller of deprecated API must check nullptr
     return *r;
 }
 
@@ -77,7 +77,7 @@ SqliteStatement* Database::getCached(const std::string& sql) const {
     std::lock_guard lk{cacheMutex_};
     auto r = getCachedForUse(sql);
     if (!r)
-        return nullptr; // error — see deprecation note
+        return nullptr; // error â€” see deprecation note
     return *r;
 }
 
@@ -100,7 +100,7 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
         std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
         // Gracefully handle existing duplicate queue positions on migration:
         // UNIQUE(queue_id, position) creation may fail if old DB has duplicates.
-        // Treat as non-fatal — open still succeeds; queue ops will normalize positions.
+        // Treat as non-fatal â€” open still succeeds; queue ops will normalize positions.
         bool isQueueUniqueMigration = msg.find("idx_queue_queue_pos") != std::string::npos ||
                                       msg.find("queue") != std::string::npos;
         bool isUniqueConstraint =
@@ -110,7 +110,7 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Corrupt, std::string("schema init failed: ") + msg)};
         }
-        // else: non-fatal migration duplicate — clear err for next exec
+        // else: non-fatal migration duplicate â€” clear err for next exec
         if (err) {
             sqlite3_free(err);
             err = nullptr;
@@ -156,7 +156,7 @@ sqlite3* Database::handleLocked() const noexcept {
 }
 
 std::string_view Database::version() const noexcept {
-    return caudio::utils::kVersionFull;
+    return caudio::versionFull;
 }
 
 std::expected<void, caudio::utils::Error> Database::flush() {

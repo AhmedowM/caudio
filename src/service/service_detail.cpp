@@ -1,10 +1,10 @@
-#ifndef WIN32_LEAN_AND_MEAN
+﻿#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "caudio/service/service_detail.hpp"
+#include <caudio/service/service_detail.hpp>
 
 #include <algorithm>
 #include <array>
@@ -28,7 +28,7 @@
 #include <variant>
 #include <vector>
 
-#include "blake3.h"
+#include <blake3.h>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -40,7 +40,7 @@
 #include <cstring>
 #else
 #include <process.h>
-// Avoid including windows.h â€” causes HMODULE conflict with caudio::utils
+// Avoid including windows.h Ã¢â‚¬â€ causes HMODULE conflict with caudio::utils
 // Provide minimal forward declarations for needed APIs
 using HANDLE = void*;
 using DWORD = unsigned long;
@@ -127,11 +127,13 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #endif
 #endif
 
-#include "caudio/db/database.hpp"
-#include "caudio/engine/engine.hpp"
-#include "caudio/player/player.hpp"
-#include "caudio/utils/utils.hpp"
-#include "caudio/ipc.hpp"
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/player.hpp>
+#include <caudio/player/decoders/decoder_interface.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/ipc.hpp>
 
 namespace caudio::service::detail {
 
@@ -317,7 +319,7 @@ std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
 std::expected<caudio::cli::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
                                                                      caudio::db::Database& db) {
     caudio::cli::Status s{};
-    s.version = std::string(caudio::utils::kVersionFull);
+    s.version = std::string(caudio::versionFull);
     s.state = eng.state();
     s.pos = eng.position();
     s.dur = eng.duration();

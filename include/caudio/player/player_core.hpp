@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file player_core.hpp
  * @brief Core audio player implementation with gapless playback support
  * @ingroup caudio_player
@@ -53,13 +53,14 @@
 #include <thread>
 #include <vector>
 
-#include "caudio/player/decoder.hpp"
-#include "caudio/player/decoders/decoder_interface.hpp"
-#include "caudio/player/output.hpp"
-#include "caudio/player/reader.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::player {
+
+class IDecoder;
 
 /**
  * @enum State
@@ -314,7 +315,7 @@ class Player {
     std::string_view lastError() const noexcept;
 
   private:
-    Player() = default;
+    Player();
 
     /**
      * @brief Initialize player with options

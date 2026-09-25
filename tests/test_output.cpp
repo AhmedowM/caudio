@@ -3,7 +3,7 @@
 #include <cmath>
 #include <span>
 
-#include "common.hpp"
+#include <common.hpp>
 import caudio.player;
 import caudio.utils;
 

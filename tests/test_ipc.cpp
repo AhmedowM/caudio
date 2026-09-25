@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-#include "common.hpp"
+#include <common.hpp>
 
 import caudio.cli;
 import caudio.service;

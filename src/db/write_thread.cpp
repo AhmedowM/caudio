@@ -1,9 +1,9 @@
-#include "caudio/db/write_thread.hpp"
+﻿#include <caudio/db/write_thread.hpp>
 
 #include <sqlite3.h>
 
 #include <caudio/db/detail.hpp>
-#include <caudio/utils/utils.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 
 namespace caudio::db {

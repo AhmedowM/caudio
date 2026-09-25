@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <cstring>
@@ -15,14 +15,14 @@
 #include <unordered_map>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/db/detail.hpp"
-#include "caudio/db/queue.hpp"
-#include "caudio/db/schema.hpp"
-#include "caudio/db/statement.hpp"
-#include "caudio/db/transaction.hpp"
-#include "caudio/db/write_thread.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/queue.hpp>
+#include <caudio/db/schema.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/db/transaction.hpp>
+#include <caudio/db/write_thread.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::db {
 
@@ -128,7 +128,7 @@ class Database final {
      */
     std::expected<SqliteStatement*, caudio::utils::Error>
     getCachedForUse(std::string_view sql) const;
-    [[deprecated("use getCachedForUse; raw nullptr is error — check expected")]]
+    [[deprecated("use getCachedForUse; raw nullptr is error â€” check expected")]]
     SqliteStatement* getCachedLocked(std::string_view sql) const;
     [[deprecated("use getCachedForUse with external lock; raw nullptr is error")]]
     SqliteStatement* getCached(const std::string& sql) const;
@@ -171,16 +171,16 @@ class Database final {
     /**
      * @brief Returns library version (full git tag).
      * @ingroup caudio_db
-     * @return Version string (kVersionFull, e.g. "v0.25.4").
+     * @return Version string (versionFull, e.g. "v0.25.4").
      */
     std::string_view version() const noexcept;
     /**
      * @brief Returns library version (static).
      * @ingroup caudio_db
-     * @return Version string (kVersionFull).
+     * @return Version string (versionFull).
      */
     static constexpr std::string_view staticVersion() noexcept {
-        return caudio::utils::kVersionFull;
+        return caudio::versionFull;
     }
     /**
      * @brief Flushes the background WriterThread queue.
@@ -269,7 +269,7 @@ class Database final {
                                                               const std::vector<int64_t>& ids);
 
     /**
-     * @brief Locked helper section — caller must hold Database::mutex().
+     * @brief Locked helper section â€” caller must hold Database::mutex().
      * @ingroup caudio_db
      * @details These avoid re-locking dbMutex_ and are intended for use inside
      * outer transactions/batches (e.g., scanLibrary).
@@ -358,7 +358,7 @@ class Database final {
     mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   private:
-    // Inline helpers — reduce duplication between insert/update (internal::bindTrack coverage)
+    // Inline helpers â€” reduce duplication between insert/update (internal::bindTrack coverage)
     /**
      * @brief Binds all Track fields for INSERT statement (24 parameters).
      * @ingroup caudio_db
@@ -396,7 +396,7 @@ class Database final {
 
   public:
     /**
-     * @brief Track CRUD — inserts, updates, deletes and queries tracks.
+     * @brief Track CRUD â€” inserts, updates, deletes and queries tracks.
      * @ingroup caudio_db
      */
     /**
@@ -488,9 +488,9 @@ class Database final {
     std::expected<void, caudio::utils::Error> setDirty(int64_t id, int dirty);
 
     // compat helpers for older database.cppm API
-    [[deprecated("use getTrack; compat shim — remove in next major")]]
+    [[deprecated("use getTrack; compat shim â€” remove in next major")]]
     std::expected<std::string, caudio::utils::Error> getTrackName(int64_t id);
-    [[deprecated("use listTracks; compat shim — remove in next major")]]
+    [[deprecated("use listTracks; compat shim â€” remove in next major")]]
     std::expected<std::vector<std::tuple<int64_t, std::string>>, caudio::utils::Error>
     listTracksSimple(int64_t libraryId = 0);
 
@@ -574,7 +574,7 @@ class Database final {
     std::expected<std::vector<Track>, caudio::utils::Error> playlistGetTracks(int64_t pid);
 
     /**
-     * @brief Queue operations — forwarded to queue partition (see queue.cppm).
+     * @brief Queue operations â€” forwarded to queue partition (see queue.cppm).
      * @ingroup caudio_db
      * @details All queue methods normalize qid == 0 to 1 and enforce the
      * UNIQUE(queue_id, position) invariant via dbMutex_ serialization.

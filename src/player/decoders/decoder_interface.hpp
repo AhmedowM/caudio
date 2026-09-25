@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file decoder_interface.hpp
  * @brief Abstract decoder interface for audio format decoders
  * @ingroup caudio_player
@@ -22,8 +22,8 @@
 #include <memory>
 #include <span>
 
-#include "caudio/player/reader.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::player {
 

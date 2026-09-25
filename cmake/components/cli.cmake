@@ -5,15 +5,7 @@
 # Current targets cli_shared/service/client stay under cli/ for build stability; promote headers
 # include/cli/shared/* → include/caudio/ipc/*, include/cli/service/* → include/caudio/service/*,
 # include/cli/client/* → include/caudio/client/* with one-release deprecated shims. See AUDIT_REPORT.md §2.2.
-# cli.cmake — caudio::json + caudio::cli_shared + caudio::service + caudio::client
-
-set(CAUDIO_JSON_SOURCES
-  src/json/json.cppm
-)
-caudio_add_component(json SOURCES ${CAUDIO_JSON_SOURCES})
-target_include_directories(json PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
-ca_set_module_warnings(json)
-caudio_add_shared_variant(json)
+# cli.cmake — caudio::cli_shared + caudio::service + caudio::client
 
 set(CAUDIO_CLI_SHARED_SOURCES
   src/ipc/cli.cppm
@@ -22,7 +14,7 @@ set(CAUDIO_CLI_SHARED_SOURCES
   src/ipc/protocol.cppm
   src/config.cppm
 )
-caudio_add_component(cli_shared SOURCES ${CAUDIO_CLI_SHARED_SOURCES} DEPS caudio::engine caudio::db caudio::utils caudio::json Threads::Threads INCLUDES vendor WITH_FFMPEG)
+caudio_add_component(cli_shared SOURCES ${CAUDIO_CLI_SHARED_SOURCES} DEPS caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
 set(CAUDIO_CLI_SHARED_IMPL_SOURCES
   src/ipc/protocol.cpp
   src/config.cpp

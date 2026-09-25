@@ -1,5 +1,5 @@
-module;
-#include "caudio/db/detail.hpp"
+﻿module;
+#include <caudio/db/detail.hpp>
 
 module caudio.db:detail;
 

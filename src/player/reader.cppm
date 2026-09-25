@@ -1,5 +1,5 @@
-module;
-#include "caudio/player/reader.hpp"
+﻿module;
+#include <caudio/player/reader.hpp>
 
 export module caudio.player:reader;
 

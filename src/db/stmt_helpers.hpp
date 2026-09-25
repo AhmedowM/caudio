@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <sqlite3.h>
 
 #include <algorithm>
@@ -9,8 +9,8 @@
 #include <string_view>
 #include <vector>
 
-#include "caudio/db/db_types.hpp"
-#include "caudio/utils/utils.hpp"
+#include <caudio/db/db_types.hpp>
+#include <caudio/utils.hpp>
 
 /**
  * @file stmt_helpers.hpp

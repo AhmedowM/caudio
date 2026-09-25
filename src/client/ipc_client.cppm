@@ -1,5 +1,5 @@
-module;
-#include "caudio/client/ipc_client.hpp"
+﻿module;
+#include <caudio/client/ipc_client.hpp>
 
 export module caudio.client:ipc_client;
 

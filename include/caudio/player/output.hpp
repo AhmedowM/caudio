@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file output.hpp
  * @brief Audio output management using miniaudio
  * @ingroup caudio_player
@@ -43,8 +43,8 @@
 #include <thread>
 #include <vector>
 
-#include "caudio/utils/utils.hpp"
-#include "miniaudio.h"
+#include <caudio/utils.hpp>
+#include <miniaudio.h>
 
 namespace caudio::player {
 
@@ -201,7 +201,7 @@ class AudioOutput {
      */
     float volume() const noexcept;
 
-    // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
+    // TEST-ONLY: used by tests/test_output.cpp â€” keep functionality (hold BREAKING deletion)
     void testFill(std::span<float> buf) const noexcept;
 
     /**
@@ -221,7 +221,7 @@ class AudioOutput {
     static void fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
                              uint32_t channels, float vol) noexcept;
 
-    // TEST-ONLY: used by tests/test_output.cpp — keep functionality (hold BREAKING deletion)
+    // TEST-ONLY: used by tests/test_output.cpp â€” keep functionality (hold BREAKING deletion)
     // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
     // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
     void fillForTest(std::span<float> out) noexcept;

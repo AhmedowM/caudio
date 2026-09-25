@@ -273,7 +273,7 @@ jobs:
           import caudio;
           #include <print>
           int main() {
-            std::println("caudio smoke ok: {}", caudio::kVersion);
+            std::println("caudio smoke ok: {}", caudio::shortVersion);
             return 0;
           }
           EOF
