@@ -193,7 +193,7 @@ endif()
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cli11_wrapper)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::cli_shared CLI11::CLI11 Threads::Threads)
+target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
@@ -205,7 +205,7 @@ if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   if(STDCXX_EXP_LIB)
     target_link_libraries(caudio PRIVATE stdc++exp)
     target_link_libraries(client PRIVATE stdc++exp)
-    target_link_libraries(cli_shared PRIVATE stdc++exp)
+    target_link_libraries(ipc PRIVATE stdc++exp)
   endif()
 endif()
 if(CAUDIO_ENABLE_SANITIZERS)
@@ -292,7 +292,7 @@ if(CAUDIO_ENABLE_MODULES)
       player player_shared
       db db_shared
       engine engine_shared
-      cli_shared
+      ipc
       client client_shared
       service service_shared
       combined
@@ -311,7 +311,7 @@ else()
       player player_shared
       db db_shared
       engine engine_shared
-      cli_shared
+      ipc
       client client_shared
       service service_shared
       combined
@@ -559,7 +559,7 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
 
   # IPC/Cli integration tests
   add_executable(test_ipc tests/test_ipc.cpp)
-  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::cli_shared caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
+  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
   target_include_directories(test_ipc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
   target_compile_features(test_ipc PRIVATE cxx_std_23)
   target_link_options(test_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)

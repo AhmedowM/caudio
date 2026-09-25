@@ -1,4 +1,4 @@
-﻿// TODO(Audit Directive 2 / B9, Appendix C Ã‚Â§B9 & Ã‚Â§2.2): remove <caudio/ipc.hpp> from public header Ã¢â‚¬â€ pulls 800+ KB macro-heavy CLI11 into every consumer (GUI/tests) and pollutes min/max macros. Forward-declare namespace CLI { class App; } and use std::unique_ptr<CLI::App> pImpl; keep CLI11 include only in cli/src/app/core.cpp. Subagent already tried but reverted; document for Phase 3 move to cli/src/app/core.hpp (private). See AUDIT_REPORT.md Ã‚Â§B9, Ã‚Â§3.2.
+// TODO(Audit Directive 2 / B9, Appendix C Â§B9 & Â§2.2): remove <caudio/ipc.hpp> from public header â€” pulls 800+ KB macro-heavy CLI11 into every consumer (GUI/tests) and pollutes min/max macros. Forward-declare namespace CLI { class App; } and use std::unique_ptr<CLI::App> pImpl; keep CLI11 include only in cli/src/app/core.cpp. Subagent already tried but reverted; document for Phase 3 move to cli/src/app/core.hpp (private). See AUDIT_REPORT.md Â§B9, Â§3.2.
 #pragma once
 
 #include <chrono>
@@ -15,7 +15,7 @@
 #include <caudio/db.hpp>
 #include <nlohmann/json.hpp>
 #include <caudio/utils.hpp>
-#include <parse.hpp>
+#include "parse.hpp"
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

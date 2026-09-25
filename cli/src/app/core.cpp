@@ -1,9 +1,9 @@
 #include <CLI/CLI.hpp>
 #include <memory>
 
-#include <core.hpp>
+#include "core.hpp"
 
-#include <parse.hpp>
+#include "parse.hpp"
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)

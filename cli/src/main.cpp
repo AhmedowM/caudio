@@ -7,7 +7,7 @@
 
 #include <caudio/ipc.hpp>
 #include <caudio/config.hpp>
-#include <core.hpp>
+#include "core.hpp"
 
 int main(int argc, char** argv) {
     // Load default config (XDG or temp). If path empty, use default.
