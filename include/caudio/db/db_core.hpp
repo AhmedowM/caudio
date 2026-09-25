@@ -163,20 +163,6 @@ class Database final {
      */
     sqlite3* handleLocked() const noexcept;
     /**
-     * @brief Returns library version (full git tag).
-     * @ingroup caudio_db
-     * @return Version string (versionFull, e.g. "v0.25.4").
-     */
-    std::string_view version() const noexcept;
-    /**
-     * @brief Returns library version (static).
-     * @ingroup caudio_db
-     * @return Version string (versionFull).
-     */
-    static constexpr std::string_view staticVersion() noexcept {
-        return caudio::versionFull;
-    }
-    /**
      * @brief Flushes the background WriterThread queue.
      * @ingroup caudio_db
      * @return Success or Error with StatusCode::Busy on 200 ms timeout.

@@ -139,10 +139,6 @@ sqlite3* Database::handleLocked() const noexcept {
     return db_.get();
 }
 
-std::string_view Database::version() const noexcept {
-    return caudio::versionFull;
-}
-
 std::expected<void, caudio::utils::Error> Database::flush() {
     return writer_.flush();
 }

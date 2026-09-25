@@ -251,10 +251,6 @@ RepeatMode Engine::repeat() const noexcept {
     return queue_.repeat;
 }
 
-std::string_view Engine::version() const noexcept {
-    return caudio::versionFull;
-}
-
 std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));

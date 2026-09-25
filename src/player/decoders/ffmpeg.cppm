@@ -1,5 +1,5 @@
-﻿module;
-#include <caudio/player/decoders/ffmpeg.hpp>
+module;
+#include "ffmpeg.hpp"
 
 export module caudio.player:ffmpeg;
 

@@ -295,24 +295,6 @@ class Engine final {
     RepeatMode repeat() const noexcept;
 
     /**
-     * @brief Returns library version (full git tag).
-     * @ingroup caudio_engine
-     * @return Version string (versionFull, e.g. "v0.25.4").
-     * @details Additive, no API break. Delegates to caudio::versionFull via imported
-     * version partition.
-     */
-    std::string_view version() const noexcept;
-
-    /**
-     * @brief Returns library version (static).
-     * @ingroup caudio_engine
-     * @return Version string (versionFull).
-     */
-    static constexpr std::string_view staticVersion() noexcept {
-        return caudio::versionFull;
-    }
-
-    /**
      * @brief Returns database statistics.
      * @ingroup caudio_engine
      * @return `std::expected<DbStats, Error>` — stats on success, State if no db.

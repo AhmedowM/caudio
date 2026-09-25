@@ -59,23 +59,3 @@ export import caudio.utils;
 export import caudio.player;
 export import caudio.db;
 export import caudio.engine;
-
-export namespace caudio {
-
-/**
- * @brief Library version string (git tag).
- * @ingroup caudio
- */
-constexpr std::string_view version() noexcept {
-    return caudio::versionFull;
-}
-
-/**
- * @brief Git commit hash.
- * @ingroup caudio
- */
-constexpr std::string_view gitHash() noexcept {
-    return caudio::versionCommit;
-}
-
-} // namespace caudio

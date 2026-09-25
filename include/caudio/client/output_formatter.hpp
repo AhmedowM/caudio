@@ -39,8 +39,6 @@ class OutputFormatter {
     bool json_{false};
 
     static std::string formatTime(double secs);
-    static std::string playbackStateToString(caudio::engine::PlaybackState s);
-    static std::string repeatModeToString(caudio::engine::RepeatMode m);
     static std::string truncateField(const std::string& s, std::size_t maxLen = 40);
 
   public:

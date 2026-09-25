@@ -27,14 +27,6 @@ std::string OutputFormatter::formatTime(double secs) {
     return std::format("{:02}:{:02}", m, s);
 }
 
-std::string OutputFormatter::playbackStateToString(caudio::engine::PlaybackState s) {
-    return caudio::cli::detail::playbackStateToString(s);
-}
-
-std::string OutputFormatter::repeatModeToString(caudio::engine::RepeatMode m) {
-    return caudio::cli::detail::repeatModeToString(m);
-}
-
 std::string OutputFormatter::truncateField(const std::string& s, std::size_t maxLen) {
     if (s.empty())
         return "---";
@@ -56,7 +48,7 @@ void OutputFormatter::print(const caudio::cli::Result& r, std::ostream& os) cons
         [&os, this](const auto& v) {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, caudio::cli::Status>) {
-                std::string stateStr = playbackStateToString(v.state);
+                std::string stateStr = caudio::cli::detail::playbackStateToString(v.state);
                 std::string posStr = formatTime(v.pos);
                 std::string durStr = formatTime(v.dur);
                 int volPct = static_cast<int>(v.vol * 100.0f);
@@ -64,7 +56,7 @@ void OutputFormatter::print(const caudio::cli::Result& r, std::ostream& os) cons
                 std::println(os, "Pos: {} / {}", posStr, durStr);
                 std::println(os, "Vol: {}% (muted: {})", volPct, v.muted ? "yes" : "no");
                 std::println(os, "Shuffle: {} Repeat: {}", v.shuffle ? "on" : "off",
-                             repeatModeToString(v.repeat));
+                             caudio::cli::detail::repeatModeToString(v.repeat));
                 if (!v.title.empty() || !v.artist.empty() || v.track_id != 0) {
                     std::println(os, "Track: {} - {} [id: {}]", truncateField(v.artist, 40),
                                  truncateField(v.title, 40), v.track_id);

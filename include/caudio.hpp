@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include <string_view>
 
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
@@ -56,23 +55,3 @@
  * @see caudio.db
  * @see caudio.engine
  */
-
-namespace caudio {
-
-/**
- * @brief Library version string (git tag).
- * @ingroup caudio
- */
-constexpr std::string_view version() noexcept {
-    return caudio::versionFull;
-}
-
-/**
- * @brief Git commit hash.
- * @ingroup caudio
- */
-constexpr std::string_view gitHash() noexcept {
-    return caudio::versionCommit;
-}
-
-} // namespace caudio
