@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <algorithm>
 #include <array>
@@ -20,12 +19,15 @@
 #include <system_error>
 #include <vector>
 
-#include <blake3.h>
 #include <caudio/db/db_core.hpp>
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/detail.hpp>
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::db {
 
@@ -34,8 +36,8 @@ namespace caudio::db {
  * @ingroup caudio_db
  */
 enum class ScanMode {
-    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) â€” fast, default.
-    Full     ///< Full-file BLAKE3 â€” slower, more collision-resistant.
+    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) — fast, default.
+    Full     ///< Full-file BLAKE3 — slower, more collision-resistant.
 };
 
 namespace detail {

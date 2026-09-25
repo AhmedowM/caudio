@@ -1,6 +1,8 @@
 #include <caudio/engine.hpp>
 #include <caudio/player/decoder_interface.hpp>
 
+#include <sqlite3.h>
+
 namespace caudio::engine {
 
 Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
@@ -202,14 +204,8 @@ Engine::ExpectedVoid Engine::seek(double seconds) {
     return {};
 }
 
-float Engine::clampVolume(float v) noexcept {
-    if (!std::isfinite(v))
-        return 0.0f;
-    return std::clamp(v, 0.0f, 1.0f);
-}
-
 Engine::ExpectedVoid Engine::setVolume(float g) {
-    g = clampVolume(g);
+    g = caudio::utils::clampVolume(g);
     state_.volume = g;
     volume_.store(g, std::memory_order_relaxed);
     if (output_)
@@ -565,7 +561,7 @@ std::optional<caudio::utils::Error> Engine::loadState() {
             return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed");
         }
     }
-    StmtGuard stmt(raw);
+    caudio::db::internal::StmtGuard stmt(raw);
     raw = stmt.get();
     rc = sqlite3_step(raw);
     if (rc == SQLITE_ROW) {
@@ -642,6 +638,37 @@ std::optional<caudio::utils::Error> Engine::loadState() {
     return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "load failed");
 }
 
+std::expected<void, caudio::utils::Error> Engine::withTransaction(
+    std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn) {
+    auto* h = dbHandle();
+    auto* m = dbMutex();
+    if (!h || !m)
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
+    std::unique_lock<std::shared_mutex> lk(*m);
+    char* err = nullptr;
+    int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+    caudio::db::internal::SqliteErrGuard errGuard{err};
+    if (rc != SQLITE_OK)
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "begin failed"));
+
+    auto result = fn(h);
+    if (!result) {
+        sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+        return result;
+    }
+    char* commitErr = nullptr;
+    rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
+    caudio::db::internal::SqliteErrGuard commitGuard{commitErr};
+    if (rc != SQLITE_OK) {
+        sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "commit failed"));
+    }
+    return {};
+}
+
 std::expected<void, caudio::utils::Error> Engine::saveState() {
     return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
         // Try with active_queue_id column; fallback to old schema if missing
@@ -664,7 +691,7 @@ std::expected<void, caudio::utils::Error> Engine::saveState() {
                 return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal,
                                                                 "prepare failed"));
         }
-        StmtGuard stmt(raw);
+        caudio::db::internal::StmtGuard stmt(raw);
         raw = stmt.get();
         sqlite3_bind_int(raw, 1, state_.shuffleEnabled);
         sqlite3_bind_int(raw, 2, (int)state_.repeatMode);
@@ -699,7 +726,7 @@ std::expected<void, caudio::utils::Error> Engine::persistShuffleBlobLocked() {
                           "shuffle_enabled=? WHERE id=1";
         sqlite3_stmt* raw = nullptr;
         int rc = sqlite3_prepare_v2(db, sql, -1, &raw, nullptr);
-        StmtGuard stmt(raw);
+        caudio::db::internal::StmtGuard stmt(raw);
         if (rc != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
@@ -734,7 +761,7 @@ std::expected<void, caudio::utils::Error> Engine::persistCursorLocked() {
         if (sqlite3_prepare_v2(db, sql, -1, &raw, nullptr) != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
-        StmtGuard stmt(raw);
+        caudio::db::internal::StmtGuard stmt(raw);
         raw = stmt.get();
         sqlite3_bind_int64(raw, 1, (int64_t)queue_.cursor);
         int rc = sqlite3_step(raw);
@@ -764,7 +791,7 @@ std::expected<caudio::db::Track, caudio::utils::Error> Engine::fetchTrackByPosLo
         if (sqlite3_prepare_v2(h, sql, -1, &raw, nullptr) != SQLITE_OK)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
-        StmtGuard stmt(raw);
+        caudio::db::internal::StmtGuard stmt(raw);
         raw = stmt.get();
         sqlite3_bind_int64(raw, 1, qid);
         sqlite3_bind_int64(raw, 2, pos);
@@ -1130,7 +1157,7 @@ void Engine::doHistoryMark() {
     std::unique_lock<std::shared_mutex> lk(*m);
     char* err = nullptr;
     int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-    SqliteErrGuard errGuard{err};
+    caudio::db::internal::SqliteErrGuard errGuard{err};
     if (rc != SQLITE_OK) {
         markedPlayed_.store(false, std::memory_order_release);
         return;
@@ -1142,7 +1169,7 @@ void Engine::doHistoryMark() {
         sqlite3_stmt* raw = nullptr;
         const char* selSql = "SELECT id, play_count FROM tracks WHERE id=?";
         rc = sqlite3_prepare_v2(h, selSql, -1, &raw, nullptr);
-        StmtGuard guard(raw);
+        caudio::db::internal::StmtGuard guard(raw);
         if (rc != SQLITE_OK)
             ok = false;
         else {
@@ -1164,7 +1191,7 @@ void Engine::doHistoryMark() {
         sqlite3_stmt* raw = nullptr;
         const char* updSql = "UPDATE tracks SET play_count=?, last_played=? WHERE id=?";
         rc = sqlite3_prepare_v2(h, updSql, -1, &raw, nullptr);
-        StmtGuard guard(raw);
+        caudio::db::internal::StmtGuard guard(raw);
         if (rc != SQLITE_OK)
             ok = false;
         else {
@@ -1189,7 +1216,7 @@ void Engine::doHistoryMark() {
         const char* insSql = "INSERT INTO history (track_id, started_at, completed_at, "
                              "position_ms, completion_pct, queue_id) VALUES (?,?,?,?,?,?)";
         rc = sqlite3_prepare_v2(h, insSql, -1, &raw, nullptr);
-        StmtGuard guard(raw);
+        caudio::db::internal::StmtGuard guard(raw);
         if (rc != SQLITE_OK)
             ok = false;
         else {
@@ -1219,7 +1246,7 @@ void Engine::doHistoryMark() {
     }
     char* commitErr = nullptr;
     rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
-    SqliteErrGuard commitGuard{commitErr};
+    caudio::db::internal::SqliteErrGuard commitGuard{commitErr};
     if (rc != SQLITE_OK) {
         sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
         markedPlayed_.store(false, std::memory_order_release);

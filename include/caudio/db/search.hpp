@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <array>
 #include <cctype>
@@ -17,6 +16,10 @@
 #include <caudio/db/detail.hpp>
 #include <caudio/utils.hpp>
 
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
+
 namespace caudio::db {
 
 /**
@@ -27,7 +30,7 @@ namespace caudio::db {
  * @par Thread safety
  * Caller must hold the DB lock protecting the statement.
  */
-inline void fillTrackSearch(sqlite3_stmt* s, Track& out);
+void fillTrackSearch(sqlite3_stmt* s, Track& out);
 
 /**
  * @brief Executes a single FTS5 MATCH query.

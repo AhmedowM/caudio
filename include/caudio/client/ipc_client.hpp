@@ -162,10 +162,6 @@ class IpcClient {
 #endif
     /** @brief Atomic request ID counter for framing. */
     std::atomic<uint32_t> nextId_{0};
-    /** @brief Condition variable (unused, reserved for future async support). */
-    std::condition_variable cv_;
-    /** @brief Mutex for condition variable (unused, reserved for future async support). */
-    std::mutex cvMtx_;
 };
 
 } // namespace caudio::client

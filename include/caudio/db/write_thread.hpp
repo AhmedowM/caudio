@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <atomic>
 #include <chrono>
@@ -25,6 +24,10 @@
  * (`writeBatchSize`, default 256) and forwarded to the queue capacity.
  * The queue is bounded: `push()` returns `Busy` when full.
  */
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::db {
 

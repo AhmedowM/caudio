@@ -259,18 +259,6 @@ class Player {
     ExpectedVoid seek(double seconds);
 
     /**
-     * @brief Clamp volume value to valid range [0.0, 1.0]
-     * @param v Volume value to clamp
-     * @return Clamped volume value
-     *
-     * Handles NaN/infinity by returning 0.0. Used internally for
-     * volume sanitization before applying to audio output.
-     *
-     * Thread Safety: Thread-safe (pure function, no shared state)
-     */
-    static float clampVolume(float v) noexcept;
-
-    /**
      * @brief Set playback volume
      * @param volume Volume level (0.0 = mute, 1.0 = full)
      * @return void on success, Error on failure

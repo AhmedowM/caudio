@@ -7,6 +7,7 @@
  * - result: StatusCode, toString, formatter
  * - error: Error, Expected, makeError
  * - log: LogLevel, Logger
+ * - math: clampVolume
  * - ring: SpscRing
  * - mpsc_queue: MpscQueue
  * - thread: sleepFor, sleepForMs, setThreadName
@@ -15,6 +16,7 @@
 
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
+#include <caudio/utils/math.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>

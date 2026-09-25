@@ -18,8 +18,6 @@ using ::caudio::engine::HistoryEntry;
 using ::caudio::engine::PlaybackState;
 using ::caudio::engine::QueueState;
 using ::caudio::engine::RepeatMode;
-using ::caudio::engine::SqliteErrGuard;
-using ::caudio::engine::StmtGuard;
 } // namespace caudio::engine
 
 export namespace caudio::engine::detail {

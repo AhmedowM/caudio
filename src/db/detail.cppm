@@ -14,5 +14,6 @@ using ::caudio::db::internal::kSample;
 using ::caudio::db::internal::kSelectTracksCols;
 using ::caudio::db::internal::sanitizeFtsTerm;
 using ::caudio::db::internal::SqliteErrGuard;
+using ::caudio::db::internal::StmtGuard;
 using ::caudio::db::internal::toHex;
 } // namespace caudio::db::internal

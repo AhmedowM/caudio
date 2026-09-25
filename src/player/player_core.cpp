@@ -217,18 +217,12 @@ Player::ExpectedVoid Player::seek(double seconds) {
     return {};
 }
 
-float Player::clampVolume(float v) noexcept {
-    if (!std::isfinite(v))
-        return 0.0f;
-    return std::clamp(v, 0.0f, 1.0f);
-}
-
 Player::ExpectedVoid Player::setVolume(float volume) {
     if (std::isnan(volume) || std::isinf(volume)) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("bad volume")});
     }
-    float vol = clampVolume(volume);
+    float vol = caudio::utils::clampVolume(volume);
     volume_.store(vol, std::memory_order_relaxed);
     if (output_) {
         output_->setVolume(vol);

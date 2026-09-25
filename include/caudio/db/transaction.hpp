@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <expected>
 #include <string>
@@ -17,6 +16,10 @@
  * rollback() finalizes. Destructor rolls back if not committed. Lock
  * ordering: caller must hold Database::mutex() before begin().
  */
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::db {
 

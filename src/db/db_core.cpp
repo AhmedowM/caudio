@@ -1,6 +1,13 @@
 ﻿#include <caudio/db/db_core.hpp>
 
+#include <sqlite3.h>
+
 namespace caudio::db {
+
+void SqliteCloser::operator()(sqlite3* db) const noexcept {
+    if (db)
+        sqlite3_close(db);
+}
 
 Database::~Database() {
     writer_.close();

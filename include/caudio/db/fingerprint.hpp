@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <blake3.h>
+#pragma once
 
 #include <algorithm>
 #include <array>

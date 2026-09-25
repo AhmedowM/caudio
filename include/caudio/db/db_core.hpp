@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include <sqlite3.h>
 
 #include <cstring>
 #include <expected>
@@ -24,6 +23,10 @@
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils.hpp>
 
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
+
 namespace caudio::db {
 
 /**
@@ -33,6 +36,14 @@ namespace caudio::db {
 struct DbOpts {
     std::size_t writeBatchSize =
         256; ///< Queue capacity / batch size for WriterThread (default 256).
+};
+
+/**
+ * @brief Closes an owned SQLite handle (defined in db_core.cpp).
+ * @ingroup caudio_db
+ */
+struct SqliteCloser {
+    void operator()(sqlite3* db) const noexcept;
 };
 
 /**
@@ -59,8 +70,7 @@ class Database final {
      * @ingroup caudio_db
      * @param opts Options; writeBatchSize forwarded to WriterThread.
      */
-    explicit Database(const DbOpts& opts)
-        : writer_(opts.writeBatchSize), db_(nullptr, &sqlite3_close) {}
+    explicit Database(const DbOpts& opts) : writer_(opts.writeBatchSize), db_(nullptr) {}
     /**
      * @brief Closes the writer, clears the statement cache and resets the handle.
      * @ingroup caudio_db
@@ -171,50 +181,6 @@ class Database final {
      * @see WriterThread::flush
      */
     std::expected<void, caudio::utils::Error> flush();
-
-    /**
-     * @brief Executes a function inside a BEGIN IMMEDIATE / COMMIT transaction.
-     * @ingroup caudio_db
-     * @tparam Fn Callable with signature Expected<void,Error>(sqlite3*).
-     * @param fn Function to execute while holding the transaction.
-     * @return Success or Error with StatusCode::Internal if no handle,
-     * StatusCode::Busy if BEGIN fails, or the error returned by fn / commit.
-     * @details Holds Database::mutex() (dbMutex_) exclusively for the entire
-     * transaction. On fn failure, rolls back and returns its error; on commit
-     * failure, rolls back and returns Internal.
-     * @par Thread safety
-     * Thread-safe: acquires dbMutex_ as unique_lock.
-     * @par Lock ordering
-     * dbMutex_ only (no cacheMutex_ taken here).
-     * @see DbTransaction
-     */
-    template <typename Fn>
-    std::expected<void, caudio::utils::Error> withTransaction(Fn&& fn) {
-        std::unique_lock lk{dbMutex_};
-        if (!db_)
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-        char* err = nullptr;
-        internal::SqliteErrGuard guard{err};
-        int rc = sqlite3_exec(db_.get(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-        if (rc != SQLITE_OK)
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Busy, err ? std::string(err) : "BEGIN failed")};
-        auto res = fn(db_.get());
-        if (!res) {
-            sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
-            return res;
-        }
-        char* cErr = nullptr;
-        internal::SqliteErrGuard cGuard{cErr};
-        rc = sqlite3_exec(db_.get(), "COMMIT", nullptr, nullptr, &cErr);
-        if (rc != SQLITE_OK) {
-            sqlite3_exec(db_.get(), "ROLLBACK", nullptr, nullptr, nullptr);
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Internal, cErr ? std::string(cErr) : "commit failed")};
-        }
-        return {};
-    }
 
     /**
      * @brief Enqueues multiple tracks atomically (single transaction).
@@ -328,7 +294,7 @@ class Database final {
 
   private:
     WriterThread writer_;
-    std::unique_ptr<sqlite3, decltype(&sqlite3_close)> db_{nullptr, &sqlite3_close};
+    std::unique_ptr<sqlite3, SqliteCloser> db_;
     // Naming clarity: dbMutex_ is dbMutex_ (protects db_ handle and serializes DB ops),
     // cacheMutex_ is stmtCacheMutex_ (protects stmtCache_), queueLock_ concept maps to
     // engineQueueSpin_ in engine but DB uses dbMutex_ for queue table as well.

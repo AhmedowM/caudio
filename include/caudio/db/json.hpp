@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <array>
 #include <cstddef>
@@ -21,6 +20,10 @@
 #include <caudio/db/statement.hpp>
 #include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::db {
 

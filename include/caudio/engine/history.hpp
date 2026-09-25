@@ -1,5 +1,4 @@
 #pragma once
-#include <sqlite3.h>
 
 #include <chrono>
 #include <cstdint>
@@ -28,6 +27,10 @@
  * helpers are pure and `noexcept`.
  */
 
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
+
 namespace caudio::engine {
 
 /**
@@ -52,6 +55,10 @@ struct HistoryEntry {
 };
 
 } // namespace caudio::engine
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::engine::detail {
 
@@ -82,6 +89,10 @@ uint64_t nowMs() noexcept;
 bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept;
 
 } // namespace caudio::engine::detail
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::engine {
 

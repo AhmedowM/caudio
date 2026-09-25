@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file output.hpp
  * @brief Audio output management using miniaudio
  * @ingroup caudio_player
@@ -13,7 +13,7 @@
  * - enumerateDevices(): Thread-safe (creates/destroys miniaudio context internally)
  * - AudioOutput::create(): Thread-safe
  * - AudioOutput methods: Thread-safe for control (start/stop/setVolume),
- *   dataCallback runs on miniaudio's audio thread (real-time priority)
+ *   the audio callback runs on the audio thread (real-time priority)
  *
  * miniaudio Integration:
  * - Uses ma_context for device enumeration
@@ -44,7 +44,9 @@
 #include <vector>
 
 #include <caudio/utils.hpp>
-#include <miniaudio.h>
+
+/// Opaque miniaudio device handle; full type visible only in output.cpp.
+struct ma_device;
 
 namespace caudio::player {
 
@@ -115,18 +117,18 @@ DeviceList enumerateDevices();
  * Thread Safety:
  * - create()/init()/shutdown(): Thread-safe, called from control thread
  * - start()/stop()/setVolume()/volume()/isPlaying(): Thread-safe (atomic)
- * - dataCallback(): Runs on miniaudio audio thread (real-time), lock-free
- * - fillFromRing()/fillForTest(): Thread-safe (no shared mutable state)
+ * - audio callback: runs on the audio thread (real-time), lock-free
+ * - fillFromRing(): Thread-safe (no shared mutable state)
  *
  * Audio Pipeline:
  * 1. Decode thread writes float samples to SPSC ring buffer
- * 2. miniaudio calls dataCallback on audio thread
- * 3. dataCallback calls fillFromRing() to read from ring + apply volume
+ * 2. the backend invokes the audio callback on the audio thread
+ * 3. the callback calls fillFromRing() to read from ring + apply volume
  * 4. Zero-fills any remaining buffer space (silence on underrun)
  *
  * Volume Control:
- * - Volume is applied in dataCallback via atomic load (lock-free)
- * - Range: 0.0 to 1.0, clamped in clampVolume()
+ * - Volume is applied in the audio callback via atomic load (lock-free)
+ * - Range: 0.0 to 1.0, clamped with utils::clampVolume()
  * - Changes take effect on next audio callback
  *
  * Lifecycle:
@@ -173,16 +175,6 @@ class AudioOutput {
     static Expected create(const Config& cfg);
 
     /**
-     * @brief Clamp volume value to valid range [0.0, 1.0]
-     * @param v Volume value to clamp
-     * @return Clamped volume value
-     *
-     * Handles NaN/infinity by returning 0.0. Used internally for
-     * volume sanitization before applying to audio output.
-     */
-    static float clampVolume(float v) noexcept;
-
-    /**
      * @brief Set playback volume
      * @param vol Volume level (0.0 = mute, 1.0 = full)
      *
@@ -201,9 +193,6 @@ class AudioOutput {
      */
     float volume() const noexcept;
 
-    // TEST-ONLY: used by tests/test_output.cpp â€” keep functionality (hold BREAKING deletion)
-    void testFill(std::span<float> buf) const noexcept;
-
     /**
      * @brief Fill output buffer from ring buffer with volume scaling
      * @param out Output buffer to fill (interleaved float samples)
@@ -213,18 +202,13 @@ class AudioOutput {
      *
      * Lock-free helper that reads available samples from the ring buffer,
      * zero-fills any remainder, and applies volume scaling. No allocations.
-     * Used by both dataCallback and testFillForTest().
+     * Used by the audio callback.
      *
      * Thread Safety: Thread-safe when ring is the SPSC ring (single producer,
      * single consumer). No internal locking.
      */
     static void fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
                              uint32_t channels, float vol) noexcept;
-
-    // TEST-ONLY: used by tests/test_output.cpp â€” keep functionality (hold BREAKING deletion)
-    // Test-accessible wrapper that mimics dataCallback logic without needing ma_device.
-    // Reads from ring (if set), applies volume, zero-fills remainder. Used for deterministic tests.
-    void fillForTest(std::span<float> out) noexcept;
 
     /**
      * @brief Check if audio output is currently playing
@@ -283,30 +267,17 @@ class AudioOutput {
      * miniaudio Integration:
      * - ma_device_config_init(ma_device_type_playback)
      * - Format: ma_format_f32 (float32)
-     * - Callback: AudioOutput::dataCallback with this as pUserData
      */
     bool init(const Config& cfg);
 
-    /**
-     * @brief miniaudio data callback - fills output buffer from ring
-     * @param pDevice miniaudio device pointer
-     * @param pOutput Output buffer (float32 interleaved)
-     * @param pInput Unused (playback only)
-     * @param frameCount Number of frames to generate
-     *
-     * Called by miniaudio on the audio thread (real-time priority).
-     * Must be lock-free and fast. Reads from SPSC ring, applies volume,
-     * zero-fills on underrun.
-     *
-     * Thread Safety: Runs on miniaudio audio thread. Must not block,
-     * allocate, or call non-realtime-safe functions.
-     */
-    static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
-                             ma_uint32 frameCount);
-
   private:
+    /// Audio-thread entry point (backend trampoline); defined in output.cpp.
+    static void dataCallback(struct ma_device* pDevice, void* pOutput, const void* pInput,
+                             std::uint32_t frameCount);
+    /// Opaque audio backend (miniaudio device); defined in output.cpp.
+    struct DeviceState;
     Config cfg_;
-    ma_device device_{};
+    std::unique_ptr<DeviceState> device_;
     std::atomic<float> volume_{1.0f};
     std::atomic<bool> running_{false};
     std::atomic<bool> initialized_{false};

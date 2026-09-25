@@ -52,4 +52,9 @@ SqliteErrGuard::~SqliteErrGuard() {
     }
 }
 
+StmtGuard::~StmtGuard() {
+    if (s)
+        sqlite3_finalize(s);
+}
+
 } // namespace caudio::db::internal

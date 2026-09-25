@@ -1,5 +1,4 @@
 #pragma once
-#include <sqlite3.h>
 
 #include <algorithm>
 #include <array>
@@ -58,42 +57,11 @@
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
 
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
+
 namespace caudio::engine {
-
-/**
- * @brief RAII guard for sqlite3_exec error strings.
- * @ingroup caudio_engine
- * @details Frees the `char*` returned by `sqlite3_exec` on scope exit.
- */
-struct SqliteErrGuard {
-    char* p; ///< Owned error string from sqlite3_exec.
-    ~SqliteErrGuard() {
-        if (p)
-            sqlite3_free(p);
-    }
-};
-
-/**
- * @brief RAII guard for sqlite3_stmt.
- * @ingroup caudio_engine
- * @details Finalizes the statement on scope exit. Non-copyable.
- */
-struct StmtGuard {
-    sqlite3_stmt* s = nullptr;
-    explicit StmtGuard(sqlite3_stmt* stmt) : s(stmt) {}
-    ~StmtGuard() {
-        if (s)
-            sqlite3_finalize(s);
-    }
-    StmtGuard(const StmtGuard&) = delete;
-    StmtGuard& operator=(const StmtGuard&) = delete;
-    sqlite3_stmt* get() const noexcept {
-        return s;
-    }
-    sqlite3_stmt* operator->() const noexcept {
-        return s;
-    }
-};
 
 /**
  * @brief Main playback engine — queue, decoding, gapless, history and persistence.
@@ -248,14 +216,6 @@ class Engine final {
      * Thread-safe; locks decodeMtx_.
      */
     ExpectedVoid seek(double seconds);
-
-    /**
-     * @brief Clamps volume to [0,1], mapping non-finite to 0.
-     * @ingroup caudio_engine
-     * @param v Input volume.
-     * @return Clamped value.
-     */
-    static float clampVolume(float v) noexcept;
 
     /**
      * @brief Sets playback volume and persists it.
@@ -537,7 +497,6 @@ class Engine final {
     /**
      * @brief Executes a callable inside a SQLite BEGIN IMMEDIATE / COMMIT transaction.
      * @ingroup caudio_engine
-     * @tparam Fn Callable with signature `std::expected<void, caudio::utils::Error>(sqlite3*)`.
      * @param fn Transaction body; receives the database handle.
      * @return `std::expected<void, Error>` — success or error (Busy if begin fails, Internal on
      * commit failure, InvalidArg if no db).
@@ -546,36 +505,8 @@ class Engine final {
      * @par Thread safety
      * Locks dbMutex_ exclusively; callers must not hold queueMutex_ to avoid deadlock.
      */
-    template <typename Fn>
-    std::expected<void, caudio::utils::Error> withTransaction(Fn&& fn) {
-        auto* h = dbHandle();
-        auto* m = dbMutex();
-        if (!h || !m)
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
-        std::unique_lock<std::shared_mutex> lk(*m);
-        char* err = nullptr;
-        int rc = sqlite3_exec(h, "BEGIN IMMEDIATE", nullptr, nullptr, &err);
-        SqliteErrGuard errGuard{err};
-        if (rc != SQLITE_OK)
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::StatusCode::Busy, "begin failed"));
-
-        auto result = fn(h);
-        if (!result) {
-            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
-            return result;
-        }
-        char* commitErr = nullptr;
-        rc = sqlite3_exec(h, "COMMIT", nullptr, nullptr, &commitErr);
-        SqliteErrGuard commitGuard{commitErr};
-        if (rc != SQLITE_OK) {
-            sqlite3_exec(h, "ROLLBACK", nullptr, nullptr, nullptr);
-            return std::unexpected(
-                caudio::utils::makeError(caudio::utils::StatusCode::Internal, "commit failed"));
-        }
-        return {};
-    }
+    std::expected<void, caudio::utils::Error> withTransaction(
+        std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
 
     /**
      * @brief Loads persisted engine state from engine_state row id=1.

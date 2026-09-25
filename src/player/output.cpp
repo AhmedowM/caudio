@@ -1,6 +1,12 @@
-﻿#include <caudio/player/output.hpp>
+#include <caudio/player/output.hpp>
+
+#include <miniaudio.h>
 
 namespace caudio::player {
+
+struct AudioOutput::DeviceState {
+    ma_device device{};
+};
 
 DeviceList enumerateDevices() {
     DeviceList list;
@@ -48,22 +54,12 @@ AudioOutput::Expected AudioOutput::create(const Config& cfg) {
     return out;
 }
 
-float AudioOutput::clampVolume(float v) noexcept {
-    if (!std::isfinite(v))
-        return 0.0f;
-    return std::clamp(v, 0.0f, 1.0f);
-}
-
 void AudioOutput::setVolume(float vol) {
-    volume_.store(clampVolume(vol), std::memory_order_relaxed);
+    volume_.store(caudio::utils::clampVolume(vol), std::memory_order_relaxed);
 }
 
 float AudioOutput::volume() const noexcept {
     return volume_.load(std::memory_order_relaxed);
-}
-
-void AudioOutput::testFill(std::span<float> buf) const noexcept {
-    std::ranges::fill(buf, 0.0f);
 }
 
 void AudioOutput::fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
@@ -85,12 +81,6 @@ void AudioOutput::fillFromRing(std::span<float> out, caudio::utils::SpscRing<flo
     }
 }
 
-void AudioOutput::fillForTest(std::span<float> out) noexcept {
-    uint32_t channels = cfg_.channels ? cfg_.channels : 1;
-    float vol = volume_.load(std::memory_order_relaxed);
-    fillFromRing(out, cfg_.ring, channels, vol);
-}
-
 bool AudioOutput::isPlaying() const noexcept {
     return running_.load(std::memory_order_acquire);
 }
@@ -100,21 +90,21 @@ void AudioOutput::start() {
         return;
     bool expected = false;
     if (running_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-        ma_device_start(&device_);
+        ma_device_start(&device_->device);
     }
 }
 
 void AudioOutput::stop() {
     bool expected = true;
     if (running_.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
-        ma_device_stop(&device_);
+        ma_device_stop(&device_->device);
     }
 }
 
 void AudioOutput::shutdown() noexcept {
     stop();
     if (initialized_.exchange(false, std::memory_order_acq_rel)) {
-        ma_device_uninit(&device_);
+        ma_device_uninit(&device_->device);
     }
 }
 
@@ -122,8 +112,9 @@ bool AudioOutput::init(const Config& cfg) {
     if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
         return false;
     cfg_ = cfg;
-    float v = clampVolume(cfg.volume);
+    float v = caudio::utils::clampVolume(cfg.volume);
     volume_.store(v, std::memory_order_relaxed);
+    device_ = std::make_unique<DeviceState>();
 
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
     deviceConfig.playback.format = ma_format_f32;
@@ -132,7 +123,7 @@ bool AudioOutput::init(const Config& cfg) {
     deviceConfig.dataCallback = &AudioOutput::dataCallback;
     deviceConfig.pUserData = this;
 
-    ma_result res = ma_device_init(nullptr, &deviceConfig, &device_);
+    ma_result res = ma_device_init(nullptr, &deviceConfig, &device_->device);
     if (res != MA_SUCCESS) {
         return false;
     }

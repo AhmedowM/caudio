@@ -3,6 +3,7 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   src/utils/result.cppm
   src/utils/error.cppm
   src/utils/log.cppm
+  src/utils/math.cppm
   src/utils/ring.cppm
   src/utils/mpsc_queue.cppm
   src/utils/thread.cppm

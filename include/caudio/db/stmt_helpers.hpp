@@ -1,5 +1,4 @@
-﻿#pragma once
-#include <sqlite3.h>
+#pragma once
 
 #include <algorithm>
 #include <array>
@@ -20,6 +19,10 @@
  * the row-mapper `fillTrackFromStmt()` and the RAII `SqliteErrGuard`.
  * All helpers are header-only and live in `caudio::db::internal`.
  */
+
+// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+struct sqlite3;
+struct sqlite3_stmt;
 
 namespace caudio::db::internal {
 
@@ -64,6 +67,26 @@ struct SqliteErrGuard {
     SqliteErrGuard& operator=(const SqliteErrGuard&) = delete;
     /** @brief Frees the error string if set. @ingroup caudio_db */
     ~SqliteErrGuard();
+};
+
+/**
+ * @brief RAII guard that finalizes a raw `sqlite3_stmt*` on scope exit.
+ * @ingroup caudio_db
+ * @details Non-copyable. For code working with raw handles (prepare/step
+ * loops) where SqliteStatement ownership is not wanted.
+ */
+struct StmtGuard {
+    sqlite3_stmt* s = nullptr; ///< Owned raw statement, finalized on destruction.
+    explicit StmtGuard(sqlite3_stmt* stmt) noexcept : s(stmt) {}
+    StmtGuard(const StmtGuard&) = delete;
+    StmtGuard& operator=(const StmtGuard&) = delete;
+    ~StmtGuard();
+    sqlite3_stmt* get() const noexcept {
+        return s;
+    }
+    sqlite3_stmt* operator->() const noexcept {
+        return s;
+    }
 };
 
 /**
