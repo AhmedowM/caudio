@@ -1,4 +1,4 @@
-﻿#ifndef WIN32_LEAN_AND_MEAN
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #ifndef NOMINMAX
@@ -40,7 +40,7 @@
 #include <cstring>
 #else
 #include <process.h>
-// Avoid including windows.h Ã¢â‚¬â€ causes HMODULE conflict with caudio::utils
+// Avoid including windows.h â€” causes HMODULE conflict with caudio::utils
 // Provide minimal forward declarations for needed APIs
 using HANDLE = void*;
 using DWORD = unsigned long;
@@ -131,7 +131,7 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/player.hpp>
-#include <caudio/player/decoders/decoder_interface.hpp>
+#include <caudio/player/decoder_interface.hpp>
 #include <caudio/utils.hpp>
 #include <caudio/ipc.hpp>
 

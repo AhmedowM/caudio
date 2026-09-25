@@ -4,9 +4,8 @@
 #include <span>
 
 #include <common.hpp>
-import caudio.player;
-import caudio.utils;
-
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
 TEST_CASE("output callback no alloc") {
     CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 2};

@@ -42,7 +42,6 @@
 #include <caudio/config.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/service_detail.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>

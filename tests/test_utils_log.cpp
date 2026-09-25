@@ -3,8 +3,7 @@
 #include <string_view>
 #include <typeinfo>
 #include <vector>
-import caudio.utils;
-
+#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool log_injected() {

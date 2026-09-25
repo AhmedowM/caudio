@@ -3,8 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <vector>
-import caudio.utils;
-
+#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool thread_sleep_timing() {

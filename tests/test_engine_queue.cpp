@@ -7,10 +7,9 @@
 
 #include <common.hpp>
 
-import caudio.db;
-import caudio.engine;
-import caudio.utils;
-
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;

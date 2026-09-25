@@ -125,16 +125,16 @@ target_link_libraries(myapp PRIVATE caudio::engine)
 #also available : caudio::utils caudio::player caudio::db caudio::json
 ```
 
-### C++ example (C++23 modules)
+### C++ example (headers are canonical)
 
 ```cpp
-import caudio;                 // umbrella re-exports utils, player, db, engine
-import caudio.utils;
-import caudio.engine;
+#include <caudio.hpp>          // umbrella re-exports utils, player, db, engine
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
 
 #include <print>
 
-#include "caudio/version.hpp"
+#include <caudio/version.hpp>
 
 int main() {
     std::println("caudio {}", caudio::versionFull); // v0.25.5
@@ -157,13 +157,15 @@ More examples in `examples/`:
 - `examples/player_db_demo.cpp` — player + db scan/search
 - `examples/engine_demo.cpp` — engine queue/history/events
 
-> **Packaging note — C++20/23 modules**
+> **Packaging note — C++23 modules (optional)**
 >
-> `import caudio;` requires the `*.cppm` module interface units *and* a BMI rebuild.
-> An installed `caudio` ships `*.cppm` under `${CMAKE_INSTALL_INCLUDEDIR}/caudio` via
-> `FILE_SET CXX_MODULES` (see `CMakeLists.txt:272`). Consumers must rebuild BMIs
-> against the consuming compiler/flags — BMI CRC covers defines/flags, so sharing
-> prebuilt BMIs across toolchains is not portable. See **Packaging** section below.
+> Headers under `include/caudio/` are the canonical interface and always build.
+> C++23 modules (`import caudio;`, `*.cppm` units) are opt-in via
+> `-DCAUDIO_ENABLE_MODULES=ON` (default `OFF`). When enabled, an installed
+> `caudio` ships `*.cppm` via `FILE_SET CXX_MODULES` and consumers must rebuild
+> BMIs against the consuming compiler/flags — BMI CRC covers defines/flags, so
+> sharing prebuilt BMIs across toolchains is not portable. See **Packaging**
+> section below.
 
 ## Build Options
 
@@ -174,6 +176,7 @@ More examples in `examples/`:
 | `CAUDIO_ENABLE_SANITIZERS` | `OFF` | Enable ASan+UBSan (`-fsanitize=address,undefined`) — Linux/GCC+Clang only; ignored on Windows/MinGW |
 | `CAUDIO_BUILD_DOCS` | `OFF` | Build Doxygen docs (requires `doxygen`; optional `dot`) |
 | `CAUDIO_ENABLE_EXAMPLES` | `OFF` | Build `examples/` (`caudio_mini`, `player_db_demo`, `engine_demo`) |
+| `CAUDIO_ENABLE_MODULES` | `OFF` | Build/install C++23 module interfaces (`import caudio.*`); headers always build |
 | `CMAKE_BUILD_TYPE` | — | `Debug` / `Release` / `RelWithDebInfo` |
 | `FFmpeg_ROOT` | — | Override FFmpeg location (passed to `find_package(FFmpeg)`) |
 

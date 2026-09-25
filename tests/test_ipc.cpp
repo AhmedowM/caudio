@@ -8,13 +8,13 @@
 
 #include <common.hpp>
 
-import caudio.cli;
-import caudio.service;
-import caudio.client;
-import caudio.engine;
-import caudio.db;
-import caudio.utils;
-
+#include <caudio/ipc.hpp>
+#include <caudio/config.hpp>
+#include <caudio/service.hpp>
+#include <caudio/client.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 using namespace caudio::cli;
 using namespace caudio::utils;
 using namespace caudio::db;

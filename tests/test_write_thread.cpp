@@ -6,9 +6,8 @@
 #include <string>
 #include <string_view>
 #include <thread>
-import caudio.utils;
-import caudio.db;
-
+#include <caudio/utils.hpp>
+#include <caudio/db.hpp>
 using namespace caudio::utils;
 
 TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer_thread]") {

@@ -8,11 +8,10 @@
 #include <thread>
 #include <vector>
 
-import caudio.utils;
-import caudio.player;
-import caudio.db;
-import caudio.engine;
-
+#include <caudio/utils.hpp>
+#include <caudio/player.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
 using namespace caudio::engine;
 using namespace caudio::db;
 

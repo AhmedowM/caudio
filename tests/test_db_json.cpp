@@ -5,9 +5,8 @@
 
 #include <common.hpp>
 
-import caudio.db;
-import caudio.utils;
-
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 using namespace caudio::db;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;

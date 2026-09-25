@@ -4,8 +4,7 @@
 #include <span>
 #include <thread>
 #include <vector>
-import caudio.utils;
-
+#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool ring_write_read_wrap() {

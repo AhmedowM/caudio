@@ -6,11 +6,10 @@
 
 #include <common.hpp>
 
-import caudio.player;
-import caudio.db;
-import caudio.engine;
-import caudio.utils;
-
+#include <caudio/player.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
 using namespace caudio::player;
 using namespace caudio::utils;
 using namespace caudio::db;

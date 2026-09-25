@@ -5,9 +5,8 @@
 #include <string>
 #include <thread>
 
-import caudio.player;
-import caudio.utils;
-
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
 using namespace caudio::player;
 using namespace caudio::utils;
 

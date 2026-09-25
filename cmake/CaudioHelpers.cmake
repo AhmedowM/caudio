@@ -14,13 +14,18 @@ function(ca_set_module_warnings tgt)
 endfunction()
 
 function(caudio_add_component NAME)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "WITH_FFMPEG" "" "SOURCES;DEPS;INCLUDES")
-  if(NOT ARG_SOURCES)
-    message(FATAL_ERROR "caudio_add_component(${NAME}): SOURCES required")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "WITH_FFMPEG" "" "SOURCES;MODULE_SOURCES;DEPS;INCLUDES")
+  if(NOT ARG_SOURCES AND NOT ARG_MODULE_SOURCES)
+    message(FATAL_ERROR "caudio_add_component(${NAME}): SOURCES or MODULE_SOURCES required")
   endif()
   add_library(${NAME} STATIC)
   add_library(caudio::${NAME} ALIAS ${NAME})
-  target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${ARG_SOURCES})
+  if(ARG_SOURCES)
+    target_sources(${NAME} PRIVATE ${ARG_SOURCES})
+  endif()
+  if(ARG_MODULE_SOURCES AND CAUDIO_ENABLE_MODULES)
+    target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${ARG_MODULE_SOURCES})
+  endif()
   target_include_directories(${NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
