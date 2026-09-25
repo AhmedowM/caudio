@@ -1,4 +1,4 @@
-﻿#include <caudio/player/decoders/ffmpeg.hpp>
+#include "ffmpeg.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -258,7 +258,7 @@ int64_t FfmpegDecoder::seekCallback(void* opaque, int64_t offset, int whence) {
     auto* self = static_cast<FfmpegDecoder*>(opaque);
     if (!self->reader_)
         return AVERROR(EIO);
-    // Handle AVSEEK_SIZE (0x10000) â€” query file size without seeking
+    // Handle AVSEEK_SIZE (0x10000) — query file size without seeking
     if (whence & AVSEEK_SIZE) {
         int64_t sz = self->reader_->size();
         if (sz < 0)
@@ -275,7 +275,7 @@ int64_t FfmpegDecoder::seekCallback(void* opaque, int64_t offset, int whence) {
     else if (whenceMasked == SEEK_SET)
         w = SEEK_SET;
     else {
-        // Unknown whence after masking â€” treat low 2 bits
+        // Unknown whence after masking — treat low 2 bits
         int low = whenceMasked & 0x3;
         if (low == SEEK_CUR)
             w = SEEK_CUR;
@@ -295,7 +295,7 @@ bool FfmpegDecoder::init() {
     if (!fmt_)
         return false;
 
-    // Allocate AVIOContext with our callbacks â€” use larger buffer for high-rate FLAC/WAV
+    // Allocate AVIOContext with our callbacks — use larger buffer for high-rate FLAC/WAV
     // probing
     constexpr size_t kBufferSize = 8192;
     uint8_t* avioBuffer = static_cast<uint8_t*>(av_malloc(kBufferSize));
@@ -319,7 +319,7 @@ bool FfmpegDecoder::init() {
     fmt_->pb = avio_;
     fmt_->flags |= AVFMT_FLAG_CUSTOM_IO;
 
-    // Silence benign probe spam like "Header missing" / "CRC mismatch" during decode â€”
+    // Silence benign probe spam like "Header missing" / "CRC mismatch" during decode —
     // real errors still surfaced via return codes; use QUIET to eliminate spam that
     // masked restart bugs (Header missing x3, CRC mismatch). Keep silent after init.
     av_log_set_level(AV_LOG_QUIET);
@@ -365,7 +365,7 @@ bool FfmpegDecoder::init() {
         return false;
     }
 
-    // Setup resampler to float interleaved â€” preserve input channel layout exactly
+    // Setup resampler to float interleaved — preserve input channel layout exactly
     swr_ = swr_alloc();
     if (!swr_) {
         cleanup();
@@ -392,7 +392,7 @@ bool FfmpegDecoder::init() {
     sampleRate_ = static_cast<uint32_t>(dec_->sample_rate);
     channels_ = static_cast<uint32_t>(dec_->ch_layout.nb_channels);
 
-    // Estimate total frames from duration â€” try all sources
+    // Estimate total frames from duration — try all sources
     if (fmt_->duration != AV_NOPTS_VALUE && fmt_->duration > 0) {
         totalFrames_ = static_cast<uint64_t>(fmt_->duration * sampleRate_ / AV_TIME_BASE);
     } else if (stream->duration != AV_NOPTS_VALUE && stream->duration > 0) {
@@ -410,7 +410,7 @@ bool FfmpegDecoder::init() {
             totalFrames_ = 0;
         }
     } else {
-        totalFrames_ = 0; // Unknown â€” will still decode to EOF
+        totalFrames_ = 0; // Unknown — will still decode to EOF
     }
 
     pos_ = 0;

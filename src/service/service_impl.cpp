@@ -1,4 +1,4 @@
-﻿#include <caudio/service/service_impl.hpp>
+#include <caudio/service/service_impl.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -24,12 +24,12 @@
 #include <caudio/engine.hpp>
 #include <nlohmann/json.hpp>
 #include <caudio/player.hpp>
-#include <caudio/player/decoders/ffmpeg.hpp>
+#include "../player/decoders/ffmpeg.hpp"
 #include <caudio/utils.hpp>
 #include <caudio/config.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/service_detail.hpp>
+#include "service_detail.hpp"
 #include <caudio/service/shm_status.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -127,7 +127,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{e.error()};
     }
 
-    // ipc server listen ÃŽâ€œÃƒâ€¡ÃƒÂ¶ honor Config::socketPath if set (canonical override), else derive
+    // ipc server listen Î“Ã‡Ã¶ honor Config::socketPath if set (canonical override), else derive
     // from dbPath
     auto srvPtr = std::make_unique<IpcServer>();
     auto listenRes = srvPtr->listen(cfg.dbPath, cfg.socketPath);
@@ -829,7 +829,7 @@ Service::dispatch(const caudio::cli::Command& cmd) {
                 }
                 auto mode = (cmd.mode == "full" ? caudio::db::ScanMode::Full
                                                 : caudio::db::ScanMode::Sampled);
-                // Prefer scanLibrary if a library matches root ÃŽâ€œÃƒâ€¡ÃƒÂ¶ gives dedup + batched
+                // Prefer scanLibrary if a library matches root Î“Ã‡Ã¶ gives dedup + batched
                 // transaction
                 if (auto libs = db_->libraryList(); libs) {
                     for (auto& l : *libs) {
@@ -1057,7 +1057,7 @@ Service::dispatch(const caudio::cli::Command& cmd) {
                     }
                     if (added == 0) {
                         // check if any audio files existed but failed?
-                        // Return Empty still if dir was empty ÃŽâ€œÃƒâ€¡ÃƒÂ¶ not an error.
+                        // Return Empty still if dir was empty Î“Ã‡Ã¶ not an error.
                     }
                     return Result{Empty{}};
                 } else {

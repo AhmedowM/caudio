@@ -38,7 +38,7 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 
-#include <caudio/player/decoders/decoder_common.hpp>
+#include "decoder_common.hpp"
 #include <caudio/player/decoder_interface.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>

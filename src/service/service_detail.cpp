@@ -4,7 +4,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <caudio/service/service_detail.hpp>
+#include "service_detail.hpp"
 
 #include <algorithm>
 #include <array>
