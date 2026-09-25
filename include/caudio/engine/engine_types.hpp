@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -12,7 +12,7 @@
  * @brief Core value types for the caudio playback engine.
  * @ingroup caudio_engine
  * @defgroup caudio_engine caudio engine
- * @brief Playback engine â€” state machine, shuffle/history, gapless and persistence.
+ * @brief Playback engine — state machine, shuffle/history, gapless and persistence.
  *
  * @details The caudio_engine module group aggregates the playback state
  * machine, queue/shuffle permutation, gapless transition, history
@@ -44,7 +44,7 @@
  *
  * History: `EngineConfig::historyThresholdPct` (default 60) and
  * `historyThresholdSecs` (default 90) feed
- * `detail::shouldMarkPlayedEx()`; `doHistoryMark()` does a single
+ * `detail::shouldMarkPlayed()`; `doHistoryMark()` does a single
  * `compare_exchange_strong` on `markedPlayed_` and a
  * `BEGIN IMMEDIATE` transaction that bumps `tracks.play_count` and
  * inserts into `history`.
@@ -65,14 +65,6 @@ namespace caudio::engine {
  * @see Engine::setRepeat
  */
 enum class RepeatMode : int { Off = 0, Queue = 1, One = 2 };
-
-/**
- * @brief Deprecated shuffle toggle â€” use QueueState::shuffle.
- * @ingroup caudio_engine
- * @deprecated Unused; kept for ABI compat. Use QueueState::shuffle
- * and Engine::setShuffle(). Will be removed in the next major.
- */
-enum class ShuffleMode : int { Off = 0, On = 1 };
 
 /**
  * @brief Playback state machine.
@@ -136,7 +128,7 @@ struct EngineCallbacks {
     std::function<void(int64_t queue_id)> on_queue_changed{}; ///< Fired on QueueChanged.
     std::function<void(caudio::utils::StatusCode err, std::string_view msg)>
         on_error{};      ///< Fired on Error.
-    void* user{nullptr}; // unused â€” reserved
+    void* user{nullptr}; // unused — reserved
 };
 
 /**
@@ -145,7 +137,7 @@ struct EngineCallbacks {
  * @details `pollMs` controls monitorLoop sleep (default 10 ms);
  * `gaplessMs` is the preroll window for gapless transition (default 300 ms);
  * `historyThresholdPct`/`historyThresholdSecs` are thresholds for
- * shouldMarkPlayedEx (defaults 60 / 90). `enableMonitorThread` gates
+ * shouldMarkPlayed (defaults 60 / 90). `enableMonitorThread` gates
  * monitorLoop creation.
  */
 struct EngineConfig {
@@ -180,7 +172,7 @@ struct QueueState {
  * @ingroup caudio_engine
  * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
  * current_track_id, volume, shuffle_perm (BLOB), active_queue_id`.
- * `active_queue_id` may be missing on old DBs â€” loadState falls back
+ * `active_queue_id` may be missing on old DBs — loadState falls back
  * to `1` and saveState tries `sqlNew` then `sqlOld`. `shuffle_perm`
  * is `perm` serialized as `int64_t` blob.
  * @see Engine::loadState

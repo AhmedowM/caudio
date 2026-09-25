@@ -17,29 +17,29 @@ using namespace caudio::utils;
 using namespace caudio::test_helpers;
 
 TEST_CASE("shouldMarkPlayed 60pct 90s thresholds", "[engine_history]") {
-    // detail::shouldMarkPlayedEx is in engine namespace detail
-    using caudio::engine::detail::shouldMarkPlayedEx;
+    // detail::shouldMarkPlayed is in engine namespace detail
+    using caudio::engine::detail::shouldMarkPlayed;
     // duration 100s, pos 59 -> not marked (59%)
-    REQUIRE(shouldMarkPlayedEx(100.0, 59.0, false, 60, 90) == false);
+    REQUIRE(shouldMarkPlayed(100.0, 59.0, false, 60, 90) == false);
     // 61% true
-    REQUIRE(shouldMarkPlayedEx(100.0, 61.0, false, 60, 90) == true);
+    REQUIRE(shouldMarkPlayed(100.0, 61.0, false, 60, 90) == true);
     // already marked -> false even if threshold met
-    REQUIRE(shouldMarkPlayedEx(100.0, 80.0, true, 60, 90) == false);
+    REQUIRE(shouldMarkPlayed(100.0, 80.0, true, 60, 90) == false);
     // secs threshold: pos 91 with duration long and pct not met but secs met
-    REQUIRE(shouldMarkPlayedEx(1000.0, 91.0, false, 60, 90) == true);
+    REQUIRE(shouldMarkPlayed(1000.0, 91.0, false, 60, 90) == true);
     // pct 60 with duration 0 -> only secs matters; pos 90 true via secs
-    REQUIRE(shouldMarkPlayedEx(0.0, 90.0, false, 60, 90) == true);
+    REQUIRE(shouldMarkPlayed(0.0, 90.0, false, 60, 90) == true);
     // short duration 10s, pos 9 secs not but pct 90% requires 6s -> true via pct
-    REQUIRE(shouldMarkPlayedEx(10.0, 6.5, false, 60, 90) == true);
+    REQUIRE(shouldMarkPlayed(10.0, 6.5, false, 60, 90) == true);
     // pos less than both thresholds -> false
-    REQUIRE(shouldMarkPlayedEx(200.0, 10.0, false, 60, 90) == false);
+    REQUIRE(shouldMarkPlayed(200.0, 10.0, false, 60, 90) == false);
 }
 
-TEST_CASE("shouldMarkPlayed default 60 90 wrapper", "[engine_history]") {
+TEST_CASE("shouldMarkPlayed explicit 60 90 thresholds", "[engine_history]") {
     using caudio::engine::detail::shouldMarkPlayed;
-    REQUIRE(shouldMarkPlayed(100.0, 61.0, false) == true);
-    REQUIRE(shouldMarkPlayed(100.0, 30.0, false) == false);
-    REQUIRE(shouldMarkPlayed(100.0, 80.0, true) == false);
+    REQUIRE(shouldMarkPlayed(100.0, 61.0, false, 60, 90) == true);
+    REQUIRE(shouldMarkPlayed(100.0, 30.0, false, 60, 90) == false);
+    REQUIRE(shouldMarkPlayed(100.0, 80.0, true, 60, 90) == false);
 }
 
 TEST_CASE("CAS exactly-once markedPlayed atomic", "[engine_history]") {
@@ -85,7 +85,7 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     // wait deterministically for history to be marked (threshold 1s or 10% of 10s=1s, so ~1s)
     // poll every 50ms with overall timeout 2000ms, breaking early when condition met

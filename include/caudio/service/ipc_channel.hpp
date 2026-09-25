@@ -25,9 +25,6 @@ class IpcChannel {
     virtual void close() noexcept = 0;
 };
 
-[[deprecated("use caudio::cli::socketPathFor")]] caudio::utils::Expected<std::string>
-socketPathFor(const std::filesystem::path& dbPath);
-
 // framing helpers shared by channel and protocol
 std::vector<std::byte> frameMessage(std::span<const std::byte> payload);
 

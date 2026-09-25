@@ -49,7 +49,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     auto ev = eng->pollEvent();
     REQUIRE(ev.has_value());
@@ -97,7 +97,7 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     REQUIRE(eng->next().has_value());
     // now we have 2 TrackStarted events
@@ -146,7 +146,7 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     // need to set callbacks via engine (attach copied empty, need setCallbacks)
     REQUIRE(eng->setCallbacks(cbs).has_value());
     REQUIRE(eng->play(1).has_value());

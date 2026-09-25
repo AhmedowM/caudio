@@ -89,8 +89,6 @@ class SqliteStatement final {
      * @param data Bytes to copy.
      */
     void bindBlob(int idx, std::span<const std::byte> data);
-    /** @brief Deprecated C-pointer overload â€” use span overload. @ingroup caudio_db */
-    [[deprecated("use span overload")]] void bindBlob(int idx, const void* data, int n);
     /**
      * @brief Binds NULL at 1-based index.
      * @ingroup caudio_db

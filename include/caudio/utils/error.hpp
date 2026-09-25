@@ -44,16 +44,6 @@ struct Error {
     explicit Error(StatusCode c, std::string_view msg);
 
     /**
-     * @brief Deprecated C-string overload.
-     * @ingroup caudio_utils
-     * @param c Status code.
-     * @param msg Null-terminated message; null is treated as empty.
-     * @deprecated Use string_view overload.
-     */
-    [[deprecated("use string_view overload")]]
-    Error(StatusCode c, const char* msg);
-
-    /**
      * @brief Equality comparison (compares code and message).
      * @ingroup caudio_utils
      * @param other Error to compare.

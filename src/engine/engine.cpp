@@ -35,14 +35,6 @@ Engine::ExpectedVoid Engine::attachDatabase(std::shared_ptr<caudio::db::Database
     return {};
 }
 
-Engine::ExpectedVoid Engine::attachDb(std::unique_ptr<caudio::db::Database> db) {
-    if (!db || !db->handle())
-        return std::unexpected(
-            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
-    auto shared = std::shared_ptr<caudio::db::Database>(std::move(db));
-    return attachDatabase(std::move(shared));
-}
-
 Engine::~Engine() {
     shutdown();
 }
@@ -478,14 +470,6 @@ std::vector<EngineEvent> Engine::drainAll() {
         out.push_back(r.value());
     }
     return out;
-}
-
-PlaybackState Engine::getState() const noexcept {
-    return state();
-}
-
-double Engine::getPosition() const noexcept {
-    return position();
 }
 
 Engine::Engine(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
@@ -1131,7 +1115,7 @@ void Engine::doHistoryMark() {
     double pos = currentPositionLocked();
     int pct = cfg_.historyThresholdPct ? cfg_.historyThresholdPct : 60;
     int secs = cfg_.historyThresholdSecs ? cfg_.historyThresholdSecs : 90;
-    if (!detail::shouldMarkPlayedEx(dur, pos, false, pct, secs))
+    if (!detail::shouldMarkPlayed(dur, pos, false, pct, secs))
         return;
     bool expected = false;
     bool desired = true;

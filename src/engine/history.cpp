@@ -1,4 +1,4 @@
-﻿#include <caudio/engine/history.hpp>
+#include <caudio/engine/history.hpp>
 
 #include <sqlite3.h>
 
@@ -9,7 +9,7 @@ uint64_t nowMs() noexcept {
     return (uint64_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }
 
-bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr,
+bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr,
                         int secsThr) noexcept {
     if (marked)
         return false;
@@ -20,10 +20,6 @@ bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr,
     if (pos >= secs)
         return true;
     return false;
-}
-
-bool shouldMarkPlayed(double duration, double pos, bool marked) noexcept {
-    return shouldMarkPlayedEx(duration, pos, marked, 60, 90);
 }
 
 } // namespace caudio::engine::detail

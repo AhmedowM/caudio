@@ -91,7 +91,7 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDb(std::move(db)).has_value());
+        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->play(1).has_value());
         REQUIRE(eng->state() == PlaybackState::Playing);
         double pos0 = eng->position();
@@ -166,7 +166,7 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     // sequential seeks while playing (decode thread races with seek's ring reset)
     // we do small delays to let decode thread interleave but avoid true concurrent seeks which
@@ -263,7 +263,7 @@ TEST_CASE("gapless via Player Engine 300ms lookahead", "[player_integration][gap
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
     busyWaitUntil([&] { return eng->currentTrackId() != first; }, std::chrono::milliseconds(3000),

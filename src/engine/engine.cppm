@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/engine.hpp>
 #include <caudio/engine/engine_types.hpp>
 #include <caudio/engine/history.hpp>
@@ -18,15 +18,12 @@ using ::caudio::engine::HistoryEntry;
 using ::caudio::engine::PlaybackState;
 using ::caudio::engine::QueueState;
 using ::caudio::engine::RepeatMode;
-using ::caudio::engine::ShuffleMode;
 using ::caudio::engine::SqliteErrGuard;
 using ::caudio::engine::StmtGuard;
-using ::caudio::engine::toString;
 } // namespace caudio::engine
 
 export namespace caudio::engine::detail {
 using ::caudio::engine::detail::nowMs;
 using ::caudio::engine::detail::shouldMarkPlayed;
-using ::caudio::engine::detail::shouldMarkPlayedEx;
 using ::caudio::engine::detail::shufflePerm;
 } // namespace caudio::engine::detail

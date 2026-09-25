@@ -35,7 +35,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDb(std::move(db)).has_value());
+        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
         REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
         REQUIRE(eng->setVolume(0.42f).has_value());
@@ -142,7 +142,7 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->setShuffle(true).has_value());
     // verify blob exists
     sqlite3* h = nullptr;

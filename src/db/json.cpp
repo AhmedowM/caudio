@@ -11,14 +11,6 @@
 
 namespace caudio::db {
 
-std::string fingerprintToHex(const std::array<uint8_t, 32>& fp) {
-    return internal::toHex(fp);
-}
-
-bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out) {
-    return internal::fromHex(hex, out);
-}
-
 ordered_json trackToJson(const Track& t) {
     ordered_json j;
     j["id"] = t.id;
@@ -39,7 +31,7 @@ ordered_json trackToJson(const Track& t) {
     j["dirty"] = t.dirty;
     j["library_id"] = t.library_id;
     j["deleted_at"] = t.deleted_at;
-    j["fingerprint"] = fingerprintToHex(t.fingerprint);
+    j["fingerprint"] = internal::toHex(t.fingerprint);
     j["path"] = t.path;
     j["title"] = t.title;
     j["artist"] = t.artist;
@@ -125,7 +117,7 @@ std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j) 
         std::string fpHex;
         getStr("fingerprint", fpHex);
         if (!fpHex.empty()) {
-            if (!hexToFingerprint(fpHex, t.fingerprint)) {
+            if (!internal::fromHex(fpHex, t.fingerprint)) {
                 t.fingerprint = internal::fallbackFingerprint(t.path);
             }
         } else {

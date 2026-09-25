@@ -65,22 +65,6 @@ Database::getCachedForUse(std::string_view sql) const {
     return raw;
 }
 
-SqliteStatement* Database::getCachedLocked(std::string_view sql) const {
-    // Caller must hold stmtCacheMutex_ (cacheMutex_); delegate to expected API.
-    auto r = getCachedForUse(sql);
-    if (!r)
-        return nullptr; // error â€” caller of deprecated API must check nullptr
-    return *r;
-}
-
-SqliteStatement* Database::getCached(const std::string& sql) const {
-    std::lock_guard lk{cacheMutex_};
-    auto r = getCachedForUse(sql);
-    if (!r)
-        return nullptr; // error â€” see deprecation note
-    return *r;
-}
-
 std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(std::string_view path,
                                                                               const DbOpts& opts) {
     std::string dbPath = path.empty() ? ":memory:" : std::string(path);
@@ -663,28 +647,6 @@ std::expected<void, caudio::utils::Error> Database::setDirty(int64_t id, int dir
     if (sqlite3_changes(db_.get()) == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
     return {};
-}
-
-std::expected<std::string, caudio::utils::Error> Database::getTrackName(int64_t id) {
-    auto r = getTrack(id);
-    if (!r)
-        return std::unexpected{r.error()};
-    return r->title.empty() ? r->path : r->title;
-}
-
-std::expected<std::vector<std::tuple<int64_t, std::string>>, caudio::utils::Error>
-Database::listTracksSimple(int64_t libraryId) {
-    TrackQuery q;
-    if (libraryId > 0) {
-        q.library_id = libraryId;
-    }
-    auto r = listTracks(&q);
-    if (!r)
-        return std::unexpected{r.error()};
-    std::vector<std::tuple<int64_t, std::string>> out;
-    for (auto& t : *r)
-        out.emplace_back(t.id, t.title.empty() ? t.path : t.title);
-    return out;
 }
 
 std::expected<int64_t, caudio::utils::Error>

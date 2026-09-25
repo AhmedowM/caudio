@@ -93,8 +93,6 @@ class Database final {
      * before returning. Thread safety: requires external lock on cacheMutex_.
      * @par Lock ordering
      * If both locks are needed, acquire dbMutex_ before cacheMutex_.
-     * @see getCachedLocked
-     * @see getCached
      */
     /**
      * @brief Inserts a track (caller holds dbMutex_).
@@ -128,10 +126,6 @@ class Database final {
      */
     std::expected<SqliteStatement*, caudio::utils::Error>
     getCachedForUse(std::string_view sql) const;
-    [[deprecated("use getCachedForUse; raw nullptr is error â€” check expected")]]
-    SqliteStatement* getCachedLocked(std::string_view sql) const;
-    [[deprecated("use getCachedForUse with external lock; raw nullptr is error")]]
-    SqliteStatement* getCached(const std::string& sql) const;
     /**
      * @brief Opens (or creates) a database.
      * @ingroup caudio_db
@@ -486,13 +480,6 @@ class Database final {
      * Thread-safe: unique_lock on dbMutex_.
      */
     std::expected<void, caudio::utils::Error> setDirty(int64_t id, int dirty);
-
-    // compat helpers for older database.cppm API
-    [[deprecated("use getTrack; compat shim â€” remove in next major")]]
-    std::expected<std::string, caudio::utils::Error> getTrackName(int64_t id);
-    [[deprecated("use listTracks; compat shim â€” remove in next major")]]
-    std::expected<std::vector<std::tuple<int64_t, std::string>>, caudio::utils::Error>
-    listTracksSimple(int64_t libraryId = 0);
 
     // Playlists
     /**

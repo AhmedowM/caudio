@@ -35,7 +35,7 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->setShuffle(true).has_value());
     // after shuffle, perm should be size 4 and be a permutation of 0..3
     // verify by checking engine_state blob via raw sqlite
@@ -84,7 +84,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Off).has_value());
     REQUIRE(eng->play(1).has_value());
     {
@@ -142,7 +142,7 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
     REQUIRE(eng->play(1).has_value());
     // queue persists via cursor, count stays 2 after play (not dequeued)
@@ -205,7 +205,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->setRepeat(RepeatMode::One).has_value());
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
@@ -238,7 +238,7 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDb(std::move(db)).has_value());
+        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
         REQUIRE(eng->play(1).has_value());
         // cursor should have advanced to 1, queueId 1 persisted
@@ -334,7 +334,7 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
     REQUIRE(eng->pause().has_value());
@@ -371,7 +371,7 @@ TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
-    REQUIRE(eng->attachDb(std::move(db)).has_value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
     REQUIRE(eng->next().has_value());
@@ -408,7 +408,7 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDb(std::move(db)).has_value());
+        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->play(1).has_value());
         REQUIRE(eng->next().has_value());
         // queue count should still be 4 (cursor, not dequeue)

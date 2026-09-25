@@ -17,10 +17,6 @@
 
 namespace caudio::service {
 
-caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath) {
-    return caudio::cli::socketPathFor(dbPath);
-}
-
 std::vector<std::byte> frameMessage(std::span<const std::byte> payload) {
     std::vector<std::byte> out;
     out.reserve(4 + payload.size());

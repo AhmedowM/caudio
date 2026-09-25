@@ -30,26 +30,6 @@ namespace caudio::db {
  */
 using ordered_json = nlohmann::ordered_json;
 
-// DRY: canonical hex helpers live in caudio.db:detail â€” thin wrappers for backwards compat
-/**
- * @brief Converts a 32-byte fingerprint to a 64-char lowercase hex string.
- * @ingroup caudio_db
- * @param fp Fingerprint bytes.
- * @return Hex string (64 chars).
- * @see hexToFingerprint
- */
-std::string fingerprintToHex(const std::array<uint8_t, 32>& fp);
-
-/**
- * @brief Parses a 64-char hex string into a fingerprint.
- * @ingroup caudio_db
- * @param hex Hex view (must be 64 chars, case-insensitive).
- * @param out Output bytes.
- * @return true on success, false if length or characters invalid.
- * @see fingerprintToHex
- */
-bool hexToFingerprint(std::string_view hex, std::array<uint8_t, 32>& out);
-
 /**
  * @brief Serializes a Track to ordered JSON.
  * @ingroup caudio_db

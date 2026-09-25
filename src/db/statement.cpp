@@ -64,11 +64,6 @@ void SqliteStatement::bindBlob(int idx, std::span<const std::byte> data) {
         sqlite3_bind_blob(stmt_, idx, data.data(), static_cast<int>(data.size()), SQLITE_TRANSIENT);
 }
 
-void SqliteStatement::bindBlob(int idx, const void* data, int n) {
-    bindBlob(idx, std::span<const std::byte>{reinterpret_cast<const std::byte*>(data),
-                                             data && n > 0 ? static_cast<std::size_t>(n) : 0});
-}
-
 void SqliteStatement::bindNull(int idx) {
     if (stmt_)
         sqlite3_bind_null(stmt_, idx);

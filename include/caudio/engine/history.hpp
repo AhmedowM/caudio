@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <sqlite3.h>
 
 #include <chrono>
@@ -19,7 +19,7 @@
  * @details Defines HistoryEntry and the history-marking thresholds
  * (`historyThresholdPct` / `historyThresholdSecs`) that decide when a
  * play counts as completed. Engine::doHistoryMark consults
- * detail::shouldMarkPlayedEx and performs a single-writer CAS plus a
+ * detail::shouldMarkPlayed and performs a single-writer CAS plus a
  * `BEGIN IMMEDIATE` transaction that bumps `tracks.play_count` and
  * inserts into `history`.
  *
@@ -79,17 +79,7 @@ uint64_t nowMs() noexcept;
  * @see Engine::doHistoryMark
  * @see EngineConfig
  */
-bool shouldMarkPlayedEx(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept;
-/**
- * @brief Deprecated wrapper for shouldMarkPlayedEx with 60%/90s defaults.
- * @ingroup caudio_engine
- * @param duration Track duration in seconds.
- * @param pos Current position in seconds.
- * @param marked Whether already marked.
- * @return true if thresholds exceeded.
- * @deprecated Use shouldMarkPlayedEx; kept for tests (test_engine_history:40).
- */
-bool shouldMarkPlayed(double duration, double pos, bool marked) noexcept;
+bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept;
 
 } // namespace caudio::engine::detail
 
@@ -103,7 +93,7 @@ namespace caudio::engine {
  * discipline as Database. Used by Engine::listHistory / clearHistory
  * which delegate to a temporary History instance.
  * @see HistoryEntry
- * @see detail::shouldMarkPlayedEx
+ * @see detail::shouldMarkPlayed
  */
 class History final {
   public:
