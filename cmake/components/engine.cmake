@@ -9,7 +9,7 @@ set(CAUDIO_ENGINE_SOURCES
   src/engine/history.cpp
   src/engine/shuffle.cpp
 )
-caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} MODULE_SOURCES ${CAUDIO_ENGINE_MODULE_SOURCES} DEPS caudio::db caudio::player caudio::utils Threads::Threads WITH_FFMPEG)
+caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} MODULE_SOURCES ${CAUDIO_ENGINE_MODULE_SOURCES} DEPS caudio::db caudio::player caudio::utils Threads::Threads)
 target_include_directories(engine PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(engine)
 

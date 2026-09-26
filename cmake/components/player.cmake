@@ -16,7 +16,7 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/player_core.cpp
   src/player/decoders/ffmpeg.cpp
 )
-caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor WITH_FFMPEG)
+caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor)
 target_compile_options(player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 
 caudio_add_shared_variant(player EXTRA_DEPS caudio::utils_shared)

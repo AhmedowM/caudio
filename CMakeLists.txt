@@ -60,17 +60,8 @@ option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,u
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
-option(CAUDIO_ENABLE_CCACHE "enable ccache for faster rebuilds" ON)
-
-# ccache for faster rebuilds
-if(CAUDIO_ENABLE_CCACHE)
-  find_program(CCACHE_PROGRAM ccache)
-  if(CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-    message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
-  endif()
-endif()
+# NOTE: ccache is environment configuration, not a project option; pass
+# -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
 
 # clang-tidy integration (requires compile_commands.json)
 if(CAUDIO_ENABLE_CLANG_TIDY)
@@ -191,7 +182,6 @@ if(CAUDIO_ENABLE_MODULES)
   target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/core.cppm)
 endif()
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
-target_include_directories(caudio BEFORE PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cli11_wrapper)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
@@ -212,92 +202,29 @@ if(CAUDIO_ENABLE_SANITIZERS)
   caudio_apply_sanitizers(caudio)
 endif()
 
-# ── Documentation (Doxygen) ─────────────────────────────────────────────
-# How to build docs:
-#   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
-#   cmake --build build --target doc   # generates HTML to build/docs/html (and docs/html if OUTPUT_DIRECTORY=.)
-# Requires Doxygen (optional). If not found, configure still succeeds.
+# Documentation (Doxygen) — see cmake/Docs.cmake
 if(CAUDIO_BUILD_DOCS)
-  find_package(Doxygen OPTIONAL_COMPONENTS dot)
-  if(DOXYGEN_FOUND)
-    if(DOXYGEN_DOT_FOUND)
-      set(DOXYGEN_HAVE_DOT YES)
-    else()
-      set(DOXYGEN_HAVE_DOT NO)
-    endif()
-
-    # Prefer template docs/Doxyfile.in (CMake @VAR@ substitution) if present
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in")
-      configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
-        @ONLY
-      )
-      set(_caudio_doxyfile "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in")
-      configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile"
-        @ONLY
-      )
-      set(_caudio_doxyfile "${CMAKE_CURRENT_BINARY_DIR}/Doxyfile")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile")
-      set(_caudio_doxyfile "${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile")
-    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile")
-      set(_caudio_doxyfile "${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile")
-    else()
-      message(WARNING "CAUDIO_BUILD_DOCS=ON but no Doxyfile or Doxyfile.in found")
-      set(_caudio_doxyfile "")
-    endif()
-
-    if(_caudio_doxyfile)
-      if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
-        doxygen_add_docs(doc CONFIG_FILE "${_caudio_doxyfile}" COMMENT "Generating Doxygen docs")
-        # Doxygen on Windows does not auto-create intermediate dirs for HTML_OUTPUT=docs/html
-        # Ensure parent exists before doxygen runs (PRE_BUILD works for Ninja/Make)
-        if(TARGET doc)
-          # Create a helper target to ensure docs/html exists; doc will depend on it
-          # Doxygen on Windows does not auto-create intermediate dirs for nested HTML_OUTPUT
-          add_custom_target(doc_mkdir
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/docs/html"
-            COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_SOURCE_DIR}/docs/html"
-            COMMENT "Preparing docs output directory"
-            VERBATIM
-          )
-          add_dependencies(doc doc_mkdir)
-        endif()
-      else()
-        # Fallback for CMake < 3.16
-        add_custom_target(doc
-          COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/docs/html"
-          COMMAND ${DOXYGEN_EXECUTABLE} "${_caudio_doxyfile}"
-          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-          COMMENT "Generating Doxygen docs (custom target)"
-          VERBATIM
-        )
-      endif()
-    endif()
-  else()
-    message(STATUS "CAUDIO_BUILD_DOCS=ON but Doxygen not found - docs target will not be available (install Doxygen to build docs)")
-  endif()
+  include(cmake/Docs.cmake)
+  caudio_add_docs()
 endif()
-# ── End Documentation ───────────────────────────────────────────────────
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
+set(CAUDIO_INSTALL_LIBS
+  utils utils_shared
+  player player_shared
+  db db_shared
+  engine engine_shared
+  ipc
+  client client_shared
+  service service_shared
+  combined
+  caudio_sqlite
+  blake3
+)
 if(CAUDIO_ENABLE_MODULES)
   install(
-    TARGETS
-      utils utils_shared
-      player player_shared
-      db db_shared
-      engine engine_shared
-      ipc
-      client client_shared
-      service service_shared
-      combined
-      caudio_sqlite
-      blake3
+    TARGETS ${CAUDIO_INSTALL_LIBS}
     EXPORT caudioTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -306,17 +233,7 @@ if(CAUDIO_ENABLE_MODULES)
   )
 else()
   install(
-    TARGETS
-      utils utils_shared
-      player player_shared
-      db db_shared
-      engine engine_shared
-      ipc
-      client client_shared
-      service service_shared
-      combined
-      caudio_sqlite
-      blake3
+    TARGETS ${CAUDIO_INSTALL_LIBS}
     EXPORT caudioTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -325,6 +242,7 @@ else()
 endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES cmake/FindFFmpeg.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 
 include(CMakePackageConfigHelpers)
@@ -363,23 +281,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/caudio.service")
   install(FILES packaging/caudio.service DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/systemd/user)
 endif()
 
-# Packaging (CPack)
+# Packaging (CPack) — TGZ/ZIP only until the first release; distro
+# generators (DEB/RPM/NSIS/DragNDrop) return when versions stabilize.
 set(CPACK_GENERATOR "TGZ;ZIP")
-if(UNIX AND NOT APPLE)
-  list(APPEND CPACK_GENERATOR "DEB;RPM")
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libavcodec-extra | libavcodec59, libavformat59, libavutil57, libswresample4")
-  set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
-  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-  set(CPACK_RPM_PACKAGE_REQUIRES "ffmpeg-libs >= 6.0")
-  set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
-endif()
-if(WIN32)
-  list(APPEND CPACK_GENERATOR "NSIS;ZIP")
-  set(CPACK_NSIS_DISPLAY_NAME "caudio")
-endif()
-if(APPLE)
-  list(APPEND CPACK_GENERATOR "DragNDrop")
-endif()
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
@@ -427,33 +331,18 @@ if(CAUDIO_ENABLE_TESTS)
     add_compile_definitions(CAUDIO_TEST_NOAUDIO=1)
   endif()
 
-  function(caudio_add_test name src)
+  function(caudio_add_catch_test name src)
+    cmake_parse_arguments(PARSE_ARGV 2 ARG "WITH_TEST_DATA;WITH_ALLOW_MULTIPLE_DEFINITION" "" "LIBS")
     add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE caudio::utils Catch2::Catch2WithMain)
-    target_compile_features(${name} PRIVATE cxx_std_23)
-    if(CAUDIO_ENABLE_SANITIZERS)
-      caudio_apply_sanitizers(${name})
-    endif()
-    catch_discover_tests(${name})
-    add_test(NAME ${name} COMMAND ${name})
-    set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 4)
-  endfunction()
-
-caudio_add_test(test_utils_result tests/test_utils_result.cpp)
-caudio_add_test(test_utils_ring tests/test_utils_ring.cpp)
-caudio_add_test(test_utils_queue tests/test_utils_queue.cpp)
-caudio_add_test(test_utils_thread tests/test_utils_thread.cpp)
-caudio_add_test(test_utils_log tests/test_utils_log.cpp)
-
-  # Task 3: Reader + DecoderRegistry
-  function(caudio_add_player_test name src)
-    add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
+    target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
     target_compile_features(${name} PRIVATE cxx_std_23)
-    if(${name} STREQUAL "test_decoder")
+    if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     endif()
+    if(ARG_WITH_ALLOW_MULTIPLE_DEFINITION)
+      target_link_options(${name} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+    endif()
     if(CAUDIO_ENABLE_SANITIZERS)
       caudio_apply_sanitizers(${name})
     endif()
@@ -461,110 +350,32 @@ caudio_add_test(test_utils_log tests/test_utils_log.cpp)
     add_test(NAME ${name} COMMAND ${name})
     set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 4)
   endfunction()
-  caudio_add_player_test(test_reader tests/test_reader.cpp)
-  caudio_add_player_test(test_decoder tests/test_decoder.cpp)
-  caudio_add_player_test(test_ffmpeg tests/test_ffmpeg.cpp)
-  target_compile_definitions(test_ffmpeg PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
 
-  # DB tests
-  add_executable(test_db tests/test_db.cpp)
-  target_link_libraries(test_db PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_db PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_db)
-  endif()
-  catch_discover_tests(test_db)
-  add_test(NAME test_db COMMAND test_db)
-  set_tests_properties(test_db PROPERTIES SKIP_RETURN_CODE 4)
+  caudio_add_catch_test(test_utils_result tests/test_utils_result.cpp LIBS caudio::utils)
+  caudio_add_catch_test(test_utils_ring tests/test_utils_ring.cpp LIBS caudio::utils)
+  caudio_add_catch_test(test_utils_queue tests/test_utils_queue.cpp LIBS caudio::utils)
+  caudio_add_catch_test(test_utils_thread tests/test_utils_thread.cpp LIBS caudio::utils)
+  caudio_add_catch_test(test_utils_log tests/test_utils_log.cpp LIBS caudio::utils)
 
-  # Write thread tests
-  add_executable(test_write_thread tests/test_write_thread.cpp)
-  target_link_libraries(test_write_thread PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_write_thread PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_write_thread PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_write_thread)
-  endif()
-  catch_discover_tests(test_write_thread)
-  add_test(NAME test_write_thread COMMAND test_write_thread)
-  set_tests_properties(test_write_thread PROPERTIES SKIP_RETURN_CODE 4)
+  caudio_add_catch_test(test_reader tests/test_reader.cpp LIBS caudio::player caudio::utils)
+  caudio_add_catch_test(test_decoder tests/test_decoder.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
+  caudio_add_catch_test(test_ffmpeg tests/test_ffmpeg.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
 
-  # Output tests
-  add_executable(test_output tests/test_output.cpp)
-  target_link_libraries(test_output PRIVATE caudio::player caudio::utils Catch2::Catch2WithMain)
-  target_include_directories(test_output PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
-  target_compile_features(test_output PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_output)
-  endif()
-  catch_discover_tests(test_output)
-  add_test(NAME test_output COMMAND test_output)
-  set_tests_properties(test_output PROPERTIES SKIP_RETURN_CODE 4)
+  caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_output tests/test_output.cpp LIBS caudio::player caudio::utils)
 
-  # Task 11: Engine parity
-  function(caudio_add_engine_test name src)
-    add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-    target_compile_features(${name} PRIVATE cxx_std_23)
-    if(CAUDIO_ENABLE_SANITIZERS)
-      caudio_apply_sanitizers(${name})
-    endif()
-    catch_discover_tests(${name})
-  endfunction()
-  caudio_add_engine_test(test_engine_queue tests/test_engine_queue.cpp)
-  caudio_add_engine_test(test_engine_history tests/test_engine_history.cpp)
-  caudio_add_engine_test(test_engine_events tests/test_engine_events.cpp)
-  caudio_add_engine_test(test_engine_state tests/test_engine_state.cpp)
-  caudio_add_engine_test(test_engine_gapless tests/test_engine_gapless.cpp)
+  caudio_add_catch_test(test_engine_queue tests/test_engine_queue.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_engine_history tests/test_engine_history.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_engine_events tests/test_engine_events.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_engine_state tests/test_engine_state.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
 
-  # DB scan/search/json
-  add_executable(test_db_scan tests/test_db_scan.cpp)
-  target_link_libraries(test_db_scan PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db_scan PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_db_scan PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_db_scan)
-  endif()
-  catch_discover_tests(test_db_scan)
+  caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio_sqlite)
 
-  add_executable(test_db_search tests/test_db_search.cpp)
-  target_link_libraries(test_db_search PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db_search PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_db_search PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_db_search)
-  endif()
-  catch_discover_tests(test_db_search)
+  caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
 
-  add_executable(test_db_json tests/test_db_json.cpp)
-  target_link_libraries(test_db_json PRIVATE caudio::db caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_db_json PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_db_json PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_db_json)
-  endif()
-  catch_discover_tests(test_db_json)
-
-  # Player integration
-  add_executable(test_player_integration tests/test_player_integration.cpp)
-  target_link_libraries(test_player_integration PRIVATE caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_player_integration PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_player_integration PRIVATE cxx_std_23)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_player_integration)
-  endif()
-  catch_discover_tests(test_player_integration)
-
-  # IPC/Cli integration tests
-  add_executable(test_ipc tests/test_ipc.cpp)
-  target_link_libraries(test_ipc PRIVATE caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils Catch2::Catch2WithMain caudio_sqlite)
-  target_include_directories(test_ipc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
-  target_compile_features(test_ipc PRIVATE cxx_std_23)
-  target_link_options(test_ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
-  if(CAUDIO_ENABLE_SANITIZERS)
-    caudio_apply_sanitizers(test_ipc)
-  endif()
-  catch_discover_tests(test_ipc)
+  caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite WITH_ALLOW_MULTIPLE_DEFINITION)
 endif()

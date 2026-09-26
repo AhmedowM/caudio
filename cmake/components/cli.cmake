@@ -12,7 +12,7 @@ set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
   src/config.cpp
 )
-caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
+caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor)
 target_include_directories(ipc PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(ipc)
 target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
@@ -43,7 +43,7 @@ set(CAUDIO_SERVICE_SOURCES
   src/service/dispatch_library.cpp
   src/service/dispatch_config.cpp
 )
-caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::ipc caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
+caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::ipc caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor)
 target_include_directories(service PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 if(NOT WIN32)
   find_library(LIBRT rt)
@@ -72,7 +72,7 @@ set(CAUDIO_CLIENT_SOURCES
   src/client/client_impl.cpp
   src/client/output_formatter.cpp
 )
-caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::ipc caudio::utils caudio::service Threads::Threads INCLUDES vendor WITH_FFMPEG)
+caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::ipc caudio::utils caudio::service Threads::Threads INCLUDES vendor)
 target_include_directories(client PRIVATE ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(client)
 target_compile_options(client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)

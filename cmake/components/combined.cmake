@@ -1,6 +1,6 @@
 # // combined is library-only (utils/player/db/engine); IPC (json/ipc/service/client) is separate, not part of libcaudio
 add_library(combined SHARED)
-set_target_properties(combined PROPERTIES OUTPUT_NAME caudio)
+set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 target_sources(combined PRIVATE src/_stub/shared_stub.cpp)
 target_link_libraries(combined PUBLIC
   caudio::utils caudio::player caudio::db caudio::engine Threads::Threads)
