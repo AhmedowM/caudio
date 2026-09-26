@@ -26,8 +26,6 @@ set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/service/service_impl.cppm
   modules/service/shm_status.cppm
   modules/service/ipc_channel.cppm
-  src/service/ipc_channel_unix.cpp
-  src/service/ipc_channel_win.cpp
   modules/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
