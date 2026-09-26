@@ -1,12 +1,11 @@
 ﻿#pragma once
+#include <caudio/utils/result.hpp>
 #include <format>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include <caudio/utils/result.hpp>
 
 /**
  * @file log.hpp

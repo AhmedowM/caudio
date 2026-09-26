@@ -1,20 +1,18 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/client.hpp>
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc.hpp>
+#include <caudio/service.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
+#include <common.hpp>
 #include <filesystem>
 #include <iostream>
 #include <thread>
 #include <variant>
 #include <vector>
-
-#include <common.hpp>
-
-#include <caudio/ipc.hpp>
-#include <caudio/config.hpp>
-#include <caudio/service.hpp>
-#include <caudio/client.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
 using namespace caudio::ipc;
 using namespace caudio::utils;
 using namespace caudio::db;

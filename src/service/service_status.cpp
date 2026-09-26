@@ -6,6 +6,8 @@
 #endif
 #include "service_status.hpp"
 
+#include <blake3.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -27,8 +29,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <blake3.h>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -130,10 +130,10 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <caudio/config.hpp>
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
+#include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/player/decoder_interface.hpp>
 #include <caudio/utils.hpp>
-#include <caudio/ipc.hpp>
 
 namespace caudio::service::detail {
 std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,

@@ -1,6 +1,5 @@
-﻿#include <caudio/service/ipc_server.hpp>
-
-#include <array>
+﻿#include <array>
+#include <caudio/service/ipc_server.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -20,9 +19,9 @@
 #endif
 
 #include <caudio/config.hpp>
-#include <caudio/utils.hpp>
 #include <caudio/ipc.hpp>
 #include <caudio/service/ipc_channel.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::service {
 

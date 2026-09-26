@@ -1,16 +1,15 @@
 #pragma once
 
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils.hpp>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file queue.hpp

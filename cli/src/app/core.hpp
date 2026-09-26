@@ -1,9 +1,15 @@
 #pragma once
 
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <ostream>
 #include <span>
@@ -11,13 +17,7 @@
 #include <string_view>
 #include <vector>
 
-#include <caudio/db.hpp>
-#include <nlohmann/json.hpp>
-#include <caudio/utils.hpp>
 #include "parse.hpp"
-#include <caudio/config.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/result.hpp>
 
 namespace CLI {
 class App;

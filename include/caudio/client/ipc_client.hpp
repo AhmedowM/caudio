@@ -60,12 +60,12 @@ __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LP
 #endif
 #endif
 
-#include <caudio/utils.hpp>
 #include <caudio/config.hpp>
-#include <caudio/service/ipc_channel.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::client {
 

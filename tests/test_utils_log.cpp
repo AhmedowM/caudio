@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/utils.hpp>
 #include <string>
 #include <string_view>
 #include <typeinfo>
 #include <vector>
-#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool log_injected() {

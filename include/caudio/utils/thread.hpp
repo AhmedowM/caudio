@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <time.h>
 #endif
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstring>
 #include <expected>
@@ -14,9 +16,6 @@
 #include <string_view>
 #include <thread>
 #include <utility>
-
-#include <caudio/utils/error.hpp>
-#include <caudio/utils/result.hpp>
 
 #if defined(_WIN32) || defined(_WIN64)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)

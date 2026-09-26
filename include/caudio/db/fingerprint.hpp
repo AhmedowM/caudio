@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <caudio/db/db_types.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -10,9 +12,6 @@
 #include <span>
 #include <string>
 #include <vector>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file fingerprint.hpp

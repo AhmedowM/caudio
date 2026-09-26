@@ -23,14 +23,14 @@
 #include <poll.h>
 #endif
 
-#include <caudio/utils.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/service/shm_status.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/service/shm_status.hpp>
+#include <caudio/utils.hpp>
 
 namespace caudio::client {
 

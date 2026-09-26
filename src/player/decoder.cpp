@@ -1,6 +1,5 @@
-#include <caudio/player/decoder.hpp>
-
 #include <array>
+#include <caudio/player/decoder.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>

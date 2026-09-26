@@ -1,7 +1,23 @@
-#include <CLI/CLI.hpp>
-#include <memory>
+#ifdef _WIN32
+// NOTE: <windows.h> must precede all other includes in this TU. thread.hpp
+// hand-declares HANDLE/HMODULE/etc. when windows.h is absent, which then
+// conflicts with the real declarations pulled in by CLI11. Keep this block
+// first: clang-format must not sort it.
+// clang-format off
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+// clang-format on
+#endif
 
 #include "core.hpp"
+
+#include <CLI/CLI.hpp>
+#include <memory>
 
 #include "parse.hpp"
 
@@ -67,6 +83,18 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <mach-o/dyld.h>
 #endif
 #endif
+#include <caudio/client.hpp>
+#include <caudio/client/ipc_client.hpp>
+#include <caudio/client/output_formatter.hpp>
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/player.hpp>
+#include <caudio/service.hpp>
+#include <caudio/utils.hpp>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -77,6 +105,7 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <print>
 #include <span>
@@ -86,20 +115,6 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <nlohmann/json.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
-#include <caudio/client.hpp>
-#include <caudio/client/ipc_client.hpp>
-#include <caudio/client/output_formatter.hpp>
-#include <caudio/config.hpp>
-#include <caudio/service.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
-#include <caudio/ipc/result.hpp>
 
 namespace caudio::app {
 

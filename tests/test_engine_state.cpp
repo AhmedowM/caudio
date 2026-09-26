@@ -1,13 +1,11 @@
 #include <sqlite3.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <filesystem>
-
-#include <common.hpp>
-
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
+#include <common.hpp>
+#include <filesystem>
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
@@ -35,7 +33,8 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
         REQUIRE(eng->setRepeat(RepeatMode::All).has_value());
         REQUIRE(eng->setVolume(0.42f).has_value());

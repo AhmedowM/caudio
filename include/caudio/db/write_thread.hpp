@@ -1,6 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <condition_variable>
 #include <expected>
@@ -10,10 +13,6 @@
 #include <string>
 #include <thread>
 #include <utility>
-
-#include <caudio/db/detail.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file write_thread.hpp

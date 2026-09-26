@@ -1,11 +1,10 @@
 #pragma once
+#include <caudio/utils.hpp>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <caudio/utils.hpp>
 
 /**
  * @file engine_types.hpp

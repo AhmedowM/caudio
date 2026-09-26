@@ -1,11 +1,10 @@
 ﻿#pragma once
+#include <caudio/utils/result.hpp>
 #include <expected>
 #include <format>
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include <caudio/utils/result.hpp>
 
 /**
  * @file error.hpp

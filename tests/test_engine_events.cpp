@@ -1,12 +1,10 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <filesystem>
-
-#include <common.hpp>
-
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
+#include <common.hpp>
+#include <filesystem>
 using namespace caudio::utils;
 using namespace caudio::engine;
 using namespace caudio::db;

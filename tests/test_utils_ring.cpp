@@ -1,10 +1,10 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <span>
 #include <thread>
 #include <vector>
-#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool ring_write_read_wrap() {

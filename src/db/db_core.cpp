@@ -1,6 +1,6 @@
-#include <caudio/db/db_core.hpp>
-
 #include <sqlite3.h>
+
+#include <caudio/db/db_core.hpp>
 
 namespace caudio::db {
 

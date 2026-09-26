@@ -6,8 +6,8 @@
  */
 #pragma once
 
-#include <caudio/ipc.hpp>
 #include <caudio/client/client_impl.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>
+#include <caudio/ipc.hpp>
 #include <caudio/service/service.hpp>

@@ -1,15 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
+#include <common.hpp>
 #include <filesystem>
 #include <thread>
 #include <vector>
-
-#include <common.hpp>
-
-#include <caudio/player.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
 using namespace caudio::player;
 using namespace caudio::utils;
 using namespace caudio::db;
@@ -91,7 +89,8 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->play(1).has_value());
         REQUIRE(eng->state() == PlaybackState::Playing);
         double pos0 = eng->position();

@@ -1,5 +1,13 @@
 ﻿#pragma once
 
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/db/queue.hpp>
+#include <caudio/db/schema.hpp>
+#include <caudio/db/statement.hpp>
+#include <caudio/db/transaction.hpp>
+#include <caudio/db/write_thread.hpp>
+#include <caudio/utils.hpp>
 #include <cstring>
 #include <expected>
 #include <functional>
@@ -13,15 +21,6 @@
 #include <tuple>
 #include <unordered_map>
 #include <vector>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/queue.hpp>
-#include <caudio/db/schema.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/db/transaction.hpp>
-#include <caudio/db/write_thread.hpp>
-#include <caudio/utils.hpp>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

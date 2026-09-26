@@ -1,4 +1,5 @@
-// combined is library-only (utils/player/db/engine); CLI IPC (json/cli_shared/service/client) is separate, not part of libcaudio — see audit §B13
+// combined is library-only (utils/player/db/engine); CLI IPC (json/cli_shared/service/client) is
+// separate, not part of libcaudio — see audit §B13
 module;
 #include <string_view>
 

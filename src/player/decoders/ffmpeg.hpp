@@ -38,10 +38,11 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 
-#include "decoder_common.hpp"
 #include <caudio/player/decoder_interface.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>
+
+#include "decoder_common.hpp"
 
 namespace caudio::player {
 

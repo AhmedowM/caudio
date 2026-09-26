@@ -6,10 +6,9 @@
  * @ingroup caudio_service
  */
 
-#include <expected>
-
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils.hpp>
+#include <expected>
 
 namespace caudio::engine {
 class Engine;

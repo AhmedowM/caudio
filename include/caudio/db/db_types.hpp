@@ -1,11 +1,10 @@
 ﻿#pragma once
 #include <array>
+#include <caudio/utils.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
-
-#include <caudio/utils.hpp>
 
 /**
  * @file db_types.hpp

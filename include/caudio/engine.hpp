@@ -505,8 +505,8 @@ class Engine final {
      * @par Thread safety
      * Locks dbMutex_ exclusively; callers must not hold queueMutex_ to avoid deadlock.
      */
-    std::expected<void, caudio::utils::Error> withTransaction(
-        std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
+    std::expected<void, caudio::utils::Error>
+    withTransaction(std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
 
     /**
      * @brief Loads persisted engine state from engine_state row id=1.

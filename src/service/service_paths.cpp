@@ -6,6 +6,8 @@
 #endif
 #include "service_paths.hpp"
 
+#include <blake3.h>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -27,8 +29,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <blake3.h>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -130,10 +130,10 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <caudio/config.hpp>
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
+#include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/player/decoder_interface.hpp>
 #include <caudio/utils.hpp>
-#include <caudio/ipc.hpp>
 
 namespace caudio::service::detail {
 std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
@@ -148,7 +148,7 @@ std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
 }
 
 std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
-                                         const std::string& /*socketPath*/) {
+                                        const std::string& /*socketPath*/) {
     auto r = caudio::config::lockPathFor(dbPath);
     if (r)
         return *r;
@@ -314,7 +314,6 @@ std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
         return std::nullopt;
     return pid;
 }
-
 
 std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
                                         const std::filesystem::path& dbPath) {

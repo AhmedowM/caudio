@@ -17,6 +17,17 @@
 
 #include <algorithm>
 #include <atomic>
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/db/json.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/service/ipc_server.hpp>
+#include <caudio/service/shm_status.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -33,18 +44,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <caudio/db.hpp>
-#include <caudio/db/json.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
-#include <caudio/config.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/service/ipc_server.hpp>
-#include <caudio/service/shm_status.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
-#include <caudio/ipc/result.hpp>
 
 namespace caudio::service {
 
@@ -196,58 +195,91 @@ class Service final {
 
     // Command handlers (defined in dispatch_*.cpp).
     std::expected<caudio::ipc::Result, caudio::utils::Error> statusResult();
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigExport& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigGet& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigImport& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::ConfigExport& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::ConfigGet& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::ConfigImport& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigList&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigReset& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::ConfigSet& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::ConfigReset& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::ConfigSet& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::DeviceList&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::DeviceSet& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::DeviceTest& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::HistoryClear&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::HistoryList& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::DeviceSet& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::DeviceTest& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::HistoryClear&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::HistoryList& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Info&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryAdd& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryList& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryRemove& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryScan& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibrarySearch& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryStats&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::LibraryStatsDetailed&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryAdd& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryList& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryRemove& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryScan& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibrarySearch& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryStats&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::LibraryStatsDetailed&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Next&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Pause&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Play&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistDelete& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistExport& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistImport& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistList&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistLoad& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistRename& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistSave& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::PlaylistTracks& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistDelete& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistExport& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistImport& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistList&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistLoad& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistRename& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistSave& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistTracks& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Prev&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Preview&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueAdd& qa);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueAdd& qa);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueClear&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueList&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueMove& qm);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueQueues&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueRemove& qr);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueRepeat& qr);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueShuffle& qs);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueSwitch& qs);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueMove& qm);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueQueues&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueRemove& qr);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueRepeat& qr);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueShuffle& qs);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::QueueSwitch& qs);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Restart&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Resume&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Seek& s);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Shutdown&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::StatusReq&);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::Stop&);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::TagEdit& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::TagEdit& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::TagGet& cmd);
-    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::VolumeSet& v);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::VolumeSet& v);
 
-ServiceConfig config_;
+    ServiceConfig config_;
     std::shared_ptr<caudio::db::Database> db_;
     std::unique_ptr<caudio::engine::Engine> engine_;
     std::unique_ptr<IpcServer> server_;

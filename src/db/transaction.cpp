@@ -1,8 +1,7 @@
-﻿#include <caudio/db/transaction.hpp>
-
-#include <sqlite3.h>
+﻿#include <sqlite3.h>
 
 #include <caudio/db/detail.hpp>
+#include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>
 #include <string>
 

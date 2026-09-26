@@ -14,11 +14,10 @@
 
 #pragma once
 
-#include <memory>
-
 #include <caudio/player/decoder_interface.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>
+#include <memory>
 
 namespace caudio::player {
 

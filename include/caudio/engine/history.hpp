@@ -1,5 +1,7 @@
 #pragma once
 
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>
@@ -7,9 +9,6 @@
 #include <shared_mutex>
 #include <string>
 #include <vector>
-
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file history.hpp

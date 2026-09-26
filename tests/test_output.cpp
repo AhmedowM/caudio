@@ -1,11 +1,10 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <cmath>
-#include <span>
-
-#include <common.hpp>
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+#include <cmath>
+#include <common.hpp>
+#include <span>
 TEST_CASE("output callback no alloc") {
     CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 2};

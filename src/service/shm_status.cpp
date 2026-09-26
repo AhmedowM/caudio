@@ -1,7 +1,8 @@
-﻿#include <caudio/service/shm_status.hpp>
-
-#include <atomic>
+﻿#include <atomic>
 #include <bit>
+#include <caudio/engine.hpp>
+#include <caudio/service/shm_status.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -11,9 +12,6 @@
 #include <string>
 #include <string_view>
 #include <thread>
-
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
 
 #ifndef _WIN32
 #include <fcntl.h>

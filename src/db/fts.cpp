@@ -1,6 +1,5 @@
-﻿#include <caudio/db/fts.hpp>
-
-#include <algorithm>
+﻿#include <algorithm>
+#include <caudio/db/fts.hpp>
 #include <cctype>
 #include <string>
 

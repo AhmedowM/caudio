@@ -1,5 +1,4 @@
 ﻿#include <caudio/engine/shuffle.hpp>
-
 #include <random>
 
 namespace caudio::engine::detail {

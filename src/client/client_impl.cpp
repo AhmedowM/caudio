@@ -1,13 +1,12 @@
-﻿#include <caudio/client/client_impl.hpp>
-
-#include <caudio/utils.hpp>
-#include <algorithm>
-#include <chrono>
+﻿#include <algorithm>
+#include <caudio/client/client_impl.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/shm_status.hpp>
-#include <caudio/ipc/protocol.hpp>
+#include <caudio/utils.hpp>
+#include <chrono>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -86,18 +85,18 @@ caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Com
         return fut.get();
     } else {
         worker->request_stop();
-        // Avoid blocking join beyond timeout: move worker to background storage with reaping and bounded size.
+        // Avoid blocking join beyond timeout: move worker to background storage with reaping and
+        // bounded size.
         static std::mutex bgMtx;
         static std::vector<std::unique_ptr<std::jthread>> bg;
         {
             std::lock_guard lk(bgMtx);
             // Reap completed workers: jthread that has finished is still joinable until joined,
-            // but if it has been joined/detached elsewhere it becomes !joinable(). Also check stop_token
-            // as best-effort to prune. This prevents unbounded growth.
-            bg.erase(std::remove_if(bg.begin(), bg.end(),
-                                     [](const std::unique_ptr<std::jthread>& t) {
-                                         return !t->joinable();
-                                     }),
+            // but if it has been joined/detached elsewhere it becomes !joinable(). Also check
+            // stop_token as best-effort to prune. This prevents unbounded growth.
+            bg.erase(std::remove_if(
+                         bg.begin(), bg.end(),
+                         [](const std::unique_ptr<std::jthread>& t) { return !t->joinable(); }),
                      bg.end());
             // Enforce bounded size (audit B6: limit to 8 background workers)
             if (bg.size() >= 8) {

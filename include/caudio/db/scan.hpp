@@ -2,6 +2,11 @@
 
 #include <algorithm>
 #include <array>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/detail.hpp>
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -18,12 +23,6 @@
 #include <string>
 #include <system_error>
 #include <vector>
-
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

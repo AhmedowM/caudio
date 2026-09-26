@@ -2,12 +2,12 @@
 
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 #include <expected>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <caudio/utils.hpp>
-#include <caudio/db.hpp>
 using namespace caudio::utils;
 
 TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer_thread]") {

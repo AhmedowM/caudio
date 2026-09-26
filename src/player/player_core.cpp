@@ -1,5 +1,5 @@
-#include <caudio/player/player_core.hpp>
 #include <caudio/player/decoder_interface.hpp>
+#include <caudio/player/player_core.hpp>
 
 namespace caudio::player {
 

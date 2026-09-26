@@ -15,15 +15,14 @@
 
 #pragma once
 
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <span>
-
-#include <caudio/player/reader.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::player {
 

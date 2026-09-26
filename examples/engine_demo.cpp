@@ -1,3 +1,7 @@
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/player.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cstdlib>
 #include <expected>
@@ -7,11 +11,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <caudio/utils.hpp>
-#include <caudio/player.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
 using namespace caudio::engine;
 using namespace caudio::db;
 

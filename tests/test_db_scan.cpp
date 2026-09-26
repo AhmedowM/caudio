@@ -1,14 +1,12 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
+#include <common.hpp>
 #include <filesystem>
 #include <fstream>
 #include <thread>
 #include <vector>
-
-#include <common.hpp>
-
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
 using namespace caudio::db;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;

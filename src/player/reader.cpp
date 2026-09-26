@@ -1,5 +1,4 @@
 ﻿#include <caudio/player/reader.hpp>
-
 #include <cstdio>
 #include <cstring>
 #include <string>

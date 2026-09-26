@@ -1,10 +1,9 @@
 ﻿module;
-#include <string_view>
-
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/statement.hpp>
 #include <caudio/db/transaction.hpp>
 #include <caudio/db/write_thread.hpp>
+#include <string_view>
 
 /**
  * @file database.cppm

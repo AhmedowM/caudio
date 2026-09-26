@@ -1,10 +1,9 @@
 ﻿#include <caudio/client/output_formatter.hpp>
-
 #include <caudio/db/db_types.hpp>
 #include <caudio/engine.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
-#include <caudio/ipc/protocol.hpp>
 #include <ctime>
 #include <format>
 #include <iostream>

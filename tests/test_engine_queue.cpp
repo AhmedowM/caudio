@@ -1,15 +1,13 @@
 #include <sqlite3.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <filesystem>
-#include <set>
-#include <vector>
-
-#include <common.hpp>
-
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
+#include <common.hpp>
+#include <filesystem>
+#include <set>
+#include <vector>
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
@@ -238,7 +236,8 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
         REQUIRE(eng->play(1).has_value());
         // cursor should have advanced to 1, queueId 1 persisted
@@ -408,7 +407,8 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
-        REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->play(1).has_value());
         REQUIRE(eng->next().has_value());
         // queue count should still be 4 (cursor, not dequeue)

@@ -1,8 +1,7 @@
 ﻿#pragma once
+#include <caudio/utils.hpp>
 #include <string>
 #include <string_view>
-
-#include <caudio/utils.hpp>
 
 /**
  * @file schema.hpp

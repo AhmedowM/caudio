@@ -1,12 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/db.hpp>
+#include <caudio/utils.hpp>
+#include <common.hpp>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
-
-#include <common.hpp>
-
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
 using namespace caudio::db;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;

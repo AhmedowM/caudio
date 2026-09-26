@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <caudio/utils.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -42,8 +43,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <caudio/utils.hpp>
 
 /// Opaque miniaudio device handle; full type visible only in output.cpp.
 struct ma_device;

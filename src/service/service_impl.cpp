@@ -1,7 +1,17 @@
-#include <caudio/service/service_impl.hpp>
-
 #include <algorithm>
 #include <atomic>
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/player.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/service/ipc_server.hpp>
+#include <caudio/service/service_impl.hpp>
+#include <caudio/service/shm_status.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -10,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <print>
 #include <span>
@@ -20,21 +31,9 @@
 #include <variant>
 #include <vector>
 
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <nlohmann/json.hpp>
-#include <caudio/player.hpp>
 #include "../player/decoders/ffmpeg.hpp"
-#include <caudio/utils.hpp>
-#include <caudio/config.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/service/ipc_server.hpp>
 #include "service_paths.hpp"
 #include "service_status.hpp"
-#include <caudio/service/shm_status.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
-#include <caudio/ipc/result.hpp>
 
 namespace caudio::service {
 

@@ -1,8 +1,7 @@
-#include <caudio/db/json.hpp>
-
 #include <sqlite3.h>
 
 #include <caudio/db/detail.hpp>
+#include <caudio/db/json.hpp>
 #include <caudio/db/statement.hpp>
 #include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>

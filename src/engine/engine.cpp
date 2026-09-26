@@ -1,7 +1,7 @@
+#include <sqlite3.h>
+
 #include <caudio/engine.hpp>
 #include <caudio/player/decoder_interface.hpp>
-
-#include <sqlite3.h>
 
 namespace caudio::engine {
 

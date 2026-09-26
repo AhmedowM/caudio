@@ -1,6 +1,6 @@
-#include <caudio/player/output.hpp>
-
 #include <miniaudio.h>
+
+#include <caudio/player/output.hpp>
 
 namespace caudio::player {
 

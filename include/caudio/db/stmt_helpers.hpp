@@ -2,14 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <caudio/db/db_types.hpp>
+#include <caudio/utils.hpp>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file stmt_helpers.hpp

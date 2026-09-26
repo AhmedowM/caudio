@@ -1,10 +1,9 @@
 ﻿#pragma once
 #include <algorithm>
+#include <caudio/engine/engine_types.hpp>
 #include <cstdint>
 #include <random>
 #include <vector>
-
-#include <caudio/engine/engine_types.hpp>
 
 /**
  * @file shuffle.hpp

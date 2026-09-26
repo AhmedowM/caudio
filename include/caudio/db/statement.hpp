@@ -1,5 +1,6 @@
 #pragma once
 
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -8,8 +9,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-
-#include <caudio/utils.hpp>
 
 /**
  * @file statement.hpp

@@ -1,12 +1,11 @@
 #pragma once
 
+#include <caudio/db/detail.hpp>
+#include <caudio/utils.hpp>
 #include <expected>
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include <caudio/db/detail.hpp>
-#include <caudio/utils.hpp>
 
 /**
  * @file transaction.hpp

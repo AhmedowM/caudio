@@ -40,6 +40,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -52,11 +56,6 @@
 #include <string_view>
 #include <thread>
 #include <vector>
-
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/output.hpp>
-#include <caudio/player/reader.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::player {
 

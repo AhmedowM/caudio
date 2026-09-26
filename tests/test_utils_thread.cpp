@@ -1,9 +1,9 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <thread>
 #include <vector>
-#include <caudio/utils.hpp>
 namespace caudio::utils::test {
 
 bool thread_sleep_timing() {

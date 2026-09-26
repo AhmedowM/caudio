@@ -64,9 +64,15 @@
  */
 
 #include <array>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <span>
 #include <string>
@@ -74,14 +80,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <nlohmann/json.hpp>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/result.hpp>
 
 namespace caudio::ipc {
 

@@ -21,14 +21,13 @@
  * @see caudio::ipc::Result for response types
  */
 
+#include <caudio/engine.hpp>
 #include <concepts>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
-
-#include <caudio/engine.hpp>
 
 namespace caudio::ipc {
 

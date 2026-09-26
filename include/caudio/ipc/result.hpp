@@ -22,6 +22,9 @@
  * @see caudio::ipc::Command for request types
  */
 
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -31,10 +34,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::ipc {
 

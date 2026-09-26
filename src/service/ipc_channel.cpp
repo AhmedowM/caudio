@@ -1,6 +1,7 @@
-﻿#include <caudio/service/ipc_channel.hpp>
-
-#include <array>
+﻿#include <array>
+#include <caudio/config.hpp>
+#include <caudio/service/ipc_channel.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -11,9 +12,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-
-#include <caudio/utils.hpp>
-#include <caudio/config.hpp>
 
 namespace caudio::service {
 
