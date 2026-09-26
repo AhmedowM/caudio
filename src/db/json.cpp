@@ -1,4 +1,4 @@
-﻿#include <caudio/db/json.hpp>
+#include <caudio/db/json.hpp>
 
 #include <sqlite3.h>
 
@@ -31,7 +31,7 @@ ordered_json trackToJson(const Track& t) {
     j["dirty"] = t.dirty;
     j["library_id"] = t.library_id;
     j["deleted_at"] = t.deleted_at;
-    j["fingerprint"] = internal::toHex(t.fingerprint);
+    j["fingerprint"] = caudio::utils::toHex(t.fingerprint);
     j["path"] = t.path;
     j["title"] = t.title;
     j["artist"] = t.artist;
@@ -117,7 +117,7 @@ std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j) 
         std::string fpHex;
         getStr("fingerprint", fpHex);
         if (!fpHex.empty()) {
-            if (!internal::fromHex(fpHex, t.fingerprint)) {
+            if (!caudio::utils::fromHex(fpHex, t.fingerprint)) {
                 t.fingerprint = internal::fallbackFingerprint(t.path);
             }
         } else {

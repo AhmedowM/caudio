@@ -7,7 +7,7 @@
  * - result: StatusCode, toString, formatter
  * - error: Error, Expected, makeError
  * - log: LogLevel, Logger
- * - math: clampVolume
+ * - math: clampVolume, toHex, fromHex
  * - ring: SpscRing
  * - mpsc_queue: MpscQueue
  * - thread: sleepFor, sleepForMs, setThreadName
