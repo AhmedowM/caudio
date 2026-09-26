@@ -1,15 +1,14 @@
 /**
- * @file ffmpeg.hpp
- * @brief FFmpeg-based audio decoder implementation
+ * @file ffmpeg_impl.hpp
+ * @brief Private FFmpeg backend for caudio::player::Decoder.
  * @ingroup caudio_player
  *
- * This header provides the FfmpegDecoder class which implements IDecoder using
- * FFmpeg libraries (libavcodec, libavformat, libswresample). It supports all
- * common audio formats: OGG/Vorbis, FLAC, MP3, WAV, M4A/AAC, Opus, WMA.
+ * Defines Decoder::Impl holding all libav state (libavcodec, libavformat,
+ * libswresample). Included only by decoder implementation files, never by
+ * public headers, so FFmpeg types do not leak to consumers.
  *
- * Thread Safety: NOT thread-safe. The Player ensures decode() runs on a single
- * decode thread. seek() may be called from the control thread; internal state
- * synchronization uses atomic operations where appropriate.
+ * Supports all common audio formats: OGG/Vorbis, FLAC, MP3, WAV, M4A/AAC,
+ * Opus, WMA. NOT thread-safe; see Decoder docs for the threading contract.
  */
 
 #pragma once
@@ -38,48 +37,28 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 
-#include <caudio/player/decoder_interface.hpp>
+#include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>
 
-#include "decoder_common.hpp"
-
 namespace caudio::player {
 
-struct TrackMetadata {
-    std::string title;
-    std::string artist;
-    std::string album;
-    std::string album_artist;
-    std::string genre;
-    int year = 0;
-    int track_num = 0;
-    int disc_num = 0;
-    double duration = 0;
-    int sample_rate = 0;
-    int channels = 0;
-    int bitrate = 0;
-};
+struct Decoder::Impl {
+    Impl() = default;
+    ~Impl();
 
-caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path);
+    [[nodiscard]] uint32_t sampleRate() const noexcept;
+    [[nodiscard]] uint32_t channels() const noexcept;
+    [[nodiscard]] uint64_t totalFrames() const noexcept;
 
-class FfmpegDecoder final : public IDecoder {
-  public:
-    static bool probe(std::span<const std::byte> data) noexcept;
+    std::size_t decode(std::span<float> out);
 
-    static caudio::utils::Expected<std::unique_ptr<IDecoder>> create(Reader& reader);
+    caudio::utils::Expected<void> seek(double seconds);
 
-    [[nodiscard]] uint32_t sampleRate() const noexcept override;
-    [[nodiscard]] uint32_t channels() const noexcept override;
-    [[nodiscard]] uint64_t totalFrames() const noexcept override;
+    bool init();
 
-    std::size_t decode(std::span<float> out) override;
+    void cleanup();
 
-    caudio::utils::Expected<void> seek(double seconds) override;
-
-    ~FfmpegDecoder() override;
-
-  private:
     struct PacketDeleter {
         void operator()(AVPacket* p) const noexcept {
             if (p)
@@ -108,16 +87,10 @@ class FfmpegDecoder final : public IDecoder {
                      std::size_t frames) noexcept;
     int flushResampler(std::span<float> out, std::size_t totalDecoded, std::size_t frames) noexcept;
 
-    FfmpegDecoder() = default;
-
     static int readCallback(void* opaque, uint8_t* buf, int bufSize);
 
     // AVIO seek: AVSEEK_SIZE queries size, AVSEEK_FORCE stripped, seekable=1
     static int64_t seekCallback(void* opaque, int64_t offset, int whence);
-
-    bool init();
-
-    void cleanup();
 
     Reader* reader_{nullptr};
     AVFormatContext* fmt_{nullptr};

@@ -1,4 +1,4 @@
-#include "ffmpeg.hpp"
+#include "ffmpeg_impl.hpp"
 
 #include <cmath>
 #include <cstring>
@@ -75,39 +75,19 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     return meta;
 }
 
-bool FfmpegDecoder::probe(std::span<const std::byte> data) noexcept {
-    // When FFmpeg is available, be permissive - try to decode anything
-    // FFmpeg's avformat_open_input will fail gracefully if format not supported
-    // Only skip obviously empty data
-    return data.size() >= 4;
-}
-
-caudio::utils::Expected<std::unique_ptr<IDecoder>> FfmpegDecoder::create(Reader& reader) {
-    auto p = std::unique_ptr<FfmpegDecoder>(new FfmpegDecoder());
-    p->reader_ = &reader;
-
-    if (!p->init()) {
-        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
-                                                    std::string_view("FFmpeg init failed")});
-    }
-
-    return caudio::utils::Expected<std::unique_ptr<IDecoder>>{
-        std::unique_ptr<IDecoder>(std::move(p))};
-}
-
-uint32_t FfmpegDecoder::sampleRate() const noexcept {
+uint32_t Decoder::Impl::sampleRate() const noexcept {
     return sampleRate_;
 }
 
-uint32_t FfmpegDecoder::channels() const noexcept {
+uint32_t Decoder::Impl::channels() const noexcept {
     return channels_;
 }
 
-uint64_t FfmpegDecoder::totalFrames() const noexcept {
+uint64_t Decoder::Impl::totalFrames() const noexcept {
     return totalFrames_;
 }
 
-std::size_t FfmpegDecoder::decode(std::span<float> out) {
+std::size_t Decoder::Impl::decode(std::span<float> out) {
     if (out.empty() || !fmt_ || !dec_ || !swr_)
         return 0;
 
@@ -190,7 +170,7 @@ std::size_t FfmpegDecoder::decode(std::span<float> out) {
     return totalDecoded;
 }
 
-caudio::utils::Expected<void> FfmpegDecoder::seek(double seconds) {
+caudio::utils::Expected<void> Decoder::Impl::seek(double seconds) {
     if (seconds < 0.0 || !std::isfinite(seconds) || !fmt_ || !dec_ || audioStreamIdx_ < 0) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("bad seconds")});
@@ -226,11 +206,11 @@ caudio::utils::Expected<void> FfmpegDecoder::seek(double seconds) {
     return {};
 }
 
-FfmpegDecoder::~FfmpegDecoder() {
+Decoder::Impl::~Impl() {
     cleanup();
 }
 
-int FfmpegDecoder::convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
+int Decoder::Impl::convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
                                 std::size_t frames) noexcept {
     uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
     int outSamples = static_cast<int>(frames - totalDecoded);
@@ -238,15 +218,15 @@ int FfmpegDecoder::convertFrame(AVFrame* frame, std::span<float> out, std::size_
                        frame->nb_samples);
 }
 
-int FfmpegDecoder::flushResampler(std::span<float> out, std::size_t totalDecoded,
+int Decoder::Impl::flushResampler(std::span<float> out, std::size_t totalDecoded,
                                   std::size_t frames) noexcept {
     uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
     int outSamples = static_cast<int>(frames - totalDecoded);
     return swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
 }
 
-int FfmpegDecoder::readCallback(void* opaque, uint8_t* buf, int bufSize) {
-    auto* self = static_cast<FfmpegDecoder*>(opaque);
+int Decoder::Impl::readCallback(void* opaque, uint8_t* buf, int bufSize) {
+    auto* self = static_cast<Impl*>(opaque);
     if (!self->reader_)
         return AVERROR(EIO);
     std::span<std::byte> dst(reinterpret_cast<std::byte*>(buf), bufSize);
@@ -254,8 +234,8 @@ int FfmpegDecoder::readCallback(void* opaque, uint8_t* buf, int bufSize) {
     return n > 0 ? static_cast<int>(n) : AVERROR_EOF;
 }
 
-int64_t FfmpegDecoder::seekCallback(void* opaque, int64_t offset, int whence) {
-    auto* self = static_cast<FfmpegDecoder*>(opaque);
+int64_t Decoder::Impl::seekCallback(void* opaque, int64_t offset, int whence) {
+    auto* self = static_cast<Impl*>(opaque);
     if (!self->reader_)
         return AVERROR(EIO);
     // Handle AVSEEK_SIZE (0x10000) — query file size without seeking
@@ -290,7 +270,7 @@ int64_t FfmpegDecoder::seekCallback(void* opaque, int64_t offset, int whence) {
     return self->reader_->tell();
 }
 
-bool FfmpegDecoder::init() {
+bool Decoder::Impl::init() {
     fmt_ = avformat_alloc_context();
     if (!fmt_)
         return false;
@@ -417,7 +397,7 @@ bool FfmpegDecoder::init() {
     return true;
 }
 
-void FfmpegDecoder::cleanup() {
+void Decoder::Impl::cleanup() {
     if (swr_) {
         swr_free(&swr_);
         swr_ = nullptr;
@@ -438,6 +418,42 @@ void FfmpegDecoder::cleanup() {
         avio_context_free(&avio_);
         avio_ = nullptr;
     }
+}
+
+Decoder::Decoder() : impl_(std::make_unique<Impl>()) {}
+
+Decoder::~Decoder() = default;
+
+Decoder::Decoder(Decoder&&) noexcept = default;
+
+Decoder& Decoder::operator=(Decoder&&) noexcept = default;
+
+caudio::utils::Expected<void> Decoder::init(Reader& reader) {
+    impl_->reader_ = &reader;
+    if (!impl_->init())
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                                    std::string_view("FFmpeg init failed")});
+    return {};
+}
+
+uint32_t Decoder::sampleRate() const noexcept {
+    return impl_->sampleRate();
+}
+
+uint32_t Decoder::channels() const noexcept {
+    return impl_->channels();
+}
+
+uint64_t Decoder::totalFrames() const noexcept {
+    return impl_->totalFrames();
+}
+
+std::size_t Decoder::decode(std::span<float> out) {
+    return impl_->decode(out);
+}
+
+caudio::utils::Expected<void> Decoder::seek(double seconds) {
+    return impl_->seek(seconds);
 }
 
 } // namespace caudio::player

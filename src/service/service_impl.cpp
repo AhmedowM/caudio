@@ -31,7 +31,6 @@
 #include <variant>
 #include <vector>
 
-#include "../player/decoders/ffmpeg.hpp"
 #include "service_paths.hpp"
 #include "service_status.hpp"
 

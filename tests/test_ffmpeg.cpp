@@ -14,9 +14,9 @@ TEST_CASE("ffmpeg primary decodes m4a", "[ffmpeg]") {
     if (!r) {
         SKIP("no fixture sample.m4a");
     }
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
-    // Should be FfmpegDecoder when FFmpeg present
+    // Should be Decoder when FFmpeg present
     std::array<float, 1024> out{};
     REQUIRE((*dec)->decode(out) > 0);
 }
@@ -28,7 +28,7 @@ TEST_CASE("ffmpeg decodes real ogg file", "[ffmpeg]") {
     }
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     std::array<float, 1024> out{};
     REQUIRE((*dec)->decode(out) > 0);
@@ -46,7 +46,7 @@ TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {
     REQUIRE(r.has_value());
 
     // With fake data, FFmpeg probe returns true but create fails -> unsupported (FFmpeg always on)
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(!dec.has_value());
     REQUIRE(dec.error().code == StatusCode::Unsupported);
 }

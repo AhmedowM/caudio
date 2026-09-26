@@ -14,7 +14,7 @@ TEST_CASE("decode registry probe unsupported", "[decoder]") {
     std::vector<std::byte> sig(32, std::byte{'X'});
     auto r = MemoryReader::open(sig);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(!dec.has_value());
     REQUIRE(dec.error().code == StatusCode::Unsupported);
 }
@@ -25,7 +25,7 @@ TEST_CASE("decode registry probe restore offset with real ogg", "[decoder]") {
     REQUIRE(r.has_value());
     REQUIRE((**r).seek(10, SEEK_SET).has_value());
     REQUIRE((**r).tell() == 10);
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     // After successful FFmpeg open, file position is owned by AVIO (advanced past probe).
     // We only require that decoder works, not that tell is restored to 10 (old buggy expectation).
@@ -37,7 +37,7 @@ TEST_CASE("ffmpeg decoder ogg real", "[decoder]") {
     auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.ogg");
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->sampleRate() > 0);
     REQUIRE((*dec)->channels() > 0);
@@ -56,7 +56,7 @@ TEST_CASE("ffmpeg decoder wav real", "[decoder]") {
     auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.wav");
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->sampleRate() > 0);
     REQUIRE((*dec)->channels() > 0);
@@ -75,7 +75,7 @@ TEST_CASE("decoder seek clamp invalid", "[decoder]") {
     auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.ogg");
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE(!(*dec)->seek(-5.0).has_value());
     REQUIRE((*dec)->seek(-5.0).error().code == StatusCode::InvalidArg);
@@ -87,7 +87,7 @@ TEST_CASE("decoder FileReader probe 32B with real wav", "[decoder]") {
     auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.wav");
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->sampleRate() > 0);
     // File pos after open is at AVIO offset (headers consumed), not 0 — allow >=0

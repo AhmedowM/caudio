@@ -30,7 +30,7 @@ static std::string fixturePath(const std::string& name) {
 TEST_CASE("player create open decode wav", "[player_integration]") {
     auto r = FileReader::open(fixturePath("sample.wav"));
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->sampleRate() > 0);
     REQUIRE((*dec)->channels() > 0);
@@ -49,7 +49,7 @@ TEST_CASE("player seek and volume", "[player_integration]") {
     CAUDIO_SKIP_IF_NOAUDIO();
     auto r = FileReader::open(fixturePath("sample.wav"));
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     REQUIRE((*dec)->seek(0.0).has_value());
     REQUIRE((*dec)->seek(-1.0).error().code == StatusCode::InvalidArg);
@@ -137,7 +137,7 @@ TEST_CASE("player state transitions invalid", "[player_integration]") {
 TEST_CASE("player decode ogg via ffmpeg", "[player_integration]") {
     auto r = FileReader::open(fixturePath("sample.ogg"));
     REQUIRE(r.has_value());
-    auto dec = DecoderRegistry::open(**r);
+    auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
     std::array<float, 512> out{};
     REQUIRE((*dec)->decode(out) > 0);
@@ -206,7 +206,7 @@ TEST_CASE("race player open concurrent", "[player_integration][race]") {
         ths.emplace_back([&]() {
             auto r = FileReader::open(path);
             if (r.has_value()) {
-                auto dec = DecoderRegistry::open(**r);
+                auto dec = Decoder::open(**r);
                 if (dec.has_value()) {
                     std::array<float, 256> out{};
                     if ((*dec)->decode(out) > 0)

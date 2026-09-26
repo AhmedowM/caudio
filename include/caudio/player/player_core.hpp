@@ -7,7 +7,7 @@
  * It coordinates decoding, audio output, and playback state management.
  *
  * Architecture:
- * - Decode thread: Runs FfmpegDecoder::decode() to fill SPSC ring buffer
+ * - Decode thread: Runs Decoder::decode() to fill SPSC ring buffer
  * - Audio thread (miniaudio): Consumes from ring buffer via AudioOutput::dataCallback
  * - Control thread: Application calls play/pause/stop/seek/volume
  *
@@ -30,8 +30,8 @@
  * - No allocations in hot path (decode loop or audio callback)
  *
  * FFmpeg Integration:
- * - DecoderRegistry probes format and creates FfmpegDecoder
- * - FfmpegDecoder uses custom AVIO callbacks for Reader abstraction
+ * - Decoder::open probes format and creates the decoder
+ * - Decoder uses custom AVIO callbacks for Reader abstraction
  * - SwrContext resamples to float32 interleaved for AudioOutput
  * - Seeking uses stream time_base for accurate container positioning
  */
@@ -59,7 +59,6 @@
 
 namespace caudio::player {
 
-class IDecoder;
 
 /**
  * @enum State
@@ -148,7 +147,7 @@ class Player {
      * @param path Path to the audio file
      * @return void on success, Error on failure
      *
-     * Opens the file using FileReader, probes the format via DecoderRegistry,
+     * Opens the file using FileReader, probes the format via Decoder::open,
      * creates the decoder, ring buffer, and audio output. Performs preroll
      * to fill the ring buffer to cap/2 before returning.
      *
@@ -378,7 +377,7 @@ class Player {
     /// Input reader (FileReader, MemoryReader, etc.)
     std::unique_ptr<Reader> reader_;
     /// Format decoder (FFmpeg, etc.)
-    std::unique_ptr<IDecoder> decoder_;
+    std::unique_ptr<Decoder> decoder_;
     /// Lock-free SPSC ring buffer for decode/audio thread communication
     std::unique_ptr<caudio::utils::SpscRing<float>> ring_;
     /// Audio output device (miniaudio)

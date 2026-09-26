@@ -12,7 +12,7 @@ double durationFromDecoder(const std::filesystem::path& path) noexcept {
         if (!readerRes)
             return 0.0;
         auto& readerPtr = readerRes.value();
-        auto decRes = caudio::player::DecoderRegistry::open(*readerPtr);
+        auto decRes = caudio::player::Decoder::open(*readerPtr);
         if (!decRes)
             return 0.0;
         auto& decPtr = decRes.value();

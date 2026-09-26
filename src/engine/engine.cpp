@@ -1,7 +1,7 @@
 #include <sqlite3.h>
 
 #include <caudio/engine.hpp>
-#include <caudio/player/decoder_interface.hpp>
+#include <caudio/player/decoder.hpp>
 
 namespace caudio::engine {
 
@@ -999,7 +999,7 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
         auto rRes = caudio::player::FileReader::open(path);
         if (rRes) {
             reader_ = std::move(rRes.value());
-            auto dRes = caudio::player::DecoderRegistry::open(*reader_);
+            auto dRes = caudio::player::Decoder::open(*reader_);
             if (dRes) {
                 decoder_ = std::move(dRes.value());
                 opened = true;

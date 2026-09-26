@@ -670,7 +670,7 @@ class Engine final {
      * @param t Track to play (path used to open reader/decoder).
      * @return `std::expected<void, Error>` — always success (errors stored in lastErr_).
      * @details Resets prior decoder/reader/ring/output. Attempts to open FileReader +
-     * DecoderRegistry from track path. On success: sets duration_, creates SpscRing (8192*ch
+     * Decoder::open from track path. On success: sets duration_, creates SpscRing (8192*ch
      * frames), AudioOutput, calls preroll() to fill ring to half capacity, starts output. On
      * failure: falls back to metadata duration (no audio output), sets lastErr_. Updates state:
      * currentTrack_, hasCurrent_=true, markedPlayed_=false, gaplessArmed_=false,
@@ -818,7 +818,7 @@ class Engine final {
      * @see decodeMtx_
      * @see decodeCv_
      * @see caudio::utils::SpscRing
-     * @see caudio::player::IDecoder
+     * @see caudio::player::Decoder
      */
     void decodeLoop(std::stop_token st);
 
@@ -841,7 +841,7 @@ class Engine final {
 
     // player
     std::unique_ptr<caudio::player::Reader> reader_{};
-    std::unique_ptr<caudio::player::IDecoder> decoder_{};
+    std::unique_ptr<caudio::player::Decoder> decoder_{};
     std::unique_ptr<caudio::utils::SpscRing<float>> ring_{};
     std::unique_ptr<caudio::player::AudioOutput> output_{};
 

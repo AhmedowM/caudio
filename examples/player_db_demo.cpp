@@ -132,9 +132,9 @@ bool playTrackViaPlayer(const Track& track) {
         return false;
     }
     auto reader = std::move(readerResult.value());
-    auto decResult = DecoderRegistry::open(*reader);
+    auto decResult = Decoder::open(*reader);
     if (!decResult) {
-        std::cerr << "[demo] DecoderRegistry::open failed: " << decResult.error().message << "\n";
+        std::cerr << "[demo] Decoder::open failed: " << decResult.error().message << "\n";
         return false;
     }
     auto decoder = std::move(decResult.value());

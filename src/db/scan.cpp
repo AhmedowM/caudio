@@ -7,7 +7,7 @@
 #include <caudio/utils.hpp>
 #include <fstream>
 
-#include "../player/decoders/ffmpeg.hpp"
+#include <caudio/player/decoder.hpp>
 
 namespace caudio::db {
 

@@ -1,4 +1,3 @@
-#include <caudio/player/decoder_interface.hpp>
 #include <caudio/player/player_core.hpp>
 
 namespace caudio::player {
@@ -51,7 +50,7 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     }
 
     // Open decoder
-    auto decResult = DecoderRegistry::open(*reader);
+    auto decResult = Decoder::open(*reader);
     if (!decResult) {
         lastError_ = decResult.error().message;
         state_.store(State::Error, std::memory_order_release);
