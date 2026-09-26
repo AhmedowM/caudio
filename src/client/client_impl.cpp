@@ -2,6 +2,8 @@
 #include <caudio/client/client_impl.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
+
+#include "config_detail.hpp"
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/shm_status.hpp>

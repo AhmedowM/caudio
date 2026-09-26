@@ -1,5 +1,7 @@
 ﻿#include <caudio/config.hpp>
 
+#include "config_detail.hpp"
+
 #include <nlohmann/json.hpp>
 
 namespace caudio::config::detail {

@@ -3,6 +3,8 @@
 namespace caudio::utils::detail {
 
 #if defined(_WIN32) || defined(_WIN64)
+/// UTF-8 code page for MultiByteToWideChar (matches CP_UTF8 without windows.h).
+inline constexpr unsigned kUtf8CodePage = 65001;
 Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept {
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
@@ -13,11 +15,11 @@ Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) no
             reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(k32, "SetThreadDescription"));
 #pragma GCC diagnostic pop
         if (pSetDesc) {
-            int wlen = MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
+            int wlen = MultiByteToWideChar(kUtf8CodePage, 0, name.data(), static_cast<int>(name.size()),
                                            nullptr, 0);
             if (wlen > 0) {
                 std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(kCpUtf8, 0, name.data(), static_cast<int>(name.size()),
+                MultiByteToWideChar(kUtf8CodePage, 0, name.data(), static_cast<int>(name.size()),
                                     wbuf.data(), wlen);
                 HRESULT hr = pSetDesc(reinterpret_cast<HANDLE>(nativeHandle), wbuf.c_str());
                 (void)hr;

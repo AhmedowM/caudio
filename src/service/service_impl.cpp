@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <atomic>
 #include <caudio/config.hpp>
+
+#include "config_detail.hpp"
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>

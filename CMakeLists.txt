@@ -126,12 +126,12 @@ configure_file(
 add_library(caudio_sqlite STATIC vendor/sqlite3.c)
 set_target_properties(caudio_sqlite PROPERTIES OUTPUT_NAME caudio_sqlite)
 target_include_directories(caudio_sqlite PRIVATE vendor)
-target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
 target_compile_definitions(caudio_sqlite PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
-target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
 # suppress GCC warnings in vendored C
 if(NOT MSVC)
@@ -242,7 +242,10 @@ else()
   )
 endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+
+# Install vendor headers to caudio/vendor/ for downstream consumers
+install(FILES vendor/sqlite3.h vendor/blake3.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor)
 install(FILES cmake/FindFFmpeg.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 

@@ -29,7 +29,6 @@ using LPWSTR = wchar_t*;
 using UINT = unsigned int;
 using DWORD = unsigned long;
 using FARPROC = long long int (*)();
-inline constexpr UINT kCpUtf8 = 65001;
 #ifndef WINAPI
 #define WINAPI __stdcall
 #endif

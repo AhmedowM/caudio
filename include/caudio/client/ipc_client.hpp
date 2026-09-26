@@ -34,30 +34,7 @@
 #include <cerrno>
 #include <cstring>
 #else
-#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-using HANDLE = void*;
-using DWORD = unsigned long;
-using BOOL = int;
-using LPCWSTR = const wchar_t*;
-using LPVOID = void*;
-using LPDWORD = DWORD*;
-inline constexpr DWORD kGenericRead = 0x80000000UL;
-inline constexpr DWORD kGenericWrite = 0x40000000UL;
-inline constexpr DWORD kOpenExisting = 3UL;
-inline constexpr DWORD kPipeReadmodeByte = 0x00000000UL;
-inline const HANDLE kInvalidHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
-extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD,
-                                                   HANDLE);
-__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, LPVOID, DWORD, LPDWORD, LPVOID);
-__declspec(dllimport) BOOL __stdcall WriteFile(HANDLE, const void*, DWORD, LPDWORD, LPVOID);
-__declspec(dllimport) DWORD __stdcall GetLastError();
-__declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
-}
-#else
 #include <windows.h>
-#endif
 #endif
 
 #include <caudio/config.hpp>
@@ -154,7 +131,8 @@ class IpcClient {
     bool isWinPipe_{false};
 #ifdef _WIN32
     /** @brief Windows named pipe handle. */
-    HANDLE pipeHandle_{nullptr};
+    /// Opaque pipe handle (real HANDLE when windows.h is present, else void*).
+    void* pipeHandle_{nullptr};
 #else
     /** @brief Unix domain socket file descriptor. */
     int fd_{-1};

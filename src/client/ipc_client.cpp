@@ -1,4 +1,5 @@
 ﻿#include <caudio/client/ipc_client.hpp>
+
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/utils.hpp>
@@ -23,14 +24,14 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
     w.reserve(path.size());
     for (char c : path)
         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-    HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting, 0,
+    HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0,
                              nullptr);
-    if (h == kInvalidHandle) {
+    if (h == INVALID_HANDLE_VALUE) {
         DWORD err = ::GetLastError();
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "CreateFileW connect failed: " + std::to_string(err))};
     }
-    DWORD mode = kPipeReadmodeByte;
+    DWORD mode = PIPE_READMODE_BYTE;
     ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
     IpcClient c;
     c.pipeHandle_ = h;
@@ -133,7 +134,7 @@ caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::
 
 void IpcClient::close() noexcept {
 #ifdef _WIN32
-    if (pipeHandle_ && pipeHandle_ != kInvalidHandle) {
+    if (pipeHandle_ && pipeHandle_ != INVALID_HANDLE_VALUE) {
         ::CloseHandle(pipeHandle_);
         pipeHandle_ = nullptr;
     }
@@ -147,7 +148,7 @@ void IpcClient::close() noexcept {
 
 caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data) {
 #ifdef _WIN32
-    if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
+    if (!pipeHandle_ || pipeHandle_ == INVALID_HANDLE_VALUE) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
@@ -187,7 +188,7 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
 
 caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
 #ifdef _WIN32
-    if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
+    if (!pipeHandle_ || pipeHandle_ == INVALID_HANDLE_VALUE) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
