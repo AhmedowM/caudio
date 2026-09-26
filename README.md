@@ -14,12 +14,12 @@
 
 - **FFmpeg decode** — primary decoder (libavformat/avcodec/avutil/swresample), streaming demux, sample-accurate seek, metadata extraction
 - **Gapless playback** — pre-roll double-buffer in `Engine::decodeLoop`, frame-accurate `AudioOutput` callback
-- **Shuffle / Repeat** — Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|Queue` (`src/engine/shuffle.cppm:1`)
+- **Shuffle / Repeat** — Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|All` (`src/engine/shuffle.cpp`)
 - **Queue & Playlist** — SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
-- **FTS5 search** — `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cppm:10`)
-- **Fingerprint dedup** — BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cppm:8`), sampled/full scan modes
-- **SHM 10 fps** — lock-free `AtomicShmStatus` shared-memory block polled by TUI at 10 Hz (`cli/src/service/shm_status.cppm:20`)
-- **IPC JSON+framing** — `protocol::frame` 4-byte length prefix + `ordered_json` (`cli/src/shared/protocol.cppm:750`), Unix Domain Socket / Windows Named Pipe
+- **FTS5 search** — `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
+- **Fingerprint dedup** — BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cpp`), sampled/full scan modes
+- **SHM 10 fps** — lock-free `AtomicShmStatus` shared-memory block polled by TUI at 10 Hz (`src/service/shm_status.cpp`)
+- **IPC JSON+framing** — `protocol::frame` 4-byte length prefix + `ordered_json` (`src/ipc/protocol.cpp`), Unix Domain Socket / Windows Named Pipe
 - **Daemon lifecycle** — single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, `STATUS` via `--watch`
 - **C++23 modules** — `import caudio;` umbrella, `std::expected`, `std::print`, `std::generator` scan, `std::jthread`/`std::stop_token`
 
@@ -118,40 +118,36 @@ Global options:
 ### CMake consumer
 
 ```cmake
-find_package(caudio 0.25 CONFIG REQUIRED)
+find_package(caudio CONFIG REQUIRED)
 
 add_executable(myapp main.cpp)
 target_link_libraries(myapp PRIVATE caudio::engine)
-#also available : caudio::utils caudio::player caudio::db caudio::json
+# also available: caudio::utils caudio::player caudio::db caudio::ipc caudio::service caudio::client
 ```
 
 ### C++ example (headers are canonical)
 
 ```cpp
-#include <caudio.hpp>          // umbrella re-exports utils, player, db, engine
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
+#include <caudio.hpp> // umbrella: utils, player, db, engine
 
 #include <print>
 
-#include <caudio/version.hpp>
-
 int main() {
-    std::println("caudio {}", caudio::versionFull); // v0.25.5
-
-    auto db = caudio::db::Database::open(":memory:").value();
-    caudio::engine::EngineConfig cfg{.dbPath = ":memory:",
-                                     .onEvent = [](const caudio::engine::EngineEvent& ev) {
-                                         std::println("event {}", (int)ev.type);
-                                     }};
-    auto eng = caudio::engine::Engine::create(cfg, db).value();
-    eng->play();
-    auto st = eng->status();
-    std::println("state={} queue={}", (int)st.state, st.queueSize);
+    auto engRes = caudio::engine::Engine::open(":memory:");
+    if (!engRes) {
+        std::println(stderr, "open: {}", engRes.error().message);
+        return 1;
+    }
+    auto eng = std::move(engRes.value());
+    if (auto r = eng->play(); !r) {
+        std::println(stderr, "play: {}", r.error().message);
+        return 1;
+    }
+    std::println("state={}", (int)eng->state());
 }
 ```
 
-More examples in `examples/`:
+More examples in `examples/` (targets `caudio_mini`, `caudio_player_db_demo`, `caudio_engine_demo`):
 
 - `examples/mini_cpp.cpp` — minimal `caudio::player` playback
 - `examples/player_db_demo.cpp` — player + db scan/search
@@ -177,6 +173,8 @@ More examples in `examples/`:
 | `CAUDIO_BUILD_DOCS` | `OFF` | Build Doxygen docs (requires `doxygen`; optional `dot`) |
 | `CAUDIO_ENABLE_EXAMPLES` | `OFF` | Build `examples/` (`caudio_mini`, `player_db_demo`, `engine_demo`) |
 | `CAUDIO_ENABLE_MODULES` | `OFF` | Build/install C++23 module interfaces (`import caudio.*`); headers always build |
+| `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip audio device tests (no beep) for headless CI |
+| `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | Run clang-tidy checks during build |
 | `CMAKE_BUILD_TYPE` | — | `Debug` / `Release` / `RelWithDebInfo` |
 | `FFmpeg_ROOT` | — | Override FFmpeg location (passed to `find_package(FFmpeg)`) |
 
@@ -199,14 +197,14 @@ Toolchain requirements:
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j4
 cmake --install build --prefix /usr/local
-#man page : / usr / local / share / man / man1 / caudio.1
-#modules : / usr / local / include / caudio/*.cppm
+# man page: /usr/local/share/man/man1/caudio.1
+# modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/include/caudio/*.cppm
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
 CPack archives: `cpack --config build/CPackConfig.cmake` → `caudio-0.25.5-<system>.tar.gz` / `.zip`.
 
-C++ modules packaging caveat: downstream projects must have CMake ≥ 3.28 and a compiler with C++23 module support. The `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
+C++ modules packaging caveat: downstream projects must have CMake ≥ 3.28 and a compiler with C++23 module support. When built with `CAUDIO_ENABLE_MODULES=ON`, the `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
 
 ## Contributing
 

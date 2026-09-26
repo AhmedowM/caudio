@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/ipc/result.hpp â€” reusable IPC, not CLI-specific. Keep include/cli/shared/result.hpp as deprecated shim for one release: #include <caudio/ipc/result.hpp>.
 #pragma once
 /**
  * @file result.hpp

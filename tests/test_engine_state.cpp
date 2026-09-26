@@ -37,7 +37,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
         auto eng = std::move(eRes.value());
         REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->setShuffle(true).has_value());
-        REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
+        REQUIRE(eng->setRepeat(RepeatMode::All).has_value());
         REQUIRE(eng->setVolume(0.42f).has_value());
         REQUIRE(eng->play(1).has_value());
         // state should be persisted on shutdown
@@ -53,7 +53,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
                                -1, &st, nullptr) == SQLITE_OK);
     REQUIRE(sqlite3_step(st) == SQLITE_ROW);
     REQUIRE(sqlite3_column_int(st, 0) == 1);
-    REQUIRE(sqlite3_column_int(st, 1) == (int)RepeatMode::Queue);
+    REQUIRE(sqlite3_column_int(st, 1) == (int)RepeatMode::All);
     int64_t cursor = sqlite3_column_int64(st, 2);
     REQUIRE(cursor >= 1);
     double vol = sqlite3_column_double(st, 3);
@@ -80,7 +80,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
                 &st2, nullptr) == SQLITE_OK);
     REQUIRE(sqlite3_step(st2) == SQLITE_ROW);
     REQUIRE(sqlite3_column_int(st2, 0) == 1);
-    REQUIRE(sqlite3_column_int(st2, 1) == (int)RepeatMode::Queue);
+    REQUIRE(sqlite3_column_int(st2, 1) == (int)RepeatMode::All);
     REQUIRE(sqlite3_column_double(st2, 2) > 0.41);
     sqlite3_finalize(st2);
     sqlite3_close(h2);

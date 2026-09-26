@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/client/ipc_client.hpp Ã¢â‚¬â€ client SDK, not CLI-specific. Keep include/cli/client/ipc_client.hpp as deprecated shim for one release: #include <caudio/client/ipc_client.hpp>.
 /**
  * @file ipc_client.hpp
  * @brief IPC client for connecting to caudio service via Unix socket or Windows named pipe.

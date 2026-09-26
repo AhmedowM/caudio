@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/ipc/command.hpp â€” reusable IPC, not CLI-specific. Keep include/cli/shared/command.hpp as deprecated shim for one release: #include <caudio/ipc/command.hpp>.
 #pragma once
 /**
  * @file command.hpp

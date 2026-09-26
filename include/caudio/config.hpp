@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/config.hpp Ã¢â‚¬â€ canonical paths are global, not CLI-specific. Keep include/cli/config.hpp as deprecated shim for one release: #include <caudio/config.hpp>.
 #pragma once
 /**
  * @file config.hpp
@@ -99,7 +98,7 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path);
  */
 caudio::utils::Expected<void> saveConfig(const Config& cfg);
 
-// Canonical socket/pid/lock path helpers Ã¢â‚¬â€ single source, XDG/LOCALAPPDATA +
+// Canonical socket/pid/lock path helpers â€” single source, XDG/LOCALAPPDATA +
 // hash(dbPath.generic_string())
 namespace detail_paths {
 
@@ -120,7 +119,7 @@ std::string hex8ForDb(const std::filesystem::path& dbPath);
 std::filesystem::path baseDirForSocket();
 } // namespace detail_paths
 
-// Generic config raw access Ã¢â‚¬â€ used by service for arbitrary key/value pairs.
+// Generic config raw access â€” used by service for arbitrary key/value pairs.
 // Delegates to nlohmann::ordered_json (single definition here, avoids per-module duplication).
 struct RawConfigValue {
     std::string key{};

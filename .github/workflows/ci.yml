@@ -74,11 +74,6 @@ jobs:
 
       - name: Add MinGW to PATH (Windows)
         if: runner.os == 'Windows'
-        run: echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Add MinGW to PATH (Windows)
-        if: runner.os == 'Windows'
         run: |
           echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
           echo "CC=gcc" >> $GITHUB_ENV
@@ -135,9 +130,6 @@ jobs:
         env:
           CAUDIO_TEST_NOAUDIO: 1
         run: ctest --test-dir build --output-on-failure -j4
-
-      - name: Docs
-        run: cmake --build build --target doc || echo "Doxygen not found or doc target unavailable — skipping"
 
       - name: Package (TGZ)
         run: |
@@ -250,13 +242,13 @@ jobs:
           /tmp/caudio-install/bin/caudio --version || build/caudio --version || echo "caudio --version check failed"
           echo "=== version.hpp ==="
           test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
-          echo "=== module sources shipped ==="
-          ls -R /tmp/caudio-install/include/caudio/src | head -n 100
-          test -f /tmp/caudio-install/include/caudio/src/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
-          ls /tmp/caudio-install/include/caudio/src/*.cppm | head -n 20
+          echo "=== no module sources in header-mode install ==="
+          test ! -d /tmp/caudio-install/include/caudio/src && echo "no src/*.cppm (expected, modules OFF)" || (echo "unexpected src/*.cppm shipped" && exit 1)
           test -f /tmp/caudio-install/lib/cmake/caudio/caudioConfig.cmake && echo "caudioConfig.cmake found" || echo "caudioConfig.cmake missing"
+          test -f /tmp/caudio-install/lib/cmake/caudio/FindFFmpeg.cmake && echo "FindFFmpeg.cmake found" || (echo "FindFFmpeg.cmake missing" && exit 1)
+          test -f /tmp/caudio-install/include/caudio/version_config.hpp && echo "version_config.hpp found" || (echo "version_config.hpp missing" && exit 1)
 
-      - name: Smoke compile (find_package + import caudio)
+      - name: Smoke compile (find_package + headers)
         run: |
           mkdir -p /tmp/caudio-smoke
           cat > /tmp/caudio-smoke/CMakeLists.txt << 'EOF'
@@ -270,7 +262,7 @@ jobs:
           target_link_libraries(smoke PRIVATE caudio::utils)
           EOF
           cat > /tmp/caudio-smoke/main.cpp << 'EOF'
-          import caudio;
+          #include <caudio/utils.hpp>
           #include <print>
           int main() {
             std::println("caudio smoke ok: {}", caudio::shortVersion);
@@ -280,3 +272,73 @@ jobs:
           cmake -B /tmp/caudio-smoke/build -G Ninja -DCMAKE_PREFIX_PATH=/tmp/caudio-install -DCMAKE_CXX_STANDARD=23 /tmp/caudio-smoke
           cmake --build /tmp/caudio-smoke/build -v
           /tmp/caudio-smoke/build/smoke || ./tmp/caudio-smoke/build/smoke
+
+  modules-smoke:
+    name: modules-smoke (ubuntu-24.04 / gcc-16)
+    runs-on: ubuntu-24.04
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC 16
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          gcc-16 --version; g++-16 --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
+          cmake --version
+          ninja --version
+
+      - name: Configure (modules ON)
+        env:
+          CC: gcc-16
+          CXX: g++-16
+        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_MODULES=ON
+
+      - name: Build
+        run: cmake --build build -j4
+
+      - name: Install to /tmp/caudio-install-mod
+        run: cmake --install build --prefix /tmp/caudio-install-mod
+
+      - name: Verify module sources shipped
+        run: |
+          test -f /tmp/caudio-install-mod/include/caudio/src/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
+          ls /tmp/caudio-install-mod/include/caudio/src/*.cppm | head -n 20
+
+      - name: Smoke compile (find_package + import caudio.utils)
+        run: |
+          mkdir -p /tmp/caudio-mod-smoke
+          cat > /tmp/caudio-mod-smoke/CMakeLists.txt << 'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(caudio_mod_smoke CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+          list(APPEND CMAKE_PREFIX_PATH "/tmp/caudio-install-mod")
+          find_package(caudio CONFIG REQUIRED)
+          add_executable(smoke main.cpp)
+          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES /tmp/caudio-install-mod/include/caudio/src/utils/utils.cppm)
+          target_link_libraries(smoke PRIVATE caudio::utils)
+          EOF
+          cat > /tmp/caudio-mod-smoke/main.cpp << 'EOF'
+          import caudio.utils;
+          #include <print>
+          int main() {
+            std::println("caudio module smoke ok: {}", caudio::utils::shortVersion());
+            return 0;
+          }
+          EOF
+          cmake -B /tmp/caudio-mod-smoke/build -G Ninja -DCMAKE_PREFIX_PATH=/tmp/caudio-install-mod -DCMAKE_CXX_STANDARD=23 /tmp/caudio-mod-smoke
+          cmake --build /tmp/caudio-mod-smoke/build -v
+          /tmp/caudio-mod-smoke/build/smoke

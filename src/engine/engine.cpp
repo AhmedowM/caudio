@@ -291,7 +291,7 @@ Engine::ExpectedVoid Engine::setShuffle(bool on) {
 }
 
 Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
-    if (m != RepeatMode::Off && m != RepeatMode::Queue && m != RepeatMode::One)
+    if (m != RepeatMode::Off && m != RepeatMode::All && m != RepeatMode::One)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
     if (!tryLockQueue())

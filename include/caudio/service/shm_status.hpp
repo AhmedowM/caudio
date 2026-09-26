@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Â§2.2): promote to include/caudio/service/shm_status.hpp â€” daemon runtime, not CLI-specific. Keep include/cli/service/shm_status.hpp as deprecated shim for one release: #include <caudio/service/shm_status.hpp>.
 #pragma once
 
 #include <atomic>
@@ -19,7 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #else
-// Lightweight Windows forward decls â€” avoid including windows.h (HMODULE conflict)
+// Lightweight Windows forward decls — avoid including windows.h (HMODULE conflict)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 using HANDLE = void*;
 using DWORD = unsigned long;

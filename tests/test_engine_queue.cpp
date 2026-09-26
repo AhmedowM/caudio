@@ -121,7 +121,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     safeRemoveDb(dbPath);
 }
 
-TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
+TEST_CASE("engine queue repeat All loops", "[engine_queue]") {
     CAUDIO_SKIP_IF_NOAUDIO();
     std::string dbPath = tempDbPath("eng_q_queue").string();
     auto dbRes = Database::open(dbPath);
@@ -143,7 +143,7 @@ TEST_CASE("engine queue repeat Queue loops", "[engine_queue]") {
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
-    REQUIRE(eng->setRepeat(RepeatMode::Queue).has_value());
+    REQUIRE(eng->setRepeat(RepeatMode::All).has_value());
     REQUIRE(eng->play(1).has_value());
     // queue persists via cursor, count stays 2 after play (not dequeued)
     {

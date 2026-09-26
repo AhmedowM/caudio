@@ -1,4 +1,3 @@
-﻿// TODO(Audit Directive 2, Appendix C Ã‚Â§2.2): promote to include/caudio/client/output_formatter.hpp Ã¢â‚¬â€ client SDK, not CLI-specific. Keep include/cli/client/output_formatter.hpp as deprecated shim for one release: #include <caudio/client/output_formatter.hpp>.
 /**
  * @file output_formatter.hpp
  * @brief Output formatting for CLI results: table and JSON output.

@@ -38,8 +38,8 @@ std::string repeatModeToString(caudio::engine::RepeatMode m) {
     switch (m) {
     case RM::Off:
         return "Off";
-    case RM::Queue:
-        return "Queue";
+    case RM::All:
+        return "All";
     case RM::One:
         return "One";
     default:
@@ -52,8 +52,8 @@ repeatModeFromString(std::string_view sv) {
     using RM = caudio::engine::RepeatMode;
     if (sv == "Off")
         return RM::Off;
-    if (sv == "Queue")
-        return RM::Queue;
+    if (sv == "All")
+        return RM::All;
     if (sv == "One")
         return RM::One;
     return std::unexpected{

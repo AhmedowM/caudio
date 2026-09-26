@@ -914,7 +914,7 @@ int App::run(int argc, char** argv) {
             else if (qRepeatArg == "one")
                 m = caudio::engine::RepeatMode::One;
             else if (qRepeatArg == "all")
-                m = caudio::engine::RepeatMode::Queue;
+                m = caudio::engine::RepeatMode::All;
             else if (!qRepeatArg.empty()) {
                 std::println(std::cerr, "repeat: invalid mode {}", qRepeatArg);
                 return 1;

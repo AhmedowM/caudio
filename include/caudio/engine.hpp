@@ -251,7 +251,7 @@ class Engine final {
     bool shuffle() const noexcept;
 
     /** @brief Returns current repeat mode. @ingroup caudio_engine
-     * @return RepeatMode (Off/Queue/One). */
+     * @return RepeatMode (Off/All/One). */
     RepeatMode repeat() const noexcept;
 
     /**
@@ -316,7 +316,7 @@ class Engine final {
     /**
      * @brief Sets repeat mode and persists it.
      * @ingroup caudio_engine
-     * @param m RepeatMode (Off/Queue/One).
+     * @param m RepeatMode (Off/All/One).
      * @return Success or Error InvalidArg/Busy/Internal.
      * @retval StatusCode::InvalidArg if m is out of range.
      * @details Under queueMutex_: updates queue_.repeat/state_.repeatMode

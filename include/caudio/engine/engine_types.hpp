@@ -58,13 +58,13 @@ namespace caudio::engine {
  * @details Controls wrap behaviour in Engine::queueNextLocked and
  * Engine::queuePrevLocked when `cursor` reaches the end or start.
  * - `Off`: linear; shuffle wrappers reshuffle and non-shuffle wraps to 0.
- * - `Queue`: same wrap as Off; single-track repeat is only via `One`.
+ * - `All`: same wrap as Off; single-track repeat is only via `One`.
  * - `One`: repeats the current track (seek 0 / stay on last position)
  *   without advancing the cursor.
  * @see QueueState
  * @see Engine::setRepeat
  */
-enum class RepeatMode : int { Off = 0, Queue = 1, One = 2 };
+enum class RepeatMode : int { Off = 0, All = 1, One = 2 };
 
 /**
  * @brief Playback state machine.

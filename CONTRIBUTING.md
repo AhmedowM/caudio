@@ -67,13 +67,12 @@ Man page is at `docs/man/caudio.1` — preview with `man ./docs/man/caudio.1` or
 
 - **Formatter:** `clang-format` using `.clang-format` at repo root. Run before committing:
   ```sh
-  clang-format -i src/**/*.cppm cli/src/**/*.cppm cli/src/**/*.cpp
+  clang-format -i include/**/*.hpp src/**/*.cpp cli/src/**/*.cpp tests/*.cpp examples/*.cpp
   ```
 - **Linter:** `clang-tidy` using `.clang-tidy` (optional, not enforced in CI yet).
-- **Naming:** `PascalCase` for types, `camelCase` for functions/variables, `kConstant` for constants, `snake_case` for module partitions.
-- **Modules:** Use `export module caudio.xxx:partition;
-` with umbrella `import caudio;
-` where appropriate.Do not add new headers — prefer `.cppm`.- **Errors
+- **Naming:** `PascalCase` for types, `camelCase` for functions/variables, `snake_case` for files and locals. Match surrounding code; do not add `k`-prefix constants.
+- **Headers/modules:** public API lives in `include/caudio/` (`*.hpp`), sources in `src/` (`*.cpp`). C++23 modules (`*.cppm`, opt-in via `CAUDIO_ENABLE_MODULES=ON`) mirror the headers; do not add new module-only APIs.
+- **Errors
     : **Return `std::expected<T, utils::Error>`;
 do not throw across module boundaries. Use `StatusCode` enum.
 
@@ -111,7 +110,7 @@ refactor(cmake): SANITIZERS target-scoped, sqlite dedup
    ```sh
    git checkout -b feat/my-feature
    ```
-2. **Implement** with tests. No logic changes to `src/` without corresponding test updates. New IPC commands need both `cli/src/shared/command.cppm` and `cli/src/service/service_detail.cppm` updates plus `tests/test_ipc.cpp` coverage.
+2. **Implement** with tests. No logic changes to `src/` without corresponding test updates. New IPC commands need a `Command` variant in `include/caudio/ipc/command.hpp`, a `Service::handle()` overload in `src/service/dispatch_*.cpp`, plus `tests/test_ipc.cpp` coverage.
 3. **Configure and test** locally:
    ```sh
    cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
@@ -130,28 +129,22 @@ refactor(cmake): SANITIZERS target-scoped, sqlite dedup
 ## Project Structure
 
 ```
-caudio-cpp/
-├── src/                 # Library (C++23 modules)
-│   ├── utils/           # Error, Result, Ring, MpscQueue, Log, Thread
-│   ├── player/          # Decoder (FFmpeg), FileReader, AudioOutput
-│   ├── db/              # SQLite + FTS5, Library/Queue/Playlist/History, Scan, WriteThread
-│   ├── engine/          # Playback engine, QueueState, Shuffle, History, EngineTypes
-│   ├── json/            # ordered_json wrapper
-│   └── caudio.cppm      # Umbrella module
-├── cli/                 # CLI daemon + client
-│   └── src/
-│       ├── app/         # App dispatch (CLI11), parse helpers
-│       ├── shared/      # Command/Result/Protocol (JSON + framing)
-│       ├── service/     # Service daemon, IpcServer, ShmStatus
-│       └── client/      # IpcClient, OutputFormatter
-├── cmake/               # FindFFmpeg, CaudioHelpers, components/, version.hpp.in
-├── docs/
-│   ├── Doxyfile.in      # CMake-configured Doxygen template
-│   ├── man/caudio.1     # Man page (roff)
-│   └── polyglot-integration.md
-├── tests/               # Catch2 tests
-├── examples/            # mini_cpp, player_db_demo, engine_demo
-└── vendor/              # sqlite3.c, blake3.c (vendored)
+caudio/
+  include/caudio/        # Public API (headers are canonical)
+    caudio.hpp alongside umbrellas: utils.hpp, player.hpp, db.hpp,
+    engine.hpp, version.hpp, ipc.hpp, client.hpp, service.hpp, config.hpp
+    db/ engine/ player/ ipc/ client/ service/  # per-area headers
+    utils/               # error/result/log/ring/queue/thread/math
+  src/<area>/            # Private sources (*.cpp) + private headers
+    utils/ player/ db/ engine/ ipc/ service/ client/
+    service/dispatch_*.cpp  # Service::handle() per command group
+    service/service_paths.* service/service_status.* service/service_audio.*
+                         # (*.cppm mirrors sit beside sources; CAUDIO_ENABLE_MODULES=ON)
+  cli/src/app/           # Executable only: main, App dispatch, parse helpers
+  cmake/components/      # Per-component build files (utils/player/db/engine/cli/combined)
+  tests/                 # Catch2 tests (tests/common.hpp helpers)
+  examples/              # mini_cpp, player_db_demo, engine_demo
+  vendor/                # sqlite3.c, blake3.c, miniaudio.h (not installed)
 ```
 
 ## Reporting Issues
