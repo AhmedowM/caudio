@@ -1,6 +1,6 @@
 ﻿#include <caudio/config.hpp>
 
-namespace caudio::cli::detail {
+namespace caudio::config::detail {
 
 std::filesystem::path defaultDbPath() {
 #ifdef _WIN32
@@ -60,9 +60,9 @@ caudio::utils::Expected<std::string> readFileString(const std::filesystem::path&
     return content;
 }
 
-} // namespace caudio::cli::detail
+} // namespace caudio::config::detail
 
-namespace caudio::cli {
+namespace caudio::config {
 
 caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
     Config cfg{};
@@ -148,9 +148,9 @@ caudio::utils::Expected<void> saveConfig(const Config& cfg) {
     }
 }
 
-} // namespace caudio::cli
+} // namespace caudio::config
 
-namespace caudio::cli::detail_paths {
+namespace caudio::config::detail_paths {
 
 std::string hex8ForDb(const std::filesystem::path& dbPath) {
     std::string input = dbPath.generic_string();
@@ -190,9 +190,9 @@ std::filesystem::path baseDirForSocket() {
     return base;
 }
 
-} // namespace caudio::cli::detail_paths
+} // namespace caudio::config::detail_paths
 
-namespace caudio::cli {
+namespace caudio::config {
 
 caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath) {
     try {
@@ -432,4 +432,4 @@ caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p) 
     }
 }
 
-} // namespace caudio::cli
+} // namespace caudio::config

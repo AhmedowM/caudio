@@ -20,7 +20,7 @@
 
 #include <caudio/utils.hpp>
 
-namespace caudio::cli {
+namespace caudio::config {
 
 /**
  * @brief Canonical path helpers: single source for socket/pid/lock derived from dbPath.
@@ -170,4 +170,4 @@ caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p, st
  */
 caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
 
-} // namespace caudio::cli
+} // namespace caudio::config

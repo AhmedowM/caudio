@@ -40,31 +40,31 @@
 
 namespace caudio::service {
 
-using namespace caudio::cli;
-using caudio::cli::LibraryScan;
-using caudio::cli::LibrarySearch;
-using caudio::cli::LibraryStats;
-using caudio::cli::LibraryStatsDetailed;
-using caudio::cli::LibraryList;
-using caudio::cli::Info;
-using caudio::cli::HistoryList;
-using caudio::cli::HistoryClear;
-using caudio::cli::LibraryAdd;
-using caudio::cli::LibraryRemove;
-using caudio::cli::TagEdit;
-using caudio::cli::TagGet;
-using caudio::cli::PlaylistList;
-using caudio::cli::PlaylistTracks;
-using caudio::cli::PlaylistLoad;
-using caudio::cli::PlaylistSave;
-using caudio::cli::PlaylistDelete;
-using caudio::cli::PlaylistRename;
-using caudio::cli::PlaylistExport;
-using caudio::cli::PlaylistImport;
-using caudio::cli::Preview;
+using namespace caudio::ipc;
+using caudio::ipc::LibraryScan;
+using caudio::ipc::LibrarySearch;
+using caudio::ipc::LibraryStats;
+using caudio::ipc::LibraryStatsDetailed;
+using caudio::ipc::LibraryList;
+using caudio::ipc::Info;
+using caudio::ipc::HistoryList;
+using caudio::ipc::HistoryClear;
+using caudio::ipc::LibraryAdd;
+using caudio::ipc::LibraryRemove;
+using caudio::ipc::TagEdit;
+using caudio::ipc::TagGet;
+using caudio::ipc::PlaylistList;
+using caudio::ipc::PlaylistTracks;
+using caudio::ipc::PlaylistLoad;
+using caudio::ipc::PlaylistSave;
+using caudio::ipc::PlaylistDelete;
+using caudio::ipc::PlaylistRename;
+using caudio::ipc::PlaylistExport;
+using caudio::ipc::PlaylistImport;
+using caudio::ipc::Preview;
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryScan& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryScan& cmd) {
                 std::filesystem::path root;
                 if (cmd.path)
                     root = std::filesystem::path(*cmd.path);
@@ -84,7 +84,7 @@ Service::handle(const caudio::cli::LibraryScan& cmd) {
                             auto sr = caudio::db::scanLibrary(*db_, l.id);
                             if (!sr)
                                 return std::unexpected{sr.error()};
-                            caudio::cli::LibraryStatsData d2{};
+                            caudio::ipc::LibraryStatsData d2{};
                             if (auto st = db_->getStats()) {
                                 d2.tracks = static_cast<std::size_t>(st->num_tracks);
                                 d2.queues = static_cast<std::size_t>(st->num_queue_items);
@@ -102,7 +102,7 @@ Service::handle(const caudio::cli::LibraryScan& cmd) {
                     if (r)
                         ++n;
                 }
-                caudio::cli::LibraryStatsData d{};
+                caudio::ipc::LibraryStatsData d{};
                 d.tracks = n;
                 d.queues = 0;
                 d.playlists = 0;
@@ -113,8 +113,8 @@ Service::handle(const caudio::cli::LibraryScan& cmd) {
                 return Result{std::move(d)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibrarySearch& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibrarySearch& cmd) {
                 auto tracks = caudio::db::search(*db_, cmd.query, cmd.limit);
                 if (!tracks)
                     return std::unexpected{tracks.error()};
@@ -124,24 +124,24 @@ Service::handle(const caudio::cli::LibrarySearch& cmd) {
                 return Result{Tracks{std::move(out)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryStats&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryStats&) {
                 auto st = db_->getStats();
                 if (!st)
                     return std::unexpected{st.error()};
-                caudio::cli::LibraryStatsData d{};
+                caudio::ipc::LibraryStatsData d{};
                 d.tracks = static_cast<std::size_t>(st->num_tracks);
                 d.queues = static_cast<std::size_t>(st->num_queue_items);
                 d.playlists = static_cast<std::size_t>(st->num_playlists);
                 return Result{d};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryStatsDetailed&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryStatsDetailed&) {
                 auto st = db_->libraryStatsDetailed();
                 if (!st)
                     return std::unexpected{st.error()};
-                caudio::cli::LibraryStatsDetailedData d{};
+                caudio::ipc::LibraryStatsDetailedData d{};
                 d.tracks = static_cast<std::size_t>(st->tracks);
                 d.queues = static_cast<std::size_t>(st->queues);
                 d.playlists = static_cast<std::size_t>(st->playlists);
@@ -151,8 +151,8 @@ Service::handle(const caudio::cli::LibraryStatsDetailed&) {
                 return Result{std::move(d)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryList& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryList& cmd) {
                 caudio::db::TrackQuery q{};
                 q.limit = cmd.limit;
                 q.offset = cmd.offset;
@@ -170,8 +170,8 @@ Service::handle(const caudio::cli::LibraryList& cmd) {
                 return Result{Tracks{std::move(*tracks)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::Info&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::Info&) {
                 // Get current track from engine status
                 int64_t track_id = engine_->currentTrackId();
                 if (track_id == 0) {
@@ -181,23 +181,23 @@ Service::handle(const caudio::cli::Info&) {
                 auto tr = db_->getTrack(track_id);
                 if (!tr)
                     return std::unexpected{tr.error()};
-                caudio::cli::TrackInfo ti{};
+                caudio::ipc::TrackInfo ti{};
                 ti.track = std::move(*tr);
                 ti.play_count = ti.track.play_count;
                 ti.last_played = ti.track.last_played;
                 return Result{std::move(ti)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::HistoryList& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::HistoryList& cmd) {
                 int limit = cmd.limit.value_or(50);
                 auto hist = engine_->listHistory(limit);
                 if (!hist)
                     return std::unexpected{hist.error()};
-                std::vector<caudio::cli::HistoryEntry> cliEntries;
+                std::vector<caudio::ipc::HistoryEntry> cliEntries;
                 cliEntries.reserve(hist->size());
                 for (const auto& e : *hist) {
-                    caudio::cli::HistoryEntry cliEntry;
+                    caudio::ipc::HistoryEntry cliEntry;
                     cliEntry.id = e.id;
                     cliEntry.track_id = e.track_id;
                     cliEntry.started_at = e.started_at;
@@ -211,19 +211,19 @@ Service::handle(const caudio::cli::HistoryList& cmd) {
                     cliEntry.duration = e.duration;
                     cliEntries.push_back(std::move(cliEntry));
                 }
-                return Result{caudio::cli::History{std::move(cliEntries)}};
+                return Result{caudio::ipc::History{std::move(cliEntries)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::HistoryClear&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::HistoryClear&) {
                 auto r = engine_->clearHistory();
                 if (!r)
                     return std::unexpected{r.error()};
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryAdd& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryAdd& cmd) {
                 if (cmd.path.empty())
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "library add: missing path")};
@@ -330,8 +330,8 @@ Service::handle(const caudio::cli::LibraryAdd& cmd) {
                 }
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::LibraryRemove& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::LibraryRemove& cmd) {
                 if (cmd.query.empty())
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "library remove: missing id")};
@@ -380,8 +380,8 @@ Service::handle(const caudio::cli::LibraryRemove& cmd) {
                                                                 "track not found: " + cmd.query)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::TagEdit& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::TagEdit& cmd) {
                 if (cmd.id == 0)
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "tag edit: invalid id")};
@@ -453,8 +453,8 @@ Service::handle(const caudio::cli::TagEdit& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::TagGet& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::TagGet& cmd) {
                 if (cmd.id == 0)
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "tag get: invalid id")};
@@ -464,8 +464,8 @@ Service::handle(const caudio::cli::TagGet& cmd) {
                 return Result{SingleTrack{std::move(*tr)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistList&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistList&) {
                 auto pls = db_->listPlaylists();
                 if (!pls)
                     return std::unexpected{pls.error()};
@@ -474,8 +474,8 @@ Service::handle(const caudio::cli::PlaylistList&) {
                 return Result{Playlists{std::move(out)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistTracks& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistTracks& cmd) {
                 auto tracks = db_->playlistGetTracks(cmd.pid);
                 if (!tracks)
                     return std::unexpected{tracks.error()};
@@ -484,8 +484,8 @@ Service::handle(const caudio::cli::PlaylistTracks& cmd) {
                 return Result{QueueTracks{std::move(out)}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistLoad& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistLoad& cmd) {
                 auto tracks = db_->playlistGetTracks(cmd.pid);
                 if (!tracks)
                     return std::unexpected{tracks.error()};
@@ -510,8 +510,8 @@ Service::handle(const caudio::cli::PlaylistLoad& cmd) {
                 return Result{*st};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistSave& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistSave& cmd) {
                 if (cmd.name.empty())
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "empty playlist name")};
@@ -531,16 +531,16 @@ Service::handle(const caudio::cli::PlaylistSave& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistDelete& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistDelete& cmd) {
                 auto r = db_->deletePlaylist(cmd.pid);
                 if (!r)
                     return std::unexpected{r.error()};
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistRename& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistRename& cmd) {
                 if (cmd.newName.empty())
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "empty playlist name")};
@@ -550,8 +550,8 @@ Service::handle(const caudio::cli::PlaylistRename& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistExport& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistExport& cmd) {
                 auto tracks = db_->playlistGetTracks(cmd.pid);
                 if (!tracks)
                     return std::unexpected{tracks.error()};
@@ -562,8 +562,8 @@ Service::handle(const caudio::cli::PlaylistExport& cmd) {
                 return Result{PlaylistData{std::move(out), cmd.format}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::PlaylistImport& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistImport& cmd) {
                 std::filesystem::path path{cmd.path};
                 std::error_code ec;
                 if (!std::filesystem::exists(path, ec)) {
@@ -650,7 +650,7 @@ Service::handle(const caudio::cli::PlaylistImport& cmd) {
                 auto pidRes = db_->createPlaylistFromTracks(name, trackIds);
                 if (!pidRes)
                     return std::unexpected{pidRes.error()};
-                caudio::cli::PlaylistData pd{};
+                caudio::ipc::PlaylistData pd{};
                 auto tracksRes = db_->playlistGetTracks(*pidRes);
                 if (tracksRes) {
                     for (auto& t : std::span<const caudio::db::Track>(*tracksRes))
@@ -667,8 +667,8 @@ Service::handle(const caudio::cli::PlaylistImport& cmd) {
                 return Result{std::move(pd)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::Preview&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::Preview&) {
                 return Result{Empty{}};
             }
 

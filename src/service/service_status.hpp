@@ -29,7 +29,7 @@ namespace caudio::service::detail {
  * @param db Database reference.
  * @return Status on success, Error on failure.
  */
-std::expected<caudio::cli::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
+std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
                                                                      caudio::db::Database& db);
 
 } // namespace caudio::service::detail

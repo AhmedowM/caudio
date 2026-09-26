@@ -15,7 +15,7 @@
 #include <caudio/engine.hpp>
 #include <caudio/db.hpp>
 #include <caudio/utils.hpp>
-using namespace caudio::cli;
+using namespace caudio::ipc;
 using namespace caudio::utils;
 using namespace caudio::db;
 using namespace caudio::engine;

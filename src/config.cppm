@@ -1,19 +1,19 @@
 ﻿module;
 #include <caudio/config.hpp>
 
-export module caudio.cli:config;
+export module caudio.ipc:config;
 
-export namespace caudio::cli {
-using ::caudio::cli::Config;
-using ::caudio::cli::configDeleteRaw;
-using ::caudio::cli::configGetRaw;
-using ::caudio::cli::configListRaw;
-using ::caudio::cli::configResetAllRaw;
-using ::caudio::cli::configSetRaw;
-using ::caudio::cli::loadConfig;
-using ::caudio::cli::lockPathFor;
-using ::caudio::cli::pidPathFor;
-using ::caudio::cli::RawConfigValue;
-using ::caudio::cli::saveConfig;
-using ::caudio::cli::socketPathFor;
-} // namespace caudio::cli
+export namespace caudio::config {
+using ::caudio::config::Config;
+using ::caudio::config::configDeleteRaw;
+using ::caudio::config::configGetRaw;
+using ::caudio::config::configListRaw;
+using ::caudio::config::configResetAllRaw;
+using ::caudio::config::configSetRaw;
+using ::caudio::config::loadConfig;
+using ::caudio::config::lockPathFor;
+using ::caudio::config::pidPathFor;
+using ::caudio::config::RawConfigValue;
+using ::caudio::config::saveConfig;
+using ::caudio::config::socketPathFor;
+} // namespace caudio::config

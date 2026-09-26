@@ -23,7 +23,7 @@ Client::Client(std::filesystem::path dbPath) : config_{std::move(dbPath), {}} {}
 Client::Client(std::filesystem::path dbPath, std::string_view socketPath)
     : config_{std::move(dbPath), std::string(socketPath.data(), socketPath.size())} {}
 
-Client::Client(const caudio::cli::Config& cfg) : config_{cfg.dbPath, cfg.socketPath} {}
+Client::Client(const caudio::config::Config& cfg) : config_{cfg.dbPath, cfg.socketPath} {}
 
 const Config& Client::config() const noexcept {
     return config_;
@@ -33,13 +33,13 @@ std::filesystem::path Client::dbPath() const noexcept {
     return config_.dbPath;
 }
 
-caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Command& cmd,
+caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Command& cmd,
                                                           std::chrono::milliseconds timeout) {
     // Use promise/future + jthread + stop_token for timeout handling.
     // This avoids C alarm and uses chrono::milliseconds + poll/select style wait.
-    auto prom = std::make_shared<std::promise<caudio::utils::Expected<caudio::cli::Result>>>();
+    auto prom = std::make_shared<std::promise<caudio::utils::Expected<caudio::ipc::Result>>>();
     auto fut = prom->get_future();
-    caudio::cli::Command cmdCopy = cmd;
+    caudio::ipc::Command cmdCopy = cmd;
     Config cfgCopy = config_;
 
     // RAII worker via make_unique per spec
@@ -113,15 +113,15 @@ caudio::utils::Expected<caudio::cli::Result> Client::send(const caudio::cli::Com
 }
 
 // Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
-caudio::utils::Expected<caudio::cli::Result> Client::snapshotStatus() {
+caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
     // Try to connect to shared memory status block
     // Derive shm name via canonical hex8 (consistent with service)
-    std::string shmName = caudio::cli::detail_paths::hex8ForDb(config_.dbPath);
+    std::string shmName = caudio::config::detail_paths::hex8ForDb(config_.dbPath);
 
     auto shmRes = caudio::service::ShmStatusHandle::openReadOnly(shmName);
     if (shmRes) {
         auto snapshot = shmRes->snapshot();
-        caudio::cli::Status s{};
+        caudio::ipc::Status s{};
         s.state = static_cast<caudio::engine::PlaybackState>(snapshot.state);
         s.pos = snapshot.position;
         s.dur = snapshot.duration;
@@ -132,11 +132,11 @@ caudio::utils::Expected<caudio::cli::Result> Client::snapshotStatus() {
         s.title = snapshot.title;
         s.artist = snapshot.artist;
         // shuffle/repeat not in shm, would need to query via IPC if needed
-        return caudio::cli::Result{s};
+        return caudio::ipc::Result{s};
     }
 
     // Fallback to IPC
-    return send(caudio::cli::Command{caudio::cli::StatusReq{}});
+    return send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
 }
 
 } // namespace caudio::client

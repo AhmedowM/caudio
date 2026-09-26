@@ -1,36 +1,36 @@
 ﻿module;
 #include <caudio/ipc/protocol.hpp>
 
-export module caudio.cli:protocol;
+export module caudio.ipc:protocol;
 
-export namespace caudio::cli {
-using ::caudio::cli::commandFromJson;
-using ::caudio::cli::deframe;
-using ::caudio::cli::deserializeReply;
-using ::caudio::cli::deserializeRequest;
-using ::caudio::cli::frame;
-using ::caudio::cli::fromJson;
-using ::caudio::cli::IpcReply;
-using ::caudio::cli::IpcRequest;
-using ::caudio::cli::ordered_json;
-using ::caudio::cli::resultFromJson;
-using ::caudio::cli::serializeReply;
-using ::caudio::cli::serializeRequest;
-using ::caudio::cli::toJson;
-using ::caudio::cli::toJsonString;
-} // namespace caudio::cli
+export namespace caudio::ipc {
+using ::caudio::ipc::commandFromJson;
+using ::caudio::ipc::deframe;
+using ::caudio::ipc::deserializeReply;
+using ::caudio::ipc::deserializeRequest;
+using ::caudio::ipc::frame;
+using ::caudio::ipc::fromJson;
+using ::caudio::ipc::IpcReply;
+using ::caudio::ipc::IpcRequest;
+using ::caudio::ipc::ordered_json;
+using ::caudio::ipc::resultFromJson;
+using ::caudio::ipc::serializeReply;
+using ::caudio::ipc::serializeRequest;
+using ::caudio::ipc::toJson;
+using ::caudio::ipc::toJsonString;
+} // namespace caudio::ipc
 
-export namespace caudio::cli::detail {
-using ::caudio::cli::detail::errorFromJson;
-using ::caudio::cli::detail::errorToJson;
-using ::caudio::cli::detail::playbackStateFromString;
-using ::caudio::cli::detail::playbackStateToString;
-using ::caudio::cli::detail::playlistFromJson;
-using ::caudio::cli::detail::playlistToJson;
-using ::caudio::cli::detail::repeatModeFromString;
-using ::caudio::cli::detail::repeatModeToString;
-using ::caudio::cli::detail::resultCodeFromString;
-using ::caudio::cli::detail::resultCodeToString;
-using ::caudio::cli::detail::trackFromJson;
-using ::caudio::cli::detail::trackToJson;
-} // namespace caudio::cli::detail
+export namespace caudio::ipc::detail {
+using ::caudio::ipc::detail::errorFromJson;
+using ::caudio::ipc::detail::errorToJson;
+using ::caudio::ipc::detail::playbackStateFromString;
+using ::caudio::ipc::detail::playbackStateToString;
+using ::caudio::ipc::detail::playlistFromJson;
+using ::caudio::ipc::detail::playlistToJson;
+using ::caudio::ipc::detail::repeatModeFromString;
+using ::caudio::ipc::detail::repeatModeToString;
+using ::caudio::ipc::detail::resultCodeFromString;
+using ::caudio::ipc::detail::resultCodeToString;
+using ::caudio::ipc::detail::trackFromJson;
+using ::caudio::ipc::detail::trackToJson;
+} // namespace caudio::ipc::detail

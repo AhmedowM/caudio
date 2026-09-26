@@ -2,7 +2,7 @@
 /**
  * @file result.hpp
  * @brief CLI result types and variants for the caudio IPC protocol.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * Defines all result structs that can be returned from the caudio service
  * daemon to a client. Results are serialized as JSON over the IPC
@@ -18,8 +18,8 @@
  *   - `ok`: boolean indicating success
  *   - `result`: Result object (if ok=true) or `error`: Error object (if ok=false)
  *
- * @see caudio::cli::protocol for serialization/deserialization functions
- * @see caudio::cli::Command for request types
+ * @see caudio::ipc::protocol for serialization/deserialization functions
+ * @see caudio::ipc::Command for request types
  */
 
 #include <cstddef>
@@ -36,7 +36,7 @@
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
 
-namespace caudio::cli {
+namespace caudio::ipc {
 
 // ---------------------------------------------------------------------------
 // Playback Status Result
@@ -45,7 +45,7 @@ namespace caudio::cli {
 /**
  * @struct Status
  * @brief Current playback status returned by StatusReq and most mutating commands.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Status", "state": "Playing", "pos": 120.5, "dur": 240.0, "vol": 0.8,
  * "muted": false, "shuffle": true, "repeat": "Off", "track_id": 123, "title": "Song", "artist":
@@ -133,7 +133,7 @@ struct Status final {
 /**
  * @struct QueueTracks
  * @brief List of tracks in a queue (returned by QueueList, QueueAdd, QueueRemove, etc.).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueTracks", "tracks": [{"id": 1, "title": "Song", ...}]}
  *
@@ -153,7 +153,7 @@ struct QueueTracks final {
 /**
  * @struct VolumeInfo
  * @brief Current volume level and mute state (returned by VolumeSet).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "VolumeInfo", "vol": 0.8, "muted": false}
  *
@@ -177,12 +177,12 @@ struct VolumeInfo final {
 
 // Note: Command already defines empty LibraryStats request. Result's stats
 // is named LibraryStatsData to avoid ODR collision when both partitions are
-// imported via caudio.cli:shared. Alias provided for ergonomic use.
+// imported via caudio.ipc:shared. Alias provided for ergonomic use.
 
 /**
  * @struct LibraryStatsData
  * @brief Basic library statistics (returned by LibraryStats and QueueQueues).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20}
  *
@@ -208,7 +208,7 @@ struct LibraryStatsData final {
 /**
  * @struct LibraryStatsDetailedData
  * @brief Detailed library statistics including play history (returned by LibraryStatsDetailed).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryStatsDetailed", "tracks": 1000, "queues": 5, "playlists": 20,
  * "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
@@ -254,7 +254,7 @@ struct LibraryStatsDetailedData final {
 /**
  * @struct Tracks
  * @brief List of tracks (returned by LibrarySearch, LibraryList).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Tracks", "tracks": [{"id": 1, "title": "Song", ...}]}
  *
@@ -270,7 +270,7 @@ struct Tracks final {
 /**
  * @struct Playlists
  * @brief List of playlists (returned by PlaylistList).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Playlists", "playlists": [{"id": 1, "name": "My Playlist", ...}]}
  *
@@ -286,7 +286,7 @@ struct Playlists final {
 /**
  * @struct PlaylistData
  * @brief Playlist contents with format info (returned by PlaylistExport, PlaylistTracks).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistData", "tracks": [...], "format": "m3u"}
  *
@@ -311,7 +311,7 @@ struct PlaylistData final {
 /**
  * @struct ConfigValue
  * @brief Single configuration key-value pair (returned by ConfigGet).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigValue", "key": "volume", "value": "0.8"}
  *
@@ -332,7 +332,7 @@ struct ConfigValue final {
 /**
  * @struct ConfigValues
  * @brief Multiple configuration key-value pairs (returned by ConfigList).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigValues", "values": [{"key": "volume", "value": "0.8"}, ...]}
  *
@@ -352,7 +352,7 @@ struct ConfigValues final {
 /**
  * @struct SingleTrack
  * @brief Single track with full metadata (returned by TagGet, LibrarySearch single result).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "SingleTrack", "track": {"id": 1, "title": "Song", ...}}
  *
@@ -368,7 +368,7 @@ struct SingleTrack final {
 /**
  * @struct TrackInfo
  * @brief Track with play statistics (returned by Info command).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "TrackInfo", "track": {...}, "play_count": 42, "last_played":
  * 1699999999000}
@@ -399,7 +399,7 @@ struct TrackInfo final {
 /**
  * @struct HistoryEntry
  * @brief Single playback history entry.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "HistoryEntry", "id": 1, "track_id": 123, "started_at": 1699999999000,
  * "completed_at": 1699999999240, "position_ms": 240000, "completion_pct": 100.0, "queue_id": 1,
@@ -467,7 +467,7 @@ struct HistoryEntry final {
 /**
  * @struct History
  * @brief List of playback history entries (returned by HistoryList).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "History", "entries": [...]}
  *
@@ -487,7 +487,7 @@ struct History final {
 /**
  * @struct DeviceInfo
  * @brief Audio output device information.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"id": "hw:0,0", "name": "Built-in Audio", "isDefault": true}
  *
@@ -513,7 +513,7 @@ struct DeviceInfo final {
 /**
  * @struct Devices
  * @brief List of audio output devices (returned by DeviceList).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Devices", "devices": [{"id": "hw:0,0", "name": "Built-in Audio",
  * "isDefault": true}, ...]}
@@ -533,13 +533,13 @@ struct Devices final {
 
 /**
  * @brief Empty result (success with no data) - uses std::monostate.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  */
 using Empty = std::monostate;
 
 /**
  * @brief Error type alias for CLI errors.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @see caudio::utils::Error
  */
@@ -551,7 +551,7 @@ using CliError = caudio::utils::Error;
  * Used for JSON serialization/deserialization. Contains all possible
  * result types plus Empty for successful operations with no data,
  * and CliError for error responses.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @see toJson for serialization
  * @see resultFromJson for deserialization
@@ -564,11 +564,11 @@ using Result =
 
 /**
  * @brief Expected type for results that can fail with a CLI error.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * Used for functions that return either a Result or a CliError.
  * @see caudio::utils::Error
  */
 using ReplyExpected = std::expected<Result, CliError>;
 
-} // namespace caudio::cli
+} // namespace caudio::ipc

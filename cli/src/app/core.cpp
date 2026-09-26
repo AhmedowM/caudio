@@ -122,13 +122,13 @@ std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
     return *r;
 }
 // Single source: delegate to caudio::app::parse::parseVolume and adapt error type.
-std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
+std::expected<caudio::ipc::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
     auto r = caudio::app::parse::parseVolume(s);
     if (!r)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
     caudio::app::parse::ParsedVolume pv = *r;
-    caudio::cli::VolumeSet vs{};
+    caudio::ipc::VolumeSet vs{};
     vs.level = pv.level;
     vs.mute = pv.mute;
     vs.deltaPct = pv.deltaPct;
@@ -181,7 +181,7 @@ void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& t
     j["version"] = 1;
     j["tracks"] = nlohmann::ordered_json::array();
     for (const auto& t : tracks) {
-        j["tracks"].push_back(caudio::cli::detail::trackToJson(t));
+        j["tracks"].push_back(caudio::ipc::detail::trackToJson(t));
     }
     os << j.dump(2) << "\n";
 }
@@ -191,7 +191,7 @@ using detail::parseSeek;
 using detail::parseTime;
 using detail::parseVolume;
 
-App::App(caudio::cli::Config cfg)
+App::App(caudio::config::Config cfg)
     : config_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
     cli_->set_version_flag("--version", std::string(caudio::versionFull));
 }
@@ -199,8 +199,8 @@ App::App(caudio::cli::Config cfg)
 App::~App() = default;
 
 std::filesystem::path App::pidPathForConfig() const {
-    // Canonical pid path â€” single source via caudio.cli:config (hash of dbPath + XDG/LOCALAPPDATA)
-    auto r = caudio::cli::pidPathFor(config_.dbPath);
+    // Canonical pid path â€” single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
+    auto r = caudio::config::pidPathFor(config_.dbPath);
     if (r)
         return *r;
     // fallback legacy
@@ -210,7 +210,7 @@ std::filesystem::path App::pidPathForConfig() const {
     return pp / "caudio.pid";
 }
 
-std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::cli::Config& cfg) {
+std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config& cfg) {
 #ifdef _WIN32
     wchar_t exeBuf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
@@ -387,7 +387,7 @@ int App::handleStart(bool foreground) {
 
 int App::handleShutdown() {
     caudio::client::Client client{config_.dbPath, config_.socketPath};
-    auto cmd = caudio::cli::Command{caudio::cli::Shutdown{}};
+    auto cmd = caudio::ipc::Command{caudio::ipc::Shutdown{}};
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
     if (!res) {
         // if daemon not running, report
@@ -674,7 +674,7 @@ int App::run(int argc, char** argv) {
     if (!configPathStr.empty())
         config_.configPath = std::filesystem::path(configPathStr);
     {
-        auto loaded = caudio::cli::loadConfig(config_.configPath);
+        auto loaded = caudio::config::loadConfig(config_.configPath);
         if (loaded) {
             config_ = *loaded;
             if (!configPathStr.empty())
@@ -686,7 +686,7 @@ int App::run(int argc, char** argv) {
                 auto parent = config_.configPath.parent_path();
                 if (!parent.empty())
                     std::filesystem::create_directories(parent, ec3);
-                (void)caudio::cli::saveConfig(config_);
+                (void)caudio::config::saveConfig(config_);
             }
         } else {
             // loadConfig failed (e.g. corrupt); keep current config_ which has robust defaults
@@ -714,7 +714,7 @@ int App::run(int argc, char** argv) {
             config_.logLevel = 4;
     }
     if (config_.socketPath.empty() && !config_.dbPath.empty()) {
-        auto sp = caudio::cli::socketPathFor(config_.dbPath);
+        auto sp = caudio::config::socketPathFor(config_.dbPath);
         if (sp)
             config_.socketPath = *sp;
     }
@@ -729,13 +729,13 @@ int App::run(int argc, char** argv) {
     if (daemonFlag) {
         return handleStart(true);
     }
-    auto sendViaClient = [&](const caudio::cli::Command& cmd, bool asJson) -> int {
+    auto sendViaClient = [&](const caudio::ipc::Command& cmd, bool asJson) -> int {
         caudio::client::Client client{config_.dbPath, config_.socketPath};
         auto timeout = std::chrono::milliseconds{2000};
         auto res = client.send(cmd, timeout);
         caudio::client::OutputFormatter fmt{asJson};
         if (!res) {
-            caudio::cli::Result errRes{res.error()};
+            caudio::ipc::Result errRes{res.error()};
             fmt.print(errRes, std::cerr);
             return 1;
         }
@@ -751,31 +751,31 @@ int App::run(int argc, char** argv) {
     if (shutdownCmd->parsed())
         return handleShutdown();
     if (playCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Play{}};
+        caudio::ipc::Command cmd{caudio::ipc::Play{}};
         return sendViaClient(cmd, false);
     }
     if (pauseCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Pause{}};
+        caudio::ipc::Command cmd{caudio::ipc::Pause{}};
         return sendViaClient(cmd, false);
     }
     if (resumeCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Resume{}};
+        caudio::ipc::Command cmd{caudio::ipc::Resume{}};
         return sendViaClient(cmd, false);
     }
     if (restartCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Restart{}};
+        caudio::ipc::Command cmd{caudio::ipc::Restart{}};
         return sendViaClient(cmd, false);
     }
     if (stopCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Stop{}};
+        caudio::ipc::Command cmd{caudio::ipc::Stop{}};
         return sendViaClient(cmd, false);
     }
     if (nextCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Next{}};
+        caudio::ipc::Command cmd{caudio::ipc::Next{}};
         return sendViaClient(cmd, false);
     }
     if (prevCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Prev{}};
+        caudio::ipc::Command cmd{caudio::ipc::Prev{}};
         return sendViaClient(cmd, false);
     }
     if (seekCmd->parsed()) {
@@ -788,11 +788,11 @@ int App::run(int argc, char** argv) {
         bool isRelative = !seekStr.empty() && (seekStr.front() == '+' || seekStr.front() == '-');
         if (isRelative) {
             caudio::client::Client client{config_.dbPath, config_.socketPath};
-            auto sres = client.send(caudio::cli::Command{caudio::cli::StatusReq{}});
+            auto sres = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
             double pos = 0;
             bool hasPos = false;
             if (sres) {
-                if (auto* ps = std::get_if<caudio::cli::Status>(&*sres)) {
+                if (auto* ps = std::get_if<caudio::ipc::Status>(&*sres)) {
                     pos = ps->pos;
                     hasPos = true;
                 }
@@ -806,7 +806,7 @@ int App::run(int argc, char** argv) {
                     target = 0;
             }
         }
-        caudio::cli::Command cmd{caudio::cli::Seek{target}};
+        caudio::ipc::Command cmd{caudio::ipc::Seek{target}};
         return sendViaClient(cmd, false);
     }
     if (statusCmd->parsed()) {
@@ -820,11 +820,11 @@ int App::run(int argc, char** argv) {
             while (true) {
                 caudio::client::Client client{config_.dbPath, config_.socketPath};
                 auto res =
-                    client.send(caudio::cli::Command{caudio::cli::StatusReq{}}, milliseconds{2000});
+                    client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}}, milliseconds{2000});
                 if (!res) {
-                    caudio::cli::Result errRes{res.error()};
+                    caudio::ipc::Result errRes{res.error()};
                     if (jsonFlag) {
-                        std::println(std::cerr, "{}", caudio::cli::toJson(errRes).dump());
+                        std::println(std::cerr, "{}", caudio::ipc::toJson(errRes).dump());
                     } else {
                         fmt.print(errRes, std::cerr);
                     }
@@ -845,7 +845,7 @@ int App::run(int argc, char** argv) {
                     fmt.print(*res, std::cout);
                 } else {
                     // Compact JSON per line for streaming to avoid multi-line log spam
-                    std::println(std::cout, "{}", caudio::cli::toJson(*res).dump());
+                    std::println(std::cout, "{}", caudio::ipc::toJson(*res).dump());
                 }
                 std::cout << std::flush;
                 if (std::holds_alternative<caudio::utils::Error>(*res))
@@ -853,7 +853,7 @@ int App::run(int argc, char** argv) {
                 std::this_thread::sleep_for(milliseconds{statusInterval});
             }
         }
-        caudio::cli::Command cmd{caudio::cli::StatusReq{}};
+        caudio::ipc::Command cmd{caudio::ipc::StatusReq{}};
         return sendViaClient(cmd, jsonFlag);
     }
     if (volumeCmd->parsed()) {
@@ -862,36 +862,36 @@ int App::run(int argc, char** argv) {
             std::println(std::cerr, "volume: {}", pv.error().message);
             return 1;
         }
-        caudio::cli::Command cmd{*pv};
+        caudio::ipc::Command cmd{*pv};
         return sendViaClient(cmd, false);
     }
     if (queueCmd->parsed()) {
         if (qList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueList{}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueList{}};
             return sendViaClient(cmd, qJson);
         }
         if (qQueues->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueQueues{}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
             return sendViaClient(cmd, false);
         }
         if (qSwitch->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueSwitch{qSwitchId}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueSwitch{qSwitchId}};
             return sendViaClient(cmd, false);
         }
         if (qAdd->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueAdd{qAddQuery, qAddSearch}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueAdd{qAddQuery, qAddSearch}};
             return sendViaClient(cmd, false);
         }
         if (qRemove->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueRemove{qRemoveId}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueRemove{qRemoveId}};
             return sendViaClient(cmd, false);
         }
         if (qMove->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueMove{qFrom, qTo}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueMove{qFrom, qTo}};
             return sendViaClient(cmd, false);
         }
         if (qClear->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::QueueClear{}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueClear{}};
             return sendViaClient(cmd, false);
         }
         if (qShuffle->parsed()) {
@@ -904,7 +904,7 @@ int App::run(int argc, char** argv) {
                 std::println(std::cerr, "shuffle: invalid mode {}", qShuffleArg);
                 return 1;
             }
-            caudio::cli::Command cmd{caudio::cli::QueueShuffle{on}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueShuffle{on}};
             return sendViaClient(cmd, false);
         }
         if (qRepeat->parsed()) {
@@ -919,7 +919,7 @@ int App::run(int argc, char** argv) {
                 std::println(std::cerr, "repeat: invalid mode {}", qRepeatArg);
                 return 1;
             }
-            caudio::cli::Command cmd{caudio::cli::QueueRepeat{m}};
+            caudio::ipc::Command cmd{caudio::ipc::QueueRepeat{m}};
             return sendViaClient(cmd, false);
         }
         std::cout << queueCmd->help() << "\n";
@@ -927,35 +927,35 @@ int App::run(int argc, char** argv) {
     }
     if (plCmd->parsed()) {
         if (plList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistList{}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistList{}};
             return sendViaClient(cmd, plJson);
         }
         if (plTracks->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistTracks{plTracksPid}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{plTracksPid}};
             return sendViaClient(cmd, false);
         }
         if (plLoad->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistLoad{plLoadPid, plLoadPlay}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistLoad{plLoadPid, plLoadPlay}};
             return sendViaClient(cmd, false);
         }
         if (plSave->parsed()) {
             std::optional<std::int64_t> qid;
             if (plSave->get_option("--queue")->count() > 0)
                 qid = plSaveQid;
-            caudio::cli::Command cmd{caudio::cli::PlaylistSave{plSaveName, qid}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistSave{plSaveName, qid}};
             return sendViaClient(cmd, false);
         }
         if (plDelete->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistDelete{plDeletePid}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistDelete{plDeletePid}};
             return sendViaClient(cmd, false);
         }
         if (plRename->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistRename{plRenamePid, plRenameName}};
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistRename{plRenamePid, plRenameName}};
             return sendViaClient(cmd, false);
         }
         if (plExport->parsed()) {
-            caudio::cli::Command cmd{
-                caudio::cli::PlaylistExport{plExportPid, plExportPath, plExportFormat}};
+            caudio::ipc::Command cmd{
+                caudio::ipc::PlaylistExport{plExportPid, plExportPath, plExportFormat}};
             caudio::client::Client client{config_.dbPath, config_.socketPath};
             auto timeout = std::chrono::milliseconds{5000};
             auto cliRes = client.send(cmd, timeout);
@@ -968,8 +968,8 @@ int App::run(int argc, char** argv) {
                              std::get<caudio::utils::Error>(*cliRes).message);
                 return 1;
             }
-            if (std::holds_alternative<caudio::cli::PlaylistData>(*cliRes)) {
-                auto& pd = std::get<caudio::cli::PlaylistData>(*cliRes);
+            if (std::holds_alternative<caudio::ipc::PlaylistData>(*cliRes)) {
+                auto& pd = std::get<caudio::ipc::PlaylistData>(*cliRes);
                 std::ofstream ofs(plExportPath);
                 if (!ofs) {
                     std::println(std::cerr, "export: failed to open output file");
@@ -988,7 +988,7 @@ int App::run(int argc, char** argv) {
             return 1;
         }
         if (plImport->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::PlaylistImport{
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistImport{
                 plImportPath, plImportName.empty() ? std::optional<std::string>{}
                                                    : std::optional<std::string>{plImportName}}};
             return sendViaClient(cmd, false);
@@ -1001,23 +1001,23 @@ int App::run(int argc, char** argv) {
             std::optional<std::string> p;
             if (!libScanPath.empty())
                 p = libScanPath;
-            caudio::cli::Command cmd{caudio::cli::LibraryScan{p, libScanMode}};
+            caudio::ipc::Command cmd{caudio::ipc::LibraryScan{p, libScanMode}};
             return sendViaClient(cmd, false);
         }
         if (libSearch->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::LibrarySearch{libSearchQuery, libSearchLimit}};
+            caudio::ipc::Command cmd{caudio::ipc::LibrarySearch{libSearchQuery, libSearchLimit}};
             return sendViaClient(cmd, libSearchJson);
         }
         if (libStats->parsed()) {
             if (libStatsDetailed) {
-                caudio::cli::Command cmd{caudio::cli::LibraryStatsDetailed{}};
+                caudio::ipc::Command cmd{caudio::ipc::LibraryStatsDetailed{}};
                 return sendViaClient(cmd, libStatsJson);
             }
-            caudio::cli::Command cmd{caudio::cli::LibraryStats{}};
+            caudio::ipc::Command cmd{caudio::ipc::LibraryStats{}};
             return sendViaClient(cmd, libStatsJson);
         }
         if (libList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::LibraryList{
+            caudio::ipc::Command cmd{caudio::ipc::LibraryList{
                 libListQuery.empty() ? std::optional<std::string>{}
                                      : std::optional<std::string>{libListQuery},
                 libListLimit, libListOffset,
@@ -1030,11 +1030,11 @@ int App::run(int argc, char** argv) {
             return sendViaClient(cmd, libListJson);
         }
         if (libAdd->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::LibraryAdd{libAddPath, libAddRecursive}};
+            caudio::ipc::Command cmd{caudio::ipc::LibraryAdd{libAddPath, libAddRecursive}};
             return sendViaClient(cmd, false);
         }
         if (libRemove->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::LibraryRemove{libRemoveQuery}};
+            caudio::ipc::Command cmd{caudio::ipc::LibraryRemove{libRemoveQuery}};
             return sendViaClient(cmd, false);
         }
         std::cout << libCmd->help() << "\n";
@@ -1042,11 +1042,11 @@ int App::run(int argc, char** argv) {
     }
     if (tagCmd->parsed()) {
         if (tagEdit->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::TagEdit{tagEditId, tagEditField, tagEditValue}};
+            caudio::ipc::Command cmd{caudio::ipc::TagEdit{tagEditId, tagEditField, tagEditValue}};
             return sendViaClient(cmd, false);
         }
         if (tagGet->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::TagGet{tagGetId}};
+            caudio::ipc::Command cmd{caudio::ipc::TagGet{tagGetId}};
             return sendViaClient(cmd, tagGetJson);
         }
         std::cout << tagCmd->help() << "\n";
@@ -1054,11 +1054,11 @@ int App::run(int argc, char** argv) {
     }
     if (historyCmd->parsed()) {
         if (historyList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::HistoryList{historyLimit}};
+            caudio::ipc::Command cmd{caudio::ipc::HistoryList{historyLimit}};
             return sendViaClient(cmd, historyJson);
         }
         if (historyClear->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::HistoryClear{}};
+            caudio::ipc::Command cmd{caudio::ipc::HistoryClear{}};
             return sendViaClient(cmd, false);
         }
         std::cout << historyCmd->help() << "\n";
@@ -1071,11 +1071,11 @@ int App::run(int argc, char** argv) {
         // Show current status once (same pretty formatting as `status`)
         {
             caudio::client::Client client{config_.dbPath, config_.socketPath};
-            auto res = client.send(caudio::cli::Command{caudio::cli::StatusReq{}},
+            auto res = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
                                    std::chrono::milliseconds{2000});
             caudio::client::OutputFormatter fmt{false};
             if (!res) {
-                caudio::cli::Result errRes{res.error()};
+                caudio::ipc::Result errRes{res.error()};
                 fmt.print(errRes, std::cout);
             } else {
                 fmt.print(*res, std::cout);
@@ -1091,23 +1091,23 @@ int App::run(int argc, char** argv) {
     }
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::ConfigGet{cfgGetKey}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigGet{cfgGetKey}};
             return sendViaClient(cmd, false);
         }
         if (cfgSet->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::ConfigSet{cfgSetKey, cfgSetVal}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigSet{cfgSetKey, cfgSetVal}};
             return sendViaClient(cmd, false);
         }
         if (cfgList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::ConfigList{}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigList{}};
             return sendViaClient(cmd, cfgListJson);
         }
         if (cfgExport->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::ConfigExport{cfgExportPath}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigExport{cfgExportPath}};
             return sendViaClient(cmd, false);
         }
         if (cfgImport->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::ConfigImport{cfgImportPath}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigImport{cfgImportPath}};
             return sendViaClient(cmd, false);
         }
         if (cfgReset->parsed()) {
@@ -1119,7 +1119,7 @@ int App::run(int argc, char** argv) {
                 std::println(std::cerr, "config reset: empty key");
                 return 1;
             }
-            caudio::cli::Command cmd{caudio::cli::ConfigReset{k}};
+            caudio::ipc::Command cmd{caudio::ipc::ConfigReset{k}};
             return sendViaClient(cmd, false);
         }
         std::cout << cfgCmd->help() << "\n";
@@ -1127,25 +1127,25 @@ int App::run(int argc, char** argv) {
     }
     if (deviceCmd->parsed()) {
         if (devList->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::DeviceList{}};
+            caudio::ipc::Command cmd{caudio::ipc::DeviceList{}};
             return sendViaClient(cmd, devJson);
         }
         if (devSet->parsed()) {
-            caudio::cli::Command cmd{caudio::cli::DeviceSet{devSetId}};
+            caudio::ipc::Command cmd{caudio::ipc::DeviceSet{devSetId}};
             return sendViaClient(cmd, false);
         }
         if (devTest->parsed()) {
             std::optional<std::string> id;
             if (!devTestId.empty())
                 id = devTestId;
-            caudio::cli::Command cmd{caudio::cli::DeviceTest{id}};
+            caudio::ipc::Command cmd{caudio::ipc::DeviceTest{id}};
             return sendViaClient(cmd, false);
         }
         std::cout << deviceCmd->help() << "\n";
         return 0;
     }
     if (infoCmd->parsed()) {
-        caudio::cli::Command cmd{caudio::cli::Info{}};
+        caudio::ipc::Command cmd{caudio::ipc::Info{}};
         return sendViaClient(cmd, infoJson);
     }
     std::cout << cli_->help() << "\n";

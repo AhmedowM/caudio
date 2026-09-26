@@ -37,40 +37,41 @@
 
 namespace caudio::service {
 
-using namespace caudio::cli;
-using caudio::cli::ConfigGet;
-using caudio::cli::ConfigSet;
-using caudio::cli::ConfigList;
-using caudio::cli::ConfigExport;
-using caudio::cli::ConfigImport;
-using caudio::cli::ConfigReset;
-using caudio::cli::Shutdown;
-using caudio::cli::DeviceList;
-using caudio::cli::DeviceSet;
-using caudio::cli::DeviceTest;
+using namespace caudio::ipc;
+using namespace caudio::config;
+using caudio::ipc::ConfigGet;
+using caudio::ipc::ConfigSet;
+using caudio::ipc::ConfigList;
+using caudio::ipc::ConfigExport;
+using caudio::ipc::ConfigImport;
+using caudio::ipc::ConfigReset;
+using caudio::ipc::Shutdown;
+using caudio::ipc::DeviceList;
+using caudio::ipc::DeviceSet;
+using caudio::ipc::DeviceTest;
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigGet& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigGet& cmd) {
                 auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-                auto vRes = caudio::cli::configGetRaw(p, cmd.key);
+                auto vRes = caudio::config::configGetRaw(p, cmd.key);
                 if (!vRes)
                     return std::unexpected{vRes.error()};
                 return Result{ConfigValue{cmd.key, *vRes}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigSet& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigSet& cmd) {
                 auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-                auto sRes = caudio::cli::configSetRaw(p, cmd.key, cmd.value);
+                auto sRes = caudio::config::configSetRaw(p, cmd.key, cmd.value);
                 if (!sRes)
                     return std::unexpected{sRes.error()};
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigList&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigList&) {
                 auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-                auto lRes = caudio::cli::configListRaw(p);
+                auto lRes = caudio::config::configListRaw(p);
                 if (!lRes)
                     return std::unexpected{lRes.error()};
                 ConfigValues cvs{};
@@ -80,8 +81,8 @@ Service::handle(const caudio::cli::ConfigList&) {
                 return Result{std::move(cvs)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigExport& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigExport& cmd) {
                 auto src = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 std::filesystem::path dst{cmd.path};
                 std::error_code ec;
@@ -97,8 +98,8 @@ Service::handle(const caudio::cli::ConfigExport& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigImport& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigImport& cmd) {
                 std::filesystem::path src{cmd.path};
                 auto dst = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 std::error_code ec;
@@ -122,44 +123,44 @@ Service::handle(const caudio::cli::ConfigImport& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::ConfigReset& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::ConfigReset& cmd) {
                 auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
                 if (cmd.key.has_value() && !cmd.key->empty()) {
-                    auto r = caudio::cli::configDeleteRaw(p, *cmd.key);
+                    auto r = caudio::config::configDeleteRaw(p, *cmd.key);
                     if (!r)
                         return std::unexpected{r.error()};
                 } else if (cmd.key.has_value() && cmd.key->empty()) {
                     return std::unexpected{caudio::utils::makeError(
                         caudio::utils::StatusCode::InvalidArg, "empty key")};
                 } else {
-                    auto r = caudio::cli::configResetAllRaw(p);
+                    auto r = caudio::config::configResetAllRaw(p);
                     if (!r)
                         return std::unexpected{r.error()};
                 }
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::Shutdown&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::Shutdown&) {
                 shutdownRequested_.store(true, std::memory_order_release);
                 // defer actual shutdown to run loop to avoid deadlock
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::DeviceList&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::DeviceList&) {
                 auto devList = caudio::player::enumerateDevices();
-                caudio::cli::Devices result;
+                caudio::ipc::Devices result;
                 result.devices.reserve(devList.devices.size());
                 for (const auto& d : devList.devices) {
-                    result.devices.push_back(caudio::cli::DeviceInfo{d.id, d.name, d.isDefault});
+                    result.devices.push_back(caudio::ipc::DeviceInfo{d.id, d.name, d.isDefault});
                 }
                 return Result{std::move(result)};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::DeviceSet& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::DeviceSet& cmd) {
                 // Validate device exists
                 auto devList = caudio::player::enumerateDevices();
                 bool found = false;
@@ -175,7 +176,7 @@ Service::handle(const caudio::cli::DeviceSet& cmd) {
                 }
                 // Save to config
                 auto cfgPath = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-                auto res = caudio::cli::configSetRaw(cfgPath, "device", cmd.id);
+                auto res = caudio::config::configSetRaw(cfgPath, "device", cmd.id);
                 if (!res) {
                     return std::unexpected{res.error()};
                 }
@@ -184,8 +185,8 @@ Service::handle(const caudio::cli::DeviceSet& cmd) {
                 return Result{Empty{}};
             }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::handle(const caudio::cli::DeviceTest& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::DeviceTest& cmd) {
                 // Get device ID to test
                 std::string testId;
                 if (cmd.id.has_value()) {
@@ -193,7 +194,7 @@ Service::handle(const caudio::cli::DeviceTest& cmd) {
                 } else {
                     // Use current config device
                     auto cfgPath = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-                    auto devRes = caudio::cli::configGetRaw(cfgPath, "device");
+                    auto devRes = caudio::config::configGetRaw(cfgPath, "device");
                     if (devRes) {
                         testId = *devRes;
                     } else {

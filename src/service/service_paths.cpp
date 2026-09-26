@@ -138,7 +138,7 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 namespace caudio::service::detail {
 std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
                                        const std::string& /*socketPath*/) {
-    auto r = caudio::cli::pidPathFor(dbPath);
+    auto r = caudio::config::pidPathFor(dbPath);
     if (r)
         return *r;
     auto pp = dbPath.parent_path();
@@ -149,20 +149,20 @@ std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
 
 std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
                                          const std::string& /*socketPath*/) {
-    auto r = caudio::cli::lockPathFor(dbPath);
+    auto r = caudio::config::lockPathFor(dbPath);
     if (r)
         return *r;
-    std::string hex = caudio::cli::detail_paths::hex8ForDb(dbPath);
+    std::string hex = caudio::config::detail_paths::hex8ForDb(dbPath);
     auto pidPath = pidPathForSocket(dbPath, "");
     return pidPath.parent_path() / ("caudio-" + hex + ".lock");
 }
 
 std::string socketPathForDb(const std::filesystem::path& dbPath) {
-    auto r = caudio::cli::socketPathFor(dbPath);
+    auto r = caudio::config::socketPathFor(dbPath);
     if (r)
         return *r;
     // Fallback uses canonical hex8 encoding (consistent with primary socketPathFor)
-    std::string hex = caudio::cli::detail_paths::hex8ForDb(dbPath);
+    std::string hex = caudio::config::detail_paths::hex8ForDb(dbPath);
 #ifdef _WIN32
     return std::string("\\\\.\\pipe\\caudio-") + hex;
 #else

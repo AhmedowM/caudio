@@ -46,17 +46,17 @@ class Client {
     explicit Client(Config cfg);
     explicit Client(std::filesystem::path dbPath);
     explicit Client(std::filesystem::path dbPath, std::string_view socketPath);
-    explicit Client(const caudio::cli::Config& cfg);
+    explicit Client(const caudio::config::Config& cfg);
 
     const Config& config() const noexcept;
     std::filesystem::path dbPath() const noexcept;
 
-    caudio::utils::Expected<caudio::cli::Result>
-    send(const caudio::cli::Command& cmd,
+    caudio::utils::Expected<caudio::ipc::Result>
+    send(const caudio::ipc::Command& cmd,
          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
 
     // Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
-    caudio::utils::Expected<caudio::cli::Result> snapshotStatus();
+    caudio::utils::Expected<caudio::ipc::Result> snapshotStatus();
 };
 
 } // namespace caudio::client

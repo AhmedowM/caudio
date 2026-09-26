@@ -89,8 +89,8 @@ class IpcServer {
                                          std::string_view socketPathOverride = {});
 
     void run(std::stop_token st,
-             std::function<std::expected<caudio::cli::Result, caudio::utils::Error>(
-                 const caudio::cli::Command&)>
+             std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
+                 const caudio::ipc::Command&)>
                  dispatch);
 
     void shutdown();

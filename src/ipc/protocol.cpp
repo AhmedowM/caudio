@@ -1,6 +1,6 @@
 ﻿#include <caudio/ipc/protocol.hpp>
 
-namespace caudio::cli::detail {
+namespace caudio::ipc::detail {
 
 std::string playbackStateToString(caudio::engine::PlaybackState s) {
     using PS = caudio::engine::PlaybackState;
@@ -240,9 +240,9 @@ std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const or
     }
 }
 
-} // namespace caudio::cli::detail
+} // namespace caudio::ipc::detail
 
-namespace caudio::cli {
+namespace caudio::ipc {
 
 ordered_json toJson(const Command& cmd) {
     return std::visit(
@@ -1300,4 +1300,4 @@ std::string toJsonString(const Command& c) {
     return toJson(c).dump(2);
 }
 
-} // namespace caudio::cli
+} // namespace caudio::ipc

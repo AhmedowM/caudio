@@ -1,9 +1,14 @@
 ﻿module;
-#include <caudio/ipc/command.hpp>
+#include <caudio/ipc.hpp>
 
-export module caudio.ipc:command;
+export module caudio.ipc;
+export import :command;
+export import :result;
+export import :protocol;
+export import :config;
 
 export namespace caudio::ipc {
+using ::caudio::ipc::CliError;
 using ::caudio::ipc::Command;
 using ::caudio::ipc::ConfigExport;
 using ::caudio::ipc::ConfigGet;
@@ -11,22 +16,34 @@ using ::caudio::ipc::ConfigImport;
 using ::caudio::ipc::ConfigList;
 using ::caudio::ipc::ConfigReset;
 using ::caudio::ipc::ConfigSet;
+using ::caudio::ipc::ConfigValue;
+using ::caudio::ipc::ConfigValues;
+using ::caudio::ipc::DeviceInfo;
 using ::caudio::ipc::DeviceList;
 using ::caudio::ipc::DeviceSet;
 using ::caudio::ipc::DeviceTest;
+using ::caudio::ipc::Devices;
+using ::caudio::ipc::Empty;
+using ::caudio::ipc::History;
 using ::caudio::ipc::HistoryClear;
+using ::caudio::ipc::HistoryEntry;
 using ::caudio::ipc::HistoryList;
 using ::caudio::ipc::Info;
+using ::caudio::ipc::IpcReply;
+using ::caudio::ipc::IpcRequest;
 using ::caudio::ipc::LibraryAdd;
 using ::caudio::ipc::LibraryList;
 using ::caudio::ipc::LibraryRemove;
 using ::caudio::ipc::LibraryScan;
 using ::caudio::ipc::LibrarySearch;
 using ::caudio::ipc::LibraryStats;
+using ::caudio::ipc::LibraryStatsData;
 using ::caudio::ipc::LibraryStatsDetailed;
+using ::caudio::ipc::LibraryStatsDetailedData;
 using ::caudio::ipc::Next;
 using ::caudio::ipc::Pause;
 using ::caudio::ipc::Play;
+using ::caudio::ipc::PlaylistData;
 using ::caudio::ipc::PlaylistDelete;
 using ::caudio::ipc::PlaylistExport;
 using ::caudio::ipc::PlaylistImport;
@@ -35,6 +52,7 @@ using ::caudio::ipc::PlaylistLoad;
 using ::caudio::ipc::PlaylistRename;
 using ::caudio::ipc::PlaylistSave;
 using ::caudio::ipc::PlaylistTracks;
+using ::caudio::ipc::Playlists;
 using ::caudio::ipc::Prev;
 using ::caudio::ipc::Preview;
 using ::caudio::ipc::QueueAdd;
@@ -46,13 +64,39 @@ using ::caudio::ipc::QueueRemove;
 using ::caudio::ipc::QueueRepeat;
 using ::caudio::ipc::QueueShuffle;
 using ::caudio::ipc::QueueSwitch;
+using ::caudio::ipc::QueueTracks;
+using ::caudio::ipc::ReplyExpected;
 using ::caudio::ipc::Restart;
+using ::caudio::ipc::Result;
 using ::caudio::ipc::Resume;
 using ::caudio::ipc::Seek;
 using ::caudio::ipc::Shutdown;
+using ::caudio::ipc::SingleTrack;
+using ::caudio::ipc::Status;
 using ::caudio::ipc::StatusReq;
 using ::caudio::ipc::Stop;
 using ::caudio::ipc::TagEdit;
 using ::caudio::ipc::TagGet;
+using ::caudio::ipc::TrackInfo;
+using ::caudio::ipc::Tracks;
+using ::caudio::ipc::VolumeInfo;
 using ::caudio::ipc::VolumeSet;
+using ::caudio::ipc::commandFromJson;
+using ::caudio::ipc::deframe;
+using ::caudio::ipc::deserializeReply;
+using ::caudio::ipc::deserializeRequest;
+using ::caudio::ipc::frame;
+using ::caudio::ipc::resultFromJson;
+using ::caudio::ipc::serializeReply;
+using ::caudio::ipc::serializeRequest;
+using ::caudio::ipc::toJson;
 } // namespace caudio::ipc
+
+export namespace caudio::config {
+using ::caudio::config::Config;
+using ::caudio::config::loadConfig;
+using ::caudio::config::lockPathFor;
+using ::caudio::config::pidPathFor;
+using ::caudio::config::saveConfig;
+using ::caudio::config::socketPathFor;
+} // namespace caudio::config

@@ -29,7 +29,7 @@ namespace detail {
 
 std::expected<double, caudio::utils::Error> parseTime(std::string_view s);
 std::expected<double, caudio::utils::Error> parseSeek(std::string_view s);
-std::expected<caudio::cli::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s);
+std::expected<caudio::ipc::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s);
 std::chrono::duration<double> parseDuration(std::string_view s);
 
 void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
@@ -44,7 +44,7 @@ using detail::parseVolume;
 
 class App {
   public:
-    explicit App(caudio::cli::Config cfg);
+    explicit App(caudio::config::Config cfg);
     ~App();
     int run(int argc, char** argv);
 
@@ -52,10 +52,10 @@ class App {
     int handleStart(bool foreground);
     int handleShutdown();
     int handlePreview(const std::string& file);
-    std::expected<void, std::uint32_t> spawnDaemon(const caudio::cli::Config& cfg);
+    std::expected<void, std::uint32_t> spawnDaemon(const caudio::config::Config& cfg);
     std::filesystem::path pidPathForConfig() const;
 
-    caudio::cli::Config config_;
+    caudio::config::Config config_;
     std::unique_ptr<CLI::App> cli_;
     std::string argv0_;
 };

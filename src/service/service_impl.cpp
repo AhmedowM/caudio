@@ -164,7 +164,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
 
     // Create shared memory status block for TUI 10fps polling
     // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
-    std::string shmName = caudio::cli::detail_paths::hex8ForDb(cfg.dbPath);
+    std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
     auto shmRes = caudio::service::createShmStatus(shmName, true);
     if (!shmRes) {
         // Non-fatal: log but continue without shm
@@ -194,8 +194,8 @@ caudio::utils::Expected<void> Service::run(std::stop_token st) {
             caudio::utils::makeError(caudio::utils::StatusCode::State, "already running")};
     }
     // build dispatcher
-    auto dispatcher = [this](const caudio::cli::Command& cmd)
-        -> std::expected<caudio::cli::Result, caudio::utils::Error> { return this->dispatch(cmd); };
+    auto dispatcher = [this](const caudio::ipc::Command& cmd)
+        -> std::expected<caudio::ipc::Result, caudio::utils::Error> { return this->dispatch(cmd); };
     if (server_)
         server_->run(st, dispatcher);
     // block until stop requested
@@ -304,15 +304,15 @@ void Service::updateShmStatus() {
     }
 }
 
-std::expected<caudio::cli::Result, caudio::utils::Error> Service::statusResult() {
+std::expected<caudio::ipc::Result, caudio::utils::Error> Service::statusResult() {
     auto st = detail::buildStatus(*engine_, *db_);
     if (!st)
         return std::unexpected{st.error()};
-    return caudio::cli::Result{*st};
+    return caudio::ipc::Result{*st};
 }
 
-std::expected<caudio::cli::Result, caudio::utils::Error>
-Service::dispatch(const caudio::cli::Command& cmd) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::dispatch(const caudio::ipc::Command& cmd) {
     return std::visit(DispatchVisitor{this}, cmd);
 }
 

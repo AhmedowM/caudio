@@ -13,7 +13,7 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
     if (!socketPathOverride.empty()) {
         sp = std::string(socketPathOverride.data(), socketPathOverride.size());
     } else {
-        sp = caudio::cli::socketPathFor(dbPath);
+        sp = caudio::config::socketPathFor(dbPath);
     }
     if (!sp)
         return std::unexpected{sp.error()};
@@ -104,11 +104,11 @@ IpcClient& IpcClient::operator=(IpcClient&& other) noexcept {
     return *this;
 }
 
-caudio::utils::Expected<caudio::cli::Result> IpcClient::send(const caudio::cli::Command& cmd) {
+caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::Command& cmd) {
     uint32_t id = nextId_.fetch_add(1) + 1;
-    caudio::cli::IpcRequest req{id, cmd};
-    std::string json = caudio::cli::serializeRequest(req);
-    auto framed = caudio::cli::frame(json);
+    caudio::ipc::IpcRequest req{id, cmd};
+    std::string json = caudio::ipc::serializeRequest(req);
+    auto framed = caudio::ipc::frame(json);
 
     if (auto e = rawSend(framed); !e)
         return std::unexpected{e.error()};
@@ -124,7 +124,7 @@ caudio::utils::Expected<caudio::cli::Result> IpcClient::send(const caudio::cli::
     for (auto b : *raw)
         replyStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
 
-    auto repExp = caudio::cli::deserializeReply(replyStr);
+    auto repExp = caudio::ipc::deserializeReply(replyStr);
     if (!repExp)
         return std::unexpected{repExp.error()};
     if (!repExp->result)

@@ -55,7 +55,7 @@ class OutputFormatter {
      * In JSON mode: pretty-prints entire Result as JSON.
      * In table mode: dispatches to type-specific formatter for each Result alternative.
      */
-    void print(const caudio::cli::Result& r, std::ostream& os) const;
+    void print(const caudio::ipc::Result& r, std::ostream& os) const;
 
     /**
      * @brief Print Result with automatic stderr/stdout routing and exit code.
@@ -67,7 +67,7 @@ class OutputFormatter {
      * Routes Error variants to err stream, others to out stream.
      * Suitable for CLI main() to return appropriate exit code.
      */
-    int printWithStatus(const caudio::cli::Result& r, std::ostream& out, std::ostream& err) const;
+    int printWithStatus(const caudio::ipc::Result& r, std::ostream& out, std::ostream& err) const;
 };
 
 } // namespace caudio::client

@@ -122,7 +122,7 @@ class IpcClient {
      * receives framed response, deserializes, and returns Result.
      * Not thread-safe; serialize calls externally if needed.
      */
-    caudio::utils::Expected<caudio::cli::Result> send(const caudio::cli::Command& cmd);
+    caudio::utils::Expected<caudio::ipc::Result> send(const caudio::ipc::Command& cmd);
 
     /**
      * @brief Close the connection (idempotent).

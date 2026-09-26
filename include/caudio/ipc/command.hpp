@@ -2,7 +2,7 @@
 /**
  * @file command.hpp
  * @brief CLI command types and variants for the caudio IPC protocol.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * Defines all command structs that can be sent from a client to the
  * caudio service daemon. Commands are serialized as JSON over the
@@ -17,8 +17,8 @@
  *   - `id`: uint32_t request identifier
  *   - `cmd`: Command object with `type` and command-specific fields
  *
- * @see caudio::cli::protocol for serialization/deserialization functions
- * @see caudio::cli::Result for response types
+ * @see caudio::ipc::protocol for serialization/deserialization functions
+ * @see caudio::ipc::Result for response types
  */
 
 #include <concepts>
@@ -30,7 +30,7 @@
 
 #include <caudio/engine.hpp>
 
-namespace caudio::cli {
+namespace caudio::ipc {
 
 // ---------------------------------------------------------------------------
 // Playback Control Commands
@@ -41,7 +41,7 @@ namespace caudio::cli {
  * @brief Start playback of the active queue.
  *
  * If no track is currently loaded, starts from the beginning of the queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Play"}
  */
@@ -50,7 +50,7 @@ struct Play final {};
 /**
  * @struct Pause
  * @brief Pause the currently playing track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Pause"}
  */
@@ -59,7 +59,7 @@ struct Pause final {};
 /**
  * @struct Resume
  * @brief Resume playback from a paused state.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Resume"}
  */
@@ -70,7 +70,7 @@ struct Resume final {};
  * @brief Restart the current track from the beginning.
  *
  * Seeks to position 0 and ensures playback is started.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Restart"}
  */
@@ -79,7 +79,7 @@ struct Restart final {};
 /**
  * @struct Stop
  * @brief Stop playback and clear the current track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Stop"}
  */
@@ -88,7 +88,7 @@ struct Stop final {};
 /**
  * @struct Next
  * @brief Advance to the next track in the queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Next"}
  */
@@ -97,7 +97,7 @@ struct Next final {};
 /**
  * @struct Prev
  * @brief Go to the previous track in the queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Prev"}
  */
@@ -106,7 +106,7 @@ struct Prev final {};
 /**
  * @struct Seek
  * @brief Seek to a specific position in the current track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Seek", "seconds": 120.5}
  *
@@ -120,7 +120,7 @@ struct Seek final {
 /**
  * @struct StatusReq
  * @brief Request the current playback status.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "StatusReq"}
  *
@@ -138,7 +138,7 @@ struct StatusReq final {};
  *
  * Any combination of level, mute, and deltaPct can be provided.
  * If multiple are given, they are applied in order: level, then deltaPct, then mute.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "VolumeSet", "level": 50.0, "mute": false, "deltaPct": 10}
  *
@@ -176,7 +176,7 @@ struct VolumeSet final {
 /**
  * @struct QueueList
  * @brief List all tracks in the active queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueList"}
  *
@@ -187,7 +187,7 @@ struct QueueList final {};
 /**
  * @struct QueueQueues
  * @brief List all available queues with their track counts.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueQueues"}
  *
@@ -198,7 +198,7 @@ struct QueueQueues final {};
 /**
  * @struct QueueSwitch
  * @brief Switch the active queue by ID.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueSwitch", "qid": 2}
  *
@@ -217,7 +217,7 @@ struct QueueSwitch final {
  * @brief Add track(s) to the active queue.
  *
  * Can add a single file by path, search by query, or add by track ID.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueAdd", "query": "song.mp3", "search": false}
  *
@@ -239,7 +239,7 @@ struct QueueAdd final {
 /**
  * @struct QueueRemove
  * @brief Remove a track from the active queue by position or track ID.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueRemove", "idOrIndex": "5"}
  *
@@ -256,7 +256,7 @@ struct QueueRemove final {
 /**
  * @struct QueueMove
  * @brief Move a track within the queue from one position to another.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueMove", "from": 3, "to": 0}
  *
@@ -278,7 +278,7 @@ struct QueueMove final {
 /**
  * @struct QueueClear
  * @brief Remove all tracks from the active queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueClear"}
  *
@@ -289,7 +289,7 @@ struct QueueClear final {};
 /**
  * @struct QueueShuffle
  * @brief Enable, disable, or toggle shuffle mode for the active queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueShuffle", "on": true}
  *
@@ -308,7 +308,7 @@ struct QueueShuffle final {
 /**
  * @struct QueueRepeat
  * @brief Set or query repeat mode for the active queue.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "QueueRepeat", "mode": "One"}
  *
@@ -329,7 +329,7 @@ struct QueueRepeat final {
 /**
  * @struct PlaylistList
  * @brief List all playlists.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistList"}
  *
@@ -340,7 +340,7 @@ struct PlaylistList final {};
 /**
  * @struct PlaylistTracks
  * @brief List tracks in a specific playlist.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistTracks", "pid": 1}
  *
@@ -357,7 +357,7 @@ struct PlaylistTracks final {
 /**
  * @struct PlaylistLoad
  * @brief Load a playlist into the active queue and optionally start playback.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistLoad", "pid": 1, "play": true}
  *
@@ -379,7 +379,7 @@ struct PlaylistLoad final {
 /**
  * @struct PlaylistSave
  * @brief Save the active queue as a new playlist.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistSave", "name": "My Playlist", "queue_id": 1}
  *
@@ -401,7 +401,7 @@ struct PlaylistSave final {
 /**
  * @struct PlaylistDelete
  * @brief Delete a playlist by ID.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistDelete", "pid": 1}
  *
@@ -418,7 +418,7 @@ struct PlaylistDelete final {
 /**
  * @struct PlaylistRename
  * @brief Rename an existing playlist.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistRename", "pid": 1, "newName": "New Name"}
  *
@@ -440,7 +440,7 @@ struct PlaylistRename final {
 /**
  * @struct PlaylistExport
  * @brief Export a playlist to a file (M3U format).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistExport", "pid": 1, "path": "/tmp/playlist.m3u", "format": "m3u"}
  *
@@ -467,7 +467,7 @@ struct PlaylistExport final {
 /**
  * @struct PlaylistImport
  * @brief Import a playlist from an M3U file.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "PlaylistImport", "path": "/tmp/playlist.m3u", "name": "Imported"}
  *
@@ -494,7 +494,7 @@ struct PlaylistImport final {
 /**
  * @struct LibraryScan
  * @brief Scan a directory for audio files and add them to the library.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryScan", "path": "/music", "mode": "sampled"}
  *
@@ -520,7 +520,7 @@ struct LibraryScan final {
 /**
  * @struct LibrarySearch
  * @brief Search the library using full-text search.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibrarySearch", "query": "beatles", "limit": 50}
  *
@@ -542,7 +542,7 @@ struct LibrarySearch final {
 /**
  * @struct LibraryStats
  * @brief Get basic library statistics (track/queue/playlist counts).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryStats"}
  *
@@ -553,7 +553,7 @@ struct LibraryStats final {};
 /**
  * @struct LibraryStatsDetailed
  * @brief Get detailed library statistics including play history.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryStatsDetailed"}
  *
@@ -564,7 +564,7 @@ struct LibraryStatsDetailed final {};
 /**
  * @struct LibraryAdd
  * @brief Add a file or directory to the library with metadata extraction.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryAdd", "path": "/music/new.mp3", "recursive": false}
  *
@@ -586,7 +586,7 @@ struct LibraryAdd final {
 /**
  * @struct LibraryRemove
  * @brief Remove a track from the library by ID or path.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryRemove", "query": "123"}
  *
@@ -603,7 +603,7 @@ struct LibraryRemove final {
 /**
  * @struct LibraryList
  * @brief List library tracks with optional filtering and pagination.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "LibraryList", "query": "rock", "limit": 20, "offset": 0, "artist":
  * "Beatles", "album": "Abbey Road", "genre": "Rock"}
@@ -650,7 +650,7 @@ struct LibraryList final {
 /**
  * @struct TagEdit
  * @brief Edit a metadata tag for a track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "TagEdit", "id": 123, "field": "artist", "value": "New Artist"}
  *
@@ -679,7 +679,7 @@ struct TagEdit final {
 /**
  * @struct TagGet
  * @brief Get metadata for a track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "TagGet", "id": 123}
  *
@@ -700,7 +700,7 @@ struct TagGet final {
 /**
  * @struct ConfigGet
  * @brief Get a configuration value by key.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigGet", "key": "volume"}
  *
@@ -717,7 +717,7 @@ struct ConfigGet final {
 /**
  * @struct ConfigSet
  * @brief Set a configuration value.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigSet", "key": "volume", "value": "0.8"}
  *
@@ -739,7 +739,7 @@ struct ConfigSet final {
 /**
  * @struct ConfigList
  * @brief List all configuration values.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigList"}
  *
@@ -750,7 +750,7 @@ struct ConfigList final {};
 /**
  * @struct ConfigExport
  * @brief Export configuration to a file.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigExport", "path": "/tmp/config.json"}
  *
@@ -767,7 +767,7 @@ struct ConfigExport final {
 /**
  * @struct ConfigImport
  * @brief Import configuration from a file.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigImport", "path": "/tmp/config.json"}
  *
@@ -784,7 +784,7 @@ struct ConfigImport final {
 /**
  * @struct ConfigReset
  * @brief Reset a specific config key or all configuration to defaults.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "ConfigReset", "key": "volume"}
  *
@@ -805,7 +805,7 @@ struct ConfigReset final {
 /**
  * @struct HistoryList
  * @brief List playback history entries.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "HistoryList", "limit": 50}
  *
@@ -822,7 +822,7 @@ struct HistoryList final {
 /**
  * @struct HistoryClear
  * @brief Clear all playback history.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "HistoryClear"}
  *
@@ -837,7 +837,7 @@ struct HistoryClear final {};
 /**
  * @struct Info
  * @brief Get detailed information about the currently playing track.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Info"}
  *
@@ -848,7 +848,7 @@ struct Info final {};
 /**
  * @struct Shutdown
  * @brief Request the service daemon to shut down.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Shutdown"}
  *
@@ -859,7 +859,7 @@ struct Shutdown final {};
 /**
  * @struct Preview
  * @brief Preview an audio file (play without adding to queue).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "Preview", "file": "/music/song.mp3"}
  *
@@ -880,7 +880,7 @@ struct Preview final {
 /**
  * @struct DeviceList
  * @brief List available audio output devices.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "DeviceList"}
  *
@@ -891,7 +891,7 @@ struct DeviceList final {};
 /**
  * @struct DeviceSet
  * @brief Set the active audio output device.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "DeviceSet", "id": "hw:0,0"}
  *
@@ -908,7 +908,7 @@ struct DeviceSet final {
 /**
  * @struct DeviceTest
  * @brief Test an audio output device with a test tone.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @json_example {"type": "DeviceTest", "id": "hw:0,0"}
  *
@@ -927,7 +927,7 @@ struct DeviceTest final {
  *
  * Used for JSON serialization/deserialization and type-safe dispatch.
  * All command structs are empty or contain only data members (no behavior).
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  *
  * @see toJson for serialization
  * @see commandFromJson for deserialization
@@ -948,7 +948,7 @@ using Command =
  * @brief Concept matching any valid command alternative type.
  *
  * Constrains template parameters to types that are part of the Command variant.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  */
 template <typename T>
 concept CommandAlternative = requires {
@@ -978,9 +978,9 @@ concept CommandAlternative = requires {
  * @brief Concept matching any valid command type (including cvref-qualified).
  *
  * Convenience concept that strips cvref qualifiers before checking CommandAlternative.
- * @ingroup caudio_cli
+ * @ingroup caudio_ipc
  */
 template <typename T>
 concept CommandType = CommandAlternative<std::remove_cvref_t<T>>;
 
-} // namespace caudio::cli
+} // namespace caudio::ipc

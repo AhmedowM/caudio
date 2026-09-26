@@ -36,7 +36,7 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     if (!socketPathOverride.empty()) {
         sp = std::string(socketPathOverride.data(), socketPathOverride.size());
     } else {
-        sp = caudio::cli::socketPathFor(dbPath);
+        sp = caudio::config::socketPathFor(dbPath);
     }
     if (!sp)
         return std::unexpected{sp.error()};
@@ -103,8 +103,8 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
 }
 
 void IpcServer::run(std::stop_token st,
-                    std::function<std::expected<caudio::cli::Result, caudio::utils::Error>(
-                        const caudio::cli::Command&)>
+                    std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
+                        const caudio::ipc::Command&)>
                         dispatch) {
     if (running_.exchange(true)) {
         return;
@@ -175,8 +175,8 @@ void IpcServer::run(std::stop_token st,
                     reqStr.reserve(payload.size());
                     for (auto b : payload)
                         reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
-                    auto reqExp = caudio::cli::deserializeRequest(reqStr);
-                    caudio::cli::IpcReply reply;
+                    auto reqExp = caudio::ipc::deserializeRequest(reqStr);
+                    caudio::ipc::IpcReply reply;
                     if (!reqExp) {
                         reply.id = 0;
                         reply.result = std::unexpected{reqExp.error()};
@@ -188,8 +188,8 @@ void IpcServer::run(std::stop_token st,
                         else
                             reply.result = *resExp;
                     }
-                    std::string repJson = caudio::cli::serializeReply(reply);
-                    auto framed = caudio::cli::frame(repJson);
+                    std::string repJson = caudio::ipc::serializeReply(reply);
+                    auto framed = caudio::ipc::frame(repJson);
                     DWORD w2 = 0;
                     BOOL okW = ::WriteFile(clientHandle, framed.data(),
                                            static_cast<DWORD>(framed.size()), &w2, nullptr);
@@ -284,8 +284,8 @@ void IpcServer::run(std::stop_token st,
                     reqStr.reserve(payload.size());
                     for (auto b : payload)
                         reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
-                    auto reqExp = caudio::cli::deserializeRequest(reqStr);
-                    caudio::cli::IpcReply reply;
+                    auto reqExp = caudio::ipc::deserializeRequest(reqStr);
+                    caudio::ipc::IpcReply reply;
                     if (!reqExp) {
                         reply.id = 0;
                         reply.result = std::unexpected{reqExp.error()};
@@ -297,8 +297,8 @@ void IpcServer::run(std::stop_token st,
                         else
                             reply.result = *resExp;
                     }
-                    std::string repJson = caudio::cli::serializeReply(reply);
-                    auto framed = caudio::cli::frame(repJson);
+                    std::string repJson = caudio::ipc::serializeReply(reply);
+                    auto framed = caudio::ipc::frame(repJson);
                     if (!sendAll(framed)) {
                         ::close(cfd);
                         return;

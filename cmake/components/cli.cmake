@@ -2,7 +2,7 @@
 # The CLI app itself (cli/src/app/*) compiles into the caudio executable only; no cli library.
 
 set(CAUDIO_IPC_MODULE_SOURCES
-  src/ipc/cli.cppm
+  src/ipc/ipc.cppm
   src/ipc/command.cppm
   src/ipc/result.cppm
   src/ipc/protocol.cppm

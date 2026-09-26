@@ -11,8 +11,8 @@
 
 int main(int argc, char** argv) {
     // Load default config (XDG or temp). If path empty, use default.
-    auto cfgExp = caudio::cli::loadConfig(std::filesystem::path{});
-    caudio::cli::Config cfg;
+    auto cfgExp = caudio::config::loadConfig(std::filesystem::path{});
+    caudio::config::Config cfg;
     if (cfgExp) {
         cfg = std::move(*cfgExp);
     } else {
