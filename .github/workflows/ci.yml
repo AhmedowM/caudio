@@ -313,8 +313,8 @@ jobs:
 
       - name: Verify module sources shipped
         run: |
-          test -f /tmp/caudio-install-mod/include/caudio/src/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
-          ls /tmp/caudio-install-mod/include/caudio/src/*.cppm | head -n 20
+          test -f /tmp/caudio-install-mod/include/caudio/modules/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
+          ls /tmp/caudio-install-mod/include/caudio/modules/*/*.cppm | head -n 20
 
       - name: Smoke compile (find_package + import caudio.utils)
         run: |
@@ -328,7 +328,7 @@ jobs:
           list(APPEND CMAKE_PREFIX_PATH "/tmp/caudio-install-mod")
           find_package(caudio CONFIG REQUIRED)
           add_executable(smoke main.cpp)
-          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES /tmp/caudio-install-mod/include/caudio/src/utils/utils.cppm)
+          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES /tmp/caudio-install-mod/include/caudio/modules/utils/utils.cppm)
           target_link_libraries(smoke PRIVATE caudio::utils)
           EOF
           cat > /tmp/caudio-mod-smoke/main.cpp << 'EOF'

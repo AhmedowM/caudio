@@ -1,13 +1,13 @@
 set(CAUDIO_UTILS_MODULE_SOURCES
-  src/utils/utils.cppm
-  src/utils/result.cppm
-  src/utils/error.cppm
-  src/utils/log.cppm
-  src/utils/math.cppm
-  src/utils/ring.cppm
-  src/utils/mpsc_queue.cppm
-  src/utils/thread.cppm
-  src/utils/version.cppm
+  modules/utils/utils.cppm
+  modules/utils/result.cppm
+  modules/utils/error.cppm
+  modules/utils/log.cppm
+  modules/utils/math.cppm
+  modules/utils/ring.cppm
+  modules/utils/mpsc_queue.cppm
+  modules/utils/thread.cppm
+  modules/utils/version.cppm
 )
 
 set(CAUDIO_UTILS_SOURCES

@@ -1,5 +1,5 @@
 module;
-#include "service_status.hpp"
+#include "service/service_status.hpp"
 
 export module caudio.service:status;
 

@@ -165,8 +165,8 @@ include(cmake/components/combined.cmake)
 
 # Umbrella module (optional, headers are canonical)
 if(CAUDIO_ENABLE_MODULES)
-  add_library(caudio_umbrella STATIC src/caudio.cppm)
-  target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES src/caudio.cppm)
+  add_library(caudio_umbrella STATIC modules/caudio.cppm)
+  target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
   target_link_libraries(caudio_umbrella PUBLIC caudio::utils caudio::player caudio::db caudio::engine)
   ca_set_warnings(caudio_umbrella)
@@ -178,9 +178,6 @@ add_executable(caudio
   cli/src/main.cpp
 )
 target_sources(caudio PRIVATE cli/src/app/core.cpp)
-if(CAUDIO_ENABLE_MODULES)
-  target_sources(caudio PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES cli/src/app/app.cppm cli/src/app/core.cppm)
-endif()
 target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
@@ -264,10 +261,10 @@ install(FILES
 
 install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# C++23 module sources for BMI rebuild (only when modules enabled)
+# C++23 module sources for BMI rebuild (only when modules enabled).
+# Both rules converge on include/caudio/modules (FILE_SET preserves source paths).
 if(CAUDIO_ENABLE_MODULES)
-  install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/src FILES_MATCHING PATTERN "*.cppm")
-  install(DIRECTORY cli/src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/cli FILES_MATCHING PATTERN "*.cppm")
+  install(DIRECTORY modules/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/modules FILES_MATCHING PATTERN "*.cppm")
 endif()
 
 # Man page — roff source tracked at docs/man/caudio.1

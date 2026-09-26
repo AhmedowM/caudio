@@ -1,12 +1,12 @@
 set(CAUDIO_PLAYER_MODULE_SOURCES
-  src/player/player.cppm
-  src/player/player_core.cppm
-  src/player/reader.cppm
-  src/player/output.cppm
-  src/player/decoder.cppm
-  src/player/decoders/decoder_common.cppm
-  src/player/decoders/decoder_interface.cppm
-  src/player/decoders/ffmpeg.cppm
+  modules/player/player.cppm
+  modules/player/player_core.cppm
+  modules/player/reader.cppm
+  modules/player/output.cppm
+  modules/player/decoder.cppm
+  modules/player/decoders/decoder_common.cppm
+  modules/player/decoders/decoder_interface.cppm
+  modules/player/decoders/ffmpeg.cppm
 )
 set(CAUDIO_PLAYER_SOURCES
   src/player/miniaudio_impl.cpp

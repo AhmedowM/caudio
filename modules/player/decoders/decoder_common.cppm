@@ -1,5 +1,5 @@
 module;
-#include "decoder_common.hpp"
+#include "player/decoders/decoder_common.hpp"
 
 export module caudio.player:decoder_common;
 

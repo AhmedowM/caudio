@@ -2,11 +2,11 @@
 # The CLI app itself (cli/src/app/*) compiles into the caudio executable only; no cli library.
 
 set(CAUDIO_IPC_MODULE_SOURCES
-  src/ipc/ipc.cppm
-  src/ipc/command.cppm
-  src/ipc/result.cppm
-  src/ipc/protocol.cppm
-  src/config.cppm
+  modules/ipc/ipc.cppm
+  modules/ipc/command.cppm
+  modules/ipc/result.cppm
+  modules/ipc/protocol.cppm
+  modules/config.cppm
 )
 set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
@@ -19,16 +19,16 @@ target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 target_link_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
-  src/service/service.cppm
-  src/service/service_paths.cppm
-  src/service/service_status.cppm
-  src/service/service_audio.cppm
-  src/service/service_impl.cppm
-  src/service/shm_status.cppm
-  src/service/ipc_channel.cppm
+  modules/service/service.cppm
+  modules/service/service_paths.cppm
+  modules/service/service_status.cppm
+  modules/service/service_audio.cppm
+  modules/service/service_impl.cppm
+  modules/service/shm_status.cppm
+  modules/service/ipc_channel.cppm
   src/service/ipc_channel_unix.cpp
   src/service/ipc_channel_win.cpp
-  src/service/ipc_server.cppm
+  modules/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_channel.cpp
@@ -62,10 +62,10 @@ if(NOT WIN32)
 endif()
 
 set(CAUDIO_CLIENT_MODULE_SOURCES
-  src/client/client.cppm
-  src/client/ipc_client.cppm
-  src/client/client_impl.cppm
-  src/client/output_formatter.cppm
+  modules/client/client.cppm
+  modules/client/ipc_client.cppm
+  modules/client/client_impl.cppm
+  modules/client/output_formatter.cppm
 )
 set(CAUDIO_CLIENT_SOURCES
   src/client/ipc_client.cpp

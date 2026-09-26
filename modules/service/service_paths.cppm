@@ -1,5 +1,5 @@
 module;
-#include "service_paths.hpp"
+#include "service/service_paths.hpp"
 
 export module caudio.service:paths;
 

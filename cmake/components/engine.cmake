@@ -1,8 +1,8 @@
 set(CAUDIO_ENGINE_MODULE_SOURCES
-  src/engine/engine.cppm
-  src/engine/engine_types.cppm
-  src/engine/history.cppm
-  src/engine/shuffle.cppm
+  modules/engine/engine.cppm
+  modules/engine/engine_types.cppm
+  modules/engine/history.cppm
+  modules/engine/shuffle.cppm
 )
 set(CAUDIO_ENGINE_SOURCES
   src/engine/engine.cpp

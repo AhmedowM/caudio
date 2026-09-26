@@ -1,19 +1,19 @@
 set(CAUDIO_DB_MODULE_SOURCES
-  src/db/database.cppm
-  src/db/db_types.cppm
-  src/db/schema.cppm
-  src/db/db_core.cppm
-  src/db/queue.cppm
-  src/db/scan.cppm
-  src/db/search.cppm
-  src/db/json.cppm
-  src/db/write_thread.cppm
-  src/db/statement.cppm
-  src/db/transaction.cppm
-  src/db/detail.cppm
-  src/db/fingerprint.cppm
-  src/db/fts.cppm
-  src/db/stmt_helpers.cppm
+  modules/db/database.cppm
+  modules/db/db_types.cppm
+  modules/db/schema.cppm
+  modules/db/db_core.cppm
+  modules/db/queue.cppm
+  modules/db/scan.cppm
+  modules/db/search.cppm
+  modules/db/json.cppm
+  modules/db/write_thread.cppm
+  modules/db/statement.cppm
+  modules/db/transaction.cppm
+  modules/db/detail.cppm
+  modules/db/fingerprint.cppm
+  modules/db/fts.cppm
+  modules/db/stmt_helpers.cppm
 )
 
 set(CAUDIO_DB_SOURCES
