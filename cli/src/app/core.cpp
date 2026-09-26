@@ -8,7 +8,7 @@
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 // Avoid including <windows.h> â€” causes HMODULE conflict with caudio::utils (like
-// service_detail.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
+// service_paths.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
 // missing decls.
 using BOOL = int;
 using LPCWSTR = const wchar_t*;

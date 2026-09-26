@@ -186,7 +186,69 @@ class Service final {
     std::expected<caudio::cli::Result, caudio::utils::Error>
     dispatch(const caudio::cli::Command& cmd);
 
-    ServiceConfig config_;
+    /// Visitor routing each Command alternative to its handle() overload.
+    struct DispatchVisitor {
+        Service* self;
+        template <typename T>
+        auto operator()(const T& c) const {
+            return self->handle(c);
+        }
+    };
+
+    // Command handlers (defined in dispatch_*.cpp).
+    std::expected<caudio::cli::Result, caudio::utils::Error> statusResult();
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigExport& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigGet& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigImport& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigList&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigReset& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::ConfigSet& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::DeviceList&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::DeviceSet& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::DeviceTest& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::HistoryClear&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::HistoryList& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Info&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryAdd& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryList& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryRemove& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryScan& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibrarySearch& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryStats&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::LibraryStatsDetailed&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Next&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Pause&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Play&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistDelete& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistExport& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistImport& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistList&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistLoad& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistRename& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistSave& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::PlaylistTracks& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Prev&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Preview&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueAdd& qa);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueClear&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueList&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueMove& qm);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueQueues&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueRemove& qr);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueRepeat& qr);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueShuffle& qs);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::QueueSwitch& qs);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Restart&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Resume&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Seek& s);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Shutdown&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::StatusReq&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::Stop&);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::TagEdit& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::TagGet& cmd);
+    std::expected<caudio::cli::Result, caudio::utils::Error> handle(const caudio::cli::VolumeSet& v);
+
+ServiceConfig config_;
     std::shared_ptr<caudio::db::Database> db_;
     std::unique_ptr<caudio::engine::Engine> engine_;
     std::unique_ptr<IpcServer> server_;

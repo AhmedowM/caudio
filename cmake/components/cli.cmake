@@ -20,7 +20,9 @@ target_link_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-de
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
   src/service/service.cppm
-  src/service/service_detail.cppm
+  src/service/service_paths.cppm
+  src/service/service_status.cppm
+  src/service/service_audio.cppm
   src/service/service_impl.cppm
   src/service/shm_status.cppm
   src/service/ipc_channel.cppm
@@ -32,8 +34,14 @@ set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_channel.cpp
   src/service/ipc_server.cpp
   src/service/shm_status.cpp
-  src/service/service_detail.cpp
+  src/service/service_paths.cpp
+  src/service/service_status.cpp
+  src/service/service_audio.cpp
   src/service/service_impl.cpp
+  src/service/dispatch_playback.cpp
+  src/service/dispatch_queue.cpp
+  src/service/dispatch_library.cpp
+  src/service/dispatch_config.cpp
 )
 caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::ipc caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor WITH_FFMPEG)
 target_include_directories(service PRIVATE ${nlohmann_json_SOURCE_DIR}/include)

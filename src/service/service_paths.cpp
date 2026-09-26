@@ -4,7 +4,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "service_detail.hpp"
+#include "service_paths.hpp"
 
 #include <algorithm>
 #include <array>
@@ -136,7 +136,6 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <caudio/ipc.hpp>
 
 namespace caudio::service::detail {
-
 std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,
                                        const std::string& /*socketPath*/) {
     auto r = caudio::cli::pidPathFor(dbPath);
@@ -316,45 +315,6 @@ std::optional<int> readPidFile(const std::filesystem::path& pidPath) {
     return pid;
 }
 
-std::expected<caudio::cli::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
-                                                                     caudio::db::Database& db) {
-    caudio::cli::Status s{};
-    s.version = std::string(caudio::versionFull);
-    s.state = eng.state();
-    s.pos = eng.position();
-    s.dur = eng.duration();
-    s.vol = eng.volume();
-    s.muted = false;
-    s.shuffle = eng.shuffle();
-    s.repeat = eng.repeat();
-    s.track_id = eng.currentTrackId();
-    if (s.track_id != 0) {
-        auto tr = db.getTrack(s.track_id);
-        if (tr) {
-            s.title = tr->title;
-            s.artist = tr->artist;
-            s.path = tr->path;
-        }
-    }
-    try {
-        int64_t activeQ = eng.activeQueueId();
-        auto items = db.queueList(activeQ);
-        if (items) {
-            s.q_size = items->size();
-            s.q_idx = 0;
-            if (s.track_id != 0 && !items->empty()) {
-                for (std::size_t i = 0; i < items->size(); ++i) {
-                    if ((*items)[i].track_id == s.track_id) {
-                        s.q_idx = i;
-                        break;
-                    }
-                }
-            }
-        }
-    } catch (...) {
-    }
-    return s;
-}
 
 std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
                                         const std::filesystem::path& dbPath) {
@@ -370,102 +330,6 @@ std::filesystem::path resolveConfigPath(const std::filesystem::path& configPath,
     if (ec)
         tmp = std::filesystem::path("/tmp");
     return tmp / "caudio" / "config.json";
-}
-
-std::expected<std::string, caudio::utils::Error> readConfigValueRaw(const std::filesystem::path& p,
-                                                                    std::string_view key) {
-    return caudio::cli::configGetRaw(p, key);
-}
-
-caudio::utils::Expected<void> writeConfigValueRaw(const std::filesystem::path& p,
-                                                  std::string_view key, std::string_view value) {
-    return caudio::cli::configSetRaw(p, key, value);
-}
-
-std::expected<std::vector<caudio::cli::ConfigValue>, caudio::utils::Error>
-listConfigValuesRaw(const std::filesystem::path& p) {
-    auto r = caudio::cli::configListRaw(p);
-    if (!r)
-        return std::unexpected{r.error()};
-    std::vector<caudio::cli::ConfigValue> out;
-    out.reserve(r->size());
-    for (auto& kv : *r)
-        out.push_back(caudio::cli::ConfigValue{kv.key, kv.value});
-    return out;
-}
-
-caudio::utils::Expected<void> deleteConfigValueRaw(const std::filesystem::path& p,
-                                                   std::string_view key) {
-    return caudio::cli::configDeleteRaw(p, key);
-}
-
-caudio::utils::Expected<void> resetAllConfigRaw(const std::filesystem::path& p) {
-    return caudio::cli::configResetAllRaw(p);
-}
-
-bool hasAudioExt(const std::filesystem::path& p) {
-    auto ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
-}
-
-std::expected<std::array<std::uint8_t, 32>, caudio::utils::Error>
-computeFingerprint(const std::filesystem::path& path) {
-    std::error_code ec;
-    auto sz = std::filesystem::file_size(path, ec);
-    if (ec)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io, ec.message())};
-    std::ifstream f(path, std::ios::binary);
-    if (!f)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
-    constexpr std::size_t kSample = 64 * 1024;
-    blake3_hasher hasher;
-    blake3_hasher_init(&hasher);
-    std::vector<std::uint8_t> buf(kSample);
-    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
-    std::size_t n = static_cast<std::size_t>(f.gcount());
-    if (n != 0)
-        blake3_hasher_update(&hasher, buf.data(), n);
-    if (sz > kSample) {
-        f.clear();
-        f.seekg(static_cast<std::streamoff>(sz - kSample), std::ios::beg);
-        if (f) {
-            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
-            n = static_cast<std::size_t>(f.gcount());
-            if (n != 0)
-                blake3_hasher_update(&hasher, buf.data(), n);
-        }
-    }
-    std::uint64_t sz64 = static_cast<std::uint64_t>(sz);
-    blake3_hasher_update(&hasher, &sz64, sizeof(sz64));
-    std::uint32_t ver = 1;
-    blake3_hasher_update(&hasher, &ver, sizeof(ver));
-    std::array<std::uint8_t, 32> out{};
-    blake3_hasher_finalize(&hasher, out.data(), out.size());
-    return out;
-}
-
-double durationFromDecoder(const std::filesystem::path& path) noexcept {
-    try {
-        auto readerRes = caudio::player::FileReader::open(path);
-        if (!readerRes)
-            return 0.0;
-        auto& readerPtr = readerRes.value();
-        auto decRes = caudio::player::DecoderRegistry::open(*readerPtr);
-        if (!decRes)
-            return 0.0;
-        auto& decPtr = decRes.value();
-        std::uint32_t sr = decPtr->sampleRate();
-        std::uint64_t frames = decPtr->totalFrames();
-        if (sr == 0)
-            return 0.0;
-        return static_cast<double>(frames) / static_cast<double>(sr);
-    } catch (...) {
-        return 0.0;
-    }
 }
 
 } // namespace caudio::service::detail
