@@ -14,7 +14,9 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/decoders/ffmpeg.cpp
 )
 caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor)
-target_compile_options(player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
+if(CAUDIO_ENABLE_MODULES)
+  target_compile_options(player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
+endif()
 
 caudio_add_shared_variant(player EXTRA_DEPS caudio::utils_shared)
 target_link_libraries(player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)

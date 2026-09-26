@@ -1,6 +1,6 @@
 ﻿#pragma once
 /**
- * @file database.hpp
+ * @file db.hpp
  * @brief Aggregate include for the caudio.db module.
  * @ingroup caudio_db
  * @details Includes all public partitions:

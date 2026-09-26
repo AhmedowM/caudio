@@ -41,9 +41,6 @@ Thumbs.db
 docs/html/
 docs/latex/
 
-# Private header junction for src/caudio -> src (allows <caudio/...> to resolve to src/... via src/caudio)
-src/caudio/
-
 # Keep source md on disk but not required in repo history (AI docs)
 # Uncomment to ignore all markdown if desired:
 # *.md

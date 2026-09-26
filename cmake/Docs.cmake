@@ -3,6 +3,7 @@
 #   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
 #   cmake --build build --target doc   # generates HTML to build/docs/html
 # Requires Doxygen (optional). If not found, configure still succeeds.
+# Doxyfile precedence: docs/Doxyfile.in > Doxyfile.in > Doxyfile > docs/Doxyfile.
 
 function(caudio_add_docs)
   find_package(Doxygen OPTIONAL_COMPONENTS dot)

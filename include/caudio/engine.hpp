@@ -21,7 +21,7 @@
 #include <vector>
 
 /**
- * @file engine.cppm
+ * @file engine.hpp
  * @brief Playback engine — state machine, gapless, decode/monitor loops and persistence.
  * @ingroup caudio_engine
  * @details Aggregate module `caudio.engine` re-exporting `:types`, `:history`
@@ -690,20 +690,6 @@ class Engine final {
      */
     std::expected<void, caudio::utils::Error> doPlayTrack(caudio::db::Track& t);
 
-    /**
-     * @brief Pre-fills the SPSC ring to half capacity before starting audio output.
-     * @ingroup caudio_engine
-     * @details Called from doPlayTrack after creating ring and output. Decodes frames in
-     * chunks (up to 1024 frames, max 2048/ch) until ring is half full or EOF. Uses
-     * decoder_->decode() into a temporary buffer, writes to ring_. Early exit if ring
-     * cannot accept a full chunk. Ensures gapless transition by having audio ready
-     * immediately on output_->start().
-     * @par Thread safety
-     * Called from doPlayTrack with queueMutex_ held; decodeLoop not yet running for
-     * this track. No locks needed.
-     * @see doPlayTrack
-     * @see decodeLoop
-     */
     /**
      * @brief Pre-fills the SPSC ring to half capacity before starting audio output.
      * @ingroup caudio_engine
