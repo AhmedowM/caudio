@@ -140,6 +140,10 @@ endif()
 
 # FetchContent deps needed before components (nlohmann_json_SOURCE_DIR etc.)
 include(FetchContent)
+# nlohmann_json is public API (protocol/db/config signatures): install its
+# package (upstream defaults JSON_Install off under FetchContent) so
+# downstream find_package(caudio) pulls working headers via find_dependency.
+set(JSON_Install ON)
 FetchContent_Declare(
   nlohmann_json
   GIT_REPOSITORY https://github.com/nlohmann/json.git

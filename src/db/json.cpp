@@ -6,6 +6,7 @@
 #include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <sstream>
 
 namespace caudio::db {

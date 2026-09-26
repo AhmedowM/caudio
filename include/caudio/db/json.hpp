@@ -13,7 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp> // full <nlohmann/json.hpp> needed only to use values, not to declare
 #include <shared_mutex>
 #include <span>
 #include <sstream>

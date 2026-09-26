@@ -1,5 +1,7 @@
 ﻿#include <caudio/ipc/protocol.hpp>
 
+#include <nlohmann/json.hpp>
+
 namespace caudio::ipc::detail {
 
 std::string playbackStateToString(caudio::engine::PlaybackState s) {

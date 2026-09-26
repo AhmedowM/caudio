@@ -1,5 +1,7 @@
 ﻿#include <caudio/config.hpp>
 
+#include <nlohmann/json.hpp>
+
 namespace caudio::config::detail {
 
 std::filesystem::path defaultDbPath() {

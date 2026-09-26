@@ -72,7 +72,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp> // full <nlohmann/json.hpp> needed only to use values, not to declare
 #include <optional>
 #include <span>
 #include <string>

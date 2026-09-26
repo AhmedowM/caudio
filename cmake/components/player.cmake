@@ -4,7 +4,6 @@ set(CAUDIO_PLAYER_MODULE_SOURCES
   modules/player/reader.cppm
   modules/player/output.cppm
   modules/player/decoder.cppm
-  modules/player/decoders/decoder_common.cppm
   modules/player/decoders/decoder_interface.cppm
   modules/player/decoders/ffmpeg.cppm
 )

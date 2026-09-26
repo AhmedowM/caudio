@@ -7,6 +7,7 @@
 #include <ctime>
 #include <format>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <print>
 #include <span>
 #include <string>
