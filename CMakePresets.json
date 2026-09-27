@@ -49,9 +49,10 @@
     {
       "name": "modules",
       "inherits": "base",
-      "displayName": "C++23 module smoke: modules on, tests/examples off",
+      "displayName": "C++23 module smoke: modules on, no CLI/tests/examples",
       "cacheVariables": {
-        "CAUDIO_ENABLE_MODULES": "ON"
+        "CAUDIO_ENABLE_MODULES": "ON",
+        "CAUDIO_BUILD_CLI": "OFF"
       }
     },
     {
@@ -65,17 +66,60 @@
     {
       "name": "shared",
       "inherits": "base",
-      "displayName": "Shared opt-in: *_shared variants + combined libcaudio",
+      "displayName": "Shared opt-in: *_shared variants + combined libcaudio, no CLI",
       "cacheVariables": {
-        "CAUDIO_BUILD_SHARED": "ON"
+        "CAUDIO_BUILD_SHARED": "ON",
+        "CAUDIO_BUILD_CLI": "OFF"
       }
     },
     {
       "name": "release",
       "inherits": "base",
-      "displayName": "Optimized release build",
+      "displayName": "Optimized release build (tag required)",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAUDIO_REQUIRE_GIT_VERSION": "ON"
+      }
+    },
+    {
+      "name": "release-lto",
+      "inherits": "release",
+      "displayName": "Release + link-time optimization, no CLI",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
+      "name": "minsize",
+      "inherits": "base",
+      "displayName": "Smallest binary: MinSizeRel, library only",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel",
+        "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
+      "name": "docs",
+      "inherits": "base",
+      "displayName": "Docs only: Doxygen build, no CLI/tests/examples",
+      "cacheVariables": {
+        "CAUDIO_BUILD_DOCS": "ON",
+        "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
+      "name": "all",
+      "inherits": "base",
+      "displayName": "Everything: tests, examples, docs, shared, modules, release (tag required)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAUDIO_REQUIRE_GIT_VERSION": "ON",
+        "CAUDIO_ENABLE_TESTS": "ON",
+        "CAUDIO_ENABLE_EXAMPLES": "ON",
+        "CAUDIO_BUILD_DOCS": "ON",
+        "CAUDIO_BUILD_SHARED": "ON",
+        "CAUDIO_ENABLE_MODULES": "ON"
       }
     }
   ],
@@ -104,6 +148,16 @@
       "name": "modules",
       "configurePreset": "modules",
       "jobs": 4
+    },
+    {
+      "name": "docs",
+      "configurePreset": "docs",
+      "targets": ["doc"]
+    },
+    {
+      "name": "all",
+      "configurePreset": "all",
+      "jobs": 4
     }
   ],
   "testPresets": [
@@ -130,6 +184,16 @@
     {
       "name": "ci-sanitizers",
       "configurePreset": "ci-sanitizers",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "all",
+      "configurePreset": "all",
       "output": {
         "outputOnFailure": true
       },
