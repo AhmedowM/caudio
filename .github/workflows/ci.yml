@@ -142,10 +142,15 @@ jobs:
           # time. The loader needs FFmpeg DLLs AND the toolchain runtime
           # (libstdc++-6.dll etc.); neither is on PATH by default.
           # 0xc0000135 == STATUS_DLL_NOT_FOUND.
+          # NOTE: the Windows loader needs ABSOLUTE Windows-style dirs.
+          # Relative entries resolve against each process CWD (useless) and
+          # Git-Bash POSIX paths (/d/...) are unreadable to it -- always
+          # convert with cygpath -w.
           dll=$(find build/ci/_deps -name 'avcodec-*.dll' | head -n 1)
           test -n "$dll" || (echo "FFmpeg DLLs not found under build/ci/_deps" && exit 1)
-          echo "$(dirname "$dll")" >> $GITHUB_PATH
-          echo "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+          cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+          echo "PATH additions:"; tail -n 2 "$GITHUB_PATH"
         shell: bash
 
       - name: Build
