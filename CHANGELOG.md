@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026-09-27
+
+### Added
+- `CMakePresets.json`: 19 configure presets (`default`, `dev`, `ci`, `ci-sanitizers`, `modules`, `minimal`, `shared`, `release`, `release-lto`, `minsize`, `docs`, `all`, plus `-no-cli` splits, `minsize-lto`, `release-native`); build + test presets; CI migrated to `cmake --preset`
+- New options: `CAUDIO_BUILD_SHARED` (default OFF — gates `*_shared` + `combined` whole-archive maze), `CAUDIO_BUILD_CLI` (default ON — OFF skips CLI11 fetch + executable), `CAUDIO_REQUIRE_GIT_VERSION` (default OFF — fails fast with no git tag)
+- Lazy FetchContent: `find_package(nlohmann_json/CLI11)` first, fetch only as fallback
+
+### Changed
+- **BREAKING (build)** Shared `*_shared`/`combined` targets no longer built by default; opt in with `-DCAUDIO_BUILD_SHARED=ON`
+- Tag-less configure emits a loud warning (fallback `0.1.0` is not a release build)
+- `test_player_integration` now defines `TEST_DATA_DIR` (fixes fixture lookup in nested `build/<preset>` trees)
+- Removed stale `e.g. "v0.25.4"` version strings from `version.hpp` / `version.hpp.in` / `ipc/result.hpp`
+- nlohmann/json propagated via installed package (`find_dependency` + PUBLIC link); `json_fwd` in public headers
+- Decoder collapsed to a single pImpl class (`IDecoder`/`DecoderRegistry`/`decoder_common` deleted)
+- `engine.hpp` slimmed 21 → 12 includes; Windows TUs include real `<windows.h>` first
+- Private `config::detail` moved to `src/config_detail.hpp`; stale test narration deleted
+
+## [0.34.2] - 2026-09-26
+
+### Removed
+- Deleted unused `ipc_channel_unix.cpp` / `ipc_channel_win.cpp` implementations
+
+## [0.34.1] - 2026-09-26
+
+### Changed
+- Module interface units moved to `modules/` mirroring `src/`; backfilled 0.25.6–0.34.0 release notes
+
 ## [0.34.0] - 2026-09-26
 
 ### Changed
