@@ -18,12 +18,12 @@
  */
 namespace caudio {
 /**
- * @brief Short version (PROJECT_VERSION, e.g. "0.25.4").
+ * @brief Short version (PROJECT_VERSION).
  * @ingroup caudio
  */
 inline constexpr std::string_view shortVersion = "@PROJECT_VERSION@";
 /**
- * @brief Full version (git tag, e.g. "v0.25.4").
+ * @brief Full version (git tag).
  * @ingroup caudio
  */
 inline constexpr std::string_view versionFull = "@CAUDIO_VERSION_FULL@";

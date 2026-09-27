@@ -9,8 +9,6 @@
 #include <string>
 #include <thread>
 
-// Import utils for SpscRing used by makeDummyRing (test-only, no AudioOutput device).
-// This import is safe to repeat in TUs that also `import caudio.utils;`.
 #include <caudio/utils.hpp>
 /**
  * @file common.hpp

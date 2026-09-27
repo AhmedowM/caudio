@@ -8,12 +8,17 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
   ERROR_QUIET
 )
+option(CAUDIO_REQUIRE_GIT_VERSION "fail configure when no git tag is found (default OFF)" OFF)
 if(GIT_TAG MATCHES "^v([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
   set(PROJECT_VERSION_MAJOR "${CMAKE_MATCH_1}")
   set(PROJECT_VERSION_MINOR "${CMAKE_MATCH_2}")
   set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
   set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
 else()
+  if(CAUDIO_REQUIRE_GIT_VERSION)
+    message(FATAL_ERROR "CAUDIO_REQUIRE_GIT_VERSION=ON but no git tag found — clone with tags (git fetch --tags) or configure with -DCAUDIO_REQUIRE_GIT_VERSION=OFF")
+  endif()
+  message(WARNING "No git tag found — using fallback version 0.1.0. Tag-less builds are NOT release builds; docs/CHANGELOG claim the latest tagged release.")
   set(PROJECT_VERSION_MAJOR "0")
   set(PROJECT_VERSION_MINOR "1")
   set(PROJECT_VERSION_PATCH "0")
@@ -142,25 +147,44 @@ if(NOT MSVC)
   target_compile_options(blake3 PRIVATE -w)
 endif()
 
-# FetchContent deps needed before components (nlohmann_json_SOURCE_DIR etc.)
+# FetchContent deps needed before components. Lazy: prefer a system/vcpkg/Conan
+# package first so plain configures don't pay for a git clone; fetch only as
+# fallback. nlohmann_json is public API (protocol/db/config signatures):
+# install its package (upstream defaults JSON_Install off under FetchContent)
+# so downstream find_package(caudio) pulls working headers via find_dependency.
 include(FetchContent)
-# nlohmann_json is public API (protocol/db/config signatures): install its
-# package (upstream defaults JSON_Install off under FetchContent) so
-# downstream find_package(caudio) pulls working headers via find_dependency.
-set(JSON_Install ON)
-FetchContent_Declare(
-  nlohmann_json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(nlohmann_json)
+find_package(nlohmann_json QUIET)
+if(NOT nlohmann_json_FOUND)
+  set(JSON_Install ON)
+  FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+  )
+  FetchContent_MakeAvailable(nlohmann_json)
+  set(CAUDIO_JSON_EXTRA_INCLUDE ${nlohmann_json_SOURCE_DIR}/include)
+else()
+  message(STATUS "nlohmann_json found (system): includes come from nlohmann_json::nlohmann_json")
+  set(CAUDIO_JSON_EXTRA_INCLUDE "")
+endif()
 
-FetchContent_Declare(
-  CLI11
-  GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-  GIT_TAG v2.4.2
-)
-FetchContent_MakeAvailable(CLI11)
+# CLI11 is private to the caudio executable: skip entirely with CAUDIO_BUILD_CLI=OFF.
+option(CAUDIO_BUILD_CLI "build the caudio executable (requires CLI11)" ON)
+if(CAUDIO_BUILD_CLI)
+  find_package(CLI11 QUIET)
+  if(NOT CLI11_FOUND)
+    FetchContent_Declare(
+      CLI11
+      GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
+      GIT_TAG v2.4.2
+    )
+    FetchContent_MakeAvailable(CLI11)
+    set(CAUDIO_CLI11_EXTRA_INCLUDE ${CLI11_SOURCE_DIR}/include)
+  else()
+    message(STATUS "CLI11 found (system): includes come from CLI11::CLI11")
+    set(CAUDIO_CLI11_EXTRA_INCLUDE "")
+  endif()
+endif()
 
 # DRY helpers + component split (include preserves single-BMI build)
 include(cmake/CaudioHelpers.cmake)
@@ -182,11 +206,12 @@ if(CAUDIO_ENABLE_MODULES)
 endif()
 
 # caudio executable — App dispatch (CLI11) + main entry (header-source only)
+if(CAUDIO_BUILD_CLI)
 add_executable(caudio
   cli/src/main.cpp
 )
 target_sources(caudio PRIVATE cli/src/app/core.cpp)
-target_include_directories(caudio PRIVATE cli/src/app vendor ${nlohmann_json_SOURCE_DIR}/include ${CLI11_SOURCE_DIR}/include)
+target_include_directories(caudio PRIVATE cli/src/app vendor ${CAUDIO_JSON_EXTRA_INCLUDE} ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
@@ -205,6 +230,7 @@ if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 if(CAUDIO_ENABLE_SANITIZERS)
   caudio_apply_sanitizers(caudio)
+endif()
 endif()
 
 # Documentation (Doxygen) — see cmake/Docs.cmake
@@ -280,7 +306,9 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio
 )
 
-install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(CAUDIO_BUILD_CLI)
+  install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 # C++23 module sources for BMI rebuild (only when modules enabled).
 # Both rules converge on include/caudio/modules (FILE_SET preserves source paths).
@@ -324,12 +352,12 @@ if(CAUDIO_ENABLE_EXAMPLES)
 
   add_executable(caudio_player_db_demo examples/player_db_demo.cpp)
   target_link_libraries(caudio_player_db_demo PRIVATE caudio::player caudio::db caudio::utils)
-  target_include_directories(caudio_player_db_demo PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+  target_include_directories(caudio_player_db_demo PRIVATE vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
   target_compile_features(caudio_player_db_demo PRIVATE cxx_std_23)
 
   add_executable(caudio_engine_demo examples/engine_demo.cpp)
   target_link_libraries(caudio_engine_demo PRIVATE caudio::engine caudio::db caudio::player caudio::utils)
-  target_include_directories(caudio_engine_demo PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
+  target_include_directories(caudio_engine_demo PRIVATE vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
@@ -353,7 +381,7 @@ if(CAUDIO_ENABLE_TESTS)
     cmake_parse_arguments(PARSE_ARGV 2 ARG "WITH_TEST_DATA;WITH_ALLOW_MULTIPLE_DEFINITION" "" "LIBS")
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${nlohmann_json_SOURCE_DIR}/include)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
     target_compile_features(${name} PRIVATE cxx_std_23)
     if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")

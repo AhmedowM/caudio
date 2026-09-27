@@ -17,7 +17,7 @@
 namespace caudio::utils {
 
 /**
- * @brief Returns library full version (git tag, e.g. "v0.25.4").
+ * @brief Returns library full version (git tag).
  * @ingroup caudio_utils
  * @return String view of caudio::versionFull.
  */
@@ -35,7 +35,7 @@ inline std::string versionString() {
 }
 
 /**
- * @brief Returns short version (PROJECT_VERSION, e.g. "0.25.4").
+ * @brief Returns short version (PROJECT_VERSION).
  * @ingroup caudio_utils
  * @return String view of caudio::shortVersion.
  */

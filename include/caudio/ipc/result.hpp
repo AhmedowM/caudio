@@ -118,7 +118,7 @@ struct Status final {
      */
     std::size_t q_idx{0};
     /**
-     * @brief Daemon/library version (full git tag, e.g. "v0.25.4").
+     * @brief Daemon/library version (full git tag).
      * @details Populated by service_detail::buildStatus from caudio::versionFull.
      * Default is versionFull so local builds without daemon still show version.
      */
