@@ -24,7 +24,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <print>
+#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -646,9 +646,9 @@ Service::handle(const caudio::ipc::PlaylistImport& cmd) {
     }
     pd.format = ext;
     if (skipped > 0) {
-        std::println(std::cerr, "playlist import: skipped {} unmatched tracks", skipped);
+        caudio::println(std::cerr, "playlist import: skipped {} unmatched tracks", skipped);
     }
-    std::println(std::cerr, "playlist import: matched {} tracks, created playlist '{}' (id={})",
+    caudio::println(std::cerr, "playlist import: matched {} tracks, created playlist '{}' (id={})",
                  matched, name, *pidRes);
     return Result{std::move(pd)};
 }

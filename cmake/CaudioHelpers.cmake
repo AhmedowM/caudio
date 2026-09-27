@@ -40,6 +40,10 @@ function(caudio_add_component NAME)
   if(ARG_DEPS)
     target_link_libraries(${NAME} PUBLIC ${ARG_DEPS})
   endif()
+  # Public C++23 requirement: headers use C++23 throughout, and components
+  # ship CXX_MODULES interface units -- consumers (incl. module synth targets)
+  # must compile at C++23 or newer.
+  target_compile_features(${NAME} PUBLIC cxx_std_23)
   # FFmpeg is required (sole decoder backend); every component links it.
   target_link_libraries(${NAME} PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   ca_set_warnings(${NAME})

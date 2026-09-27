@@ -107,7 +107,7 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <print>
+#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -344,7 +344,7 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 int App::handleStart(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
-        std::println("daemon already running at {}", config_.socketPath);
+        caudio::println("daemon already running at {}", config_.socketPath);
         return 0;
     }
     // Ensure db parent dirs exist before trying to start service (foreground)
@@ -362,17 +362,17 @@ int App::handleStart(bool foreground) {
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) {
-            std::println(std::cerr, "start failed: {} {} (dbPath={})",
+            caudio::println(std::cerr, "start failed: {} {} (dbPath={})",
                          std::to_string(std::to_underlying(svc.error().code)), svc.error().message,
                          config_.dbPath.generic_string());
             return 1;
         }
-        std::println("starting daemon foreground at {} db={}", config_.socketPath,
+        caudio::println("starting daemon foreground at {} db={}", config_.socketPath,
                      config_.dbPath.generic_string());
         std::stop_source ss;
         auto res = svc.value()->run(ss.get_token());
         if (!res) {
-            std::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message,
+            caudio::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message,
                          config_.dbPath.generic_string());
             return 1;
         }
@@ -381,7 +381,7 @@ int App::handleStart(bool foreground) {
         auto spawnRes = spawnDaemon(config_);
         if (!spawnRes) {
             std::uint32_t err = spawnRes.error();
-            std::println(std::cerr, "start failed: CreateProcess failed {} at {} db={}", err,
+            caudio::println(std::cerr, "start failed: CreateProcess failed {} at {} db={}", err,
                          config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
@@ -389,12 +389,12 @@ int App::handleStart(bool foreground) {
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {
-                std::println("daemon started at {}", config_.socketPath);
+                caudio::println("daemon started at {}", config_.socketPath);
                 return 0;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        std::println(std::cerr, "daemon start failed, socket not reachable at {} db={}",
+        caudio::println(std::cerr, "daemon start failed, socket not reachable at {} db={}",
                      config_.socketPath, config_.dbPath.generic_string());
         return 1;
     }
@@ -407,7 +407,7 @@ int App::handleShutdown() {
     if (!res) {
         // if daemon not running, report
         if (res.error().code == caudio::utils::StatusCode::State) {
-            std::println(std::cerr, "shutdown: daemon not running");
+            caudio::println(std::cerr, "shutdown: daemon not running");
             return 1;
         }
         // even if send failed, attempt to poll pid file
@@ -429,10 +429,10 @@ int App::handleShutdown() {
     }
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
-        std::println(std::cerr, "shutdown: daemon still running at {}", config_.socketPath);
+        caudio::println(std::cerr, "shutdown: daemon still running at {}", config_.socketPath);
         return 1;
     }
-    std::println("daemon stopped");
+    caudio::println("daemon stopped");
     return 0;
 }
 
@@ -440,12 +440,12 @@ int App::handlePreview(const std::string& file) {
     std::filesystem::path p{file};
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) {
-        std::println(std::cerr, "preview: file not found {}", file);
+        caudio::println(std::cerr, "preview: file not found {}", file);
         return 1;
     }
     auto playerRes = caudio::player::Player::create();
     if (!playerRes) {
-        std::println(std::cerr, "preview: player create failed {} {}",
+        caudio::println(std::cerr, "preview: player create failed {} {}",
                      std::to_string(std::to_underlying(playerRes.error().code)),
                      playerRes.error().message);
         return 1;
@@ -453,23 +453,23 @@ int App::handlePreview(const std::string& file) {
     auto& player = *playerRes.value();
     auto openRes = player.open(file);
     if (!openRes) {
-        std::println(std::cerr, "preview: open failed {} {}",
+        caudio::println(std::cerr, "preview: open failed {} {}",
                      std::to_string(std::to_underlying(openRes.error().code)),
                      openRes.error().message);
         return 1;
     }
     auto playRes = player.play();
     if (!playRes) {
-        std::println(std::cerr, "preview: play failed {} {}",
+        caudio::println(std::cerr, "preview: play failed {} {}",
                      std::to_string(std::to_underlying(playRes.error().code)),
                      playRes.error().message);
         return 1;
     }
-    std::println("preview playing {}", file);
+    caudio::println("preview playing {}", file);
     while (player.state() == caudio::player::State::Playing) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    std::println("preview done");
+    caudio::println("preview done");
     return 0;
 }
 int App::run(int argc, char** argv) {
@@ -794,7 +794,7 @@ int App::run(int argc, char** argv) {
     if (seekCmd->parsed()) {
         auto parsed = detail::parseSeek(seekStr);
         if (!parsed) {
-            std::println(std::cerr, "seek: {}", parsed.error().message);
+            caudio::println(std::cerr, "seek: {}", parsed.error().message);
             return 1;
         }
         double target = *parsed;
@@ -825,7 +825,7 @@ int App::run(int argc, char** argv) {
     if (statusCmd->parsed()) {
         if (statusWatch) {
             if (statusInterval <= 0) {
-                std::println(std::cerr, "status --interval must be positive");
+                caudio::println(std::cerr, "status --interval must be positive");
                 return 1;
             }
             using namespace std::chrono;
@@ -837,7 +837,7 @@ int App::run(int argc, char** argv) {
                 if (!res) {
                     caudio::ipc::Result errRes{res.error()};
                     if (jsonFlag) {
-                        std::println(std::cerr, "{}", caudio::ipc::toJson(errRes).dump());
+                        caudio::println(std::cerr, "{}", caudio::ipc::toJson(errRes).dump());
                     } else {
                         fmt.print(errRes, std::cerr);
                     }
@@ -854,11 +854,11 @@ int App::run(int argc, char** argv) {
 #endif
                     char buf[32];
                     std::strftime(buf, sizeof(buf), "%H:%M:%S", &tm);
-                    std::println(std::cout, "[{}]", buf);
+                    caudio::println(std::cout, "[{}]", buf);
                     fmt.print(*res, std::cout);
                 } else {
                     // Compact JSON per line for streaming to avoid multi-line log spam
-                    std::println(std::cout, "{}", caudio::ipc::toJson(*res).dump());
+                    caudio::println(std::cout, "{}", caudio::ipc::toJson(*res).dump());
                 }
                 std::cout << std::flush;
                 if (std::holds_alternative<caudio::utils::Error>(*res))
@@ -872,7 +872,7 @@ int App::run(int argc, char** argv) {
     if (volumeCmd->parsed()) {
         auto pv = detail::parseVolume(volumeArg);
         if (!pv) {
-            std::println(std::cerr, "volume: {}", pv.error().message);
+            caudio::println(std::cerr, "volume: {}", pv.error().message);
             return 1;
         }
         caudio::ipc::Command cmd{*pv};
@@ -914,7 +914,7 @@ int App::run(int argc, char** argv) {
             else if (qShuffleArg == "off")
                 on = false;
             else if (!qShuffleArg.empty()) {
-                std::println(std::cerr, "shuffle: invalid mode {}", qShuffleArg);
+                caudio::println(std::cerr, "shuffle: invalid mode {}", qShuffleArg);
                 return 1;
             }
             caudio::ipc::Command cmd{caudio::ipc::QueueShuffle{on}};
@@ -929,7 +929,7 @@ int App::run(int argc, char** argv) {
             else if (qRepeatArg == "all")
                 m = caudio::engine::RepeatMode::All;
             else if (!qRepeatArg.empty()) {
-                std::println(std::cerr, "repeat: invalid mode {}", qRepeatArg);
+                caudio::println(std::cerr, "repeat: invalid mode {}", qRepeatArg);
                 return 1;
             }
             caudio::ipc::Command cmd{caudio::ipc::QueueRepeat{m}};
@@ -973,11 +973,11 @@ int App::run(int argc, char** argv) {
             auto timeout = std::chrono::milliseconds{5000};
             auto cliRes = client.send(cmd, timeout);
             if (!cliRes) {
-                std::println(std::cerr, "export: {}", cliRes.error().message);
+                caudio::println(std::cerr, "export: {}", cliRes.error().message);
                 return 1;
             }
             if (std::holds_alternative<caudio::utils::Error>(*cliRes)) {
-                std::println(std::cerr, "export: {}",
+                caudio::println(std::cerr, "export: {}",
                              std::get<caudio::utils::Error>(*cliRes).message);
                 return 1;
             }
@@ -985,7 +985,7 @@ int App::run(int argc, char** argv) {
                 auto& pd = std::get<caudio::ipc::PlaylistData>(*cliRes);
                 std::ofstream ofs(plExportPath);
                 if (!ofs) {
-                    std::println(std::cerr, "export: failed to open output file");
+                    caudio::println(std::cerr, "export: failed to open output file");
                     return 1;
                 }
                 if (pd.format == "m3u" || pd.format == "pls") {
@@ -994,10 +994,10 @@ int App::run(int argc, char** argv) {
                     detail::writePlaylistJson(ofs, pd.tracks);
                 }
                 ofs.close();
-                std::println("exported {} tracks to {}", pd.tracks.size(), plExportPath);
+                caudio::println("exported {} tracks to {}", pd.tracks.size(), plExportPath);
                 return 0;
             }
-            std::println(std::cerr, "export: unexpected response");
+            caudio::println(std::cerr, "export: unexpected response");
             return 1;
         }
         if (plImport->parsed()) {
@@ -1106,7 +1106,7 @@ int App::run(int argc, char** argv) {
                 k = cfgResetKey;
             else if (cfgReset->count("key") > 0 && cfgResetKey.empty()) {
                 // explicit empty string passed -> treat as error
-                std::println(std::cerr, "config reset: empty key");
+                caudio::println(std::cerr, "config reset: empty key");
                 return 1;
             }
             caudio::ipc::Command cmd{caudio::ipc::ConfigReset{k}};

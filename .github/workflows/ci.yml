@@ -19,13 +19,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
         include:
           - os: ubuntu-24.04
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
-          - os: macos-14
+          - os: macos-15
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
@@ -135,6 +135,16 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: cmake --preset ci
 
+      - name: Expose FFmpeg DLLs (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Test executables run at build time (Catch2 discovery) and test
+          # time; the prebuilt FFmpeg DLLs must be on PATH for the loader.
+          dll=$(find build/ci/_deps -name 'avcodec-*.dll' | head -n 1)
+          test -n "$dll" || (echo "FFmpeg DLLs not found under build/ci/_deps" && exit 1)
+          echo "$(dirname "$dll")" >> $GITHUB_PATH
+        shell: bash
+
       - name: Build
         run: cmake --build --preset ci
 
@@ -201,9 +211,9 @@ jobs:
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-          # Diagnostic: print leaked object contents to identify the owning
-          # subsystem (all current leaks are av_realloc_f inside libavutil).
-          LSAN_OPTIONS: report_objects=1
+          # Known FFmpeg probe-buffer drip suppressed (see file); all other
+          # leaks, UBSan and ASan reports stay fatal.
+          LSAN_OPTIONS: suppressions=$GITHUB_WORKSPACE/tests/sanitizers/lsan.supp:report_objects=1
         run: ctest --preset ci-sanitizers
 
   install-smoke:

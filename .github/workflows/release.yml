@@ -15,13 +15,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-2022]
+        os: [ubuntu-24.04, macos-15, windows-2022]
         include:
           - os: ubuntu-24.04
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
-          - os: macos-14
+          - os: macos-15
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
