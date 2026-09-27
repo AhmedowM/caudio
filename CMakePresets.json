@@ -75,16 +75,32 @@
     {
       "name": "release",
       "inherits": "base",
-      "displayName": "Optimized release build (tag required)",
+      "displayName": "Optimized release build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CAUDIO_REQUIRE_GIT_VERSION": "ON"
       }
     },
     {
+      "name": "release-no-cli",
+      "inherits": "release",
+      "displayName": "Optimized release build (no CLI)",
+      "cacheVariables": {
+        "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
       "name": "release-lto",
       "inherits": "release",
-      "displayName": "Release + link-time optimization, no CLI",
+      "displayName": "Release + link-time optimization",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
+      }
+    },
+    {
+      "name": "release-lto-no-cli",
+      "inherits": "release",
+      "displayName": "Release + link-time optimization (no CLI)",
       "cacheVariables": {
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
         "CAUDIO_BUILD_CLI": "OFF"
@@ -93,10 +109,56 @@
     {
       "name": "minsize",
       "inherits": "base",
-      "displayName": "Smallest binary: MinSizeRel, library only",
+      "displayName": "Smallest binary: MinSizeRel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    },
+    {
+      "name": "minsize-no-cli",
+      "inherits": "base",
+      "displayName": "Smallest binary: MinSizeRel (no CLI)",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "MinSizeRel",
         "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
+      "name": "minsize-lto",
+      "inherits": "minsize",
+      "displayName": "Smallest binary: MinSizeRel + LTO + section GC (GCC/Clang)",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_CXX_FLAGS": "-ffunction-sections -fdata-sections",
+        "CMAKE_EXE_LINKER_FLAGS": "-Wl,--gc-sections",
+        "CMAKE_SHARED_LINKER_FLAGS": "-Wl,--gc-sections"
+      }
+    },
+    {
+      "name": "minsize-lto-no-cli",
+      "inherits": "minsize-no-cli",
+      "displayName": "Smallest binary: MinSizeRel + LTO + section GC, no CLI (GCC/Clang)",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_CXX_FLAGS": "-ffunction-sections -fdata-sections",
+        "CMAKE_EXE_LINKER_FLAGS": "-Wl,--gc-sections",
+        "CMAKE_SHARED_LINKER_FLAGS": "-Wl,--gc-sections"
+      }
+    },
+    {
+      "name": "release-native",
+      "inherits": "release-lto",
+      "displayName": "Fastest local binary: -march=native. NOT distributable (illegal-instruction on older CPUs)",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-march=native"
+      }
+    },
+    {
+      "name": "release-native-no-cli",
+      "inherits": "release-lto-no-cli",
+      "displayName": "Fastest local binary, no CLI: -march=native. NOT distributable",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-march=native"
       }
     },
     {
@@ -153,6 +215,56 @@
       "name": "docs",
       "configurePreset": "docs",
       "targets": ["doc"]
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "jobs": 4
+    },
+    {
+      "name": "release-no-cli",
+      "configurePreset": "release-no-cli",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto",
+      "configurePreset": "release-lto",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-no-cli",
+      "configurePreset": "release-lto-no-cli",
+      "jobs": 4
+    },
+    {
+      "name": "minsize",
+      "configurePreset": "minsize",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-no-cli",
+      "configurePreset": "minsize-no-cli",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-lto",
+      "configurePreset": "minsize-lto",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-lto-no-cli",
+      "configurePreset": "minsize-lto-no-cli",
+      "jobs": 4
+    },
+    {
+      "name": "release-native",
+      "configurePreset": "release-native",
+      "jobs": 4
+    },
+    {
+      "name": "release-native-no-cli",
+      "configurePreset": "release-native-no-cli",
+      "jobs": 4
     },
     {
       "name": "all",
