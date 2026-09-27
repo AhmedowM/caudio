@@ -124,7 +124,7 @@ jobs:
       - name: List packages
         run: |
           echo "=== packages in build/release/ ==="
-          ls -lh build/release/*.{tar.gz,zip,deb,rpm,exe,dmg} 2>&1 || ls -lh build/release/ || true
+          ls -lh build/release/*.tar.gz build/release/*.zip
         shell: bash
 
       - name: Upload artifact - packages
@@ -134,11 +134,9 @@ jobs:
           path: |
             build/release/*.tar.gz
             build/release/*.zip
-            build/release/*.deb
-            build/release/*.rpm
-            build/release/*.exe
-            build/release/*.dmg
-          if-no-files-found: warn
+          # Only TGZ/ZIP are produced (CPACK_GENERATOR); a missing package
+          # must fail loudly -- never ship a raw .exe as a "release" again.
+          if-no-files-found: error
 
   release:
     name: release

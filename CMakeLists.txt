@@ -338,6 +338,39 @@ if(CAUDIO_BUILD_CLI)
   install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+# Windows distributability: the caudio.exe links FFmpeg + MinGW runtime
+# dynamically, none of which lives on a bare machine's PATH. Bundle both next
+# to the executable so CPack archives run standalone. (Linux/macOS resolve
+# via system loader paths; nothing to bundle there.)
+if(WIN32 AND CAUDIO_BUILD_CLI)
+  # Bundle FFmpeg runtime DLLs next to the executable. Our FindFFmpeg targets
+  # are UNKNOWN IMPORTED (no runtime location), so resolve the DLLs by layout:
+  # <root>/bin next to the found import library (gyan/choco/vcpkg layouts).
+  get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
+  file(GLOB _ff_dlls
+    "${_ff_libdir}/../bin/avcodec-*.dll"
+    "${_ff_libdir}/../bin/avformat-*.dll"
+    "${_ff_libdir}/../bin/avutil-*.dll"
+    "${_ff_libdir}/../bin/*swresample-*.dll")
+  if(_ff_dlls)
+    install(FILES ${_ff_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+  else()
+    message(WARNING "FFmpeg DLLs not found near ${FFmpeg_AVCODEC_LIBRARY} -- packages will need them on PATH")
+  endif()
+  if(MINGW)
+    get_filename_component(_mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    file(GLOB _mingw_rt_dlls
+      "${_mingw_bin}/libstdc++-6.dll"
+      "${_mingw_bin}/libgcc_s_*.dll"
+      "${_mingw_bin}/libwinpthread-1.dll")
+    if(_mingw_rt_dlls)
+      install(FILES ${_mingw_rt_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+    else()
+      message(WARNING "MinGW runtime DLLs not found next to ${CMAKE_CXX_COMPILER} -- packages will need them on PATH")
+    endif()
+  endif()
+endif()
+
 # C++23 module sources for BMI rebuild (only when modules enabled).
 # Both rules converge on include/caudio/modules (FILE_SET preserves source paths).
 if(CAUDIO_ENABLE_MODULES)
@@ -357,6 +390,9 @@ endif()
 
 # Packaging (CPack) -- TGZ/ZIP only until the first release; distro
 # generators (DEB/RPM/NSIS/DragNDrop) return when versions stabilize.
+# Output dir pinned to the build tree: otherwise `cpack` writes packages to
+# whatever CWD invoked it (e.g. the source root), and CI globs miss them.
+set(CPACK_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
