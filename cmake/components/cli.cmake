@@ -17,7 +17,7 @@ ca_set_module_warnings(ipc)
 if(CAUDIO_ENABLE_MODULES)
   target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 endif()
-target_link_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/service/service.cppm

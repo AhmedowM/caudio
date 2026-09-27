@@ -68,8 +68,12 @@ Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept;
  * @brief Truncates name to 15 chars for pthread limit.
  * @param s Input view.
  * @return View of first 15 bytes (pthread limit is 16 inc. NUL).
+ * @details Defined here (not in thread.cpp): constexpr implies inline, so
+ * every TU that uses it must see the definition.
  */
-constexpr std::string_view truncate15(std::string_view s) noexcept;
+constexpr std::string_view truncate15(std::string_view s) noexcept {
+    return s.substr(0, 15);
+}
 /**
  * @brief Sets pthread name with truncation and NUL termination.
  * @param th pthread_t handle.

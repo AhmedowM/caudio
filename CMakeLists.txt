@@ -246,7 +246,7 @@ target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::av
 ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
 # Needed on MinGW for template instantiation deduplication across executable + static libs
-target_link_options(caudio PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+target_link_options(caudio PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
 # GCC 14+ <print> requires libstdc++exp on MinGW/GCC
 if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   find_library(STDCXX_EXP_LIB stdc++exp)
@@ -415,7 +415,7 @@ if(CAUDIO_ENABLE_TESTS)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     endif()
     if(ARG_WITH_ALLOW_MULTIPLE_DEFINITION)
-      target_link_options(${name} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+      target_link_options(${name} PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
     endif()
     if(CAUDIO_ENABLE_SANITIZERS)
       caudio_apply_sanitizers(${name})

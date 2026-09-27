@@ -34,10 +34,6 @@ Expected<void> setCurrentThreadNameImpl(std::string_view name) noexcept {
     return setNativeHandleName(GetCurrentThread(), name);
 }
 #else
-constexpr std::string_view truncate15(std::string_view s) noexcept {
-    return s.substr(0, 15);
-}
-
 int setPthreadName(pthread_t th, std::string_view name) noexcept {
     std::string_view t = truncate15(name);
     char buf[16]{};

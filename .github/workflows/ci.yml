@@ -135,14 +135,17 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: cmake --preset ci
 
-      - name: Expose FFmpeg DLLs (Windows)
+      - name: Expose DLLs (Windows)
         if: runner.os == 'Windows'
         run: |
           # Test executables run at build time (Catch2 discovery) and test
-          # time; the prebuilt FFmpeg DLLs must be on PATH for the loader.
+          # time. The loader needs FFmpeg DLLs AND the toolchain runtime
+          # (libstdc++-6.dll etc.); neither is on PATH by default.
+          # 0xc0000135 == STATUS_DLL_NOT_FOUND.
           dll=$(find build/ci/_deps -name 'avcodec-*.dll' | head -n 1)
           test -n "$dll" || (echo "FFmpeg DLLs not found under build/ci/_deps" && exit 1)
           echo "$(dirname "$dll")" >> $GITHUB_PATH
+          echo "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
         shell: bash
 
       - name: Build
@@ -212,8 +215,9 @@ jobs:
         env:
           CAUDIO_TEST_NOAUDIO: 1
           # Known FFmpeg probe-buffer drip suppressed (see file); all other
-          # leaks, UBSan and ASan reports stay fatal.
-          LSAN_OPTIONS: suppressions=$GITHUB_WORKSPACE/tests/sanitizers/lsan.supp:report_objects=1
+          # leaks, UBSan and ASan reports stay fatal. NOTE: env blocks need
+          # ${{ }} context syntax -- $VAR is NOT expanded here.
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/sanitizers/lsan.supp:report_objects=1
         run: ctest --preset ci-sanitizers
 
   install-smoke:
@@ -344,9 +348,11 @@ jobs:
       - name: Smoke compile (find_package + import caudio.utils)
         run: |
           mkdir -p /tmp/caudio-mod-smoke
-          # FILE_SET sources must live under the consumer's base dirs: copy the
-          # installed primary interface + all 8 partitions next to main.cpp.
-          cp /tmp/caudio-install-mod/include/caudio/modules/utils/*.cppm /tmp/caudio-mod-smoke/
+          # Correct consumption: link caudio::utils (which carries its own
+          # installed CXX_MODULES file set) and import the module. Do NOT list
+          # the installed .cppm files in our own FILE_SET -- that compiles the
+          # same module names twice and CMake aborts with "Disagreement of the
+          # location of the 'caudio.utils' module".
           cat > /tmp/caudio-mod-smoke/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.28)
           project(caudio_mod_smoke CXX)
@@ -356,22 +362,12 @@ jobs:
           list(APPEND CMAKE_PREFIX_PATH "/tmp/caudio-install-mod")
           find_package(caudio CONFIG REQUIRED)
           add_executable(smoke main.cpp)
-          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
-            ${CMAKE_CURRENT_SOURCE_DIR}/utils.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/result.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/error.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/log.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/math.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/ring.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/mpsc_queue.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/thread.cppm
-            ${CMAKE_CURRENT_SOURCE_DIR}/version.cppm)
           target_compile_features(smoke PRIVATE cxx_std_23)
           target_link_libraries(smoke PRIVATE caudio::utils)
           EOF
           cat > /tmp/caudio-mod-smoke/main.cpp << 'EOF'
-          import caudio.utils;
           #include <print>
+          import caudio.utils;
           int main() {
             std::println("caudio module smoke ok: {}", caudio::utils::shortVersion());
             return 0;

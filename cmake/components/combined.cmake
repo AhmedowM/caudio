@@ -11,6 +11,6 @@ if(CAUDIO_BUILD_SHARED)
     $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::player>
     $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::db>
     $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::engine>)
-  target_link_options(combined PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wl,--allow-multiple-definition>)
+  target_link_options(combined PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
   target_link_libraries(combined PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 endif()
