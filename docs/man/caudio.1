@@ -1,4 +1,4 @@
-.TH CAUDIO 1 "2026-09-15" "caudio 0.25.5" "User Commands"
+.TH CAUDIO 1 "" "caudio X.Y.Z" "User Commands"
 .SH NAME
 caudio \- C++23 headless music player daemon and CLI
 .SH SYNOPSIS
@@ -62,7 +62,7 @@ Daemon log level: \fBtrace\fR|\fBdebug\fR|\fBinfo\fR|\fBwarn\fR|\fBerror\fR.
 Audio output device ID. Overrides config.
 .TP
 .BR \-\-version
-Show version (\fBcaudio::versionFull\fR, e.g. \fBv0.25.5\fR) and exit.
+Show version (\fBcaudio::versionFull\fR, e.g. \fBvX.Y.Z\fR) and exit.
 .TP
 .BR \-h ", " \-\-help
 Print help and exit.
@@ -255,16 +255,11 @@ Copy file at \fIPATH\fR to config location.
 .TP
 .B config reset [\fIKEY\fR]
 Reset config \fIKEY\fR or all keys to defaults.
-.SS Preview and TUI
+.SS Preview
 .TP
 .B preview \fIFILE\fR
 Ephemeral playback of \fIFILE\fR without daemon (direct \fBcaudio::player::Player\fR).
 Blocks until playback finishes.
-.TP
-.B tui
-Launch TUI preview. Ensures daemon is running, prints current status,
-and shows guidance. Full ratatui TUI is planned for v0.28.0. For live
-polling use \fBcaudio status \-\-watch\fR.
 .SH EXAMPLES
 .TP
 Start daemon and play a file:

@@ -1,7 +1,7 @@
 #caudio - cpp
 
 [![CI](https://github.com/AhmedowM/caudio/actions/workflows/ci.yml/badge.svg)](https://github.com/AhmedowM/caudio/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v0.25.5-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/github/v/release/AhmedowM/caudio)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![C++](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/CMake-%3E%3D3.28-red)](CMakeLists.txt)
@@ -28,27 +28,28 @@
 ```sh
 git clone https://github.com/AhmedowM/caudio.git
 cd caudio
-cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
-cmake --build build -j4
-ctest --test-dir build -j4
-./build/caudio --version
-./build/caudio start
-./build/caudio status
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+./build/dev/caudio --version
+./build/dev/caudio start
+./build/dev/caudio status
 ```
+See `cmake --list-presets` for all configs (`ci`, `release`, `modules`, `minimal`, …).
 
 Typical first session:
 
 ```sh
-./build/caudio library scan --path ~/Music --mode sampled
-./build/caudio library search "beatles" --limit 10
-./build/caudio queue add ~/Music/album/track.flac
-./build/caudio play
-./build/caudio status --watch --interval 1000
+./build/dev/caudio library scan --path ~/Music --mode sampled
+./build/dev/caudio library search "beatles" --limit 10
+./build/dev/caudio queue add ~/Music/album/track.flac
+./build/dev/caudio play
+./build/dev/caudio status --watch --interval 1000
 ```
 
 ## CLI Overview
 
-Run `caudio --help` or `caudio <subcommand> --help` for details. All commands (except `preview`/`tui`) talk to the daemon via IPC.
+Run `caudio --help` or `caudio <subcommand> --help` for details. All commands (except `preview`) talk to the daemon via IPC.
 
 | Command | Description |
 |---|---|
@@ -101,7 +102,6 @@ Run `caudio --help` or `caudio <subcommand> --help` for details. All commands (e
 | `caudio config import <path>` | Import config file |
 | `caudio config reset [key]` | Reset key or all to defaults |
 | `caudio preview <file>` | Ephemeral playback without daemon (direct `Player`) |
-| `caudio tui` | TUI preview — shows `status` + guidance (full ratatui TUI planned v0.28.0) |
 
 Global options:
 
@@ -110,7 +110,7 @@ Global options:
 | `--config <FILE>` | Config file path (default: XDG / `%LOCALAPPDATA%`) |
 | `--log-level trace|debug|info|warn|error` | Daemon log level |
 | `--device <DEVICE>` | Audio output device id |
-| `--version` | Show version (`caudio::versionFull`, e.g. `v0.25.5`) |
+| `--version` | Show version (`caudio::versionFull`, e.g. `vX.Y.Z`) |
 | `--help` / `-h` | Show help |
 
 ## Library Usage
@@ -186,7 +186,7 @@ Toolchain requirements:
 
 ## Documentation
 
-- **Doxygen API docs** — `cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc` → `docs/html/` (and `build/docs/html/`). Configured via `docs/Doxyfile.in` / `Doxyfile`.
+- **Doxygen API docs** — `cmake --preset docs && cmake --build --preset docs` → `build/docs/docs/html/`. Configured via `docs/Doxyfile.in` / `Doxyfile`.
 - **Man page** — `docs/man/caudio.1` (roff), installed to `${CMAKE_INSTALL_MANDIR}/man1`; view with `man ./docs/man/caudio.1`.
 - **Polyglot integration** — `docs/polyglot-integration.md` (Rust metadata, Svelte/Tauri GUI, Python bindings, Go sidecar).
 - **Specs / audits** — `docs/specs/`.
@@ -194,15 +194,15 @@ Toolchain requirements:
 ## Packaging
 
 ```sh
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j4
-cmake --install build --prefix /usr/local
+cmake --preset release
+cmake --build --preset release
+cmake --install build/release --prefix /usr/local
 # man page: /usr/local/share/man/man1/caudio.1
 # modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/include/caudio/*.cppm
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
-CPack archives: `cpack --config build/CPackConfig.cmake` → `caudio-0.25.5-<system>.tar.gz` / `.zip`.
+CPack archives: `cpack --config build/<preset>/CPackConfig.cmake` → `caudio-X.Y.Z-<system>.tar.gz` / `.zip`.
 
 C++ modules packaging caveat: downstream projects must have CMake ≥ 3.28 and a compiler with C++23 module support. When built with `CAUDIO_ENABLE_MODULES=ON`, the `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
 

@@ -1,28 +1,56 @@
 cmake_minimum_required(VERSION 3.28)
 
-# Get version from git tags (e.g., v0.4.0 -> 0.4.0) — same workflow as C CMakeLists.txt:4-35
-execute_process(
-  COMMAND git describe --tags --abbrev=0
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  OUTPUT_VARIABLE GIT_TAG
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  ERROR_QUIET
-)
+# Version precedence (top wins):
+#   1. -DCAUDIO_PROJECT_VERSION=X.Y.Z (explicit override for packagers stripping .git)
+#   2. git describe --tags (normal clones, CI with fetch-depth: 0)
+#   3. VERSION file (tarballs, shallow exports — bumped in the release-prep commit)
+#   4. 0.1.0 + loud warning (never silent; NOT a release build)
 option(CAUDIO_REQUIRE_GIT_VERSION "fail configure when no git tag is found (default OFF)" OFF)
-if(GIT_TAG MATCHES "^v([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
-  set(PROJECT_VERSION_MAJOR "${CMAKE_MATCH_1}")
-  set(PROJECT_VERSION_MINOR "${CMAKE_MATCH_2}")
-  set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
-  set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
-else()
-  if(CAUDIO_REQUIRE_GIT_VERSION)
-    message(FATAL_ERROR "CAUDIO_REQUIRE_GIT_VERSION=ON but no git tag found — clone with tags (git fetch --tags) or configure with -DCAUDIO_REQUIRE_GIT_VERSION=OFF")
+if(DEFINED CAUDIO_PROJECT_VERSION AND NOT CAUDIO_PROJECT_VERSION STREQUAL "")
+  if(CAUDIO_PROJECT_VERSION MATCHES "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+    set(PROJECT_VERSION_MAJOR "${CMAKE_MATCH_1}")
+    set(PROJECT_VERSION_MINOR "${CMAKE_MATCH_2}")
+    set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
+    set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+    set(GIT_TAG "v${PROJECT_VERSION}")
+    message(STATUS "Using explicit version override: ${PROJECT_VERSION} (-DCAUDIO_PROJECT_VERSION)")
+  else()
+    message(FATAL_ERROR "CAUDIO_PROJECT_VERSION='${CAUDIO_PROJECT_VERSION}' is not X.Y.Z (optional leading v)")
   endif()
-  message(WARNING "No git tag found — using fallback version 0.1.0. Tag-less builds are NOT release builds; docs/CHANGELOG claim the latest tagged release.")
-  set(PROJECT_VERSION_MAJOR "0")
-  set(PROJECT_VERSION_MINOR "1")
-  set(PROJECT_VERSION_PATCH "0")
-  set(PROJECT_VERSION "0.1.0")
+else()
+  execute_process(
+    COMMAND git describe --tags --abbrev=0
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(GIT_TAG MATCHES "^v([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+    set(PROJECT_VERSION_MAJOR "${CMAKE_MATCH_1}")
+    set(PROJECT_VERSION_MINOR "${CMAKE_MATCH_2}")
+    set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
+    set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+  else()
+    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_FILE_CONTENT)
+    string(STRIP "${VERSION_FILE_CONTENT}" VERSION_FILE_CONTENT)
+    if(VERSION_FILE_CONTENT MATCHES "^v?([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+      set(PROJECT_VERSION_MAJOR "${CMAKE_MATCH_1}")
+      set(PROJECT_VERSION_MINOR "${CMAKE_MATCH_2}")
+      set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
+      set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+      set(GIT_TAG "v${PROJECT_VERSION}")
+      message(STATUS "No git tag — using VERSION file: ${PROJECT_VERSION}")
+    else()
+      if(CAUDIO_REQUIRE_GIT_VERSION)
+        message(FATAL_ERROR "CAUDIO_REQUIRE_GIT_VERSION=ON but no git tag found — clone with tags (git fetch --tags) or configure with -DCAUDIO_REQUIRE_GIT_VERSION=OFF")
+      endif()
+      message(WARNING "No git tag and no usable VERSION file — using fallback version 0.1.0. Tag-less builds are NOT release builds; docs/CHANGELOG claim the latest tagged release.")
+      set(PROJECT_VERSION_MAJOR "0")
+      set(PROJECT_VERSION_MINOR "1")
+      set(PROJECT_VERSION_PATCH "0")
+      set(PROJECT_VERSION "0.1.0")
+    endif()
+  endif()
 endif()
 execute_process(
   COMMAND git rev-parse --short HEAD

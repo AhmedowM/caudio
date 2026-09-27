@@ -645,8 +645,6 @@ int App::run(int argc, char** argv) {
     std::string previewFile;
     auto* previewCmd = cli_->add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
-    auto* tuiCmd =
-        cli_->add_subcommand("tui", "Launch TUI (preview: shows status, full TUI coming soon)");
     auto* cfgCmd = cli_->add_subcommand("config", "Config operations");
     std::string cfgGetKey;
     auto* cfgGet = cfgCmd->add_subcommand("get", "Get config value");
@@ -1081,29 +1079,6 @@ int App::run(int argc, char** argv) {
     }
     if (previewCmd->parsed())
         return handlePreview(previewFile);
-    if (tuiCmd->parsed()) {
-        (void)handleStart(false);
-        // Show current status once (same pretty formatting as `status`)
-        {
-            caudio::client::Client client{config_.dbPath, config_.socketPath};
-            auto res = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
-                                   std::chrono::milliseconds{2000});
-            caudio::client::OutputFormatter fmt{false};
-            if (!res) {
-                caudio::ipc::Result errRes{res.error()};
-                fmt.print(errRes, std::cout);
-            } else {
-                fmt.print(*res, std::cout);
-            }
-        }
-        std::println(std::cout, "");
-        std::println(std::cout, "TUI is not yet implemented.");
-        std::println(std::cout, "  - Try `caudio status --watch` for live polling");
-        std::println(std::cout,
-                     "  - Try `caudio status --watch --interval 200` for faster refresh");
-        std::println(std::cout, "  - Full TUI (ratatui) planned for v0.28.0");
-        return 0;
-    }
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::ConfigGet{cfgGetKey}};

@@ -17,10 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tag-less configure emits a loud warning (fallback `0.1.0` is not a release build)
 - `test_player_integration` now defines `TEST_DATA_DIR` (fixes fixture lookup in nested `build/<preset>` trees)
 - Removed stale `e.g. "v0.25.4"` version strings from `version.hpp` / `version.hpp.in` / `ipc/result.hpp`
+- `engine.hpp` slimmed 21 → 12 includes
+- Private `config::detail` moved to `src/config_detail.hpp`; stale test narration deleted
+- Removed `tui` stub subcommand (+ stale "planned v0.28.0" promises in README/man)
+- Version precedence: `-DCAUDIO_PROJECT_VERSION` → git tag → `VERSION` file → `0.1.0`+warning; `VERSION` drift guarded in CI
+
+## [0.34.3] - 2026-09-27
+
+### Changed
 - nlohmann/json propagated via installed package (`find_dependency` + PUBLIC link); `json_fwd` in public headers
 - Decoder collapsed to a single pImpl class (`IDecoder`/`DecoderRegistry`/`decoder_common` deleted)
-- `engine.hpp` slimmed 21 → 12 includes; Windows TUs include real `<windows.h>` first
-- Private `config::detail` moved to `src/config_detail.hpp`; stale test narration deleted
+- Windows TUs include real `<windows.h>` first (hand-rolled declarations removed)
+- Hygiene: pruned duplicates, stale refs, warning leaks
 
 ## [0.34.2] - 2026-09-26
 

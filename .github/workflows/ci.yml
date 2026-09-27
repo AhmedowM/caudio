@@ -39,6 +39,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check VERSION matches latest tag
+        run: |
+          tag="$(git describe --tags --abbrev=0 2>/dev/null | tr -d v)" || { echo "no tags in clone — skipping VERSION check"; exit 0; }
+          ver="$(tr -d 'v \n\r' < VERSION)"
+          test "$ver" = "$tag" || (echo "VERSION file ($ver) drifted from latest tag ($tag) — bump VERSION in the release-prep commit" && exit 1)
+        shell: bash
+
       - name: Setup GCC 16 (Ubuntu)
         if: runner.os == 'Linux'
         run: |
