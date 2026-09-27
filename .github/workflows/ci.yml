@@ -121,33 +121,33 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
+        run: cmake --preset ci
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset ci
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --test-dir build --output-on-failure -j4
+        run: ctest --preset ci
 
       - name: Package (TGZ)
         run: |
-          cpack --config build/CPackConfig.cmake -G TGZ || cpack -G TGZ --config build/CPackConfig.cmake || (cd build && cpack -G TGZ) || echo "CPack TGZ failed"
+          cpack --config build/ci/CPackConfig.cmake -G TGZ || cpack -G TGZ --config build/ci/CPackConfig.cmake || (cd build/ci && cpack -G TGZ) || echo "CPack TGZ failed"
         shell: bash
 
       - name: Upload artifact - package
         uses: actions/upload-artifact@v4
         with:
           name: caudio-package-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/*.tar.gz
+          path: build/ci/*.tar.gz
           if-no-files-found: warn
 
       - name: Upload artifact - docs
         uses: actions/upload-artifact@v4
         with:
           name: caudio-docs-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/docs/html
+          path: build/ci/docs/html
           if-no-files-found: warn
 
   sanitizers:
@@ -181,15 +181,15 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_ENABLE_SANITIZERS=ON
+        run: cmake --preset ci-sanitizers
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset ci-sanitizers
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --test-dir build --output-on-failure -j4
+        run: ctest --preset ci-sanitizers
 
   install-smoke:
     name: install-smoke (ubuntu-24.04 / gcc-16)
@@ -221,25 +221,25 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
+        run: cmake --preset ci
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset ci
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --test-dir build --output-on-failure -j4
+        run: ctest --preset ci
 
       - name: Install to /tmp/caudio-install
-        run: cmake --install build --prefix /tmp/caudio-install
+        run: cmake --install build/ci --prefix /tmp/caudio-install
 
       - name: Verify install layout
         run: |
           echo "=== install tree ==="
           find /tmp/caudio-install -type f | head -n 100
           echo "=== caudio --version ==="
-          /tmp/caudio-install/bin/caudio --version || build/caudio --version || echo "caudio --version check failed"
+          /tmp/caudio-install/bin/caudio --version || build/ci/caudio --version || echo "caudio --version check failed"
           echo "=== version.hpp ==="
           test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
           echo "=== no module sources in header-mode install ==="
@@ -303,13 +303,13 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake -B build -G Ninja -DCAUDIO_ENABLE_MODULES=ON
+        run: cmake --preset modules
 
       - name: Build
-        run: cmake --build build -j4
+        run: cmake --build --preset modules
 
       - name: Install to /tmp/caudio-install-mod
-        run: cmake --install build --prefix /tmp/caudio-install-mod
+        run: cmake --install build/modules --prefix /tmp/caudio-install-mod
 
       - name: Verify module sources shipped
         run: |
