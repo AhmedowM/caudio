@@ -39,6 +39,7 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
+#include <signal.h>
 #include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/un.h>

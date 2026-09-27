@@ -90,10 +90,11 @@ jobs:
       - name: Verify GCC 16 (Windows)
         if: runner.os == 'Windows'
         run: |
-          which gcc || echo "gcc not found in PATH"
-          gcc --version
-          which g++ || echo "g++ not found in PATH"
-          g++ --version
+          ls C:/msys64/ucrt64/bin/g++.exe || (echo "MinGW g++ missing at C:/msys64/ucrt64/bin — msys2 setup failed" && exit 1)
+          gcc --version || exit 1
+          g++ --version || exit 1
+          test -x "${{ matrix.cc }}" || (echo "matrix cc ${{ matrix.cc }} not executable" && exit 1)
+          test -x "${{ matrix.cxx }}" || (echo "matrix cxx ${{ matrix.cxx }} not executable" && exit 1)
         shell: bash
 
       - name: Install dependencies (Ubuntu)
