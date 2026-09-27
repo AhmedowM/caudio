@@ -254,14 +254,15 @@ ca_set_warnings(caudio)
 ca_set_module_warnings(caudio)
 # Needed on MinGW for template instantiation deduplication across executable + static libs
 target_link_options(caudio PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
-# GCC 14+ <print> requires libstdc++exp on MinGW/GCC
-if(MINGW OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  find_library(STDCXX_EXP_LIB stdc++exp)
-  if(STDCXX_EXP_LIB)
-    target_link_libraries(caudio PRIVATE stdc++exp)
-    target_link_libraries(client PRIVATE stdc++exp)
-    target_link_libraries(ipc PRIVATE stdc++exp)
-  endif()
+# Static GNU runtime for the shipped executable: kills GLIBCXX-version failures
+# and missing libstdc++/libgcc DLLs on bare machines (all platforms, validated
+# by CI incl. macOS/GCC). libwinpthread stays shared -- a single instance
+# shared with FFmpeg's own DLLs; swresample/av* stay DLL (no static FFmpeg
+# build here). Skipped under sanitizers (ASan runtime interplays badly with
+# static libstdc++). Replaces the old libstdc++exp workaround: no TU uses
+# std::print directly anymore (see utils/print.hpp).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CAUDIO_ENABLE_SANITIZERS)
+  target_link_options(caudio PRIVATE -static-libgcc -static-libstdc++)
 endif()
 if(CAUDIO_ENABLE_SANITIZERS)
   caudio_apply_sanitizers(caudio)
@@ -365,15 +366,16 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
     message(WARNING "FFmpeg DLLs not found near ${FFmpeg_AVCODEC_LIBRARY} -- packages will need them on PATH")
   endif()
   if(MINGW)
+    # Only winpthread ships as a DLL: libstdc++/libgcc are statically linked
+    # into the exe above. winpthread stays shared on purpose -- FFmpeg's own
+    # DLLs use it too, and two pthread runtimes in one process is worse than
+    # one shared DLL.
     get_filename_component(_mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
-    file(GLOB _mingw_rt_dlls
-      "${_mingw_bin}/libstdc++-6.dll"
-      "${_mingw_bin}/libgcc_s_*.dll"
-      "${_mingw_bin}/libwinpthread-1.dll")
+    file(GLOB _mingw_rt_dlls "${_mingw_bin}/libwinpthread-1.dll")
     if(_mingw_rt_dlls)
       install(FILES ${_mingw_rt_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
     else()
-      message(WARNING "MinGW runtime DLLs not found next to ${CMAKE_CXX_COMPILER} -- packages will need them on PATH")
+      message(WARNING "libwinpthread-1.dll not found next to ${CMAKE_CXX_COMPILER} -- packages will need it on PATH")
     endif()
   endif()
 endif()
