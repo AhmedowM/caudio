@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/config.hpp>
 
 export module caudio.ipc:config;

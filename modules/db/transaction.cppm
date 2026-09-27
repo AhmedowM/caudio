@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/transaction.hpp>
 
 export module caudio.db:DbTransaction;

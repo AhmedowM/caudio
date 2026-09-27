@@ -1,4 +1,4 @@
-# SetupFFmpeg.cmake — cascading FFmpeg provider
+# SetupFFmpeg.cmake -- cascading FFmpeg provider
 # Priority:
 # 1. System (find_package with hints from FindFFmpeg.cmake)
 # 2. vcpkg / Conan (if available)
@@ -51,10 +51,10 @@ function(caudio_setup_ffmpeg)
   endif()
   message(STATUS "vcpkg/Conan not found, trying prebuilt download...")
 
-  # 3. Prebuilt download (FetchContent) — Windows only for now, Linux/macOS use system
+  # 3. Prebuilt download (FetchContent) -- Windows only for now, Linux/macOS use system
   if(WIN32)
     include(FetchContent)
-    # Gyan FFmpeg 9.0.1 shared full — ~500MB, contains bin/*.dll + lib/*.lib + include
+    # Gyan FFmpeg 9.0.1 shared full -- ~500MB, contains bin/*.dll + lib/*.lib + include
     # Latest Windows build from gyan.dev
     set(_ffmpeg_url "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z")
     message(STATUS "Fetching FFmpeg prebuilt from ${_ffmpeg_url}...")
@@ -82,7 +82,7 @@ function(caudio_setup_ffmpeg)
     message(STATUS "Prebuilt download skipped on non-Windows, trying source build...")
   endif()
 
-  # 4. Build from source (ExternalProject) — last resort, slow
+  # 4. Build from source (ExternalProject) -- last resort, slow
   include(ExternalProject)
   message(STATUS "Fetching FFmpeg source to build (this will take 10+ minutes, requires yasm/nasm)...")
   ExternalProject_Add(ffmpeg_external
@@ -98,6 +98,6 @@ function(caudio_setup_ffmpeg)
   # Note: need to re-run find_package after build completes (user must re-configure)
   message(WARNING "FFmpeg source build configured as target 'ffmpeg_external'. Build it first: cmake --build build --target ffmpeg_external. Then re-run cmake.")
 
-  # 5. Fail — only if not using ExternalProject (user must build then re-configure)
+  # 5. Fail -- only if not using ExternalProject (user must build then re-configure)
   message(FATAL_ERROR "FFmpeg not found. ExternalProject 'ffmpeg_external' configured. Build it with: cmake --build build --target ffmpeg_external, then re-run cmake. Or install FFmpeg via: winget install ffmpeg / brew install ffmpeg / apt install libavcodec-dev, or set -DFFmpeg_ROOT=/path/to/ffmpeg")
 endfunction()

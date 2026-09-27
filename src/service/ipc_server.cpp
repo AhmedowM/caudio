@@ -1,4 +1,4 @@
-﻿#include <array>
+#include <array>
 #include <caudio/service/ipc_server.hpp>
 #include <chrono>
 #include <cstddef>

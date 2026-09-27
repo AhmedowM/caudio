@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `CMakePresets.json`: 19 configure presets (`default`, `dev`, `ci`, `ci-sanitizers`, `modules`, `minimal`, `shared`, `release`, `release-lto`, `minsize`, `docs`, `all`, plus `-no-cli` splits, `minsize-lto`, `release-native`); build + test presets; CI migrated to `cmake --preset`
-- New options: `CAUDIO_BUILD_SHARED` (default OFF — gates `*_shared` + `combined` whole-archive maze), `CAUDIO_BUILD_CLI` (default ON — OFF skips CLI11 fetch + executable), `CAUDIO_REQUIRE_GIT_VERSION` (default OFF — fails fast with no git tag)
+- New options: `CAUDIO_BUILD_SHARED` (default OFF -- gates `*_shared` + `combined` whole-archive maze), `CAUDIO_BUILD_CLI` (default ON -- OFF skips CLI11 fetch + executable), `CAUDIO_REQUIRE_GIT_VERSION` (default OFF -- fails fast with no git tag)
 - Lazy FetchContent: `find_package(nlohmann_json/CLI11)` first, fetch only as fallback
 
 ### Changed
@@ -17,10 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tag-less configure emits a loud warning (fallback `0.1.0` is not a release build)
 - `test_player_integration` now defines `TEST_DATA_DIR` (fixes fixture lookup in nested `build/<preset>` trees)
 - Removed stale `e.g. "v0.25.4"` version strings from `version.hpp` / `version.hpp.in` / `ipc/result.hpp`
-- `engine.hpp` slimmed 21 → 12 includes
+- `engine.hpp` slimmed 21 -> 12 includes
 - Private `config::detail` moved to `src/config_detail.hpp`; stale test narration deleted
 - Removed `tui` stub subcommand (+ stale "planned v0.28.0" promises in README/man)
-- Version precedence: `-DCAUDIO_PROJECT_VERSION` → git tag → `VERSION` file → `0.1.0`+warning; `VERSION` drift guarded in CI
+- Version precedence: `-DCAUDIO_PROJECT_VERSION` -> git tag -> `VERSION` file -> `0.1.0`+warning; `VERSION` drift guarded in CI
 
 ## [0.34.3] - 2026-09-27
 
@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.34.1] - 2026-09-26
 
 ### Changed
-- Module interface units moved to `modules/` mirroring `src/`; backfilled 0.25.6–0.34.0 release notes
+- Module interface units moved to `modules/` mirroring `src/`; backfilled 0.25.6-0.34.0 release notes
 
 ## [0.34.0] - 2026-09-26
 
@@ -99,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.27.0] - 2026-09-25
 
 ### Changed
-- Promoted umbrella include paths (`<caudio.hpp>`, `<caudio/db.hpp>`, …), privatized detail headers, unified angle-bracket includes
+- Promoted umbrella include paths (`<caudio.hpp>`, `<caudio/db.hpp>`, ...), privatized detail headers, unified angle-bracket includes
 - C++23 modules are now opt-in (`CAUDIO_ENABLE_MODULES=OFF` by default); headers are canonical for tests, CLI and examples
 
 ## [0.26.1] - 2026-09-22
@@ -124,11 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.25.5] - 2026-09-15
 
 ### Added
-- `docs` + `man` + `service` packaging — `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/man/caudio.1` (roff), `packaging/caudio.service` (systemd user unit); Doxygen docs wiring via `docs/Doxyfile.in`
-- Packaging pipeline — install `caudio` binary, C++23 module sources (`src/` + `cli/src/` for BMI rebuild), man page, systemd unit; `CPack` per-platform generators (`TGZ`/`ZIP` + `DEB`/`RPM` on Linux, `NSIS` on Windows, `DragNDrop` on macOS)
+- `docs` + `man` + `service` packaging -- `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `docs/man/caudio.1` (roff), `packaging/caudio.service` (systemd user unit); Doxygen docs wiring via `docs/Doxyfile.in`
+- Packaging pipeline -- install `caudio` binary, C++23 module sources (`src/` + `cli/src/` for BMI rebuild), man page, systemd unit; `CPack` per-platform generators (`TGZ`/`ZIP` + `DEB`/`RPM` on Linux, `NSIS` on Windows, `DragNDrop` on macOS)
 
 ### Changed
-- Version wiring to `import caudio.utils` — `cmake/version.hpp.in` (moved from `version.hpp.in`), `src/utils/version.cppm` (`version()`/`versionString()`/`shortVersion()`/`versionCommit()`), `Engine::version()`/`Database::version()` + `staticVersion()`, `Status.version` via `service_detail::buildStatus` + `protocol` + `output_formatter`, CLI `--version` now `versionFull` (`v0.25.5`) (`301f7c8`)
+- Version wiring to `import caudio.utils` -- `cmake/version.hpp.in` (moved from `version.hpp.in`), `src/utils/version.cppm` (`version()`/`versionString()`/`shortVersion()`/`versionCommit()`), `Engine::version()`/`Database::version()` + `staticVersion()`, `Status.version` via `service_detail::buildStatus` + `protocol` + `output_formatter`, CLI `--version` now `versionFull` (`v0.25.5`) (`301f7c8`)
 
 ### Fixed
 - `cmake/version.hpp.in` clang-format fix
@@ -141,9 +141,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.25.3] - 2026-09-13
 
 ### Added
-- `library list` — filtered library listing with `--query`/`--artist`/`--album`/`--genre`/`--limit`/`--offset`/`--json`
-- `library stats --detailed` — detailed stats with most-played and total play time (`LibraryStatsDetailed`)
-- `info` — current track info with metadata and play statistics (`Info` command)
+- `library list` -- filtered library listing with `--query`/`--artist`/`--album`/`--genre`/`--limit`/`--offset`/`--json`
+- `library stats --detailed` -- detailed stats with most-played and total play time (`LibraryStatsDetailed`)
+- `info` -- current track info with metadata and play statistics (`Info` command)
 
 ## [0.25.2] - 2026-09-13
 
@@ -153,40 +153,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.25.1] - 2026-09-13
 
 ### Added
-- Device management — `device list`/`set`/`test` (miniaudio device enumeration)
+- Device management -- `device list`/`set`/`test` (miniaudio device enumeration)
 
 ## [0.25.0] - 2026-09-13
 
 ### Added
-- Playback history — `history list [--limit N] [--json]` / `history clear`
-- TUI preview polish — `tui` shows `status` + guidance (`cedac0f`)
+- Playback history -- `history list [--limit N] [--json]` / `history clear`
+- TUI preview polish -- `tui` shows `status` + guidance (`cedac0f`)
 
 ## [0.24.1] - 2026-09-13
 
 ### Added
-- Multi-queue switch — `queue switch <qid>` with `active_queue_id` in engine, `QueueSwitch` IPC command and `QueueQueues` listing (`4b7e70d`)
+- Multi-queue switch -- `queue switch <qid>` with `active_queue_id` in engine, `QueueSwitch` IPC command and `QueueQueues` listing (`4b7e70d`)
 
 ## [0.24.0] - 2026-09-13
 
 ### Added
-- Library add/remove — `library add <path> [--recursive]`, `library remove <id>` with metadata extraction and fingerprint
-- Tag editing — `tag edit <id> <field>` / `tag get <id>` with field validation
-- Config reset — `config reset [key]` to restore defaults
-- Status watch mode — `status --watch`/`--follow` with `--interval <ms>` for continuous polling
+- Library add/remove -- `library add <path> [--recursive]`, `library remove <id>` with metadata extraction and fingerprint
+- Tag editing -- `tag edit <id> <field>` / `tag get <id>` with field validation
+- Config reset -- `config reset [key]` to restore defaults
+- Status watch mode -- `status --watch`/`--follow` with `--interval <ms>` for continuous polling
 
 ## [0.23.3] - 2026-09-13
 
 ### Added
-- Playlist operations — `playlist rename` / `export` (m3u/pls/json) / `import` (m3u)
+- Playlist operations -- `playlist rename` / `export` (m3u/pls/json) / `import` (m3u)
 
 ### Fixed
-- Queue shuffle/repeat — correctly toggles when no arg provided (`3c6f4e8`)
+- Queue shuffle/repeat -- correctly toggles when no arg provided (`3c6f4e8`)
 
 ## [0.23.2] - 2026-09-12
 
 ### Changed
 - CMake: target-scoped sanitizers, deduplicated sqlite, export fix, `FindFFmpeg` + `ExternalProject` fallback (`02816e3`)
-- Tests: renamed `helpers_test.hpp` → `common.hpp`, deduped `tempDbPath`/`safeRemoveDb`
+- Tests: renamed `helpers_test.hpp` -> `common.hpp`, deduped `tempDbPath`/`safeRemoveDb`
 
 ### Fixed
 - `test_reader` parallel race and compiler warnings (`6871ee1`)
@@ -206,17 +206,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **BREAKING** C++23 module moves per audit (`8d935af`, `aee0cf7`)
-- **BREAKING** C++23 module naming and thin-aggregator removal — `caudio.db`, `caudio.engine`, `caudio.utils` partition renames (`43506aa`)
+- **BREAKING** C++23 module naming and thin-aggregator removal -- `caudio.db`, `caudio.engine`, `caudio.utils` partition renames (`43506aa`)
 
 ## [0.21.0] - 2026-09-12
 
 ### Changed
-- **BREAKING** C++23 type renames per audit — `StatusCode`, `Error`, `Result<T>`, `EngineState`, `QueueState` (`c69338e`)
+- **BREAKING** C++23 type renames per audit -- `StatusCode`, `Error`, `Result<T>`, `EngineState`, `QueueState` (`c69338e`)
 - Modernization per audit: RAII guards, `std::expected` error handling, `std::jthread`/`std::stop_token`, concept constraints
 
 ### Added
-- Polyglot integration strategy (`docs/polyglot-integration.md`) — Rust metadata, Tauri GUI, Python `nanobind`, Go sidecar
-- Single-module BMI build fix (`bbc1f47`) — `CMAKE_POSITION_INDEPENDENT_CODE ON`, static libs own BMIs, shared variants use `whole-archive`
+- Polyglot integration strategy (`docs/polyglot-integration.md`) -- Rust metadata, Tauri GUI, Python `nanobind`, Go sidecar
+- Single-module BMI build fix (`bbc1f47`) -- `CMAKE_POSITION_INDEPENDENT_CODE ON`, static libs own BMIs, shared variants use `whole-archive`
 
 ## [0.20.0] - 2026-09-11
 
@@ -348,8 +348,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0] - 2026-09-05
 
 ### Changed
-- Player: FFmpeg-only — removed `miniaudio`/`dr_*` decoder leftovers
-- Build: FFmpeg provider cascade (system → vcpkg → prebuilt → source)
+- Player: FFmpeg-only -- removed `miniaudio`/`dr_*` decoder leftovers
+- Build: FFmpeg provider cascade (system -> vcpkg -> prebuilt -> source)
 
 ### Fixed
 - Player: FFmpeg streaming and playback, hybrid streaming for all formats

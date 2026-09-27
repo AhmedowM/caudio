@@ -1,4 +1,4 @@
-﻿#include <array>
+#include <array>
 #include <caudio/config.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/utils.hpp>

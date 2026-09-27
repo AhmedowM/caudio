@@ -8,7 +8,7 @@
 |---|---|---|
 | **Compiler** | GCC 14+ / Clang 17+ / AppleClang 17+ | C++23 required (`std::expected`, `std::print`, `std::generator`, modules). MinGW GCC 14+ on Windows. |
 | **CMake** | 3.28+ | Required for `FILE_SET CXX_MODULES` and BMI handling |
-| **Ninja** | 1.11+ | **Required** — C++23 modules only work reliably with Ninja generator |
+| **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | 9.0.1+ | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. Auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
 | **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
 | **Catch2** | 3.7.1 | Auto-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
@@ -47,7 +47,7 @@ ctest --test-dir build -j4 --output-on-failure
 ```
 
 > **Audio tests beep:** `AudioOutput::create` (`ma_device_start`) beeps on desktop.
-> For silent/headless runs: `CAUDIO_TEST_NOAUDIO=1 ctest -j4` — tests that would beep
+> For silent/headless runs: `CAUDIO_TEST_NOAUDIO=1 ctest -j4` -- tests that would beep
 > check `caudio::test::noAudio()` / `CAUDIO_SKIP_IF_NOAUDIO()` in `tests/common.hpp`
 > and `SKIP` when set. CI sets `CAUDIO_TEST_NOAUDIO=1` automatically. For silent
 > ring exercises without a device use `caudio::test::makeDummyRing()` (no `ma_device_init`).
@@ -61,7 +61,7 @@ cmake --build build --target doc
 #Open : docs / html / index.html
 ```
 
-Man page is at `docs/man/caudio.1` — preview with `man ./docs/man/caudio.1` or `groff -man -Tascii docs/man/caudio.1 | less`.
+Man page is at `docs/man/caudio.1` -- preview with `man ./docs/man/caudio.1` or `groff -man -Tascii docs/man/caudio.1 | less`.
 
 ### Code Style
 
@@ -101,7 +101,7 @@ docs: comprehensive Doxygen documentation for all public APIs
 refactor(cmake): SANITIZERS target-scoped, sqlite dedup
 ```
 
-- Keep subject line ≤ 72 chars.
+- Keep subject line <= 72 chars.
 - Use `BREAKING CHANGE:` footer for API-breaking changes.
 
 ## Pull Request Process
@@ -124,7 +124,7 @@ refactor(cmake): SANITIZERS target-scoped, sqlite dedup
    - Any `BREAKING CHANGE` notes.
    - Screenshots or `caudio --help` output for CLI changes.
 6. **CI** must pass (build + tests on Linux/Windows/macOS if configured).
-7. **Review** — address feedback; squash or rebase as requested.
+7. **Review** -- address feedback; squash or rebase as requested.
 
 ## Project Structure
 

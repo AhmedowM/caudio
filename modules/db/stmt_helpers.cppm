@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/stmt_helpers.hpp>
 
 module caudio.db:stmt_helpers;

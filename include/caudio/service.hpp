@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * @file service.hpp
  * @brief Umbrella header for the daemon service runtime.

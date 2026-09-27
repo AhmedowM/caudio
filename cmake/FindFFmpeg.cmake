@@ -1,7 +1,7 @@
-# FindFFmpeg.cmake — locates FFmpeg shared build
+# FindFFmpeg.cmake -- locates FFmpeg shared build
 # Provides imported targets FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil etc.
 # Search order: CMAKE_PREFIX_PATH / FFmpeg_ROOT (var or env) / auto-detected from ffmpeg executable / system paths
-# No hardcoded absolute paths — set -DFFmpeg_ROOT=/path/to/ffmpeg or add ffmpeg/bin to PATH
+# No hardcoded absolute paths -- set -DFFmpeg_ROOT=/path/to/ffmpeg or add ffmpeg/bin to PATH
 
 # Auto-detect FFmpeg root from ffmpeg executable in PATH (portable, no hardcoding)
 if(NOT FFmpeg_ROOT AND NOT DEFINED ENV{FFmpeg_ROOT})

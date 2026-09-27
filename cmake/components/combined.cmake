@@ -1,5 +1,5 @@
 # // combined is library-only (utils/player/db/engine); IPC (json/ipc/service/client) is separate, not part of libcaudio
-# Gated on CAUDIO_BUILD_SHARED (OFF by default) — see KISS-1.
+# Gated on CAUDIO_BUILD_SHARED (OFF by default) -- see KISS-1.
 if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
   set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})

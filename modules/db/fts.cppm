@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/fts.hpp>
 
 module caudio.db:fts;

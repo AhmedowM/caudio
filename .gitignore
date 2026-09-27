@@ -45,7 +45,7 @@ docs/latex/
 # Keep source md on disk but not required in repo history (AI docs)
 # Uncomment to ignore all markdown if desired:
 # *.md
-# But keep real docs if you add README.md — currently ignoring AI artefacts:
+# But keep real docs if you add README.md -- currently ignoring AI artefacts:
 CPP_PORT_REPORT.md
 docs/specs/
 docs/superpowers/

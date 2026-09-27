@@ -35,8 +35,8 @@ namespace caudio::db {
  * @ingroup caudio_db
  */
 enum class ScanMode {
-    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) — fast, default.
-    Full     ///< Full-file BLAKE3 — slower, more collision-resistant.
+    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) -- fast, default.
+    Full     ///< Full-file BLAKE3 -- slower, more collision-resistant.
 };
 
 namespace detail {

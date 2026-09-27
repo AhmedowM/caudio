@@ -1,4 +1,4 @@
-﻿#include <blake3.h>
+#include <blake3.h>
 
 #include <caudio/db/fingerprint.hpp>
 #include <caudio/utils.hpp>

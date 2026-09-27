@@ -1,4 +1,4 @@
-﻿#include <atomic>
+#include <atomic>
 #include <bit>
 #include <caudio/engine.hpp>
 #include <caudio/service/shm_status.hpp>
@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #else
-// HANDLE etc are already defined in shm_status.hpp Ã¢â‚¬â€ do not redefine
+// HANDLE etc are already defined in shm_status.hpp -- do not redefine
 inline constexpr DWORD kFileMapRead = 0x0004UL;
 inline constexpr DWORD kFileMapWrite = 0x0002UL;
 inline constexpr DWORD kPageReadWrite = 0x04UL;

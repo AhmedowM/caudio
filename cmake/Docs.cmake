@@ -1,4 +1,4 @@
-# Docs.cmake — Doxygen documentation target (enabled via CAUDIO_BUILD_DOCS=ON).
+# Docs.cmake -- Doxygen documentation target (enabled via CAUDIO_BUILD_DOCS=ON).
 # How to build docs:
 #   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
 #   cmake --build build --target doc   # generates HTML to build/docs/html

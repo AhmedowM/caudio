@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/statement.hpp>
 #include <caudio/db/transaction.hpp>

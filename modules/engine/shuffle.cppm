@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/engine/shuffle.hpp>
 
 export module caudio.engine:shuffle;

@@ -41,9 +41,9 @@ jobs:
 
       - name: Check VERSION matches latest tag
         run: |
-          tag="$(git describe --tags --abbrev=0 2>/dev/null | tr -d v)" || { echo "no tags in clone — skipping VERSION check"; exit 0; }
+          tag="$(git describe --tags --abbrev=0 2>/dev/null | tr -d v)" || { echo "no tags in clone -- skipping VERSION check"; exit 0; }
           ver="$(tr -d 'v \n\r' < VERSION)"
-          test "$ver" = "$tag" || (echo "VERSION file ($ver) drifted from latest tag ($tag) — bump VERSION in the release-prep commit" && exit 1)
+          test "$ver" = "$tag" || (echo "VERSION file ($ver) drifted from latest tag ($tag) -- bump VERSION in the release-prep commit" && exit 1)
         shell: bash
 
       - name: Setup GCC 16 (Ubuntu)
@@ -117,7 +117,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           choco install ninja -y --no-progress || echo "ninja choco install failed"
-          # FFmpeg via system or SetupFFmpeg fallback — no hard fail if not found, but tests need it
+          # FFmpeg via system or SetupFFmpeg fallback -- no hard fail if not found, but tests need it
           # Try choco ffmpeg as best-effort; fallback cmake/SetupFFmpeg.cmake will fetch prebuilt if needed
           choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
           cmake --version

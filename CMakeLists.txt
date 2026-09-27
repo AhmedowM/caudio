@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.28)
 # Version precedence (top wins):
 #   1. -DCAUDIO_PROJECT_VERSION=X.Y.Z (explicit override for packagers stripping .git)
 #   2. git describe --tags (normal clones, CI with fetch-depth: 0)
-#   3. VERSION file (tarballs, shallow exports — bumped in the release-prep commit)
+#   3. VERSION file (tarballs, shallow exports -- bumped in the release-prep commit)
 #   4. 0.1.0 + loud warning (never silent; NOT a release build)
 option(CAUDIO_REQUIRE_GIT_VERSION "fail configure when no git tag is found (default OFF)" OFF)
 if(DEFINED CAUDIO_PROJECT_VERSION AND NOT CAUDIO_PROJECT_VERSION STREQUAL "")
@@ -39,12 +39,12 @@ else()
       set(PROJECT_VERSION_PATCH "${CMAKE_MATCH_3}")
       set(PROJECT_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
       set(GIT_TAG "v${PROJECT_VERSION}")
-      message(STATUS "No git tag — using VERSION file: ${PROJECT_VERSION}")
+      message(STATUS "No git tag -- using VERSION file: ${PROJECT_VERSION}")
     else()
       if(CAUDIO_REQUIRE_GIT_VERSION)
-        message(FATAL_ERROR "CAUDIO_REQUIRE_GIT_VERSION=ON but no git tag found — clone with tags (git fetch --tags) or configure with -DCAUDIO_REQUIRE_GIT_VERSION=OFF")
+        message(FATAL_ERROR "CAUDIO_REQUIRE_GIT_VERSION=ON but no git tag found -- clone with tags (git fetch --tags) or configure with -DCAUDIO_REQUIRE_GIT_VERSION=OFF")
       endif()
-      message(WARNING "No git tag and no usable VERSION file — using fallback version 0.1.0. Tag-less builds are NOT release builds; docs/CHANGELOG claim the latest tagged release.")
+      message(WARNING "No git tag and no usable VERSION file -- using fallback version 0.1.0. Tag-less builds are NOT release builds; docs/CHANGELOG claim the latest tagged release.")
       set(PROJECT_VERSION_MAJOR "0")
       set(PROJECT_VERSION_MINOR "1")
       set(PROJECT_VERSION_PATCH "0")
@@ -85,8 +85,8 @@ endif()
 # different *_EXPORTS/PIC flags breaks dependents with CRC mismatch).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Options — FFmpeg is required primary (dr_* deleted, vendor cleaned)
-option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system → vcpkg/Conan → prebuilt → source)" ON)
+# Options -- FFmpeg is required primary (dr_* deleted, vendor cleaned)
+option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system -> vcpkg/Conan -> prebuilt -> source)" ON)
 option(CAUDIO_ENABLE_TESTS "build tests" OFF)
 option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
 option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,undefined)" OFF)
@@ -123,11 +123,11 @@ elseif(CAUDIO_WITH_FETCH_FFMPEG)
   include(cmake/SetupFFmpeg.cmake)
   caudio_setup_ffmpeg()
   if(NOT FFmpeg_FOUND)
-    message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
+    message(FATAL_ERROR "FFmpeg is required -- install 9.0.1+ or set FFmpeg_ROOT")
   endif()
   message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
 else()
-  message(FATAL_ERROR "FFmpeg is required — install 9.0.1+ or set FFmpeg_ROOT")
+  message(FATAL_ERROR "FFmpeg is required -- install 9.0.1+ or set FFmpeg_ROOT")
 endif()
 
 function(caudio_apply_sanitizers tgt)
@@ -144,7 +144,7 @@ endfunction()
 
 if(CAUDIO_ENABLE_SANITIZERS)
   if(WIN32)
-    message(WARNING "CAUDIO_ENABLE_SANITIZERS not supported on Windows/MinGW — sanitizers require Clang/GCC on Linux. Option ignored.")
+    message(WARNING "CAUDIO_ENABLE_SANITIZERS not supported on Windows/MinGW -- sanitizers require Clang/GCC on Linux. Option ignored.")
   elseif(MSVC)
     message(WARNING "CAUDIO_ENABLE_SANITIZERS: MSVC sanitizers limited; using /fsanitize=address")
   else()
@@ -152,7 +152,7 @@ if(CAUDIO_ENABLE_SANITIZERS)
   endif()
 endif()
 
-# Configure version header (template lives in cmake/ — canonical for CMake @ONLY files)
+# Configure version header (template lives in cmake/ -- canonical for CMake @ONLY files)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.hpp.in
   ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp
@@ -233,7 +233,7 @@ if(CAUDIO_ENABLE_MODULES)
   ca_set_module_warnings(caudio_umbrella)
 endif()
 
-# caudio executable — App dispatch (CLI11) + main entry (header-source only)
+# caudio executable -- App dispatch (CLI11) + main entry (header-source only)
 if(CAUDIO_BUILD_CLI)
 add_executable(caudio
   cli/src/main.cpp
@@ -261,7 +261,7 @@ if(CAUDIO_ENABLE_SANITIZERS)
 endif()
 endif()
 
-# Documentation (Doxygen) — see cmake/Docs.cmake
+# Documentation (Doxygen) -- see cmake/Docs.cmake
 if(CAUDIO_BUILD_DOCS)
   include(cmake/Docs.cmake)
   caudio_add_docs()
@@ -344,7 +344,7 @@ if(CAUDIO_ENABLE_MODULES)
   install(DIRECTORY modules/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/modules FILES_MATCHING PATTERN "*.cppm")
 endif()
 
-# Man page — roff source tracked at docs/man/caudio.1
+# Man page -- roff source tracked at docs/man/caudio.1
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1")
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
@@ -355,13 +355,13 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/caudio.service")
   install(FILES packaging/caudio.service DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/systemd/user)
 endif()
 
-# Packaging (CPack) — TGZ/ZIP only until the first release; distro
+# Packaging (CPack) -- TGZ/ZIP only until the first release; distro
 # generators (DEB/RPM/NSIS/DragNDrop) return when versions stabilize.
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library — utils, player, db, engine")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library -- utils, player, db, engine")
 set(CPACK_PACKAGE_CONTACT "caudio@example.com")
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" CPACK_SYSTEM_NAME)
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CPACK_SYSTEM_NAME}")
@@ -389,7 +389,7 @@ if(CAUDIO_ENABLE_EXAMPLES)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
-# Tests — Catch2 via FetchContent, ports of test_utils_*
+# Tests -- Catch2 via FetchContent, ports of test_utils_*
 if(CAUDIO_ENABLE_TESTS)
   FetchContent_Declare(
     Catch2

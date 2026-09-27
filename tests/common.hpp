@@ -40,7 +40,7 @@ inline bool noAudio() noexcept {
  * @param channels Channel count for the ring (default 2).
  * @param frames Capacity in frames (default 8192).
  * @return `caudio::utils::SpscRing<float>` ready for `fillForTest` exercises.
- * @details Test-only helper — does NOT call `AudioOutput::create` or
+ * @details Test-only helper -- does NOT call `AudioOutput::create` or
  * `ma_device_init`/`ma_device_start`, so no beep. Example:
  * `auto ring = caudio::test::makeDummyRing(48000, 2);`
  */

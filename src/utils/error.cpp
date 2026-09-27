@@ -1,4 +1,4 @@
-﻿#include <caudio/utils/error.hpp>
+#include <caudio/utils/error.hpp>
 
 namespace caudio::utils {
 

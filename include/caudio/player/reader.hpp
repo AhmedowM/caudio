@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file reader.hpp
  * @brief Input reader abstractions for audio data sources
  * @ingroup caudio_player

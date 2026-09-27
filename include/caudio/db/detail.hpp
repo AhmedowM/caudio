@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * @file detail.hpp
  * @brief Internal re-export hub for db helpers.

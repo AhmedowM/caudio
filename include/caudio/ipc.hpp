@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * @file ipc.hpp
  * @brief Umbrella header for IPC command/result/protocol and config.

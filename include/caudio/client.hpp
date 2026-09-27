@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * @file client.hpp
  * @brief Umbrella header for the daemon client SDK.

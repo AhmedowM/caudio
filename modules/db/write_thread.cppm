@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/write_thread.hpp>
 
 export module caudio.db:write_thread;

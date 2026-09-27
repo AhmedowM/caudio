@@ -1,4 +1,4 @@
-﻿#include <caudio/client/ipc_client.hpp>
+#include <caudio/client/ipc_client.hpp>
 
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -117,7 +117,7 @@ caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::
     if (!raw)
         return std::unexpected{raw.error()};
 
-    // rawRecv already stripped the 4-byte BE header; construct string directly Ã¢â‚¬â€ do not
+    // rawRecv already stripped the 4-byte BE header; construct string directly -- do not
     // call deframe
     std::string replyStr;
     replyStr.reserve(raw->size());

@@ -125,7 +125,7 @@ bool playTrackViaPlayer(const Track& track) {
     if (!readerResult) {
         std::cerr << "[demo] FileReader::open('" << track.path
                   << "') failed: " << readerResult.error().message
-                  << " — using synthetic fallback\n";
+                  << " -- using synthetic fallback\n";
         // Fallback: still exercise decoder with MemoryReader empty data via synthetic path
         // Create a tiny in-memory wav header synthetic fallback: just use decoder fallback directly
         // For demo, skip if file missing but count as error

@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/db_core.hpp>
 
 export module caudio.db:core;

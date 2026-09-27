@@ -1,4 +1,4 @@
-﻿#include <caudio/client/output_formatter.hpp>
+#include <caudio/client/output_formatter.hpp>
 #include <caudio/db/db_types.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/protocol.hpp>

@@ -11,7 +11,7 @@
  * @brief Core value types for the caudio playback engine.
  * @ingroup caudio_engine
  * @defgroup caudio_engine caudio engine
- * @brief Playback engine — state machine, shuffle/history, gapless and persistence.
+ * @brief Playback engine -- state machine, shuffle/history, gapless and persistence.
  *
  * @details The caudio_engine module group aggregates the playback state
  * machine, queue/shuffle permutation, gapless transition, history
@@ -127,7 +127,7 @@ struct EngineCallbacks {
     std::function<void(int64_t queue_id)> on_queue_changed{}; ///< Fired on QueueChanged.
     std::function<void(caudio::utils::StatusCode err, std::string_view msg)>
         on_error{};      ///< Fired on Error.
-    void* user{nullptr}; // unused — reserved
+    void* user{nullptr}; // unused -- reserved
 };
 
 /**
@@ -171,7 +171,7 @@ struct QueueState {
  * @ingroup caudio_engine
  * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
  * current_track_id, volume, shuffle_perm (BLOB), active_queue_id`.
- * `active_queue_id` may be missing on old DBs — loadState falls back
+ * `active_queue_id` may be missing on old DBs -- loadState falls back
  * to `1` and saveState tries `sqlNew` then `sqlOld`. `shuffle_perm`
  * is `perm` serialized as `int64_t` blob.
  * @see Engine::loadState

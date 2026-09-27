@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/player/decoder.hpp>
 
 export module caudio.player:decoder;

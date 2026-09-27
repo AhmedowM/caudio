@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/ipc/command.hpp>
 
 export module caudio.ipc:command;

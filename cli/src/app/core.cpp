@@ -23,7 +23,7 @@
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-// Avoid including <windows.h> â€” causes HMODULE conflict with caudio::utils (like
+// Avoid including <windows.h> -- causes HMODULE conflict with caudio::utils (like
 // service_paths.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
 // missing decls.
 using BOOL = int;
@@ -214,7 +214,7 @@ App::App(caudio::config::Config cfg)
 App::~App() = default;
 
 std::filesystem::path App::pidPathForConfig() const {
-    // Canonical pid path â€” single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
+    // Canonical pid path -- single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
     auto r = caudio::config::pidPathFor(config_.dbPath);
     if (r)
         return *r;
@@ -385,7 +385,7 @@ int App::handleStart(bool foreground) {
                          config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
-        // Poll for pipe readiness: 1500ms total, 100ms interval Ã—15
+        // Poll for pipe readiness: 1500ms total, 100ms interval x--15
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {

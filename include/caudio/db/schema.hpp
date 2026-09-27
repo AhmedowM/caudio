@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <caudio/utils.hpp>
 #include <string>
 #include <string_view>
@@ -18,14 +18,14 @@
 namespace caudio::db {
 
 /**
- * @brief Queue table UNIQUE invariant â€” single-writer guarantee.
+ * @brief Queue table UNIQUE invariant -- single-writer guarantee.
  * @ingroup caudio_db
  * @details `queue` enforces `UNIQUE(queue_id, position)` and a unique
  * index `idx_queue_queue_pos`. `Database::dbMutex_` serializes all queue
  * writes; the UNIQUE is a safety net. For existing DBs created before
  * the constraint, `IF NOT EXISTS` leaves the old table as-is; the
  * `CREATE UNIQUE INDEX IF NOT EXISTS` may fail if duplicate positions
- * exist â€” `Database::open()` handles that gracefully by ignoring the
+ * exist -- `Database::open()` handles that gracefully by ignoring the
  * index-creation error and queue ops will normalize positions on next write.
  * Position shifts use `UPDATE ... SET position=position+1` which under
  * UNIQUE requires serialized access (guaranteed by `dbMutex_`); transient

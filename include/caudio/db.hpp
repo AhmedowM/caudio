@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 /**
  * @file db.hpp
  * @brief Aggregate include for the caudio.db module.

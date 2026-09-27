@@ -1,4 +1,4 @@
-﻿#include <caudio/player/reader.hpp>
+#include <caudio/player/reader.hpp>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -121,7 +121,7 @@ FileReader::FileReader(FILE* f) : file_(f) {}
 
 caudio::utils::Expected<std::unique_ptr<Reader>>
 MemoryReader::open(std::span<const std::byte> data) {
-    // copy data to owned buffer â€” wrap immediately for exception safety
+    // copy data to owned buffer -- wrap immediately for exception safety
     auto holder = std::unique_ptr<MemoryReader>(new MemoryReader(data));
     std::unique_ptr<Reader> base = std::move(holder);
     return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};

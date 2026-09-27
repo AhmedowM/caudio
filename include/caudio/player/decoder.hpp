@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file decoder.hpp
  * @brief Single audio decoder (FFmpeg backend) with format probing.
  * @ingroup caudio_player

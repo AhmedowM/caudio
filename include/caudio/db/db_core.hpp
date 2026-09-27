@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/detail.hpp>
@@ -214,7 +214,7 @@ class Database final {
                                                               const std::vector<int64_t>& ids);
 
     /**
-     * @brief Locked helper section â€” caller must hold Database::mutex().
+     * @brief Locked helper section -- caller must hold Database::mutex().
      * @ingroup caudio_db
      * @details These avoid re-locking dbMutex_ and are intended for use inside
      * outer transactions/batches (e.g., scanLibrary).
@@ -303,7 +303,7 @@ class Database final {
     mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   private:
-    // Inline helpers â€” reduce duplication between insert/update (internal::bindTrack coverage)
+    // Inline helpers -- reduce duplication between insert/update (internal::bindTrack coverage)
     /**
      * @brief Binds all Track fields for INSERT statement (24 parameters).
      * @ingroup caudio_db
@@ -341,7 +341,7 @@ class Database final {
 
   public:
     /**
-     * @brief Track CRUD â€” inserts, updates, deletes and queries tracks.
+     * @brief Track CRUD -- inserts, updates, deletes and queries tracks.
      * @ingroup caudio_db
      */
     /**
@@ -512,7 +512,7 @@ class Database final {
     std::expected<std::vector<Track>, caudio::utils::Error> playlistGetTracks(int64_t pid);
 
     /**
-     * @brief Queue operations â€” forwarded to queue partition (see queue.cppm).
+     * @brief Queue operations -- forwarded to queue partition (see queue.cppm).
      * @ingroup caudio_db
      * @details All queue methods normalize qid == 0 to 1 and enforce the
      * UNIQUE(queue_id, position) invariant via dbMutex_ serialization.

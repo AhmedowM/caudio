@@ -4,10 +4,10 @@
 
 /**
  * @file version.hpp
- * @brief Version utilities — re-exports caudio::shortVersion constants and helpers.
+ * @brief Version utilities -- re-exports caudio::shortVersion constants and helpers.
  * @ingroup caudio_utils
  * @details Thin header that exposes version constants plus helpers
- * `version()` / `versionString()`. No API break — additive only.
+ * `version()` / `versionString()`. No API break -- additive only.
  * Includes the CMake-generated version_config.hpp for version constants.
  */
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #if defined(_WIN32) || defined(_WIN64)
 // No windows.h here to avoid intrin conflict; Win32 decls go after export module
 #else

@@ -17,7 +17,7 @@
 
 /**
  * @file engine.hpp
- * @brief Playback engine — state machine, gapless, decode/monitor loops and persistence.
+ * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
  * @ingroup caudio_engine
  * @details Aggregate module `caudio.engine` re-exporting `:types`, `:history`
  * and `:shuffle`. Core class is Engine which owns:
@@ -59,7 +59,7 @@ struct sqlite3_stmt;
 namespace caudio::engine {
 
 /**
- * @brief Main playback engine — queue, decoding, gapless, history and persistence.
+ * @brief Main playback engine -- queue, decoding, gapless, history and persistence.
  * @ingroup caudio_engine
  * @details See file-level docs for state machine, threading and persistence.
  * Public mutators that touch QueueState use `tryLockQueue()` (non-blocking);
@@ -252,7 +252,7 @@ class Engine final {
     /**
      * @brief Returns database statistics.
      * @ingroup caudio_engine
-     * @return `std::expected<DbStats, Error>` — stats on success, State if no db.
+     * @return `std::expected<DbStats, Error>` -- stats on success, State if no db.
      * @par Thread safety
      * Thread-safe; delegates to Database::getStats() which takes shared_lock.
      * @see caudio::db::Database::getStats
@@ -264,7 +264,7 @@ class Engine final {
      * @brief Lists history entries.
      * @ingroup caudio_engine
      * @param limit Max rows (0 = no limit, default 50).
-     * @return `std::expected<std::vector<HistoryEntry>, Error>` — vector on success, State if no
+     * @return `std::expected<std::vector<HistoryEntry>, Error>` -- vector on success, State if no
      * db.
      * @par Thread safety
      * Thread-safe; History::listHistory takes shared_lock on its mutex.
@@ -276,7 +276,7 @@ class Engine final {
     /**
      * @brief Clears all history entries.
      * @ingroup caudio_engine
-     * @return `std::expected<void, Error>` — success or State/Internal.
+     * @return `std::expected<void, Error>` -- success or State/Internal.
      * @par Thread safety
      * Thread-safe; History::clearHistory takes unique_lock on its mutex.
      * @see History::clearHistory
@@ -391,7 +391,7 @@ class Engine final {
     /**
      * @brief Pops one event from the MPSC queue (non-blocking).
      * @ingroup caudio_engine
-     * @return `std::expected<EngineEvent, Error>` — event on success, NotFound if queue empty.
+     * @return `std::expected<EngineEvent, Error>` -- event on success, NotFound if queue empty.
      * @par Thread safety
      * Thread-safe; MpscQueue is lock-free MPSC.
      * @see drainEvents
@@ -406,7 +406,7 @@ class Engine final {
      * @param buf Output buffer (may be null if cap==0).
      * @param cap Capacity of buf.
      * @param n Out: number of events written (must be non-null).
-     * @return `std::expected<void, Error>` — success or InvalidArg if n is null or buf is null with
+     * @return `std::expected<void, Error>` -- success or InvalidArg if n is null or buf is null with
      * cap>0.
      * @par Thread safety
      * Thread-safe; pops from MpscQueue (lock-free).
@@ -493,7 +493,7 @@ class Engine final {
      * @brief Executes a callable inside a SQLite BEGIN IMMEDIATE / COMMIT transaction.
      * @ingroup caudio_engine
      * @param fn Transaction body; receives the database handle.
-     * @return `std::expected<void, Error>` — success or error (Busy if begin fails, Internal on
+     * @return `std::expected<void, Error>` -- success or error (Busy if begin fails, Internal on
      * commit failure, InvalidArg if no db).
      * @details Acquires unique_lock on dbMutex_, executes `BEGIN IMMEDIATE`, runs `fn(h)`,
      * commits on success, rolls back on any failure. Used by all state persistence methods.
@@ -506,7 +506,7 @@ class Engine final {
     /**
      * @brief Loads persisted engine state from engine_state row id=1.
      * @ingroup caudio_engine
-     * @return `std::optional<Error>` — `std::nullopt` on success (including no row, defaults
+     * @return `std::optional<Error>` -- `std::nullopt` on success (including no row, defaults
      * applied), or Error on failure.
      * @details Tries `sqlNew` (with `active_queue_id` column) first; if prepare fails (old schema),
      * falls back to `sqlOld` without that column for migration. On row found:
@@ -527,7 +527,7 @@ class Engine final {
     /**
      * @brief Persists current engine state to engine_state row id=1.
      * @ingroup caudio_engine
-     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure,
+     * @return `std::expected<void, Error>` -- success or error (Internal on prepare/step failure,
      * NoMem if perm too large).
      * @details Uses `withTransaction()` for atomicity. Tries `sqlNew` (with `active_queue_id`)
      * first; if prepare fails (old schema), falls back to `sqlOld`. Binds:
@@ -544,7 +544,7 @@ class Engine final {
     /**
      * @brief Persists shuffle permutation and cursor position atomically.
      * @ingroup caudio_engine
-     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure,
+     * @return `std::expected<void, Error>` -- success or error (Internal on prepare/step failure,
      * NoMem if perm too large).
      * @details Executes `UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, shuffle_enabled=?
      * WHERE id=1` inside a transaction. Binds the current `queue_.perm` as BLOB (or NULL if not
@@ -563,7 +563,7 @@ class Engine final {
     /**
      * @brief Persists only the cursor position to engine_state.
      * @ingroup caudio_engine
-     * @return `std::expected<void, Error>` — success or error (Internal on prepare/step failure).
+     * @return `std::expected<void, Error>` -- success or error (Internal on prepare/step failure).
      * @details Executes `UPDATE engine_state SET cursor_pos=? WHERE id=1` inside a transaction.
      * Binds `queue_.cursor`. Also updates `state_.cursorPos`. Lighter than
      * persistShuffleBlobLocked; used when only cursor advances (non-shuffle next/prev).
@@ -579,7 +579,7 @@ class Engine final {
      * @ingroup caudio_engine
      * @param qid Queue id (0 defaults to 1).
      * @param pos Zero-based position in queue.
-     * @return `std::expected<Track, Error>` — track on success, NotFound if position out of range,
+     * @return `std::expected<Track, Error>` -- track on success, NotFound if position out of range,
      * Internal on SQL error.
      * @details Executes `SELECT track_id FROM queue WHERE queue_id=? ORDER BY position LIMIT 1
      * OFFSET ?` under dbMutex_ shared_lock, then calls `db_->getTrack(trackId)`.
@@ -595,7 +595,7 @@ class Engine final {
      * @brief Internal shuffle toggle with persistence (queueMutex_ must be held).
      * @ingroup caudio_engine
      * @param on True to enable shuffle, false to disable.
-     * @return `std::expected<void, Error>` — success or error from persistShuffleBlobLocked.
+     * @return `std::expected<void, Error>` -- success or error from persistShuffleBlobLocked.
      * @details If enabling and perm empty: clears perm/cursor, gets queue count, generates new
      * permutation via `detail::shufflePerm` with random_device, persists via
      * persistShuffleBlobLocked. If disabling: clears perm, sets shuffle=false, persists. No-op if
@@ -613,7 +613,7 @@ class Engine final {
      * @brief Advances queue cursor to next track per shuffle/repeat mode (queueMutex_ held).
      * @ingroup caudio_engine
      * @param out Output track reference (filled on success).
-     * @return `std::expected<void, Error>` — success, NotFound if queue empty, Internal on fetch
+     * @return `std::expected<void, Error>` -- success, NotFound if queue empty, Internal on fetch
      * error.
      * @details Shuffle path:
      * - If perm empty, calls setShuffleLocked(true) to generate.
@@ -641,7 +641,7 @@ class Engine final {
      * @brief Moves queue cursor to previous track per shuffle/repeat mode (queueMutex_ held).
      * @ingroup caudio_engine
      * @param out Output track reference (filled on success).
-     * @return `std::expected<void, Error>` — success, NotFound if queue empty/at start/no perm.
+     * @return `std::expected<void, Error>` -- success, NotFound if queue empty/at start/no perm.
      * @details Non-shuffle path:
      * - If cursor <= 1: returns NotFound ("at start" if cursor==0).
      * - Else: cursor -= 2, clamp to count-1, fetch track at cursor, increment cursor, persist
@@ -663,7 +663,7 @@ class Engine final {
      * @brief Initializes decoder/reader/ring/output for a track and starts playback.
      * @ingroup caudio_engine
      * @param t Track to play (path used to open reader/decoder).
-     * @return `std::expected<void, Error>` — always success (errors stored in lastErr_).
+     * @return `std::expected<void, Error>` -- always success (errors stored in lastErr_).
      * @details Resets prior decoder/reader/ring/output. Attempts to open FileReader +
      * Decoder::open from track path. On success: sets duration_, creates SpscRing (8192*ch
      * frames), AudioOutput, calls preroll() to fill ring to half capacity, starts output. On
@@ -760,7 +760,7 @@ class Engine final {
     void engineTick();
 
     /**
-     * @brief Monitor thread main loop — polls engineTick at configurable interval.
+     * @brief Monitor thread main loop -- polls engineTick at configurable interval.
      * @ingroup caudio_engine
      * @param st Stop token from jthread (request_stop() on shutdown).
      * @details Runs while monRun_ is true and stop not requested. Uses monMtx_/monCv_ to wait
@@ -779,7 +779,7 @@ class Engine final {
     void monitorLoop(std::stop_token st);
 
     /**
-     * @brief Decode thread main loop — fills SPSC ring with decoded audio frames.
+     * @brief Decode thread main loop -- fills SPSC ring with decoded audio frames.
      * @ingroup caudio_engine
      * @param st Stop token from jthread (request_stop() on shutdown).
      * @details Runs while decodeRun_ is true and stop not requested.
@@ -844,7 +844,7 @@ class Engine final {
 
     // atomics spec required
     std::atomic<uint64_t> lastProgressMs_{0};
-    // gaplessArmed_: 0→1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
+    // gaplessArmed_: 0->1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
     mutable std::mutex queueMutex_;

@@ -26,10 +26,10 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader) 
     if (orig < 0)
         orig = 0;
 
-    // probe from start: seek to 0, read, then restore BEFORE create — ca_decode.c:60-72
+    // probe from start: seek to 0, read, then restore BEFORE create -- ca_decode.c:60-72
     (void)reader.seek(0, SEEK_SET);
     n = reader.read(std::span<std::byte>(buf.data(), buf.size()));
-    // restore to orig before probing/choosing — matches ca_decode.c
+    // restore to orig before probing/choosing -- matches ca_decode.c
     {
         auto sr0 = reader.seek(orig, SEEK_SET);
         if (!sr0.has_value())
@@ -46,7 +46,7 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader) 
     if (Decoder::probe(probeSpan)) {
         // FFmpeg init expects file at 0 (start of container). C's ca_decode.c
         // restores to orig before open, but that is for decoders that can start
-        // at arbitrary offset — FFmpeg's AVIO owns position after open and must
+        // at arbitrary offset -- FFmpeg's AVIO owns position after open and must
         // start at 0. Always seek to 0 before create; do NOT restore after success
         // or AVIO pos and file pos will diverge (causing Header missing/CRC).
         (void)reader.seek(0, SEEK_SET);

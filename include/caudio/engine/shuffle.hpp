@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <algorithm>
 #include <caudio/engine/engine_types.hpp>
 #include <cstdint>

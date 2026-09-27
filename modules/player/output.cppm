@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/player/output.hpp>
 
 export module caudio.player:output;

@@ -1,4 +1,4 @@
-# Doxyfile.in for caudio-cpp — configured via CMake
+# Doxyfile.in for caudio-cpp -- configured via CMake
 # @CMAKE_CURRENT_SOURCE_DIR@ and @CMAKE_CURRENT_BINARY_DIR@ substituted by configure_file
 # Usage: cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc
 

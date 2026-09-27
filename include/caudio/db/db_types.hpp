@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <caudio/utils.hpp>
 #include <cstdint>

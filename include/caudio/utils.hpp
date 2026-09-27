@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 /**
  * @file utils.hpp
- * @brief Main header for caudio.utils â€” includes all utility partitions.
+ * @brief Main header for caudio.utils -- includes all utility partitions.
  * @ingroup caudio_utils
  * @details This header includes all public partitions of caudio.utils:
  * - result: StatusCode, toString, formatter

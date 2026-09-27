@@ -1,4 +1,4 @@
-﻿#include <caudio/utils/thread.hpp>
+#include <caudio/utils/thread.hpp>
 
 namespace caudio::utils::detail {
 

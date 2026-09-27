@@ -128,7 +128,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{e.error()};
     }
 
-    // ipc server listen Î“Ã‡Ã¶ honor Config::socketPath if set (canonical override), else derive
+    // ipc server listen -- honor Config::socketPath if set (canonical override), else derive
     // from dbPath
     auto srvPtr = std::make_unique<IpcServer>();
     auto listenRes = srvPtr->listen(cfg.dbPath, cfg.socketPath);

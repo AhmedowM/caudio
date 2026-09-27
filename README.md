@@ -6,22 +6,22 @@
 [![C++](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/CMake-%3E%3D3.28-red)](CMakeLists.txt)
 
-> C++23 headless music player library — utils, player, db, engine, CLI
+> C++23 headless music player library -- utils, player, db, engine, CLI
 
 `caudio-cpp` is the C++23 port of `caudio` (C11 headless music daemon). It provides a modular library (`caudio::utils`, `caudio::player`, `caudio::db`, `caudio::engine`) plus a `caudio` CLI that talks to a background daemon over IPC (JSON + 4-byte big-endian framing).
 
 ## Features
 
-- **FFmpeg decode** — primary decoder (libavformat/avcodec/avutil/swresample), streaming demux, sample-accurate seek, metadata extraction
-- **Gapless playback** — pre-roll double-buffer in `Engine::decodeLoop`, frame-accurate `AudioOutput` callback
-- **Shuffle / Repeat** — Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|All` (`src/engine/shuffle.cpp`)
-- **Queue & Playlist** — SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
-- **FTS5 search** — `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
-- **Fingerprint dedup** — BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cpp`), sampled/full scan modes
-- **SHM 10 fps** — lock-free `AtomicShmStatus` shared-memory block polled by TUI at 10 Hz (`src/service/shm_status.cpp`)
-- **IPC JSON+framing** — `protocol::frame` 4-byte length prefix + `ordered_json` (`src/ipc/protocol.cpp`), Unix Domain Socket / Windows Named Pipe
-- **Daemon lifecycle** — single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, `STATUS` via `--watch`
-- **C++23 modules** — `import caudio;` umbrella, `std::expected`, `std::print`, `std::generator` scan, `std::jthread`/`std::stop_token`
+- **FFmpeg decode** -- primary decoder (libavformat/avcodec/avutil/swresample), streaming demux, sample-accurate seek, metadata extraction
+- **Gapless playback** -- pre-roll double-buffer in `Engine::decodeLoop`, frame-accurate `AudioOutput` callback
+- **Shuffle / Repeat** -- Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|All` (`src/engine/shuffle.cpp`)
+- **Queue & Playlist** -- SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
+- **FTS5 search** -- `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
+- **Fingerprint dedup** -- BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cpp`), sampled/full scan modes
+- **SHM 10 fps** -- lock-free `AtomicShmStatus` shared-memory block polled by TUI at 10 Hz (`src/service/shm_status.cpp`)
+- **IPC JSON+framing** -- `protocol::frame` 4-byte length prefix + `ordered_json` (`src/ipc/protocol.cpp`), Unix Domain Socket / Windows Named Pipe
+- **Daemon lifecycle** -- single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, `STATUS` via `--watch`
+- **C++23 modules** -- `import caudio;` umbrella, `std::expected`, `std::print`, `std::generator` scan, `std::jthread`/`std::stop_token`
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ ctest --preset dev
 ./build/dev/caudio start
 ./build/dev/caudio status
 ```
-See `cmake --list-presets` for all configs (`ci`, `release`, `modules`, `minimal`, …).
+See `cmake --list-presets` for all configs (`ci`, `release`, `modules`, `minimal`, ...).
 
 Typical first session:
 
@@ -61,7 +61,7 @@ Run `caudio --help` or `caudio <subcommand> --help` for details. All commands (e
 | `caudio restart` | Seek to 0 and play |
 | `caudio stop` | Stop playback |
 | `caudio next` / `prev` | Next / previous track (shuffle-aware, repeat-aware) |
-| `caudio seek <time>` | Seek — `mm:ss`, seconds, or relative `+N`/`-N` |
+| `caudio seek <time>` | Seek -- `mm:ss`, seconds, or relative `+N`/`-N` |
 | `caudio status [--json] [--watch] [--interval <ms>]` | Show status; `--watch`/`--follow` polls every `--interval` ms (default 1000) |
 | `caudio volume [0-100|+N|-N|mute|unmute]` | Get or set volume |
 | `caudio queue list [--json]` | List tracks in active queue |
@@ -149,17 +149,17 @@ int main() {
 
 More examples in `examples/` (targets `caudio_mini`, `caudio_player_db_demo`, `caudio_engine_demo`):
 
-- `examples/mini_cpp.cpp` — minimal `caudio::player` playback
-- `examples/player_db_demo.cpp` — player + db scan/search
-- `examples/engine_demo.cpp` — engine queue/history/events
+- `examples/mini_cpp.cpp` -- minimal `caudio::player` playback
+- `examples/player_db_demo.cpp` -- player + db scan/search
+- `examples/engine_demo.cpp` -- engine queue/history/events
 
-> **Packaging note — C++23 modules (optional)**
+> **Packaging note -- C++23 modules (optional)**
 >
 > Headers under `include/caudio/` are the canonical interface and always build.
 > C++23 modules (`import caudio;`, `*.cppm` units) are opt-in via
 > `-DCAUDIO_ENABLE_MODULES=ON` (default `OFF`). When enabled, an installed
 > `caudio` ships `*.cppm` via `FILE_SET CXX_MODULES` and consumers must rebuild
-> BMIs against the consuming compiler/flags — BMI CRC covers defines/flags, so
+> BMIs against the consuming compiler/flags -- BMI CRC covers defines/flags, so
 > sharing prebuilt BMIs across toolchains is not portable. See **Packaging**
 > section below.
 
@@ -167,16 +167,16 @@ More examples in `examples/` (targets `caudio_mini`, `caudio_player_db_demo`, `c
 
 | Option | Default | Description |
 |---|---|---|
-| `CAUDIO_WITH_FETCH_FFMPEG` | `ON` | Auto-fetch FFmpeg if not found on system (system → vcpkg/Conan → prebuilt → source) |
+| `CAUDIO_WITH_FETCH_FFMPEG` | `ON` | Auto-fetch FFmpeg if not found on system (system -> vcpkg/Conan -> prebuilt -> source) |
 | `CAUDIO_ENABLE_TESTS` | `OFF` | Build Catch2 tests (`ctest --test-dir build -j4`) |
-| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | Enable ASan+UBSan (`-fsanitize=address,undefined`) — Linux/GCC+Clang only; ignored on Windows/MinGW |
+| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | Enable ASan+UBSan (`-fsanitize=address,undefined`) -- Linux/GCC+Clang only; ignored on Windows/MinGW |
 | `CAUDIO_BUILD_DOCS` | `OFF` | Build Doxygen docs (requires `doxygen`; optional `dot`) |
 | `CAUDIO_ENABLE_EXAMPLES` | `OFF` | Build `examples/` (`caudio_mini`, `player_db_demo`, `engine_demo`) |
 | `CAUDIO_ENABLE_MODULES` | `OFF` | Build/install C++23 module interfaces (`import caudio.*`); headers always build |
 | `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip audio device tests (no beep) for headless CI |
 | `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | Run clang-tidy checks during build |
-| `CMAKE_BUILD_TYPE` | — | `Debug` / `Release` / `RelWithDebInfo` |
-| `FFmpeg_ROOT` | — | Override FFmpeg location (passed to `find_package(FFmpeg)`) |
+| `CMAKE_BUILD_TYPE` | -- | `Debug` / `Release` / `RelWithDebInfo` |
+| `FFmpeg_ROOT` | -- | Override FFmpeg location (passed to `find_package(FFmpeg)`) |
 
 Toolchain requirements:
 
@@ -186,10 +186,10 @@ Toolchain requirements:
 
 ## Documentation
 
-- **Doxygen API docs** — `cmake --preset docs && cmake --build --preset docs` → `build/docs/docs/html/`. Configured via `docs/Doxyfile.in` / `Doxyfile`.
-- **Man page** — `docs/man/caudio.1` (roff), installed to `${CMAKE_INSTALL_MANDIR}/man1`; view with `man ./docs/man/caudio.1`.
-- **Polyglot integration** — `docs/polyglot-integration.md` (Rust metadata, Svelte/Tauri GUI, Python bindings, Go sidecar).
-- **Specs / audits** — `docs/specs/`.
+- **Doxygen API docs** -- `cmake --preset docs && cmake --build --preset docs` -> `build/docs/docs/html/`. Configured via `docs/Doxyfile.in` / `Doxyfile`.
+- **Man page** -- `docs/man/caudio.1` (roff), installed to `${CMAKE_INSTALL_MANDIR}/man1`; view with `man ./docs/man/caudio.1`.
+- **Polyglot integration** -- `docs/polyglot-integration.md` (Rust metadata, Svelte/Tauri GUI, Python bindings, Go sidecar).
+- **Specs / audits** -- `docs/specs/`.
 
 ## Packaging
 
@@ -202,9 +202,9 @@ cmake --install build/release --prefix /usr/local
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
-CPack archives: `cpack --config build/<preset>/CPackConfig.cmake` → `caudio-X.Y.Z-<system>.tar.gz` / `.zip`.
+CPack archives: `cpack --config build/<preset>/CPackConfig.cmake` -> `caudio-X.Y.Z-<system>.tar.gz` / `.zip`.
 
-C++ modules packaging caveat: downstream projects must have CMake ≥ 3.28 and a compiler with C++23 module support. When built with `CAUDIO_ENABLE_MODULES=ON`, the `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
+C++ modules packaging caveat: downstream projects must have CMake >= 3.28 and a compiler with C++23 module support. When built with `CAUDIO_ENABLE_MODULES=ON`, the `caudioTargets.cmake` exports `FILE_SET CXX_MODULES`; CMake will rebuild BMIs during the consumer's configure step. Do not ship prebuilt `*.pcm`/`*.ifc` BMIs.
 
 ## Contributing
 
@@ -212,7 +212,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE) (if present) or `CPACK_RESOURCE_FILE_LICENSE`.
+MIT -- see [LICENSE](LICENSE) (if present) or `CPACK_RESOURCE_FILE_LICENSE`.
 
 ## Changelog
 

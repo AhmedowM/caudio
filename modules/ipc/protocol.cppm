@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/ipc/protocol.hpp>
 
 export module caudio.ipc:protocol;

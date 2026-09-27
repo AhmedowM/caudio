@@ -17,7 +17,7 @@
  * @details Non-copyable, movable. Owns a sqlite3_stmt* and finalizes on
  * destruction/move. Provides prepare/bind/step/column/reset helpers.
  * All operations are thin wrappers over the SQLite C API; no locking is
- * performed here — callers must hold the appropriate Database mutex.
+ * performed here -- callers must hold the appropriate Database mutex.
  */
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).

@@ -15,12 +15,12 @@
  * @file queue.hpp
  * @brief Queue table helpers (single-writer invariant).
  * @ingroup caudio_db
- * @details All helpers are `*Locked` — the caller must hold the
+ * @details All helpers are `*Locked` -- the caller must hold the
  * Database mutex (dbMutex_) exclusively for mutating ops and at least
  * shared for reads. The `queue` table enforces UNIQUE(queue_id, position)
  * (see schema.hpp); position shifts use
  * `UPDATE queue SET position=position+1 WHERE queue_id=? AND position>=?`
- * which requires serialized access — guaranteed by the single-writer lock.
+ * which requires serialized access -- guaranteed by the single-writer lock.
  * Every function normalizes qid == 0 to 1 (default queue).
  */
 

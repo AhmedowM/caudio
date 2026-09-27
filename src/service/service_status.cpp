@@ -40,7 +40,7 @@
 #include <cstring>
 #else
 #include <process.h>
-// Avoid including windows.h â€” causes HMODULE conflict with caudio::utils
+// Avoid including windows.h -- causes HMODULE conflict with caudio::utils
 // Provide minimal forward declarations for needed APIs
 using HANDLE = void*;
 using DWORD = unsigned long;

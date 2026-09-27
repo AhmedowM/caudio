@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <condition_variable>

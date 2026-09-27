@@ -1,4 +1,4 @@
-﻿#include <sqlite3.h>
+#include <sqlite3.h>
 
 #include <caudio/db/queue.hpp>
 #include <caudio/db/statement.hpp>

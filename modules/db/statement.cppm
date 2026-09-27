@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/statement.hpp>
 
 export module caudio.db:SqliteStatement;

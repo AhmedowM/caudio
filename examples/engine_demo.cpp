@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
     };
     cfg.callbacks = cbs;
 
-    // Engine::open with its own DB handle — but we already have dbShared; demonstrate attach path
+    // Engine::open with its own DB handle -- but we already have dbShared; demonstrate attach path
     // For parity with C engine_demo.c which uses ca_engine_attach, we use attach if possible.
     // Create engine via open on same path then attach shared DB alternative:
     auto engineRes = Engine::create(cfg);

@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/utils/error.hpp>
 
 export module caudio.utils:error;

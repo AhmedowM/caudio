@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/json.hpp>
 
 export module caudio.db:json;

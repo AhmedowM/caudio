@@ -1,4 +1,4 @@
-# CaudioHelpers.cmake — DRY helpers for caudio components
+# CaudioHelpers.cmake -- DRY helpers for caudio components
 # Provides ca_set_warnings / ca_set_module_warnings and shared component scaffolding.
 
 set(CAUDIO_WARNING_FLAGS

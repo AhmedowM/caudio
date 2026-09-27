@@ -1,4 +1,4 @@
-﻿#include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/protocol.hpp>
 
 #include <nlohmann/json.hpp>
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @defgroup caudio_player caudio player
  *
  * Audio playback module providing:

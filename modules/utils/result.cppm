@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/utils/result.hpp>
 
 export module caudio.utils:result;

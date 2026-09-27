@@ -73,7 +73,7 @@ Service::handle(const caudio::ipc::LibraryScan& cmd) {
         root = pp / "music";
     }
     auto mode = (cmd.mode == "full" ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
-    // Prefer scanLibrary if a library matches root Î“Ã‡Ã¶ gives dedup + batched
+    // Prefer scanLibrary if a library matches root -- gives dedup + batched
     // transaction
     if (auto libs = db_->libraryList(); libs) {
         for (auto& l : *libs) {
@@ -314,7 +314,7 @@ Service::handle(const caudio::ipc::LibraryAdd& cmd) {
         }
         if (added == 0) {
             // check if any audio files existed but failed?
-            // Return Empty still if dir was empty Î“Ã‡Ã¶ not an error.
+            // Return Empty still if dir was empty -- not an error.
         }
         return Result{Empty{}};
     } else {

@@ -1,4 +1,4 @@
-# Vendor Directory — Provenance Manifest
+# Vendor Directory -- Provenance Manifest
 
 | File | Upstream URL | Version/Tag | Date | License |
 |------|--------------|-------------|------|---------|

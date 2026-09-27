@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/ipc/result.hpp>
 
 export module caudio.ipc:result;

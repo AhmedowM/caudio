@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/scan.hpp>
 
 export module caudio.db:scan;

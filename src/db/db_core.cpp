@@ -91,7 +91,7 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
         std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
         // Gracefully handle existing duplicate queue positions on migration:
         // UNIQUE(queue_id, position) creation may fail if old DB has duplicates.
-        // Treat as non-fatal — open still succeeds; queue ops will normalize positions.
+        // Treat as non-fatal -- open still succeeds; queue ops will normalize positions.
         bool isQueueUniqueMigration = msg.find("idx_queue_queue_pos") != std::string::npos ||
                                       msg.find("queue") != std::string::npos;
         bool isUniqueConstraint =
@@ -101,7 +101,7 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Corrupt, std::string("schema init failed: ") + msg)};
         }
-        // else: non-fatal migration duplicate — clear err for next exec
+        // else: non-fatal migration duplicate -- clear err for next exec
         if (err) {
             sqlite3_free(err);
             err = nullptr;

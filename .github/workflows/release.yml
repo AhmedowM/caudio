@@ -100,7 +100,7 @@ jobs:
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
           cpack --version || cmake --version
 
-      # Release packaging only — testing lives in ci.yml. The release preset
+      # Release packaging only -- testing lives in ci.yml. The release preset
       # requires a git tag (tag-triggered workflow checks out fetch-depth 0).
       - name: Configure (release preset)
         env:

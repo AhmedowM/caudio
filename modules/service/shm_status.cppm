@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/service/shm_status.hpp>
 
 export module caudio.service:shm_status;

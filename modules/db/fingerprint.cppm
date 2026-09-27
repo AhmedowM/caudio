@@ -1,4 +1,4 @@
-﻿module;
+module;
 #include <caudio/db/fingerprint.hpp>
 
 module caudio.db:fingerprint;

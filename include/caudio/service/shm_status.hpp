@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #else
-// Lightweight Windows forward decls — avoid including windows.h (HMODULE conflict)
+// Lightweight Windows forward decls -- avoid including windows.h (HMODULE conflict)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 using HANDLE = void*;
 using DWORD = unsigned long;
