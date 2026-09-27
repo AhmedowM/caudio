@@ -15,17 +15,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2022]
+        # NOTE: ubuntu-latest is 24.04 today but migrates to 26.04 in Nov 2026
+        # (new kernel/CMake/FFmpeg, PPA gcc-16 support TBD) -- re-validate then.
+        os: [ubuntu-latest, macos-latest, windows-latest]
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-latest
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
-          - os: macos-15
+          - os: macos-latest
             compiler: gcc-16
             cc: gcc-16
             cxx: g++-16
-          - os: windows-2022
+          - os: windows-latest
             compiler: gcc-16
             cc: gcc
             cxx: g++
@@ -35,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup GCC 16 (Ubuntu)
+      - name: Setup GCC (Ubuntu)
         if: runner.os == 'Linux'
         run: |
           sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -45,14 +47,14 @@ jobs:
           gcc-16 --version; g++-16 --version
           sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
 
-      - name: Setup GCC 16 (macOS)
+      - name: Setup GCC (macOS)
         if: runner.os == 'macOS'
         run: |
           brew update
           brew install gcc@16 || brew install gcc
           gcc-16 --version; g++-16 --version
 
-      - name: Setup GCC 16 (Windows)
+      - name: Setup GCC (Windows)
         if: runner.os == 'Windows'
         id: msys2
         uses: msys2/setup-msys2@v2
@@ -141,7 +143,7 @@ jobs:
   release:
     name: release
     needs: build-packages
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
