@@ -44,7 +44,14 @@ int setPthreadName(pthread_t th, std::string_view name) noexcept {
     if (!t.empty())
         std::memcpy(buf, t.data(), t.size());
     buf[t.size()] = '\0';
+#ifdef __APPLE__
+    // macOS can only name the calling thread (no thread-targeted variant).
+    if (!pthread_equal(th, pthread_self()))
+        return 0;
+    return pthread_setname_np(buf);
+#else
     return pthread_setname_np(th, buf);
+#endif
 }
 #endif
 

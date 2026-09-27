@@ -31,8 +31,8 @@ jobs:
             cxx: g++-16
           - os: windows-2022
             compiler: gcc-16
-            cc: C:/msys64/ucrt64/bin/gcc.exe
-            cxx: C:/msys64/ucrt64/bin/g++.exe
+            cc: gcc
+            cxx: g++
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -73,6 +73,7 @@ jobs:
 
       - name: Setup GCC 16 (Windows)
         if: runner.os == 'Windows'
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -82,7 +83,9 @@ jobs:
       - name: Add MinGW to PATH (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
+          # setup-msys2 installs under RUNNER_TEMP, not C:/msys64: resolve via
+          # the action's msys2-location output.
+          echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
           echo "CC=gcc" >> $GITHUB_ENV
           echo "CXX=g++" >> $GITHUB_ENV
         shell: bash
@@ -90,11 +93,10 @@ jobs:
       - name: Verify GCC 16 (Windows)
         if: runner.os == 'Windows'
         run: |
-          ls C:/msys64/ucrt64/bin/g++.exe || (echo "MinGW g++ missing at C:/msys64/ucrt64/bin — msys2 setup failed" && exit 1)
+          command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
+          command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
           gcc --version || exit 1
           g++ --version || exit 1
-          test -x "${{ matrix.cc }}" || (echo "matrix cc ${{ matrix.cc }} not executable" && exit 1)
-          test -x "${{ matrix.cxx }}" || (echo "matrix cxx ${{ matrix.cxx }} not executable" && exit 1)
         shell: bash
 
       - name: Install dependencies (Ubuntu)
@@ -109,7 +111,9 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install ninja ffmpeg graphviz || brew upgrade ninja ffmpeg graphviz || true
+          # ninja + ffmpeg only: graphviz (Doxygen dot) is unused in CI and
+          # its bottle (svn dependency) is slow and flaky.
+          brew install ninja ffmpeg || brew upgrade ninja ffmpeg || true
           ffmpeg -version || true
           cmake --version
           ninja --version
@@ -197,6 +201,9 @@ jobs:
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
+          # Diagnostic: print leaked object contents to identify the owning
+          # subsystem (all current leaks are av_realloc_f inside libavutil).
+          LSAN_OPTIONS: report_objects=1
         run: ctest --preset ci-sanitizers
 
   install-smoke:
@@ -327,6 +334,9 @@ jobs:
       - name: Smoke compile (find_package + import caudio.utils)
         run: |
           mkdir -p /tmp/caudio-mod-smoke
+          # FILE_SET sources must live under the consumer's base dirs: copy the
+          # installed primary interface + all 8 partitions next to main.cpp.
+          cp /tmp/caudio-install-mod/include/caudio/modules/utils/*.cppm /tmp/caudio-mod-smoke/
           cat > /tmp/caudio-mod-smoke/CMakeLists.txt << 'EOF'
           cmake_minimum_required(VERSION 3.28)
           project(caudio_mod_smoke CXX)
@@ -336,7 +346,17 @@ jobs:
           list(APPEND CMAKE_PREFIX_PATH "/tmp/caudio-install-mod")
           find_package(caudio CONFIG REQUIRED)
           add_executable(smoke main.cpp)
-          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES /tmp/caudio-install-mod/include/caudio/modules/utils/utils.cppm)
+          target_sources(smoke PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+            ${CMAKE_CURRENT_SOURCE_DIR}/utils.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/result.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/error.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/log.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/math.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/ring.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/mpsc_queue.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/thread.cppm
+            ${CMAKE_CURRENT_SOURCE_DIR}/version.cppm)
+          target_compile_features(smoke PRIVATE cxx_std_23)
           target_link_libraries(smoke PRIVATE caudio::utils)
           EOF
           cat > /tmp/caudio-mod-smoke/main.cpp << 'EOF'

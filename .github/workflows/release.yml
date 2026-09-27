@@ -27,8 +27,8 @@ jobs:
             cxx: g++-16
           - os: windows-2022
             compiler: gcc-16
-            cc: C:/msys64/ucrt64/bin/gcc.exe
-            cxx: C:/msys64/ucrt64/bin/g++.exe
+            cc: gcc
+            cxx: g++
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -54,6 +54,7 @@ jobs:
 
       - name: Setup GCC 16 (Windows)
         if: runner.os == 'Windows'
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -62,14 +63,16 @@ jobs:
 
       - name: Add MinGW to PATH (Windows)
         if: runner.os == 'Windows'
-        run: echo "C:\msys64\ucrt64\bin" >> $GITHUB_PATH
+        run: echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
         shell: bash
 
       - name: Verify GCC 16 (Windows)
         if: runner.os == 'Windows'
         run: |
-          C:/msys64/ucrt64/bin/gcc.exe --version
-          C:/msys64/ucrt64/bin/g++.exe --version
+          command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
+          command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
+          gcc --version || exit 1
+          g++ --version || exit 1
         shell: bash
 
       - name: Install dependencies (Ubuntu)
