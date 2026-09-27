@@ -1,0 +1,14 @@
+{
+  // clangd reads the compile database from the dev preset tree.
+  // Re-run `cmake --preset dev` after adding/removing files.
+  "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/build/dev"],
+  // CMake Tools: configure with the dev preset on folder open.
+  "cmake.configureOnOpen": true,
+  "cmake.configureArgs": ["--preset", "dev"],
+  "cmake.buildDirectory": "${workspaceFolder}/build/dev",
+  // Keep clang-format (committed .clang-format) as the formatter.
+  "editor.formatOnSave": true,
+  "[cpp]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+  }
+}

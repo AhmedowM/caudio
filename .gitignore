@@ -13,7 +13,8 @@ CPack*.cmake
 _deps/
 
 # IDE / OS
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *~
