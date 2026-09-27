@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.2] - 2026-09-27
+
+### Fixed
+- CPack output pinned to the build dir (`CPACK_OUTPUT_DIRECTORY`); packages
+  previously landed in the repo root and CI uploaded a raw `caudio.exe`
+- Windows packages now bundle runtime DLLs next to the executable (FFmpeg
+  `avcodec/avformat/avutil/swresample` + MinGW `libstdc++/libgcc/libwinpthread`),
+  so archives run on bare machines
+- Release uploads accept only `*.tar.gz` / `*.zip` and fail if missing
+
+## [0.35.1] - 2026-09-27
+
+### Removed
+- `tui` stub subcommand (+ stale "planned v0.28.0" promises in README/man)
+
+### Added
+- `VERSION` file + precedence (`-DCAUDIO_PROJECT_VERSION` -> git tag ->
+  `VERSION` file -> `0.1.0`+warning); `VERSION`-vs-tag drift guarded in CI
+- `CAUDIO_BUILD_CLI` option (OFF skips CLI11 fetch + executable)
+- `caudio::print`/`println` facade (`utils/print.hpp`): works around missing
+  `std::__open_terminal`/`__write_to_terminal` in msys2 MinGW GCC 16 libstdc++
+- `tests/sanitizers/lsan.supp`: narrow suppression for the FFmpeg
+  probe-buffer drip (system libavutil, tracked, all other reports fatal)
+
+### Changed
+- **BREAKING (build)** Shared `*_shared`/`combined` targets gated behind
+  `CAUDIO_BUILD_SHARED=OFF` by default
+- Components declare `PUBLIC cxx_std_23` (downstream module consumers need it)
+- `checkPidAlive` includes `<signal.h>`; `truncate15` defined in-header
+- macOS: `pthread_setname_np` Apple form, `MA_NO_COREAUDIO` for GNU builds
+- CI on presets; `--allow-multiple-definition` skipped on Darwin; Windows
+  toolchain resolved via msys2-location; FFmpeg DLLs on PATH for tests
+- Tree normalized to ASCII (BOMs stripped, mojibake fixed)
+- clangd pointed at the preset compile database (`.vscode/settings.json`)
+
 ## [0.35.0] - 2026-09-27
 
 ### Added
