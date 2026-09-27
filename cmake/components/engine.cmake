@@ -13,4 +13,6 @@ caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} MODULE_SOURCES ${CA
 target_include_directories(engine PRIVATE vendor ${nlohmann_json_SOURCE_DIR}/include)
 ca_set_module_warnings(engine)
 
-caudio_add_shared_variant(engine EXTRA_DEPS caudio::db_shared caudio::player_shared caudio::utils_shared Threads::Threads)
+if(CAUDIO_BUILD_SHARED)
+  caudio_add_shared_variant(engine EXTRA_DEPS caudio::db_shared caudio::player_shared caudio::utils_shared Threads::Threads)
+endif()

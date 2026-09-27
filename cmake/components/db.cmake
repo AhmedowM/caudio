@@ -34,4 +34,6 @@ target_link_libraries(db PRIVATE caudio_sqlite blake3)
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_module_warnings(db)
 
-caudio_add_shared_variant(db EXTRA_DEPS caudio::utils_shared Threads::Threads)
+if(CAUDIO_BUILD_SHARED)
+  caudio_add_shared_variant(db EXTRA_DEPS caudio::utils_shared Threads::Threads)
+endif()

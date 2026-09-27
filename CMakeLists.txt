@@ -60,6 +60,10 @@ option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,u
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
+# Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
+# to work around duplicate-symbol/ODR issues from merged static twins. Static +
+# header-only is the default; opt in only if you need shared libs (see KISS-1).
+option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 # NOTE: ccache is environment configuration, not a project option; pass
 # -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
 
@@ -212,17 +216,27 @@ endif()
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 include(GNUInstallDirs)
 set(CAUDIO_INSTALL_LIBS
-  utils utils_shared
-  player player_shared
-  db db_shared
-  engine engine_shared
+  utils
+  player
+  db
+  engine
   ipc
-  client client_shared
-  service service_shared
-  combined
+  client
+  service
   caudio_sqlite
   blake3
 )
+if(CAUDIO_BUILD_SHARED)
+  list(APPEND CAUDIO_INSTALL_LIBS
+    utils_shared
+    player_shared
+    db_shared
+    engine_shared
+    client_shared
+    service_shared
+    combined
+  )
+endif()
 if(CAUDIO_ENABLE_MODULES)
   install(
     TARGETS ${CAUDIO_INSTALL_LIBS}
