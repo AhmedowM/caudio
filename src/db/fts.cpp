@@ -1,6 +1,6 @@
 #include <algorithm>
-#include <db/fts.hpp>
 #include <cctype>
+#include <db/fts.hpp>
 #include <string>
 
 namespace caudio::db::internal {

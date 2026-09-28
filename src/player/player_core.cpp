@@ -1,7 +1,6 @@
-#include <caudio/player/player_core.hpp>
-
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
+#include <caudio/player/player_core.hpp>
 #include <caudio/player/reader.hpp>
 
 namespace caudio::player {

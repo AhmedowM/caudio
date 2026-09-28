@@ -61,7 +61,6 @@ class Reader;
 class Decoder;
 class AudioOutput;
 
-
 /**
  * @enum State
  * @brief Playback state enumeration
@@ -303,6 +302,7 @@ class Player {
     std::string_view lastError() const noexcept;
 
   private:
+    /** @brief Private default ctor; use create() factory. */
     Player();
 
     /**

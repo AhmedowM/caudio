@@ -1,3 +1,4 @@
+# db.cmake -- caudio::db (SQLite library/engine-state persistence).
 # NOTE: statement/transaction/queue/schema/detail/fingerprint/fts/stmt_helpers
 # live in src/db/ (NOT installed) and have no module partitions.
 set(CAUDIO_DB_MODULE_SOURCES

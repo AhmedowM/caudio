@@ -4,8 +4,8 @@
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
-#include <engine/shuffle.hpp>
 #include <common.hpp>
+#include <engine/shuffle.hpp>
 #include <filesystem>
 #include <set>
 #include <vector>

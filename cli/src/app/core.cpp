@@ -95,6 +95,7 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <caudio/player.hpp>
 #include <caudio/service.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/print.hpp>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -106,7 +107,6 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <fstream>
 #include <iostream>
 #include <optional>
-#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -217,7 +217,7 @@ std::filesystem::path App::pidPathForConfig() const {
     auto r = caudio::config::pidPathFor(config_.dbPath);
     if (r)
         return *r;
-    // fallback legacy
+    // Fallback when canonical derivation fails: pid file next to the database.
     auto pp = config_.dbPath.parent_path();
     if (pp.empty())
         pp = std::filesystem::current_path();
@@ -362,17 +362,17 @@ int App::handleStart(bool foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) {
             caudio::println(std::cerr, "start failed: {} {} (dbPath={})",
-                         std::to_string(std::to_underlying(svc.error().code)), svc.error().message,
-                         config_.dbPath.generic_string());
+                            std::to_string(std::to_underlying(svc.error().code)),
+                            svc.error().message, config_.dbPath.generic_string());
             return 1;
         }
         caudio::println("starting daemon foreground at {} db={}", config_.socketPath,
-                     config_.dbPath.generic_string());
+                        config_.dbPath.generic_string());
         std::stop_source ss;
         auto res = svc.value()->run(ss.get_token());
         if (!res) {
             caudio::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message,
-                         config_.dbPath.generic_string());
+                            config_.dbPath.generic_string());
             return 1;
         }
         return 0;
@@ -381,7 +381,7 @@ int App::handleStart(bool foreground) {
         if (!spawnRes) {
             std::uint32_t err = spawnRes.error();
             caudio::println(std::cerr, "start failed: CreateProcess failed {} at {} db={}", err,
-                         config_.socketPath, config_.dbPath.generic_string());
+                            config_.socketPath, config_.dbPath.generic_string());
             return 1;
         }
         // Poll for pipe readiness: 1500ms total, 100ms interval x--15
@@ -394,7 +394,7 @@ int App::handleStart(bool foreground) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         caudio::println(std::cerr, "daemon start failed, socket not reachable at {} db={}",
-                     config_.socketPath, config_.dbPath.generic_string());
+                        config_.socketPath, config_.dbPath.generic_string());
         return 1;
     }
 }
@@ -445,23 +445,23 @@ int App::handlePreview(const std::string& file) {
     auto playerRes = caudio::player::Player::create();
     if (!playerRes) {
         caudio::println(std::cerr, "preview: player create failed {} {}",
-                     std::to_string(std::to_underlying(playerRes.error().code)),
-                     playerRes.error().message);
+                        std::to_string(std::to_underlying(playerRes.error().code)),
+                        playerRes.error().message);
         return 1;
     }
     auto& player = *playerRes.value();
     auto openRes = player.open(file);
     if (!openRes) {
         caudio::println(std::cerr, "preview: open failed {} {}",
-                     std::to_string(std::to_underlying(openRes.error().code)),
-                     openRes.error().message);
+                        std::to_string(std::to_underlying(openRes.error().code)),
+                        openRes.error().message);
         return 1;
     }
     auto playRes = player.play();
     if (!playRes) {
         caudio::println(std::cerr, "preview: play failed {} {}",
-                     std::to_string(std::to_underlying(playRes.error().code)),
-                     playRes.error().message);
+                        std::to_string(std::to_underlying(playRes.error().code)),
+                        playRes.error().message);
         return 1;
     }
     caudio::println("preview playing {}", file);
@@ -977,7 +977,7 @@ int App::run(int argc, char** argv) {
             }
             if (std::holds_alternative<caudio::utils::Error>(*cliRes)) {
                 caudio::println(std::cerr, "export: {}",
-                             std::get<caudio::utils::Error>(*cliRes).message);
+                                std::get<caudio::utils::Error>(*cliRes).message);
                 return 1;
             }
             if (std::holds_alternative<caudio::ipc::PlaylistData>(*cliRes)) {

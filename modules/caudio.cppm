@@ -1,4 +1,4 @@
-// Umbrella mirrors include/caudio.hpp (utils/player/db/engine); IPC lives in caudio.ipc.
+// Umbrella mirrors include/caudio.hpp (all libraries).
 module;
 #include <string_view>
 
@@ -16,3 +16,6 @@ export import caudio.utils;
 export import caudio.player;
 export import caudio.db;
 export import caudio.engine;
+export import caudio.ipc;
+export import caudio.service;
+export import caudio.client;

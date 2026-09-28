@@ -1,5 +1,6 @@
-# // combined is library-only (utils/player/db/engine); IPC (json/ipc/service/client) is separate, not part of libcaudio
-# Gated on CAUDIO_BUILD_SHARED (OFF by default) -- see KISS-1.
+# combined is the opt-in shared libcaudio: utils/player/db/engine whole-archived.
+# ipc/service/client stay static-only (daemon IPC has no shared ABI); config
+# sources compile into ipc. Gated on CAUDIO_BUILD_SHARED (OFF by default).
 if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
   set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})

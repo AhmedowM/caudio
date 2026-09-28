@@ -2,7 +2,6 @@
 #include <atomic>
 #include <caudio/config.hpp>
 #include <caudio/db.hpp>
-#include <db/fingerprint.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -13,17 +12,17 @@
 #include <caudio/service/service_core.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <db/fingerprint.hpp>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
-
 #include <optional>
-#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -653,7 +652,7 @@ Service::handle(const caudio::ipc::PlaylistImport& cmd) {
         caudio::println(std::cerr, "playlist import: skipped {} unmatched tracks", skipped);
     }
     caudio::println(std::cerr, "playlist import: matched {} tracks, created playlist '{}' (id={})",
-                 matched, name, *pidRes);
+                    matched, name, *pidRes);
     return Result{std::move(pd)};
 }
 

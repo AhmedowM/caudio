@@ -1,6 +1,5 @@
-#include <caudio/ipc/protocol.hpp>
-
 #include <caudio/db/json.hpp>
+#include <caudio/ipc/protocol.hpp>
 
 namespace caudio::ipc::detail {
 

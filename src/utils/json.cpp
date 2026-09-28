@@ -1,5 +1,4 @@
 #include <caudio/utils/json.hpp>
-
 #include <nlohmann/json.hpp>
 
 namespace caudio::utils {
@@ -16,8 +15,8 @@ namespace {
 
 } // namespace
 
-Json::Impl& Json::resolveImpl(Json* owner, [[maybe_unused]] std::string_view key,
-                              std::size_t index, bool byIndex) {
+Json::Impl& Json::resolveImpl(Json* owner, [[maybe_unused]] std::string_view key, std::size_t index,
+                              bool byIndex) {
     if (!owner || !owner->impl_)
         throwJson("json: null reference");
     auto& impl = *owner->impl_;
@@ -34,8 +33,8 @@ Json::Impl& Json::resolveImpl(Json* owner, [[maybe_unused]] std::string_view key
     return impl;
 }
 
-const Json::Impl& Json::resolveConstImpl(const Json* owner, std::string_view key,
-                                         std::size_t index, bool byIndex) {
+const Json::Impl& Json::resolveConstImpl(const Json* owner, std::string_view key, std::size_t index,
+                                         bool byIndex) {
     if (!owner || !owner->impl_)
         throwJson("json: null reference");
     const auto& impl = *owner->impl_;
@@ -54,8 +53,8 @@ const Json::Impl& Json::resolveConstImpl(const Json* owner, std::string_view key
 // A befriended file-local struct so no backend type appears in any header
 // declaration; Json/JsonRef members call through it.
 struct JsonSlots {
-    static nlohmann::ordered_json& mut(Json::Impl& impl, std::string_view key,
-                                       std::size_t index, bool byIndex) {
+    static nlohmann::ordered_json& mut(Json::Impl& impl, std::string_view key, std::size_t index,
+                                       bool byIndex) {
         auto& v = impl.v;
         if (byIndex)
             return v.at(index);
@@ -72,8 +71,7 @@ struct JsonSlots {
 
 Json::Json() : impl_(std::make_unique<Impl>()) {}
 Json::~Json() = default;
-Json::Json(const Json& other)
-    : impl_(std::make_unique<Impl>(*other.impl_)) {}
+Json::Json(const Json& other) : impl_(std::make_unique<Impl>(*other.impl_)) {}
 Json& Json::operator=(const Json& other) {
     if (this != &other)
         *impl_ = *other.impl_;
@@ -306,23 +304,24 @@ double Json::getDouble() const {
     throwJson("json: not a number");
 }
 
-JsonRef::JsonRef(Json* owner, std::string_view key)
-    : owner_(owner), key_(key), byIndex_(false) {}
-JsonRef::JsonRef(Json* owner, std::size_t index)
-    : owner_(owner), index_(index), byIndex_(true) {}
+JsonRef::JsonRef(Json* owner, std::string_view key) : owner_(owner), key_(key), byIndex_(false) {}
+JsonRef::JsonRef(Json* owner, std::size_t index) : owner_(owner), index_(index), byIndex_(true) {}
 
 JsonRef& JsonRef::operator=(const Json& v) {
-    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) = v.impl_ ? v.impl_->v : nlohmann::ordered_json(nullptr);
+    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) =
+        v.impl_ ? v.impl_->v : nlohmann::ordered_json(nullptr);
     return *this;
 }
 
 JsonRef& JsonRef::operator=(std::string_view v) {
-    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) = std::string(v);
+    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) =
+        std::string(v);
     return *this;
 }
 
 JsonRef& JsonRef::operator=(const char* v) {
-    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) = v ? std::string(v) : std::string();
+    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) =
+        v ? std::string(v) : std::string();
     return *this;
 }
 
@@ -332,7 +331,8 @@ JsonRef& JsonRef::operator=(bool v) {
 }
 
 JsonRef& JsonRef::operator=(std::nullptr_t) {
-    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) = nullptr;
+    JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_) =
+        nullptr;
     return *this;
 }
 
@@ -351,8 +351,8 @@ void JsonRef::assignDouble(double v) {
 void JsonRef::push_back(const Json& v) {
     if (!owner_ || !owner_->impl_)
         throwJson("json: null reference");
-    auto& dst = JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_,
-                               byIndex_);
+    auto& dst =
+        JsonSlots::mut(Json::resolveImpl(owner_, key_, index_, byIndex_), key_, index_, byIndex_);
     if (!dst.is_array())
         throwJson("json: push_back on non-array");
     dst.push_back(v.impl_ ? v.impl_->v : nlohmann::ordered_json(nullptr));

@@ -1,3 +1,13 @@
+/**
+ * @file shm_status.hpp
+ * @brief Seqlock shared-memory playback snapshot (daemon writes, clients poll).
+ * @ingroup caudio_service
+ * @details Lets `Client::snapshotStatus()` read position/state at 10 fps
+ * without an IPC round-trip. Writers publish through `AtomicShmStatus`
+ * (lock-free atomics + seqlock sequence); readers get a plain `ShmStatus`
+ * copy. Windows pattern as in `ipc_server.hpp`: local API declarations
+ * unless `windows.h` is already included.
+ */
 #pragma once
 
 #include <atomic>
@@ -51,8 +61,12 @@ __declspec(dllimport) DWORD __stdcall GetLastError();
 
 namespace caudio::service {
 
-// ShmStatus uses regular types for the snapshot (no atomics in the snapshot itself)
-// The atomic fields are in the shared memory, but we read them into a non-atomic snapshot
+/**
+ * @brief Plain snapshot copy (no atomics); what readers take home.
+ * @ingroup caudio_service
+ * @details Strings are fixed `char` arrays (atomics can't hold them);
+ * writers publish under an odd seqlock sequence, readers retry on mismatch.
+ */
 struct ShmStatus {
     uint64_t seq{0};      // seqlock writer: odd=writing, even=done
     double position{0.0}; // current playback position in seconds
@@ -66,9 +80,11 @@ struct ShmStatus {
     char artist[256]{0};  // track artist
 };
 
-// Atomic view of ShmStatus in shared memory
-// Uses atomic<uint64_t> with bit_cast for double/float to ensure lock-free on all platforms
-// including MSVC
+/**
+ * @brief Lock-free shared-memory view (`bit_cast` doubles/floats through integers).
+ * @ingroup caudio_service
+ * @details Cache-line aligned; fits one page (static_assert below).
+ */
 struct alignas(64) AtomicShmStatus {
     std::atomic<uint64_t> seq{0};
     std::atomic<uint64_t> position{0}; // bit_cast<double>
@@ -85,41 +101,75 @@ struct alignas(64) AtomicShmStatus {
 
 static_assert(sizeof(AtomicShmStatus) <= 4096, "AtomicShmStatus should fit in one page");
 
-// Helpers for bit_cast atomic operations
+/**
+ * @brief `bit_cast` atomic helpers for the double/float snapshot fields.
+ * @ingroup caudio_service
+ */
 inline double atomicLoadDouble(const std::atomic<uint64_t>& a) noexcept;
+/** @ingroup caudio_service */
 inline void atomicStoreDouble(std::atomic<uint64_t>& a, double v) noexcept;
+/** @ingroup caudio_service */
 inline float atomicLoadFloat(const std::atomic<uint32_t>& a) noexcept;
+/** @ingroup caudio_service */
 inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept;
 
+/**
+ * @brief RAII owner of the shared-memory segment (creator or reader side).
+ * @ingroup caudio_service
+ */
 class ShmStatusHandle {
   public:
     using ExpectedShm = std::expected<ShmStatusHandle, caudio::utils::Error>;
 
+    /**
+     * @brief Creates or opens the segment by name.
+     * @ingroup caudio_service
+     * @param name Platform segment name (derived from the database path).
+     * @param create True to create, false to open an existing one.
+     */
     static ExpectedShm create(const std::string& name, bool create);
+    /**
+     * @brief Opens an existing segment read-only (client side).
+     * @ingroup caudio_service
+     */
     static ExpectedShm openReadOnly(const std::string& name);
 
+    /** @brief Unmaps and closes (idempotent). */
     ~ShmStatusHandle();
 
     ShmStatusHandle(const ShmStatusHandle&) = delete;
     ShmStatusHandle& operator=(const ShmStatusHandle&) = delete;
 
+    /** @brief Move-constructs, transferring the mapping. */
     ShmStatusHandle(ShmStatusHandle&& other) noexcept;
+    /** @brief Move-assigns, transferring the mapping. */
     ShmStatusHandle& operator=(ShmStatusHandle&& other) noexcept;
 
+    /** @brief True when the mapping is live. @ingroup caudio_service */
     bool valid() const noexcept;
+    /** @brief Segment name. @ingroup caudio_service */
     const std::string& name() const noexcept;
 
-    // Seqlock reader: returns a snapshot copy of the status
+    /**
+     * @brief Seqlock reader: returns a snapshot copy of the status.
+     * @ingroup caudio_service
+     */
     ShmStatus snapshot() const;
 
-    // Seqlock writer: updates all fields atomically
+    /**
+     * @brief Seqlock writer: updates all fields atomically.
+     * @ingroup caudio_service
+     */
     void updateFromEngine(const caudio::engine::Engine& eng, int64_t track_id,
                           std::string_view title, std::string_view artist);
 
+    /** @ingroup caudio_service */
     void setDuration(double dur) noexcept;
+    /** @ingroup caudio_service */
     void setQueueSize(size_t sz) noexcept;
 
   private:
+    /** @brief Private default ctor; use create()/openReadOnly(). */
     ShmStatusHandle() = default;
 
     void close() noexcept;
@@ -135,7 +185,12 @@ class ShmStatusHandle {
 #endif
 };
 
-// Convenience function for service to create shm status
+/**
+ * @brief Creates the daemon-side status segment for a database hash.
+ * @ingroup caudio_service
+ * @param hash Database identity hash (from the db path).
+ * @param create True to create, false to open.
+ */
 ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, bool create);
 
 } // namespace caudio::service

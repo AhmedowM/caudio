@@ -1,3 +1,4 @@
+# player.cmake -- caudio::player (FFmpeg decoding + miniaudio output).
 set(CAUDIO_PLAYER_MODULE_SOURCES
   modules/player/player.cppm
   modules/player/player_core.cppm

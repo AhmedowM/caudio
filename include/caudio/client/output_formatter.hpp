@@ -28,6 +28,7 @@ namespace caudio::client {
 
 /**
  * @brief Formats CLI results for human-readable table output or JSON.
+ * @ingroup caudio_client
  *
  * Provides print() for formatted output and printWithStatus() for exit code handling.
  * Supports all Result variant types: Status, QueueTracks, VolumeInfo, LibraryStats, etc.
@@ -36,7 +37,9 @@ namespace caudio::client {
 class OutputFormatter {
     bool json_{false};
 
+    /** @brief mm:ss rendering for durations. */
     static std::string formatTime(double secs);
+    /** @brief Ellipsizes overlong table cells. */
     static std::string truncateField(const std::string& s, std::size_t maxLen = 40);
 
   public:

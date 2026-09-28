@@ -1,10 +1,10 @@
 #pragma once
 
 #include <caudio/db/db_types.hpp>
-#include <db/detail.hpp>
-#include <db/statement.hpp>
 #include <caudio/utils.hpp>
 #include <cstdint>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
 #include <expected>
 #include <memory>
 #include <string>

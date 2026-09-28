@@ -1,7 +1,7 @@
-#include "ffmpeg_impl.hpp"
-
 #include <cmath>
 #include <cstring>
+
+#include "ffmpeg_impl.hpp"
 
 namespace caudio::player {
 

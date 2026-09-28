@@ -1,8 +1,7 @@
 #include <sqlite3.h>
 
-#include <engine/history.hpp>
-
 #include <caudio/db/db_core.hpp>
+#include <engine/history.hpp>
 
 namespace caudio::engine::detail {
 

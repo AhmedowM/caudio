@@ -1,8 +1,8 @@
 #include <sqlite3.h>
 
 #include <algorithm>
-#include <db/statement.hpp>
 #include <caudio/utils.hpp>
+#include <db/statement.hpp>
 #include <limits>
 #include <string>
 

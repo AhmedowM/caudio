@@ -1,8 +1,8 @@
 #include <sqlite3.h>
 
+#include <caudio/utils.hpp>
 #include <db/queue.hpp>
 #include <db/statement.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::db {
 

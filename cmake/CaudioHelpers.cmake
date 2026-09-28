@@ -26,7 +26,9 @@ function(caudio_add_component NAME)
     target_sources(${NAME} PRIVATE ${ARG_SOURCES})
   endif()
   if(ARG_MODULE_SOURCES AND CAUDIO_ENABLE_MODULES)
-    target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES ${ARG_MODULE_SOURCES})
+    # BASE_DIRS strips the leading modules/ so the install tree gets
+    # <prefix>/modules/<component>/*.cppm (not modules/modules/...).
+    target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES ${ARG_MODULE_SOURCES})
   endif()
   target_include_directories(${NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

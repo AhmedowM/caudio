@@ -1,14 +1,13 @@
 #include <blake3.h>
 #include <sqlite3.h>
 
-#include <db/detail.hpp>
 #include <caudio/db/db_core.hpp>
 #include <caudio/db/scan.hpp>
-#include <db/statement.hpp>
-#include <caudio/utils.hpp>
-#include <fstream>
-
 #include <caudio/player/decoder.hpp>
+#include <caudio/utils.hpp>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
+#include <fstream>
 
 namespace caudio::db {
 

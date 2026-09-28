@@ -2,10 +2,10 @@
 
 #include <caudio/db/db_core.hpp>
 #include <caudio/db/json.hpp>
+#include <caudio/utils.hpp>
 #include <db/detail.hpp>
 #include <db/statement.hpp>
 #include <db/transaction.hpp>
-#include <caudio/utils.hpp>
 #include <fstream>
 #include <sstream>
 

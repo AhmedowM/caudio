@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <caudio/utils.hpp>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -8,8 +9,6 @@
 #include <random>
 #include <string>
 #include <thread>
-
-#include <caudio/utils.hpp>
 /**
  * @file common.hpp
  * @brief Shared test helpers (temp paths, busy-wait, NOAUDIO switch).

@@ -3,6 +3,7 @@
  * @file config.hpp
  * @brief Configuration management: canonical paths, load/save, and raw key/value access.
  * @ingroup caudio_config
+ * @defgroup caudio_config caudio configuration
  */
 
 #include <array>
@@ -48,7 +49,6 @@ struct Config {
     std::string socketPath{};
 };
 
-
 /**
  * @brief Load configuration from file with defaults.
  * @param path Config file path (empty = use default).
@@ -68,8 +68,6 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path);
  * Only writes dbPath, device, logLevel, and socketPath (if non-empty).
  */
 caudio::utils::Expected<void> saveConfig(const Config& cfg);
-
-
 
 // Generic config raw access -- used by service for arbitrary key/value pairs.
 // Implemented over caudio::utils::Json (single definition here, avoids per-module duplication).

@@ -45,9 +45,13 @@ class Client {
     Config config_;
 
   public:
+    /** @brief Constructs from an explicit config. */
     explicit Client(Config cfg);
+    /** @brief Constructs for a database path (socket path derived). */
     explicit Client(std::filesystem::path dbPath);
+    /** @brief Constructs for a database path with explicit socket path. */
     explicit Client(std::filesystem::path dbPath, std::string_view socketPath);
+    /** @brief Constructs from a loaded app config. */
     explicit Client(const caudio::config::Config& cfg);
 
     const Config& config() const noexcept;
@@ -57,7 +61,7 @@ class Client {
     send(const caudio::ipc::Command& cmd,
          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
 
-    // Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
+    // Snapshot status via shared memory (10fps status polling) or fallback to IPC
     caudio::utils::Expected<caudio::ipc::Result> snapshotStatus();
 };
 

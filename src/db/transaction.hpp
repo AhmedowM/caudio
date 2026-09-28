@@ -1,7 +1,7 @@
 #pragma once
 
-#include <db/detail.hpp>
 #include <caudio/utils.hpp>
+#include <db/detail.hpp>
 #include <expected>
 #include <string>
 #include <string_view>

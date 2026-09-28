@@ -49,13 +49,13 @@
 #endif
 
 #include <caudio/config.hpp>
-
-#include "config_detail.hpp"
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+
+#include "config_detail.hpp"
 
 namespace caudio::service::detail {
 std::filesystem::path pidPathForSocket(const std::filesystem::path& dbPath,

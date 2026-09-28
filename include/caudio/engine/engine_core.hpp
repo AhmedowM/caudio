@@ -55,6 +55,7 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
+// Full type in db_core.hpp; Engine holds it by shared_ptr only.
 class Database;
 } // namespace caudio::db
 
@@ -273,8 +274,8 @@ class Engine final {
      * @brief Lists history entries.
      * @ingroup caudio_engine
      * @param limit Max rows (0 = no limit, default 50).
-     * @return `std::expected<std::vector<db::HistoryEntry>, Error>` -- vector on success, State if no
-     * db. Entries carry track snapshots (title/artist/path/duration).
+     * @return `std::expected<std::vector<db::HistoryEntry>, Error>` -- vector on success, State if
+     * no db. Entries carry track snapshots (title/artist/path/duration).
      * @par Thread safety
      * Thread-safe; takes shared_lock on the database mutex.
      * @see caudio::db::HistoryEntry
@@ -414,8 +415,8 @@ class Engine final {
      * @param buf Output buffer (may be null if cap==0).
      * @param cap Capacity of buf.
      * @param n Out: number of events written (must be non-null).
-     * @return `std::expected<void, Error>` -- success or InvalidArg if n is null or buf is null with
-     * cap>0.
+     * @return `std::expected<void, Error>` -- success or InvalidArg if n is null or buf is null
+     * with cap>0.
      * @par Thread safety
      * Thread-safe; pops from MpscQueue (lock-free).
      * @see pollEvent

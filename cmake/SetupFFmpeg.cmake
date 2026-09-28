@@ -54,8 +54,8 @@ function(caudio_setup_ffmpeg)
   # 3. Prebuilt download (FetchContent) -- Windows only for now, Linux/macOS use system
   if(WIN32)
     include(FetchContent)
-    # Gyan FFmpeg 9.0.1 shared full -- ~500MB, contains bin/*.dll + lib/*.lib + include
-    # Latest Windows build from gyan.dev
+    # Gyan rolling shared full build -- ~500MB, contains bin/*.dll + lib/*.lib + include.
+    # URL is unpinned (tracks gyan.dev latest); the §4 trim track pins 8.1 separately.
     set(_ffmpeg_url "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full-shared.7z")
     message(STATUS "Fetching FFmpeg prebuilt from ${_ffmpeg_url}...")
     FetchContent_Declare(

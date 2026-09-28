@@ -1,7 +1,6 @@
 #include <sqlite3.h>
 
 #include <caudio/db/db_core.hpp>
-
 #include <db/detail.hpp>
 #include <db/queue.hpp>
 #include <db/schema.hpp>

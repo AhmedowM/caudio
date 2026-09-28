@@ -1,9 +1,9 @@
 /**
- * @defgroup caudio_player caudio player
+ * @brief Re-export anchor for the caudio.player module (group defined in player.hpp).
  *
  * Audio playback module providing:
  * - Reader abstractions (FileReader, MemoryReader) for input sources
- * - Decoder registry with FFmpeg support for all common formats
+ * - FFmpeg-based Decoder for all common formats
  * - Lock-free SPSC ring buffer for decode/audio thread communication
  * - miniaudio-based AudioOutput for device playback
  * - Player core with gapless playback, seeking, and state management

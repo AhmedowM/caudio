@@ -102,7 +102,8 @@ option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" O
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
 # to work around duplicate-symbol/ODR issues from merged static twins. Static +
-# header-only is the default; opt in only if you need shared libs (see KISS-1).
+# header-only is the default; opt in only if you need shared libs
+# (CODEBASE_REVIEW.md KISS-1).
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 # NOTE: ccache is environment configuration, not a project option; pass
 # -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
@@ -130,11 +131,11 @@ elseif(CAUDIO_WITH_FETCH_FFMPEG)
   include(cmake/SetupFFmpeg.cmake)
   caudio_setup_ffmpeg()
   if(NOT FFmpeg_FOUND)
-    message(FATAL_ERROR "FFmpeg is required -- install 9.0.1+ or set FFmpeg_ROOT")
+    message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
   endif()
   message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
 else()
-  message(FATAL_ERROR "FFmpeg is required -- install 9.0.1+ or set FFmpeg_ROOT")
+  message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
 endif()
 
 function(caudio_apply_sanitizers tgt)
@@ -189,7 +190,9 @@ endif()
 # package first so plain configures don't pay for a git clone; fetch only as
 # fallback. nlohmann_json is PRIVATE (backend for src/utils/json.cpp only):
 # its headers never enter installed headers, so no JSON_Install and no
-# find_dependency downstream. Components link it PRIVATE (see components/).
+# find_dependency downstream. Components get it as plain PRIVATE -I
+# (CAUDIO_NLOHMANN_PRIVATE_INCLUDE): even a PRIVATE target link would force
+# it into install(EXPORT).
 include(FetchContent)
 find_package(nlohmann_json QUIET)
 if(NOT nlohmann_json_FOUND)
@@ -243,9 +246,9 @@ include(cmake/components/combined.cmake)
 # Umbrella module (optional, headers are canonical)
 if(CAUDIO_ENABLE_MODULES)
   add_library(caudio_umbrella STATIC modules/caudio.cppm)
-  target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES FILES modules/caudio.cppm)
+  target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-  target_link_libraries(caudio_umbrella PUBLIC caudio::utils caudio::player caudio::db caudio::engine)
+  target_link_libraries(caudio_umbrella PUBLIC caudio::utils caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
 endif()
@@ -320,7 +323,9 @@ if(CAUDIO_ENABLE_MODULES)
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    FILE_SET CXX_MODULES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio
+    # Module sources live at <prefix>/modules/ (NOT under include/):
+    # they are build inputs for BMI consumers, not C++ headers.
+    FILE_SET CXX_MODULES DESTINATION modules
   )
 else()
   install(
@@ -396,9 +401,9 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
 endif()
 
 # C++23 module sources for BMI rebuild (only when modules enabled).
-# Both rules converge on include/caudio/modules (FILE_SET preserves source paths).
+# Both rules converge on <prefix>/modules/ (same level as include/).
 if(CAUDIO_ENABLE_MODULES)
-  install(DIRECTORY modules/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/modules FILES_MATCHING PATTERN "*.cppm")
+  install(DIRECTORY modules/ DESTINATION modules FILES_MATCHING PATTERN "*.cppm")
 endif()
 
 # Man page -- roff source tracked at docs/man/caudio.1
@@ -421,7 +426,7 @@ set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library -- utils, player, db, engine")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library -- utils, player, db, engine, ipc, client, service")
 set(CPACK_PACKAGE_CONTACT "caudio@example.com")
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" CPACK_SYSTEM_NAME)
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}${CAUDIO_VERSION_SUFFIX}-${CPACK_SYSTEM_NAME}")
@@ -449,7 +454,7 @@ if(CAUDIO_ENABLE_EXAMPLES)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
-# Tests -- Catch2 via FetchContent, ports of test_utils_*
+# Tests -- Catch2 via FetchContent (143 tests: utils/player/db/engine/ipc/cli paths)
 if(CAUDIO_ENABLE_TESTS)
   FetchContent_Declare(
     Catch2

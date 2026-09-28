@@ -221,10 +221,9 @@ class Json {
     // backend is complete). The file-local JsonSlots reaches them through
     // friendship (JsonRef is befriended above).
     friend struct JsonSlots;
-    static Impl& resolveImpl(Json* owner, std::string_view key, std::size_t index,
-                             bool byIndex);
-    static const Impl& resolveConstImpl(const Json* owner, std::string_view key,
-                                        std::size_t index, bool byIndex);
+    static Impl& resolveImpl(Json* owner, std::string_view key, std::size_t index, bool byIndex);
+    static const Impl& resolveConstImpl(const Json* owner, std::string_view key, std::size_t index,
+                                        bool byIndex);
 };
 
 /**

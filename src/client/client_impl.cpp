@@ -2,8 +2,6 @@
 #include <caudio/client/client_core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
-
-#include "config_detail.hpp"
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/shm_status.hpp>
@@ -14,6 +12,8 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+
+#include "config_detail.hpp"
 
 namespace caudio::client {
 
@@ -113,7 +113,7 @@ caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Com
     }
 }
 
-// Snapshot status via shared memory (for TUI 10fps polling) or fallback to IPC
+// Snapshot status via shared memory (10fps status polling) or fallback to IPC
 caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
     // Try to connect to shared memory status block
     // Derive shm name via canonical hex8 (consistent with service)

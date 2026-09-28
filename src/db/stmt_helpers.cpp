@@ -1,8 +1,8 @@
 #include <sqlite3.h>
 
-#include <db/stmt_helpers.hpp>
 #include <caudio/utils.hpp>
 #include <cstring>
+#include <db/stmt_helpers.hpp>
 #include <string>
 
 namespace caudio::db::internal {

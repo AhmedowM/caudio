@@ -9,7 +9,7 @@
 | **Compiler** | GCC 14+ / Clang 17+ / AppleClang 17+ | C++23 required (`std::expected`, `std::print`, `std::generator`, modules). MinGW GCC 14+ on Windows. |
 | **CMake** | 3.28+ | Required for `FILE_SET CXX_MODULES` and BMI handling |
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
-| **FFmpeg** | 9.0.1+ | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. Auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
+| **FFmpeg** | recent (tools + dev packages) | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. CI uses Ubuntu system FFmpeg; auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
 | **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
 | **Catch2** | 3.16.0 | Auto-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
 | **Git** | 2.30+ | For `git describe --tags` version stamping |
@@ -144,7 +144,7 @@ caudio/
   cmake/components/      # Per-component build files (utils/player/db/engine/cli/combined)
   tests/                 # Catch2 tests (tests/common.hpp helpers)
   examples/              # mini_cpp, player_db_demo, engine_demo
-  vendor/                # sqlite3.c, blake3.c, miniaudio.h (not installed)
+  vendor/                # sqlite3.c, blake3.c, miniaudio.h (sources; only static archives install, headers don't)
 ```
 
 ## Reporting Issues

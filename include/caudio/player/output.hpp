@@ -154,8 +154,10 @@ class AudioOutput {
         float volume = 1.0f;
     };
 
+    /** @brief Default-constructs an uninitialized output; use create(). */
     AudioOutput() = default;
 
+    /** @brief Shuts down the device. */
     ~AudioOutput();
 
     /**

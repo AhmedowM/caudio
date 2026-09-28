@@ -10,21 +10,19 @@
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
 #include <caudio/service/service_core.hpp>
-
-#include <db/fingerprint.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <db/fingerprint.hpp>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
-
 #include <optional>
-#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>

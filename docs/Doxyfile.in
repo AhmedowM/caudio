@@ -1,20 +1,23 @@
-# Doxyfile.in for caudio-cpp -- configured via CMake
+# Doxyfile.in for caudio -- configured via CMake
 # @CMAKE_CURRENT_SOURCE_DIR@ and @CMAKE_CURRENT_BINARY_DIR@ substituted by configure_file
 # Usage: cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc
+#
+# INPUT is the installed public surface (include/): src/ internals are
+# deliberately NOT documented (they are not installed either).
 
-PROJECT_NAME           = "caudio-cpp"
+PROJECT_NAME           = "caudio"
 PROJECT_NUMBER         = "@PROJECT_VERSION@"
 OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@"
-INPUT                  = "@CMAKE_CURRENT_SOURCE_DIR@/src" "@CMAKE_CURRENT_SOURCE_DIR@/cli/src"
+INPUT                  = "@CMAKE_CURRENT_SOURCE_DIR@/include"
 RECURSIVE              = YES
-FILE_PATTERNS          = *.cppm *.cpp *.h
+FILE_PATTERNS          = *.hpp *.h
 EXCLUDE_PATTERNS       =
 EXCLUDE_SYMLINKS       = NO
 
 EXTRACT_ALL            = YES
-EXTRACT_PRIVATE        = YES
-EXTRACT_STATIC         = YES
-EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = NO
 
 GENERATE_HTML          = YES
 HTML_OUTPUT            = docs/html

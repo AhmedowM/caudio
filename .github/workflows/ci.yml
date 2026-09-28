@@ -349,8 +349,8 @@ jobs:
 
       - name: Verify module sources shipped
         run: |
-          test -f /tmp/caudio-install-mod/include/caudio/modules/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
-          ls /tmp/caudio-install-mod/include/caudio/modules/*/*.cppm | head -n 20
+          test -f /tmp/caudio-install-mod/modules/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
+          ls /tmp/caudio-install-mod/modules/*/*.cppm | head -n 20
 
       - name: Smoke compile (find_package + import caudio.utils)
         run: |

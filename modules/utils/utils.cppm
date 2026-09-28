@@ -7,5 +7,6 @@ export import :json;
 export import :math;
 export import :ring;
 export import :mpsc_queue;
+export import :print;
 export import :thread;
 export import :version;

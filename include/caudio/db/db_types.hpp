@@ -23,8 +23,8 @@ namespace caudio::db {
  * @brief Represents a single audio track row.
  * @ingroup caudio_db
  * @details Maps 1:1 to the `tracks` table. `fingerprint` is a 32-byte
- * BLAKE3 digest (see fingerprint.hpp); `deleted_at == 0` means not
- * soft-deleted. `library_id` defaults to 1 (the built-in default library).
+ * BLAKE3 digest; `deleted_at == 0` means not soft-deleted. `library_id`
+ * defaults to 1 (the built-in default library).
  */
 struct Track {
     int64_t id{};                          ///< Row id (PK, 0 = not yet persisted).
@@ -104,8 +104,8 @@ struct Queue {
  * @ingroup caudio_db
  * @details First 7 fields map 1:1 to the `history` table row. The trailing
  * `title`/`artist`/`path`/`duration` are track snapshots populated only by
- * JOIN queries (e.g. `History::listHistory`); they are empty on freshly
- * marked rows and ignored on insert. Single definition shared by db, engine
+ * JOIN queries (`history` + `tracks`); they are empty on freshly marked
+ * rows and ignored on insert. Single definition shared by db, engine
  * and service layers (the former `engine::HistoryEntry` duplicate is deleted).
  */
 struct HistoryEntry {

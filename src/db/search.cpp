@@ -1,10 +1,10 @@
 #include <sqlite3.h>
 
-#include <db/detail.hpp>
 #include <caudio/db/db_core.hpp>
 #include <caudio/db/search.hpp>
-#include <db/statement.hpp>
 #include <caudio/utils.hpp>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
 #include <string>
 
 namespace caudio::db {

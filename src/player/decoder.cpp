@@ -39,9 +39,8 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader) 
     std::span<const std::byte> probeSpan(buf.data(), n);
 
     // Try FFmpeg (handles all supported formats: OGG/FLAC/MP3/WAV/M4A/AAC/Opus/WMA)
-    caudio::utils::Expected<std::unique_ptr<Decoder>> result =
-        std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
-                                             std::string_view("no decoder matched")});
+    caudio::utils::Expected<std::unique_ptr<Decoder>> result = std::unexpected(caudio::utils::Error{
+        caudio::utils::StatusCode::Unsupported, std::string_view("no decoder matched")});
 
     if (Decoder::probe(probeSpan)) {
         // FFmpeg init expects file at 0 (start of container). C's ca_decode.c

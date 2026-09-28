@@ -27,15 +27,14 @@
 
 #pragma once
 
+#include <caudio/player/reader.hpp>
+#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
 #include <string_view>
-
-#include <caudio/player/reader.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::player {
 
@@ -97,14 +96,17 @@ class Decoder final {
      * @retval StatusCode::Io FFmpeg initialization failed
      * @retval StatusCode::InvalidArg Reader seek/tell returned invalid values
      */
-    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<Decoder>>
-    open(Reader& reader);
+    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<Decoder>> open(Reader& reader);
 
+    /** @brief Default-constructs an unopened decoder; use open() factory. */
     Decoder();
+    /** @brief Tears down the FFmpeg backend. */
     ~Decoder();
     Decoder(const Decoder&) = delete;
     Decoder& operator=(const Decoder&) = delete;
+    /** @brief Move-constructs, transferring the backend. */
     Decoder(Decoder&&) noexcept;
+    /** @brief Move-assigns, transferring the backend. */
     Decoder& operator=(Decoder&&) noexcept;
 
     /**

@@ -1,3 +1,4 @@
+# engine.cmake -- caudio::engine (playback state machine + persistence).
 # NOTE: history/shuffle live in src/engine/ (NOT installed), no partitions.
 set(CAUDIO_ENGINE_MODULE_SOURCES
   modules/engine/engine.cppm

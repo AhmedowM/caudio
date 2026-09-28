@@ -10,15 +10,12 @@
  * @file engine_types.hpp
  * @brief Core value types for the caudio playback engine.
  * @ingroup caudio_engine
- * @defgroup caudio_engine caudio engine
- * @brief Playback engine -- state machine, shuffle/history, gapless and persistence.
  *
  * @details The caudio_engine module group aggregates the playback state
  * machine, queue/shuffle permutation, gapless transition, history
  * thresholds, monitor/decode loops and SQLite-backed persistence.
- * All public symbols are exported under `caudio::engine` via
- * `caudio.engine:types`, `caudio.engine:history`, `caudio.engine:shuffle`
- * and `caudio.engine` (aggregate).
+ * All public symbols live in `caudio::engine` (headers are canonical;
+ * the `caudio.engine` C++23 module mirrors them when enabled).
  *
  * Thread safety: Engine synchronizes queue state via `queueMutex_`
  * (try_lock pattern for public mutators), decode/ring access via

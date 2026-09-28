@@ -122,7 +122,7 @@ find_package(caudio CONFIG REQUIRED)
 
 add_executable(myapp main.cpp)
 target_link_libraries(myapp PRIVATE caudio::engine)
-# also available: caudio::utils caudio::player caudio::db caudio::ipc caudio::service caudio::client
+# also available: caudio::utils caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client
 ```
 
 ### C++ example (headers are canonical)
@@ -198,7 +198,7 @@ cmake --preset release
 cmake --build --preset release
 cmake --install build/release --prefix /usr/local
 # man page: /usr/local/share/man/man1/caudio.1
-# modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/include/caudio/*.cppm
+# modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/modules/*.cppm (same level as include/)
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 

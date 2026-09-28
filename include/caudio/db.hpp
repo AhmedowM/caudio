@@ -3,6 +3,7 @@
  * @file db.hpp
  * @brief Aggregate include for the caudio.db module.
  * @ingroup caudio_db
+ * @defgroup caudio_db caudio database
  * @details Includes all public headers: types, core, scan, search, json
  * and write_thread. Statement/transaction/queue/schema/detail internals
  * live in src/db/ and are NOT installed.

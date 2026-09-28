@@ -1,10 +1,10 @@
 #include <sqlite3.h>
 
-#include <db/detail.hpp>
-#include <db/statement.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
 
 namespace caudio::db {
 

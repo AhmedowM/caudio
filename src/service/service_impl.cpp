@@ -1,8 +1,6 @@
 #include <algorithm>
 #include <atomic>
 #include <caudio/config.hpp>
-
-#include "config_detail.hpp"
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>
@@ -14,6 +12,7 @@
 #include <caudio/service/service_core.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -22,9 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-
 #include <optional>
-#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
@@ -33,6 +30,7 @@
 #include <variant>
 #include <vector>
 
+#include "config_detail.hpp"
 #include "service_paths.hpp"
 #include "service_status.hpp"
 
@@ -162,7 +160,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     } catch (...) {
     }
 
-    // Create shared memory status block for TUI 10fps polling
+    // Create shared memory status block for 10fps status polling
     // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
     std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
     auto shmRes = caudio::service::createShmStatus(shmName, true);

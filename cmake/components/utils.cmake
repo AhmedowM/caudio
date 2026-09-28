@@ -1,3 +1,4 @@
+# utils.cmake -- caudio::utils (no dependencies; everything links this).
 set(CAUDIO_UTILS_MODULE_SOURCES
   modules/utils/utils.cppm
   modules/utils/result.cppm
@@ -7,6 +8,7 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   modules/utils/math.cppm
   modules/utils/ring.cppm
   modules/utils/mpsc_queue.cppm
+  modules/utils/print.cppm
   modules/utils/thread.cppm
   modules/utils/version.cppm
 )

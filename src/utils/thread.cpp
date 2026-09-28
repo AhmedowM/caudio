@@ -15,8 +15,8 @@ Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) no
             reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(k32, "SetThreadDescription"));
 #pragma GCC diagnostic pop
         if (pSetDesc) {
-            int wlen = MultiByteToWideChar(kUtf8CodePage, 0, name.data(), static_cast<int>(name.size()),
-                                           nullptr, 0);
+            int wlen = MultiByteToWideChar(kUtf8CodePage, 0, name.data(),
+                                           static_cast<int>(name.size()), nullptr, 0);
             if (wlen > 0) {
                 std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
                 MultiByteToWideChar(kUtf8CodePage, 0, name.data(), static_cast<int>(name.size()),

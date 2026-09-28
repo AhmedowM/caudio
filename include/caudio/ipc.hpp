@@ -3,6 +3,7 @@
  * @file ipc.hpp
  * @brief Umbrella header for IPC command/result/protocol and config.
  * @ingroup caudio_ipc
+ * @defgroup caudio_ipc caudio IPC protocol
  * @see caudio::ipc::Command
  * @see caudio::ipc::Result
  * @see caudio::config::Config

@@ -90,9 +90,8 @@ class Database final {
      * Thread-safe: locks cacheMutex_.
      */
     void clearCache() const;
-    // per-connection prepared SqliteStatement cache
-    // Primary API: getCachedForUse returns expected; callers must check.
-    // Legacy raw-pointer APIs are deprecated and delegate to expected (nullptr only on error).
+    // Per-connection prepared-statement cache. getCachedForUse is the only
+    // accessor: it returns expected (nullptr only inside an Error state).
     /**
      * @brief Gets or prepares a cached statement (caller must hold cacheMutex_).
      * @ingroup caudio_db

@@ -1,9 +1,14 @@
 #pragma once
 
+#include <caudio/client.hpp>
+#include <caudio/config.hpp>
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
+#include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
+#include <caudio/service.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/version.hpp>
 
 /**
  * @file caudio.hpp
@@ -12,25 +17,36 @@
  * @ingroup caudio
  *
  * @details caudio is a cross-platform, offline-first music player library
- * written in modern C++23. It provides four independent, layered modules:
+ * written in modern C++23. It provides layered libraries (this header
+ * includes all of them):
  *
  * - @ref caudio_utils "caudio.utils" -- Core utilities: error handling (`std::expected`),
- *   lock-free SPSC/MPSC queues, thread helpers, logging.
+ *   lock-free SPSC/MPSC queues, thread helpers, logging, opaque JSON value.
  * - @ref caudio_player "caudio.player" -- Audio playback: reader abstractions,
- *   FFmpeg-based decoder registry, miniaudio output, gapless playback.
+ *   FFmpeg-based decoder, miniaudio output, gapless playback.
  * - @ref caudio_db "caudio.db" -- Database layer: SQLite with WAL, track/playlist/queue
  *   management, full-text search (FTS5), JSON import/export, library scanning.
  * - @ref caudio_engine "caudio.engine" -- Playback engine: state machine, shuffle/repeat,
  *   gapless transition, history marking, persistence, event queue.
+ * - @ref caudio_ipc "caudio.ipc" -- Daemon wire protocol: Command/Result
+ *   variants, JSON serialization, length-prefixed framing.
+ * - @ref caudio_client "caudio.client" -- Daemon SDK: Client, IPC transport,
+ *   output formatting (used by the CLI and third-party frontends).
+ * - @ref caudio_service "caudio.service" -- Daemon runtime: Service owning
+ *   Engine, Database and the IPC server.
+ * - config -- JSON config file, socket/pid/lock path derivation.
  *
- * Layer rule (enforced by module imports):
+ * Layer rule (enforced by link dependencies):
  * @code
  * caudio.utils  (no deps)
  *    |'
- * caudio.player (imports utils)
- * caudio.db     (imports utils)
+ * caudio.player (utils) -- caudio.db (utils)
+ *    |'                        |'
+ * caudio.engine (utils, player, db)
  *    |'
- * caudio.engine (imports utils, player, db)
+ * caudio.ipc (engine, db, utils) -- caudio.client (ipc, utils, service)
+ *    |'
+ * caudio.service (ipc, engine, db, utils)
  * @endcode
  *
  * Threading model:
@@ -55,4 +71,8 @@
  * @see caudio.player
  * @see caudio.db
  * @see caudio.engine
+ * @see caudio.ipc
+ * @see caudio.client
+ * @see caudio.service
+ * @see caudio_config
  */

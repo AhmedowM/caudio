@@ -1,7 +1,7 @@
 #include <blake3.h>
 
-#include <db/fingerprint.hpp>
 #include <caudio/utils.hpp>
+#include <db/fingerprint.hpp>
 #include <fstream>
 #include <thread>
 

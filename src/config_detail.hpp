@@ -6,10 +6,9 @@
  * @ingroup caudio_config
  */
 
+#include <caudio/utils.hpp>
 #include <filesystem>
 #include <string>
-
-#include <caudio/utils.hpp>
 
 namespace caudio::config::detail {
 
@@ -36,7 +35,7 @@ std::filesystem::path defaultConfigPath();
  */
 caudio::utils::Expected<std::string> readFileString(const std::filesystem::path& p);
 
-} // namespace detail
+} // namespace caudio::config::detail
 
 namespace caudio::config::detail_paths {
 
@@ -55,4 +54,4 @@ std::string hex8ForDb(const std::filesystem::path& dbPath);
  * @return Base directory path.
  */
 std::filesystem::path baseDirForSocket();
-} // namespace detail_paths
+} // namespace caudio::config::detail_paths

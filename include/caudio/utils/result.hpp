@@ -6,14 +6,6 @@
  * @file result.hpp
  * @brief Status codes and string conversion for caudio utilities.
  * @ingroup caudio_utils
- * @defgroup caudio_utils caudio utilities
- * @brief Core utility types for error handling, logging, threading and queues.
- *
- * @details The caudio_utils module group aggregates lightweight, header-like
- * C++23 module partitions that have no external runtime dependencies beyond
- * the standard library. All public symbols are exported under
- * `caudio::utils` and use @ref StatusCode / @ref Error for uniform error
- * reporting via `std::expected`.
  */
 
 namespace caudio::utils {

@@ -12,6 +12,7 @@
 #include <caudio/service/service_core.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -20,9 +21,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-
 #include <optional>
-#include <caudio/utils/print.hpp>
 #include <span>
 #include <string>
 #include <string_view>
