@@ -25,7 +25,7 @@ set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/service/service_paths.cppm
   modules/service/service_status.cppm
   modules/service/service_audio.cppm
-  modules/service/service_impl.cppm
+  modules/service/service_core.cppm
   modules/service/shm_status.cppm
   modules/service/ipc_channel.cppm
   modules/service/ipc_server.cppm
@@ -67,7 +67,7 @@ endif()
 set(CAUDIO_CLIENT_MODULE_SOURCES
   modules/client/client.cppm
   modules/client/ipc_client.cppm
-  modules/client/client_impl.cppm
+  modules/client/client_core.cppm
   modules/client/output_formatter.cppm
 )
 set(CAUDIO_CLIENT_SOURCES

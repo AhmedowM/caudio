@@ -7,6 +7,6 @@
  * @see caudio::client::IpcClient
  * @see caudio::client::OutputFormatter
  */
-#include <caudio/client/client.hpp>
+#include <caudio/client/client_core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>

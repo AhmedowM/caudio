@@ -2,6 +2,7 @@
 set(CAUDIO_ENGINE_MODULE_SOURCES
   modules/engine/engine.cppm
   modules/engine/engine_types.cppm
+  modules/engine/engine_core.cppm
 )
 set(CAUDIO_ENGINE_SOURCES
   src/engine/engine.cpp

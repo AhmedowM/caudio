@@ -1,7 +1,7 @@
 module;
-#include <caudio/service/service.hpp>
+#include <caudio/service/service_core.hpp>
 
-export module caudio.service:impl;
+export module caudio.service:core;
 
 export namespace caudio::service {
 using ::caudio::service::Service;

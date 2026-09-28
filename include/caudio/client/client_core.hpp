@@ -1,5 +1,5 @@
 /**
- * @file client.hpp
+ * @file client_core.hpp
  * @brief Client for the caudio daemon (used by the CLI and third-party frontends).
  * @ingroup caudio_client
  */

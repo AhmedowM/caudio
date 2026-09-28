@@ -1,7 +1,7 @@
 module;
-#include <caudio/client/client.hpp>
+#include <caudio/client/client_core.hpp>
 
-export module caudio.client:impl;
+export module caudio.client:core;
 
 export namespace caudio::client {
 using ::caudio::client::Client;

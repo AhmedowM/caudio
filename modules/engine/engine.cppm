@@ -4,8 +4,9 @@ module;
 
 export module caudio.engine;
 
+export import :core;
+
 export namespace caudio::engine {
-using ::caudio::engine::Engine;
 using ::caudio::engine::EngineCallbacks;
 using ::caudio::engine::EngineConfig;
 using ::caudio::engine::EngineEvent;

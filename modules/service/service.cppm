@@ -6,4 +6,4 @@ export import :shm_status;
 export import :paths;
 export import :status;
 export import :audio;
-export import :impl;
+export import :core;
