@@ -166,12 +166,13 @@ configure_file(
   @ONLY
 )
 
-# Vendor: caudio_sqlite STATIC (SQLITE_ENABLE_FTS5=1)
-add_library(caudio_sqlite STATIC vendor/sqlite3.c)
-set_target_properties(caudio_sqlite PROPERTIES OUTPUT_NAME caudio_sqlite)
-target_include_directories(caudio_sqlite PRIVATE vendor)
-target_include_directories(caudio_sqlite PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
-target_compile_definitions(caudio_sqlite PUBLIC SQLITE_ENABLE_FTS5=1)
+# Vendor: caudio STATIC (libcaudio -- sqlite3 amalgamation, SQLITE_ENABLE_FTS5=1)
+add_library(caudio STATIC vendor/sqlite3.c)
+add_library(caudio::caudio ALIAS caudio)
+set_target_properties(caudio PROPERTIES OUTPUT_NAME caudio)
+target_include_directories(caudio PRIVATE vendor)
+target_include_directories(caudio PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
+target_compile_definitions(caudio PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
@@ -194,7 +195,7 @@ if(NOT nlohmann_json_FOUND)
   FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
+    GIT_TAG v3.12.0
   )
   FetchContent_MakeAvailable(nlohmann_json)
   set(CAUDIO_JSON_EXTRA_INCLUDE ${nlohmann_json_SOURCE_DIR}/include)
@@ -211,7 +212,7 @@ if(CAUDIO_BUILD_CLI)
     FetchContent_Declare(
       CLI11
       GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-      GIT_TAG v2.4.2
+      GIT_TAG v2.7.2
     )
     FetchContent_MakeAvailable(CLI11)
     set(CAUDIO_CLI11_EXTRA_INCLUDE ${CLI11_SOURCE_DIR}/include)
@@ -240,20 +241,23 @@ if(CAUDIO_ENABLE_MODULES)
   ca_set_module_warnings(caudio_umbrella)
 endif()
 
-# caudio executable -- App dispatch (CLI11) + main entry (header-source only)
+# caudio executable -- App dispatch (CLI11) + main entry (header-source only).
+# Target is caudio_cli (OUTPUT_NAME caudio) so the static libcaudio can own
+# the `caudio` target name; the shipped binary is still `caudio`/`caudio.exe`.
 if(CAUDIO_BUILD_CLI)
-add_executable(caudio
+add_executable(caudio_cli
   cli/src/main.cpp
 )
-target_sources(caudio PRIVATE cli/src/app/core.cpp)
-target_include_directories(caudio PRIVATE cli/src/app vendor ${CAUDIO_JSON_EXTRA_INCLUDE} ${CAUDIO_CLI11_EXTRA_INCLUDE})
-target_include_directories(caudio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(caudio PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
-target_link_libraries(caudio PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
-ca_set_warnings(caudio)
-ca_set_module_warnings(caudio)
+set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
+target_sources(caudio_cli PRIVATE cli/src/app/core.cpp)
+target_include_directories(caudio_cli PRIVATE cli/src/app vendor ${CAUDIO_JSON_EXTRA_INCLUDE} ${CAUDIO_CLI11_EXTRA_INCLUDE})
+target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(caudio_cli PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
+target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+ca_set_warnings(caudio_cli)
+ca_set_module_warnings(caudio_cli)
 # Needed on MinGW for template instantiation deduplication across executable + static libs
-target_link_options(caudio PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
+target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
 # Static GNU runtime for the shipped executable: kills GLIBCXX-version failures
 # and missing libstdc++/libgcc DLLs on bare machines (all platforms, validated
 # by CI incl. macOS/GCC). libwinpthread stays shared -- a single instance
@@ -262,10 +266,10 @@ target_link_options(caudio PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFO
 # static libstdc++). Replaces the old libstdc++exp workaround: no TU uses
 # std::print directly anymore (see utils/print.hpp).
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CAUDIO_ENABLE_SANITIZERS)
-  target_link_options(caudio PRIVATE -static-libgcc -static-libstdc++)
+  target_link_options(caudio_cli PRIVATE -static-libgcc -static-libstdc++)
 endif()
 if(CAUDIO_ENABLE_SANITIZERS)
-  caudio_apply_sanitizers(caudio)
+  caudio_apply_sanitizers(caudio_cli)
 endif()
 endif()
 
@@ -285,7 +289,7 @@ set(CAUDIO_INSTALL_LIBS
   ipc
   client
   service
-  caudio_sqlite
+  caudio
   blake3
 )
 if(CAUDIO_BUILD_SHARED)
@@ -343,7 +347,7 @@ install(FILES
 )
 
 if(CAUDIO_BUILD_CLI)
-  install(TARGETS caudio RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(TARGETS caudio_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # Windows distributability: the caudio.exe links FFmpeg + MinGW runtime
@@ -439,7 +443,7 @@ if(CAUDIO_ENABLE_TESTS)
   FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.7.1
+    GIT_TAG v3.16.0
   )
   FetchContent_MakeAvailable(Catch2)
   include(CTest)
@@ -480,21 +484,21 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_decoder tests/test_decoder.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
   caudio_add_catch_test(test_ffmpeg tests/test_ffmpeg.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
 
-  caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio::caudio)
   caudio_add_catch_test(test_output tests/test_output.cpp LIBS caudio::player caudio::utils)
 
-  caudio_add_catch_test(test_engine_queue tests/test_engine_queue.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_engine_history tests/test_engine_history.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_engine_events tests/test_engine_events.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_engine_state tests/test_engine_state.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_engine_queue tests/test_engine_queue.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_engine_history tests/test_engine_history.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_engine_events tests/test_engine_events.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_engine_state tests/test_engine_state.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
 
-  caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio_sqlite)
-  caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio_sqlite)
+  caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio::caudio)
 
-  caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite WITH_TEST_DATA)
+  caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio WITH_TEST_DATA)
 
-  caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio_sqlite WITH_ALLOW_MULTIPLE_DEFINITION)
+  caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::caudio WITH_ALLOW_MULTIPLE_DEFINITION)
 endif()

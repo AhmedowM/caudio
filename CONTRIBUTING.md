@@ -11,7 +11,7 @@
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | 9.0.1+ | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. Auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
 | **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
-| **Catch2** | 3.7.1 | Auto-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
+| **Catch2** | 3.16.0 | Auto-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
 | **Git** | 2.30+ | For `git describe --tags` version stamping |
 
 ### Clone and Configure
