@@ -6,6 +6,42 @@
 
 namespace caudio::player {
 
+namespace detail {
+// 64-bit file helpers (TU-local; were inline in reader.hpp).
+int64_t ftell64(FILE* f) noexcept {
+#if defined(_WIN32)
+    return _ftelli64(f);
+#else
+    off_t o = ftello(f);
+    if (o == (off_t)-1)
+        return -1;
+    return static_cast<int64_t>(o);
+#endif
+}
+
+int fseek64(FILE* f, int64_t off, int whence) noexcept {
+#if defined(_WIN32)
+    return _fseeki64(f, off, whence);
+#else
+    return fseeko(f, static_cast<off_t>(off), whence);
+#endif
+}
+
+int64_t fileSizeInner(FILE* f) noexcept {
+    int64_t cur = ftell64(f);
+    if (cur < 0)
+        return -1;
+    if (fseek64(f, 0, SEEK_END) != 0)
+        return -1;
+    int64_t sz = ftell64(f);
+    if (sz < 0)
+        return -1;
+    if (fseek64(f, cur, SEEK_SET) != 0)
+        return -1;
+    return sz;
+}
+} // namespace detail
+
 caudio::utils::Expected<std::unique_ptr<Reader>>
 FileReader::open(const std::filesystem::path& path) {
     if (path.empty()) {

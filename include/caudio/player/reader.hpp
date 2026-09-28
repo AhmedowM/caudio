@@ -103,45 +103,6 @@ class Reader {
     [[nodiscard]] virtual int64_t size() noexcept = 0;
 };
 
-// 64-bit helpers like ca_reader.c:28
-namespace detail {
-/// @brief 64-bit ftell wrapper (platform-specific)
-inline int64_t ftell64(FILE* f) noexcept {
-#if defined(_WIN32)
-    return _ftelli64(f);
-#else
-    off_t o = ftello(f);
-    if (o == (off_t)-1)
-        return -1;
-    return static_cast<int64_t>(o);
-#endif
-}
-
-/// @brief 64-bit fseek wrapper (platform-specific)
-inline int fseek64(FILE* f, int64_t off, int whence) noexcept {
-#if defined(_WIN32)
-    return _fseeki64(f, off, whence);
-#else
-    return fseeko(f, static_cast<off_t>(off), whence);
-#endif
-}
-
-/// @brief Get file size using 64-bit seek (preserves position)
-inline int64_t fileSizeInner(FILE* f) noexcept {
-    int64_t cur = ftell64(f);
-    if (cur < 0)
-        return -1;
-    if (fseek64(f, 0, SEEK_END) != 0)
-        return -1;
-    int64_t sz = ftell64(f);
-    if (sz < 0)
-        return -1;
-    if (fseek64(f, cur, SEEK_SET) != 0)
-        return -1;
-    return sz;
-}
-} // namespace detail
-
 /**
  * @class FileReader
  * @brief File-based reader with 64-bit seek support

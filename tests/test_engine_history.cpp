@@ -5,6 +5,7 @@
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
+#include <engine/history.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <filesystem>

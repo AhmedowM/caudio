@@ -1,9 +1,10 @@
 #include <blake3.h>
 #include <sqlite3.h>
 
-#include <caudio/db/detail.hpp>
+#include <db/detail.hpp>
+#include <caudio/db/db_core.hpp>
 #include <caudio/db/scan.hpp>
-#include <caudio/db/statement.hpp>
+#include <db/statement.hpp>
 #include <caudio/utils.hpp>
 #include <fstream>
 

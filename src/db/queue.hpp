@@ -1,8 +1,8 @@
 #pragma once
 
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/statement.hpp>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
 #include <caudio/utils.hpp>
 #include <cstdint>
 #include <expected>

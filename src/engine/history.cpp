@@ -1,6 +1,8 @@
 #include <sqlite3.h>
 
-#include <caudio/engine/history.hpp>
+#include <engine/history.hpp>
+
+#include <caudio/db/db_core.hpp>
 
 namespace caudio::engine::detail {
 
@@ -61,9 +63,9 @@ History::ExpectedEntries History::listHistory(int limit) {
     if (hasLimit)
         sqlite3_bind_int(raw, 1, limit);
 
-    std::vector<HistoryEntry> out;
+    std::vector<caudio::db::HistoryEntry> out;
     while (sqlite3_step(raw) == SQLITE_ROW) {
-        HistoryEntry e;
+        caudio::db::HistoryEntry e;
         e.id = sqlite3_column_int64(raw, 0);
         e.track_id = sqlite3_column_int64(raw, 1);
         e.started_at = sqlite3_column_int64(raw, 2);

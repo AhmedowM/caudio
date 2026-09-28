@@ -102,7 +102,11 @@ struct Queue {
 /**
  * @brief Playback history entry.
  * @ingroup caudio_db
- * @details Maps to `history`. Records a single play session.
+ * @details First 7 fields map 1:1 to the `history` table row. The trailing
+ * `title`/`artist`/`path`/`duration` are track snapshots populated only by
+ * JOIN queries (e.g. `History::listHistory`); they are empty on freshly
+ * marked rows and ignored on insert. Single definition shared by db, engine
+ * and service layers (the former `engine::HistoryEntry` duplicate is deleted).
  */
 struct HistoryEntry {
     int64_t id{};            ///< Row id (PK).
@@ -112,6 +116,10 @@ struct HistoryEntry {
     int64_t position_ms{};   ///< Position reached in milliseconds.
     double completion_pct{}; ///< Completion percentage [0,1].
     int64_t queue_id{1};     ///< Queue context.
+    std::string title{};     ///< Track title snapshot (JOIN queries only).
+    std::string artist{};    ///< Track artist snapshot (JOIN queries only).
+    std::string path{};      ///< Track path snapshot (JOIN queries only).
+    double duration{};       ///< Track duration snapshot (JOIN queries only).
 };
 
 /**

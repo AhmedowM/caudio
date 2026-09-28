@@ -1,6 +1,6 @@
 #pragma once
 
-#include <caudio/db/detail.hpp>
+#include <db/detail.hpp>
 #include <caudio/utils.hpp>
 #include <expected>
 #include <string>

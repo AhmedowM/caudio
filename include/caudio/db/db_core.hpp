@@ -1,11 +1,6 @@
 #pragma once
 
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/queue.hpp>
-#include <caudio/db/schema.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/db/transaction.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils.hpp>
 #include <cstring>
@@ -27,6 +22,10 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
+
+// Statement/transaction internals live in src/db/ (NOT installed);
+// the cache below only needs the declaration (Database dtor is out-of-line).
+class SqliteStatement;
 
 /**
  * @brief Options for opening a Database.
@@ -69,7 +68,9 @@ class Database final {
      * @ingroup caudio_db
      * @param opts Options; writeBatchSize forwarded to WriterThread.
      */
-    explicit Database(const DbOpts& opts) : writer_(opts.writeBatchSize), db_(nullptr) {}
+    // Out-of-line (db_core.cpp): constructing writer_ with only a
+    // forward-declared SqliteStatement in scope is insufficient for inline.
+    explicit Database(const DbOpts& opts);
     /**
      * @brief Closes the writer, clears the statement cache and resets the handle.
      * @ingroup caudio_db

@@ -1,5 +1,5 @@
 module;
-#include <caudio/service/service_impl.hpp>
+#include <caudio/service/service.hpp>
 
 export module caudio.service:impl;
 

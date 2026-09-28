@@ -26,11 +26,11 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         // push two ops without opening thread -> queue stays full
         // need to construct WriteOp-like pushes via WriterThread::push
         // Use sql strings; stmt nullptr
-        auto pr1 = wt.push("SELECT 1;", nullptr, nullptr);
+        auto pr1 = wt.push("SELECT 1;", {});
         REQUIRE(pr1.has_value());
-        auto pr2 = wt.push("SELECT 1;", nullptr, nullptr);
+        auto pr2 = wt.push("SELECT 1;", {});
         REQUIRE(pr2.has_value());
-        auto pr3 = wt.push("SELECT 1;", nullptr, nullptr);
+        auto pr3 = wt.push("SELECT 1;", {});
         REQUIRE(!pr3.has_value());
         REQUIRE(pr3.error().code == caudio::utils::StatusCode::Busy);
         auto start = std::chrono::steady_clock::now();
@@ -68,7 +68,7 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
         wt.open(db);
         // push an insert using SQL string (stmt=nullptr)
         std::atomic<bool> cbCalled{false};
-        auto pr = wt.push("INSERT INTO t(id) VALUES (1)", nullptr,
+        auto pr = wt.push("INSERT INTO t(id) VALUES (1)",
                           [&](std::expected<void, caudio::utils::Error> e) {
                               cbCalled.store(true);
                               (void)e;

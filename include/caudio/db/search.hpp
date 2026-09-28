@@ -1,9 +1,7 @@
 #pragma once
 
 #include <array>
-#include <caudio/db/db_core.hpp>
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
 #include <caudio/utils.hpp>
 #include <cctype>
 #include <cstdint>
@@ -20,32 +18,8 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
-
-/**
- * @brief Maps a search result row into a Track (alias for fillTrackFromStmt).
- * @ingroup caudio_db
- * @param s Statement positioned on a row.
- * @param out Track to populate.
- * @par Thread safety
- * Caller must hold the DB lock protecting the statement.
- */
-void fillTrackSearch(sqlite3_stmt* s, Track& out);
-
-/**
- * @brief Executes a single FTS5 MATCH query.
- * @ingroup caudio_db
- * @param h SQLite handle (must be valid, caller holds lock).
- * @param query Already-sanitized FTS5 query text.
- * @param limit Maximum rows (<=0 defaults to 50).
- * @return Vector of matching Tracks, or `Error` on prepare failure.
- * @details SQL: `SELECT ... FROM tracks JOIN tracks_fts ON id=rowid WHERE tracks_fts MATCH ? ORDER
- * BY rank LIMIT ?`.
- * @par Thread safety
- * Caller must hold `Database::mutex()` (shared or exclusive).
- * @see sanitizeFtsTerm
- */
-std::expected<std::vector<Track>, caudio::utils::Error>
-tryFtsQuery(sqlite3* h, std::string_view query, int limit);
+// Defined in db_core.hpp (full Database API); reference params need only this.
+class Database;
 
 /**
  * @brief FTS5 search with LIKE fallback (three stages).

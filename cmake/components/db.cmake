@@ -1,19 +1,13 @@
+# NOTE: statement/transaction/queue/schema/detail/fingerprint/fts/stmt_helpers
+# live in src/db/ (NOT installed) and have no module partitions.
 set(CAUDIO_DB_MODULE_SOURCES
   modules/db/database.cppm
   modules/db/db_types.cppm
-  modules/db/schema.cppm
   modules/db/db_core.cppm
-  modules/db/queue.cppm
   modules/db/scan.cppm
   modules/db/search.cppm
   modules/db/json.cppm
   modules/db/write_thread.cppm
-  modules/db/statement.cppm
-  modules/db/transaction.cppm
-  modules/db/detail.cppm
-  modules/db/fingerprint.cppm
-  modules/db/fts.cppm
-  modules/db/stmt_helpers.cppm
 )
 
 set(CAUDIO_DB_SOURCES

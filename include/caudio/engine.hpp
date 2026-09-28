@@ -19,8 +19,9 @@
  * @file engine.hpp
  * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
  * @ingroup caudio_engine
- * @details Aggregate module `caudio.engine` re-exporting `:types`, `:history`
- * and `:shuffle`. Core class is Engine which owns:
+ * @details Aggregate module `caudio.engine`: `Engine` plus `:types`.
+ * History/shuffle internals live in src/engine/ (NOT installed).
+ * Core class is Engine which owns:
  * - Playback state machine (`Stopped -> Playing -> Paused -> Playing`,
  *   next/prev with shuffle/repeat, see queueNextLocked/queuePrevLocked).
  * - Gapless transition: preroll() fills SpscRing<float> to half capacity
@@ -45,16 +46,24 @@
  * pushEvent to callbacks under cbMutex_.
  */
 
-#include <caudio/db.hpp>
+#include <caudio/db/db_types.hpp>
 #include <caudio/engine/engine_types.hpp>
-#include <caudio/engine/history.hpp>
-#include <caudio/engine/shuffle.hpp>
-#include <caudio/player.hpp>
 #include <caudio/utils.hpp>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;
 struct sqlite3_stmt;
+
+namespace caudio::db {
+class Database;
+} // namespace caudio::db
+
+namespace caudio::player {
+// Player components held by unique_ptr (Engine ctor/dtor out-of-line).
+class Reader;
+class Decoder;
+class AudioOutput;
+} // namespace caudio::player
 
 namespace caudio::engine {
 
@@ -264,22 +273,21 @@ class Engine final {
      * @brief Lists history entries.
      * @ingroup caudio_engine
      * @param limit Max rows (0 = no limit, default 50).
-     * @return `std::expected<std::vector<HistoryEntry>, Error>` -- vector on success, State if no
-     * db.
+     * @return `std::expected<std::vector<db::HistoryEntry>, Error>` -- vector on success, State if no
+     * db. Entries carry track snapshots (title/artist/path/duration).
      * @par Thread safety
-     * Thread-safe; History::listHistory takes shared_lock on its mutex.
-     * @see History::listHistory
-     * @see HistoryEntry
+     * Thread-safe; takes shared_lock on the database mutex.
+     * @see caudio::db::HistoryEntry
      */
-    std::expected<std::vector<HistoryEntry>, caudio::utils::Error> listHistory(int limit = 50);
+    std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+    listHistory(int limit = 50);
 
     /**
      * @brief Clears all history entries.
      * @ingroup caudio_engine
      * @return `std::expected<void, Error>` -- success or State/Internal.
      * @par Thread safety
-     * Thread-safe; History::clearHistory takes unique_lock on its mutex.
-     * @see History::clearHistory
+     * Thread-safe; takes unique_lock on the database mutex.
      */
     std::expected<void, caudio::utils::Error> clearHistory();
 

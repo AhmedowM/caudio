@@ -1,7 +1,15 @@
 #include <sqlite3.h>
 
 #include <caudio/engine.hpp>
+
+#include <caudio/db/db_core.hpp>
 #include <caudio/player/decoder.hpp>
+#include <db/stmt_helpers.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/player/player_core.hpp>
+#include <caudio/player/reader.hpp>
+#include <engine/history.hpp>
+#include <engine/shuffle.hpp>
 
 namespace caudio::engine {
 
@@ -253,7 +261,8 @@ std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
     return db_->getStats();
 }
 
-std::expected<std::vector<HistoryEntry>, caudio::utils::Error> Engine::listHistory(int limit) {
+std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+Engine::listHistory(int limit) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     caudio::engine::History hist(db_);

@@ -1,18 +1,21 @@
 #include <sqlite3.h>
 
-#include <caudio/db/detail.hpp>
+#include <db/detail.hpp>
+#include <caudio/db/db_core.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/db/statement.hpp>
+#include <db/statement.hpp>
 #include <caudio/utils.hpp>
 #include <string>
 
 namespace caudio::db {
 
-void fillTrackSearch(sqlite3_stmt* s, Track& out) {
+// TU-local row mapper (alias for internal::fillTrackFromStmt).
+static void fillTrackSearch(sqlite3_stmt* s, Track& out) {
     internal::fillTrackFromStmt(s, out);
 }
 
-std::expected<std::vector<Track>, caudio::utils::Error>
+// TU-local single FTS5 MATCH query.
+static std::expected<std::vector<Track>, caudio::utils::Error>
 tryFtsQuery(sqlite3* h, std::string_view query, int limit) {
     const char* sql =
         "SELECT t.id, t.fingerprint, t.path, t.deleted_at, t.size, t.mtime, t.duration, "

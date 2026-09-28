@@ -2,8 +2,7 @@
 #include <atomic>
 #include <caudio/config.hpp>
 #include <caudio/db.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/fingerprint.hpp>
+#include <db/fingerprint.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -11,7 +10,7 @@
 #include <caudio/player.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/service_impl.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>

@@ -1,11 +1,7 @@
 #pragma once
 
 #include <array>
-#include <caudio/db/db_core.hpp>
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +20,8 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
+// Defined in db_core.hpp (full Database API); reference params need only this.
+class Database;
 
 /**
  * @brief Serializes a Track to JSON.

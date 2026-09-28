@@ -1,9 +1,10 @@
 #include <sqlite3.h>
 
-#include <caudio/db/detail.hpp>
+#include <caudio/db/db_core.hpp>
 #include <caudio/db/json.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/db/transaction.hpp>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
+#include <db/transaction.hpp>
 #include <caudio/utils.hpp>
 #include <fstream>
 #include <sstream>

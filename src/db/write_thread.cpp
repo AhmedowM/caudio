@@ -1,11 +1,23 @@
 #include <sqlite3.h>
 
-#include <caudio/db/detail.hpp>
+#include <db/detail.hpp>
+#include <db/statement.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
 
 namespace caudio::db {
+
+// Out-of-line: the header only forward-declares SqliteStatement.
+WriteOp::WriteOp() = default;
+
+WriteOp::WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
+                 std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c)
+    : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
+
+WriteOp::WriteOp(WriteOp&&) noexcept = default;
+WriteOp& WriteOp::operator=(WriteOp&&) noexcept = default;
+WriteOp::~WriteOp() = default;
 
 WriterThread::WriterThread(std::size_t writeBatchSize)
     : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(writeBatchSize > 0 ? writeBatchSize
@@ -59,6 +71,12 @@ WriterThread::push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
         return std::unexpected{r.error()};
     cv_.notify_one();
     return {};
+}
+
+std::expected<void, caudio::utils::Error>
+WriterThread::push(std::string sql,
+                   std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
+    return push(std::move(sql), std::unique_ptr<SqliteStatement>{}, std::move(cb));
 }
 
 std::expected<void, caudio::utils::Error> WriterThread::flush() {

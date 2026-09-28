@@ -1,5 +1,5 @@
 module;
-#include <caudio/client/client_impl.hpp>
+#include <caudio/client/client.hpp>
 
 export module caudio.client:impl;
 

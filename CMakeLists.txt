@@ -334,8 +334,9 @@ endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 
-# Install vendor headers to caudio/vendor/ for downstream consumers
-install(FILES vendor/sqlite3.h vendor/blake3.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor)
+# NOTE: vendor headers (sqlite3.h, blake3.h) are deliberately NOT installed --
+# no public header references them (fwd-decls only). Only the static archives
+# below ship (transitive link deps). miniaudio.h was never installed either.
 install(FILES cmake/FindFFmpeg.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
 
@@ -468,7 +469,9 @@ if(CAUDIO_ENABLE_TESTS)
     cmake_parse_arguments(PARSE_ARGV 2 ARG "WITH_TEST_DATA;WITH_ALLOW_MULTIPLE_DEFINITION" "" "LIBS")
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
+    # + src/: white-box tests cover src-internal helpers (engine detail fns)
+    # directly. Build-tree only -- src/ is never installed.
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
     if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")

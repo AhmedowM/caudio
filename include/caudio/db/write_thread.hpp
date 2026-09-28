@@ -1,8 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <caudio/db/detail.hpp>
-#include <caudio/db/statement.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
 #include <condition_variable>
@@ -24,9 +22,15 @@
  * The queue is bounded: `push()` returns `Busy` when full.
  */
 
-// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
+// Forward declarations (sqlite3.h + statement impl stay in src/db/).
 struct sqlite3;
 struct sqlite3_stmt;
+
+namespace caudio::db {
+// Defined in src/db/statement.hpp (NOT installed); unique_ptr members only
+// need the declaration here (all WriteOp/WriterThread methods are out-of-line).
+class SqliteStatement;
+} // namespace caudio::db
 
 namespace caudio::db {
 
@@ -42,7 +46,10 @@ struct WriteOp {
     std::move_only_function<void(std::expected<void, caudio::utils::Error>)>
         cb; ///< Completion callback.
 
-    WriteOp() = default;
+    // All special members are out-of-line (write_thread.cpp): the header only
+    // forward-declares SqliteStatement, which is insufficient for inline
+    // construction/destruction of the unique_ptr member.
+    WriteOp();
     /**
      * @brief Constructs a write operation.
      * @ingroup caudio_db
@@ -51,13 +58,12 @@ struct WriteOp {
      * @param c Completion callback (may be empty).
      */
     WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
-            std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c)
-        : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
+            std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c);
     WriteOp(const WriteOp&) = delete;
     WriteOp& operator=(const WriteOp&) = delete;
-    WriteOp(WriteOp&&) noexcept = default;
-    WriteOp& operator=(WriteOp&&) noexcept = default;
-    ~WriteOp() = default;
+    WriteOp(WriteOp&&) noexcept;
+    WriteOp& operator=(WriteOp&&) noexcept;
+    ~WriteOp();
 };
 
 /**
@@ -136,6 +142,21 @@ class WriterThread final {
      */
     std::expected<void, caudio::utils::Error>
     push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
+         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb);
+    /**
+     * @brief Enqueues a raw-SQL write operation (no prepared statement).
+     * @ingroup caudio_db
+     * @param sql SQL text to execute.
+     * @param cb Completion callback invoked after execution.
+     * @return Success or `Error` with `StatusCode::Busy` if queue is full.
+     * @details Convenience overload: passing (or moving) a statement needs
+     * the complete `SqliteStatement` type, which is src-private. Most
+     * callers — including all downstream users — want this overload.
+     * @par Thread safety
+     * Thread-safe (MPSC); multiple producers may call concurrently.
+     */
+    std::expected<void, caudio::utils::Error>
+    push(std::string sql,
          std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb);
 
     /**

@@ -40,9 +40,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/output.hpp>
-#include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
 #include <cmath>
@@ -58,6 +55,11 @@
 #include <vector>
 
 namespace caudio::player {
+// Decoder/Reader/AudioOutput live in their own public headers; Player holds
+// them by unique_ptr only (ctor/dtor out-of-line), so declarations suffice.
+class Reader;
+class Decoder;
+class AudioOutput;
 
 
 /**

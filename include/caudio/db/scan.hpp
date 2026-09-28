@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <array>
-#include <caudio/db/db_core.hpp>
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/detail.hpp>
-#include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+
+namespace caudio::db {
+// Defined in db_core.hpp (full Database API); reference params need only this.
+class Database;
+} // namespace caudio::db
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -63,10 +65,7 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
  * @param mode Fingerprinting mode (Sampled vs Full).
  * @return Generator yielding one `Track` per audio file.
  * @details Uses `recursive_directory_iterator` with `skip_permission_denied`.
- * For each regular file with an audio extension, populates `path`, `size`,
- * `mtime`, fingerprint (per `mode`) and metadata via
- * `caudio::player::extractMetadata`. Files that cannot be read yield
- * a track with zeroed fingerprint (fallback handled by caller).
+ * Shared with the service layer (playlist/scan imports).
  * @par Thread safety
  * Not thread-safe with concurrent filesystem mutation; otherwise re-entrant.
  * @see ScanMode
@@ -82,8 +81,7 @@ std::generator<Track> scan(const std::filesystem::path& root, ScanMode mode = Sc
  * @param mode Fingerprinting mode.
  * @return Vector of tracks, or `Error` (currently always succeeds, returns empty on missing root).
  * @par Thread safety
- * Same as `scan()`.
- * @see scan
+ * Re-entrant; not thread-safe with concurrent filesystem mutation.
  */
 std::expected<std::vector<Track>, caudio::utils::Error>
 scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
@@ -109,7 +107,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
  * Acquires `db.mutex()` (dbMutex_) exclusively per batch; inside the batch
  * uses `*Locked` helpers that assume the lock is held and additionally take
  * `cacheMutex_` internally.
- * @see scan
+ * @see scanDirectory
  * @see Database::findByPathLocked
  * @see Database::findByFingerprintLocked
  */

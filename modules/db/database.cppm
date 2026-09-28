@@ -1,7 +1,5 @@
 module;
 #include <caudio/db/db_types.hpp>
-#include <caudio/db/statement.hpp>
-#include <caudio/db/transaction.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <string_view>
 
@@ -10,27 +8,19 @@ module;
  * @brief Aggregate re-export for the caudio.db module.
  * @ingroup caudio_db
  * @details Thin wrapper that re-exports all public partitions:
- * :types, :schema, :core, :queue, :scan, :search, :json and
- * :write_thread. Internal partitions :detail, :fingerprint, :fts and
- * :stmt_helpers are imported privately.
+ * :types, :core, :scan, :search, :json and :write_thread.
+ * Statement/transaction/queue/schema/detail internals live in src/db/
+ * and have no partitions.
  */
 
 export module caudio.db;
 
 export import :types;
-export import :schema;
 export import :core;
-export import :queue;
 export import :scan;
 export import :search;
 export import :json;
 export import :write_thread;
-export import :SqliteStatement;
-export import :DbTransaction;
-import :detail;
-import :fingerprint;
-import :fts;
-import :stmt_helpers;
 
 import caudio.utils;
 
