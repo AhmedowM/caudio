@@ -12,7 +12,8 @@ set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
   src/config.cpp
 )
-caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::engine caudio::db caudio::utils nlohmann_json::nlohmann_json Threads::Threads INCLUDES vendor)
+caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::engine caudio::db caudio::utils Threads::Threads INCLUDES vendor)
+target_include_directories(ipc PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
 ca_set_module_warnings(ipc)
 if(CAUDIO_ENABLE_MODULES)
   target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)

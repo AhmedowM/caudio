@@ -105,7 +105,6 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <format>
 #include <fstream>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <caudio/utils/print.hpp>
 #include <span>
@@ -191,12 +190,12 @@ void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& t
 }
 
 void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks) {
-    nlohmann::ordered_json j;
+    caudio::utils::Json j;
     j["format"] = "caudio-playlist";
     j["version"] = 1;
-    j["tracks"] = nlohmann::ordered_json::array();
+    j["tracks"] = caudio::utils::Json::array();
     for (const auto& t : tracks) {
-        j["tracks"].push_back(caudio::ipc::detail::trackToJson(t));
+        j["tracks"].push_back(caudio::db::trackToJson(t));
     }
     os << j.dump(2) << "\n";
 }

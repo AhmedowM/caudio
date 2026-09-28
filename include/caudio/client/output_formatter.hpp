@@ -31,7 +31,7 @@ namespace caudio::client {
  *
  * Provides print() for formatted output and printWithStatus() for exit code handling.
  * Supports all Result variant types: Status, QueueTracks, VolumeInfo, LibraryStats, etc.
- * JSON mode uses nlohmann::json pretty-printing (2-space indent).
+ * JSON mode uses caudio::utils::Json pretty-printing (2-space indent).
  */
 class OutputFormatter {
     bool json_{false};

@@ -6,13 +6,14 @@
 #include <caudio/db/transaction.hpp>
 #include <caudio/utils.hpp>
 #include <fstream>
-#include <nlohmann/json.hpp>
 #include <sstream>
 
 namespace caudio::db {
 
-ordered_json trackToJson(const Track& t) {
-    ordered_json j;
+using caudio::utils::Json;
+
+Json trackToJson(const Track& t) {
+    Json j;
     j["id"] = t.id;
     j["size"] = t.size;
     j["mtime"] = t.mtime;
@@ -42,12 +43,12 @@ ordered_json trackToJson(const Track& t) {
     return j;
 }
 
-std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j) {
+std::expected<Track, caudio::utils::Error> trackFromJson(const Json& j) {
     try {
         Track t;
         auto getI64 = [&](const char* k, int64_t& out, int64_t def = 0) {
-            if (j.contains(k) && !j[k].is_null()) {
-                if (j[k].is_number())
+            if (j.contains(k) && !j[k].isNull()) {
+                if (j[k].isNumber())
                     out = j[k].get<int64_t>();
                 else
                     out = def;
@@ -60,13 +61,13 @@ std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j) 
             out = (int)v;
         };
         auto getDbl = [&](const char* k, double& out, double def = 0) {
-            if (j.contains(k) && !j[k].is_null() && j[k].is_number())
+            if (j.contains(k) && !j[k].isNull() && j[k].isNumber())
                 out = j[k].get<double>();
             else
                 out = def;
         };
         auto getStr = [&](const char* k, std::string& out) {
-            if (j.contains(k) && !j[k].is_null() && j[k].is_string())
+            if (j.contains(k) && !j[k].isNull() && j[k].isString())
                 out = j[k].get<std::string>();
             else
                 out.clear();
@@ -135,8 +136,8 @@ std::expected<void, caudio::utils::Error> exportJson(Database& db,
     auto tracks = db.listTracks(nullptr);
     if (!tracks)
         return std::unexpected{tracks.error()};
-    ordered_json root;
-    root["tracks"] = ordered_json::array();
+    Json root;
+    root["tracks"] = Json::array();
     for (auto& t : *tracks) {
         root["tracks"].push_back(trackToJson(t));
     }
@@ -161,14 +162,18 @@ std::expected<void, caudio::utils::Error> importJson(Database& db,
     if (content.empty())
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "empty file")};
-    ordered_json root;
+    Json root;
     try {
-        root = ordered_json::parse(content);
+        root = Json::parse(content);
     } catch (const std::exception& e) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, e.what())};
     }
-    if (!root.contains("tracks") || !root["tracks"].is_array()) {
+    if (!root.contains("tracks"))
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "missing tracks array")};
+    const Json tracks = root["tracks"];
+    if (!tracks.isArray()) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "missing tracks array")};
     }
@@ -182,8 +187,13 @@ std::expected<void, caudio::utils::Error> importJson(Database& db,
         return std::unexpected{txRes.error()};
     DbTransaction tx = std::move(*txRes);
     bool corrupt = false;
-    for (auto& j : root["tracks"]) {
-        auto tr = trackFromJson(j);
+    for (std::size_t ti = 0, tn = tracks.size(); ti < tn; ++ti) {
+        auto jt = tracks.at(ti);
+        if (!jt) {
+            corrupt = true;
+            break;
+        }
+        auto tr = trackFromJson(*jt);
         if (!tr) {
             corrupt = true;
             break;

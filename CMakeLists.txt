@@ -185,23 +185,30 @@ endif()
 
 # FetchContent deps needed before components. Lazy: prefer a system/vcpkg/Conan
 # package first so plain configures don't pay for a git clone; fetch only as
-# fallback. nlohmann_json is public API (protocol/db/config signatures):
-# install its package (upstream defaults JSON_Install off under FetchContent)
-# so downstream find_package(caudio) pulls working headers via find_dependency.
+# fallback. nlohmann_json is PRIVATE (backend for src/utils/json.cpp only):
+# its headers never enter installed headers, so no JSON_Install and no
+# find_dependency downstream. Components link it PRIVATE (see components/).
 include(FetchContent)
 find_package(nlohmann_json QUIET)
 if(NOT nlohmann_json_FOUND)
-  set(JSON_Install ON)
   FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.12.0
   )
   FetchContent_MakeAvailable(nlohmann_json)
-  set(CAUDIO_JSON_EXTRA_INCLUDE ${nlohmann_json_SOURCE_DIR}/include)
 else()
-  message(STATUS "nlohmann_json found (system): includes come from nlohmann_json::nlohmann_json")
-  set(CAUDIO_JSON_EXTRA_INCLUDE "")
+  message(STATUS "nlohmann_json found (system): backend includes come from nlohmann_json::nlohmann_json")
+endif()
+# Private backend include dirs for src/ only. Plain PRIVATE -I (never a
+# target link): linking nlohmann_json::nlohmann_json even PRIVATEly would
+# force it into install(EXPORT caudioTargets) and drag find_dependency back.
+# Same SOURCE_DIR pattern as CAUDIO_CLI11_EXTRA_INCLUDE below.
+if(DEFINED nlohmann_json_SOURCE_DIR)
+  set(CAUDIO_NLOHMANN_PRIVATE_INCLUDE ${nlohmann_json_SOURCE_DIR}/include)
+else()
+  set(CAUDIO_NLOHMANN_PRIVATE_INCLUDE
+    $<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>)
 endif()
 
 # CLI11 is private to the caudio executable: skip entirely with CAUDIO_BUILD_CLI=OFF.
@@ -250,7 +257,7 @@ add_executable(caudio_cli
 )
 set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_cli PRIVATE cli/src/app/core.cpp)
-target_include_directories(caudio_cli PRIVATE cli/src/app vendor ${CAUDIO_JSON_EXTRA_INCLUDE} ${CAUDIO_CLI11_EXTRA_INCLUDE})
+target_include_directories(caudio_cli PRIVATE cli/src/app vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
@@ -429,12 +436,12 @@ if(CAUDIO_ENABLE_EXAMPLES)
 
   add_executable(caudio_player_db_demo examples/player_db_demo.cpp)
   target_link_libraries(caudio_player_db_demo PRIVATE caudio::player caudio::db caudio::utils)
-  target_include_directories(caudio_player_db_demo PRIVATE vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
+  target_include_directories(caudio_player_db_demo PRIVATE vendor)
   target_compile_features(caudio_player_db_demo PRIVATE cxx_std_23)
 
   add_executable(caudio_engine_demo examples/engine_demo.cpp)
   target_link_libraries(caudio_engine_demo PRIVATE caudio::engine caudio::db caudio::player caudio::utils)
-  target_include_directories(caudio_engine_demo PRIVATE vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
+  target_include_directories(caudio_engine_demo PRIVATE vendor)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
@@ -458,7 +465,7 @@ if(CAUDIO_ENABLE_TESTS)
     cmake_parse_arguments(PARSE_ARGV 2 ARG "WITH_TEST_DATA;WITH_ALLOW_MULTIPLE_DEFINITION" "" "LIBS")
     add_executable(${name} ${src})
     target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor ${CAUDIO_JSON_EXTRA_INCLUDE})
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
     if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")

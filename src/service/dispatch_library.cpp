@@ -22,7 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <nlohmann/json.hpp>
+
 #include <optional>
 #include <caudio/utils/print.hpp>
 #include <span>
@@ -572,10 +572,15 @@ Service::handle(const caudio::ipc::PlaylistImport& cmd) {
         std::string content((std::istreambuf_iterator<char>(ifs)),
                             std::istreambuf_iterator<char>());
         try {
-            auto j = nlohmann::ordered_json::parse(content);
-            if (j.contains("tracks") && j["tracks"].is_array()) {
-                for (const auto& track : j["tracks"]) {
-                    if (track.contains("path") && track["path"].is_string()) {
+            const caudio::utils::Json j = caudio::utils::Json::parse(content);
+            if (j.contains("tracks") && j["tracks"].isArray()) {
+                const caudio::utils::Json tracks = j["tracks"];
+                for (std::size_t ti = 0, tn = tracks.size(); ti < tn; ++ti) {
+                    auto trackExp = tracks.at(ti);
+                    if (!trackExp)
+                        continue;
+                    const caudio::utils::Json track = std::move(*trackExp);
+                    if (track.contains("path") && track["path"].isString()) {
                         lines.push_back(track["path"].get<std::string>());
                     }
                 }

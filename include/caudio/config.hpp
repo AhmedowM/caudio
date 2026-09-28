@@ -72,7 +72,7 @@ caudio::utils::Expected<void> saveConfig(const Config& cfg);
 
 
 // Generic config raw access -- used by service for arbitrary key/value pairs.
-// Delegates to nlohmann::ordered_json (single definition here, avoids per-module duplication).
+// Implemented over caudio::utils::Json (single definition here, avoids per-module duplication).
 struct RawConfigValue {
     std::string key{};
     std::string value{};

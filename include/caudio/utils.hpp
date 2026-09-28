@@ -12,10 +12,12 @@
  * - mpsc_queue: MpscQueue
  * - thread: sleepFor, sleepForMs, setThreadName
  * - print: portable print/println facade (see print.hpp)
+ * - json: opaque Json/JsonRef value type (nlohmann stays behind src/ walls)
  * - version: version constants and helpers
  */
 
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/mpsc_queue.hpp>

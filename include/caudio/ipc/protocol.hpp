@@ -72,7 +72,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <nlohmann/json_fwd.hpp> // full <nlohmann/json.hpp> needed only to use values, not to declare
 #include <optional>
 #include <span>
 #include <string>
@@ -83,7 +82,10 @@
 
 namespace caudio::ipc {
 
-using ordered_json = nlohmann::ordered_json;
+// JSON vocabulary: the opaque caudio::utils::Json (nlohmann stays in src/).
+// Track conversion lives in caudio::db (db/json.hpp) -- single definition,
+// no ipc::detail duplicate.
+using Json = caudio::utils::Json;
 
 /**
  * @struct IpcRequest
@@ -167,30 +169,15 @@ std::string resultCodeToString(caudio::utils::StatusCode r);
 std::expected<caudio::utils::StatusCode, caudio::utils::Error>
 resultCodeFromString(std::string_view sv);
 
-// Track JSON helpers
-/**
- * @brief Convert Track struct to JSON object.
- * @ingroup caudio_ipc
- * @param t Track to convert.
- * @return JSON object with all track fields.
- */
-ordered_json trackToJson(const caudio::db::Track& t);
-
-/**
- * @brief Convert JSON object to Track struct.
- * @ingroup caudio_ipc
- * @param j JSON object with track fields.
- * @return Track struct, or error if parsing fails.
- */
-std::expected<caudio::db::Track, caudio::utils::Error> trackFromJson(const ordered_json& j);
-
+// Track JSON helpers live in caudio::db (db/json.hpp) -- single definition.
+// Playlist JSON helpers
 /**
  * @brief Convert Playlist struct to JSON object.
  * @ingroup caudio_ipc
  * @param p Playlist to convert.
  * @return JSON object with all playlist fields.
  */
-ordered_json playlistToJson(const caudio::db::Playlist& p);
+Json playlistToJson(const caudio::db::Playlist& p);
 
 /**
  * @brief Convert JSON object to Playlist struct.
@@ -198,7 +185,7 @@ ordered_json playlistToJson(const caudio::db::Playlist& p);
  * @param j JSON object with playlist fields.
  * @return Playlist struct, or error if parsing fails.
  */
-std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const ordered_json& j);
+std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const Json& j);
 
 /**
  * @brief Convert Error struct to JSON object.
@@ -206,7 +193,7 @@ std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const
  * @param e Error to convert.
  * @return JSON object with type, code, code_value, and message fields.
  */
-ordered_json errorToJson(const caudio::utils::Error& e);
+Json errorToJson(const caudio::utils::Error& e);
 
 /**
  * @brief Convert JSON object to Error struct.
@@ -214,7 +201,7 @@ ordered_json errorToJson(const caudio::utils::Error& e);
  * @param j JSON object with code/code_value and message fields.
  * @return Error struct, or error if parsing fails.
  */
-std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const ordered_json& j);
+std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const Json& j);
 
 } // namespace detail
 
@@ -227,7 +214,7 @@ std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const or
  * @param cmd Command to serialize.
  * @return JSON object with "type" field and command-specific fields.
  */
-ordered_json toJson(const Command& cmd);
+Json toJson(const Command& cmd);
 
 /**
  * @brief Deserialize a Command from JSON.
@@ -235,7 +222,16 @@ ordered_json toJson(const Command& cmd);
  * @param j JSON object with "type" field and command-specific fields.
  * @return Command variant, or error if type is unknown or parsing fails.
  */
-std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json& j);
+std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j);
+
+/**
+ * @brief Deserialize a Result from JSON (forward-declared so
+ * fromJson<Result> dispatches instead of erroring).
+ * @ingroup caudio_ipc
+ * @param j JSON object with "type" field and result-specific fields.
+ * @return Result variant, or error if type is unknown or parsing fails.
+ */
+std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j);
 
 // Generic fromJson template wrapper: fromJson<Command>(json)
 /**
@@ -244,19 +240,13 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const ordered_json&
  * @tparam T Type to deserialize (Command or Result).
  * @param j JSON object to parse.
  * @return Deserialized value, or error if type is unsupported or parsing fails.
- * @note For Result type, use resultFromJson directly.
  */
 template <typename T>
-std::expected<T, caudio::utils::Error> fromJson(const ordered_json& j) {
+std::expected<T, caudio::utils::Error> fromJson(const Json& j) {
     if constexpr (std::is_same_v<T, Command>) {
         return commandFromJson(j);
     } else if constexpr (std::is_same_v<T, Result>) {
-        // forwarded to resultFromJson declared below; use if constexpr dispatch via overload
-        // This branch will be instantiated only for Result; to avoid incomplete type,
-        // we handle Result via separate function resultFromJson and call it here.
-        // We need forward declaration: implement after Result helpers.
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Unsupported, "use resultFromJson")};
+        return resultFromJson(j);
     } else {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
                                                         "unsupported fromJson type")};
@@ -272,15 +262,7 @@ std::expected<T, caudio::utils::Error> fromJson(const ordered_json& j) {
  * @param r Result to serialize.
  * @return JSON object with "type" field and result-specific fields.
  */
-ordered_json toJson(const Result& r);
-
-/**
- * @brief Deserialize a Result from JSON.
- * @ingroup caudio_ipc
- * @param j JSON object with "type" field and result-specific fields.
- * @return Result variant, or error if type is unknown or parsing fails.
- */
-std::expected<Result, caudio::utils::Error> resultFromJson(const ordered_json& j);
+Json toJson(const Result& r);
 
 // ---------------------------------------------------------------------------
 // IpcRequest / IpcReply serialization

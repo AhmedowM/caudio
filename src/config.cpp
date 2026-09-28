@@ -2,8 +2,6 @@
 
 #include "config_detail.hpp"
 
-#include <nlohmann/json.hpp>
-
 namespace caudio::config::detail {
 
 std::filesystem::path defaultDbPath() {
@@ -68,6 +66,8 @@ caudio::utils::Expected<std::string> readFileString(const std::filesystem::path&
 
 namespace caudio::config {
 
+using caudio::utils::Json;
+
 caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
     Config cfg{};
     cfg.dbPath = detail::defaultDbPath();
@@ -90,33 +90,33 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
         return cfg;
     }
     try {
-        auto j = nlohmann::ordered_json::parse(content);
-        if (j.contains("dbPath") && j["dbPath"].is_string()) {
+        const Json j = Json::parse(content);
+        if (j.contains("dbPath") && j["dbPath"].isString()) {
             std::string s = j["dbPath"].get<std::string>();
             if (!s.empty())
                 cfg.dbPath = std::filesystem::path(s);
         }
-        if (j.contains("configPath") && j["configPath"].is_string()) {
+        if (j.contains("configPath") && j["configPath"].isString()) {
             // ignore - already set
         }
-        if (j.contains("device") && j["device"].is_string()) {
+        if (j.contains("device") && j["device"].isString()) {
             cfg.device = j["device"].get<std::string>();
         }
-        if (j.contains("logLevel") && j["logLevel"].is_number_integer()) {
+        if (j.contains("logLevel") && j["logLevel"].isInteger()) {
             cfg.logLevel = j["logLevel"].get<int>();
         }
-        if (j.contains("socketPath") && j["socketPath"].is_string()) {
+        if (j.contains("socketPath") && j["socketPath"].isString()) {
             std::string s = j["socketPath"].get<std::string>();
             if (!s.empty())
                 cfg.socketPath = s;
         }
         // legacy keys: db_path, log_level
-        if (j.contains("db_path") && j["db_path"].is_string()) {
+        if (j.contains("db_path") && j["db_path"].isString()) {
             std::string s = j["db_path"].get<std::string>();
             if (!s.empty())
                 cfg.dbPath = std::filesystem::path(s);
         }
-        if (j.contains("log_level") && j["log_level"].is_number_integer()) {
+        if (j.contains("log_level") && j["log_level"].isInteger()) {
             cfg.logLevel = j["log_level"].get<int>();
         }
     } catch (const std::exception& e) {
@@ -133,7 +133,7 @@ caudio::utils::Expected<void> saveConfig(const Config& cfg) {
             std::error_code ec;
             std::filesystem::create_directories(dir, ec);
         }
-        nlohmann::ordered_json j;
+        Json j;
         j["dbPath"] = cfg.dbPath.generic_string();
         j["device"] = cfg.device;
         j["logLevel"] = cfg.logLevel;
@@ -257,8 +257,8 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
                                                         "key not found: " + std::string(key))};
     }
     try {
-        auto j = nlohmann::ordered_json::parse(content);
-        if (!j.is_object()) {
+        const Json j = Json::parse(content);
+        if (!j.isObject()) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                             "config is not an object")};
         }
@@ -267,10 +267,10 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
                                                             "key not found: " + k)};
         }
-        auto& v = j.at(k);
-        if (v.is_string())
+        const Json v = j[k];
+        if (v.isString())
             return v.get<std::string>();
-        if (v.is_null())
+        if (v.isNull())
             return std::string{"null"};
         return v.dump();
     } catch (const std::exception& e) {
@@ -281,7 +281,7 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
 
 caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key,
                                            std::string_view value) {
-    nlohmann::ordered_json j = nlohmann::ordered_json::object();
+    Json j = Json::object();
     std::error_code ec;
     if (std::filesystem::exists(p, ec)) {
         auto fileRes = detail::readFileString(p);
@@ -289,23 +289,23 @@ caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::
             std::string content = std::move(*fileRes);
             if (!content.empty()) {
                 try {
-                    auto parsed = nlohmann::ordered_json::parse(content);
-                    if (parsed.is_object())
+                    auto parsed = Json::parse(content);
+                    if (parsed.isObject())
                         j = std::move(parsed);
                     else
-                        j = nlohmann::ordered_json::object();
+                        j = Json::object();
                 } catch (...) {
-                    j = nlohmann::ordered_json::object();
+                    j = Json::object();
                 }
             }
         }
     }
     std::string k(key);
-    nlohmann::ordered_json v;
+    Json v;
     bool parsedAsJson = false;
     if (!value.empty()) {
         try {
-            auto tmp = nlohmann::ordered_json::parse(value);
+            auto tmp = Json::parse(value);
             v = std::move(tmp);
             parsedAsJson = true;
         } catch (...) {
@@ -346,20 +346,24 @@ caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::fi
     if (content.empty())
         return std::vector<RawConfigValue>{};
     try {
-        auto j = nlohmann::ordered_json::parse(content);
-        if (!j.is_object())
+        const Json j = Json::parse(content);
+        if (!j.isObject())
             return std::vector<RawConfigValue>{};
         std::vector<RawConfigValue> out;
         out.reserve(j.size());
-        for (auto& item : j.items()) {
-            const std::string kk = item.key();
-            auto& vv = item.value();
+        for (std::size_t i = 0, n = j.size(); i < n; ++i) {
+            auto kkExp = j.keyAt(i);
+            auto vvExp = j.at(i);
+            if (!kkExp || !vvExp)
+                continue;
+            const std::string kk = std::move(*kkExp);
+            const Json vv = std::move(*vvExp);
             if (kk.empty() || kk == "type")
                 continue;
             std::string vs;
-            if (vv.is_string())
+            if (vv.isString())
                 vs = vv.get<std::string>();
-            else if (vv.is_null())
+            else if (vv.isNull())
                 vs = "null";
             else
                 vs = vv.dump();
@@ -392,8 +396,8 @@ caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
                                                         "key not found: " + std::string(key))};
     }
     try {
-        auto j = nlohmann::ordered_json::parse(content);
-        if (!j.is_object()) {
+        Json j = Json::parse(content);
+        if (!j.isObject()) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Corrupt,
                                                             "config is not an object")};
         }

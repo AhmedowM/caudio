@@ -48,7 +48,8 @@
  * State, NoMem, Internal, AlreadyExists, Busy, Corrupt, NoSpace).
  *
  * Build: CMake 3.28+, C++23 modules, Ninja. Vendored deps: SQLite (FTS5),
- * miniaudio, BLAKE3, nlohmann::ordered_json, FFmpeg (required).
+ * miniaudio, BLAKE3, FFmpeg (required). JSON (nlohmann backend) is private
+ * to the build -- downstream needs no JSON package.
  *
  * @see caudio.utils
  * @see caudio.player

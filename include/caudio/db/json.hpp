@@ -13,7 +13,6 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
-#include <nlohmann/json_fwd.hpp> // full <nlohmann/json.hpp> needed only to use values, not to declare
 #include <shared_mutex>
 #include <span>
 #include <sstream>
@@ -27,20 +26,15 @@ struct sqlite3_stmt;
 namespace caudio::db {
 
 /**
- * @brief Ordered JSON type used for track serialization.
- * @ingroup caudio_db
- */
-using ordered_json = nlohmann::ordered_json;
-
-/**
- * @brief Serializes a Track to ordered JSON.
+ * @brief Serializes a Track to JSON.
  * @ingroup caudio_db
  * @param t Track to serialize.
  * @return JSON object with all Track fields; fingerprint is hex-encoded.
+ * Keys keep insertion order (ordered backend behind `caudio::utils::Json`).
  * @par Thread safety
  * Pure function, thread-safe.
  */
-ordered_json trackToJson(const Track& t);
+caudio::utils::Json trackToJson(const Track& t);
 
 /**
  * @brief Deserializes a Track from ordered JSON.
@@ -54,7 +48,7 @@ ordered_json trackToJson(const Track& t);
  * Pure function, thread-safe.
  * @see trackToJson
  */
-std::expected<Track, caudio::utils::Error> trackFromJson(const ordered_json& j);
+std::expected<Track, caudio::utils::Error> trackFromJson(const caudio::utils::Json& j);
 
 /**
  * @brief Exports all tracks to a JSON file.

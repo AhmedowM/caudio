@@ -7,9 +7,9 @@ find_dependency(Threads)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 find_dependency(FFmpeg)
 
-# nlohmann_json is public API (ipc/protocol.hpp, db/json.hpp signatures);
-# its package ships alongside this config when built from FetchContent.
-find_dependency(nlohmann_json)
+# nlohmann_json is private (backend for src/utils/json.cpp behind the opaque
+# caudio::utils::Json facade): nothing installed needs it, so no
+# find_dependency here. Only Threads + FFmpeg propagate downstream.
 
 include("${CMAKE_CURRENT_LIST_DIR}/caudioTargets.cmake")
 

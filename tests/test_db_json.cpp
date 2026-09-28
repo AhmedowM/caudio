@@ -4,7 +4,6 @@
 #include <common.hpp>
 #include <filesystem>
 #include <fstream>
-#include <nlohmann/json.hpp>
 using namespace caudio::db;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;
@@ -30,11 +29,11 @@ TEST_CASE("trackToJson and trackFromJson roundtrip ordered", "[db_json]") {
     t.library_id = 1;
     for (int b = 0; b < 32; ++b)
         t.fingerprint[b] = (uint8_t)b;
-    auto j = trackToJson(t);
+    const auto j = trackToJson(t);
     REQUIRE(j.contains("title"));
     REQUIRE(j["title"].get<std::string>() == "Title");
     REQUIRE(j["fingerprint"].get<std::string>().size() == 64);
-    // ordered_json: keys appear in insertion order? just check all fields present
+    // Json preserves insertion order; just check all fields present
     REQUIRE(j.contains("path"));
     REQUIRE(j.contains("artist"));
     auto t2Res = trackFromJson(j);
@@ -65,7 +64,7 @@ TEST_CASE("exportJson and importJson roundtrip", "[db_json]") {
     auto er = exportJson(*db, outPath);
     REQUIRE(er.has_value());
     REQUIRE(std::filesystem::exists(outPath));
-    // read file check ordered_json array
+    // read file and check the tracks array made it to disk
     std::ifstream f(outPath);
     std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     REQUIRE(content.find("JsonTrack") != std::string::npos);
@@ -110,7 +109,7 @@ TEST_CASE("importJson handles duplicate fingerprint upsert", "[db_json]") {
 }
 
 TEST_CASE("trackFromJson invalid fingerprint falls back", "[db_json]") {
-    nlohmann::ordered_json j;
+    Json j;
     j["path"] = "/tmp/f.mp3";
     j["title"] = "T";
     j["fingerprint"] = "zzzz"; // invalid hex length

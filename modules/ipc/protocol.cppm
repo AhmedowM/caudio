@@ -12,7 +12,7 @@ using ::caudio::ipc::frame;
 using ::caudio::ipc::fromJson;
 using ::caudio::ipc::IpcReply;
 using ::caudio::ipc::IpcRequest;
-using ::caudio::ipc::ordered_json;
+using ::caudio::ipc::Json;
 using ::caudio::ipc::resultFromJson;
 using ::caudio::ipc::serializeReply;
 using ::caudio::ipc::serializeRequest;
@@ -31,6 +31,4 @@ using ::caudio::ipc::detail::repeatModeFromString;
 using ::caudio::ipc::detail::repeatModeToString;
 using ::caudio::ipc::detail::resultCodeFromString;
 using ::caudio::ipc::detail::resultCodeToString;
-using ::caudio::ipc::detail::trackFromJson;
-using ::caudio::ipc::detail::trackToJson;
 } // namespace caudio::ipc::detail
