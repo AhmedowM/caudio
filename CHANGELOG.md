@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.0] - 2026-09-28
+
+### Added
+- `caudio::utils::Json` opaque JSON value type (`utils/json.hpp`, backend in
+  `src/utils/json.cpp`, `modules/utils/json.cppm` partition): `Json`/`JsonRef`/`JsonError`,
+  insertion-order preserving, throwing `get<T>` matching previous backend behavior
+
+### Changed
+- **BREAKING (build)** Vendored sqlite target renamed `caudio` -> `sqlite3`
+  (artifact `libsqlite3.a` / `sqlite3.lib`, exported as `caudio::sqlite3`),
+  content-named like `blake3`; the only `caudio`-named artifact is the opt-in
+  shared umbrella (`combined` -> `libcaudio`)
+- nlohmann/json is now private (backend for `src/utils/json.cpp` only):
+  `db/json.hpp` + `ipc/protocol.hpp` signatures use `caudio::utils::Json`;
+  `ipc::detail::trackToJson/trackFromJson` deleted in favor of `db::` versions;
+  `fromJson<Result>` trap fixed; `JSON_Install`, `find_dependency(nlohmann_json)`
+  and `CAUDIO_JSON_EXTRA_INCLUDE` removed -- `install()` ships zero JSON headers
+
 ## [1.0.0-rc1] - 2026-09-28
 
 ### Changed

@@ -166,13 +166,15 @@ configure_file(
   @ONLY
 )
 
-# Vendor: caudio STATIC (libcaudio -- sqlite3 amalgamation, SQLITE_ENABLE_FTS5=1)
-add_library(caudio STATIC vendor/sqlite3.c)
-add_library(caudio::caudio ALIAS caudio)
-set_target_properties(caudio PROPERTIES OUTPUT_NAME caudio)
-target_include_directories(caudio PRIVATE vendor)
-target_include_directories(caudio PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
-target_compile_definitions(caudio PUBLIC SQLITE_ENABLE_FTS5=1)
+# Vendor: sqlite3 STATIC (libsqlite3.a -- sqlite3 amalgamation, SQLITE_ENABLE_FTS5=1)
+# Content-named like blake3 below; the only artifact called "caudio" is the
+# opt-in shared umbrella (combined -> libcaudio).
+add_library(sqlite3 STATIC vendor/sqlite3.c)
+add_library(caudio::sqlite3 ALIAS sqlite3)
+set_target_properties(sqlite3 PROPERTIES OUTPUT_NAME sqlite3)
+target_include_directories(sqlite3 PRIVATE vendor)
+target_include_directories(sqlite3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/caudio/vendor>)
+target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
@@ -249,8 +251,9 @@ if(CAUDIO_ENABLE_MODULES)
 endif()
 
 # caudio executable -- App dispatch (CLI11) + main entry (header-source only).
-# Target is caudio_cli (OUTPUT_NAME caudio) so the static libcaudio can own
-# the `caudio` target name; the shipped binary is still `caudio`/`caudio.exe`.
+# Target is caudio_cli (OUTPUT_NAME caudio); the shipped binary is still
+# `caudio`/`caudio.exe`. (No static lib owns the `caudio` target name: the
+# sqlite archive is target sqlite3, like blake3.)
 if(CAUDIO_BUILD_CLI)
 add_executable(caudio_cli
   cli/src/main.cpp
@@ -296,7 +299,7 @@ set(CAUDIO_INSTALL_LIBS
   ipc
   client
   service
-  caudio
+  sqlite3
   blake3
 )
 if(CAUDIO_BUILD_SHARED)
@@ -491,21 +494,21 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_decoder tests/test_decoder.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
   caudio_add_catch_test(test_ffmpeg tests/test_ffmpeg.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
 
-  caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
   caudio_add_catch_test(test_output tests/test_output.cpp LIBS caudio::player caudio::utils)
 
-  caudio_add_catch_test(test_engine_queue tests/test_engine_queue.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_engine_history tests/test_engine_history.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_engine_events tests/test_engine_events.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_engine_state tests/test_engine_state.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_engine_queue tests/test_engine_queue.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_engine_history tests/test_engine_history.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_engine_events tests/test_engine_events.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_engine_state tests/test_engine_state.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
 
-  caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio::caudio)
-  caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio::caudio)
+  caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
 
-  caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::caudio WITH_TEST_DATA)
+  caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_TEST_DATA)
 
-  caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::caudio WITH_ALLOW_MULTIPLE_DEFINITION)
+  caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_ALLOW_MULTIPLE_DEFINITION)
 endif()
