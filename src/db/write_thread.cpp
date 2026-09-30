@@ -1,10 +1,22 @@
 #include <sqlite3.h>
 
+#include <atomic>
 #include <caudio/db/write_thread.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
-#include <db/detail.hpp>
+#include <cstddef>
 #include <db/statement.hpp>
+#include <db/stmt_helpers.hpp>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <stop_token>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace caudio::db {
 

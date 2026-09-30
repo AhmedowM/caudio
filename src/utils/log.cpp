@@ -1,4 +1,6 @@
 #include <caudio/utils/log.hpp>
+#include <mutex>
+#include <utility>
 
 namespace caudio::utils {
 

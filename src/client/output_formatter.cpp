@@ -44,7 +44,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
     }
 
     std::visit(
-        [&os, this](const auto& v) {
+        [&os](const auto& v) {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, caudio::ipc::Status>) {
                 std::string stateStr = caudio::ipc::detail::playbackStateToString(v.state);

@@ -1,22 +1,18 @@
 #pragma once
 
 #include <caudio/config.hpp>
-#include <caudio/db.hpp>
+#include <caudio/db/db_types.hpp>
 #include <caudio/ipc/command.hpp>
-#include <caudio/ipc/result.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
 #include <chrono>
+#include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <memory>
-#include <optional>
 #include <ostream>
-#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
-
-#include "parse.hpp"
 
 namespace CLI {
 class App;

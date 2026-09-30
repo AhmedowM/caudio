@@ -1,14 +1,22 @@
-#include <caudio/db.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/utils/ring.hpp>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <span>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 using namespace caudio::player;
 using namespace caudio::db;

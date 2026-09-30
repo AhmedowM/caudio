@@ -1,3 +1,19 @@
+#ifdef _WIN32
+// NOTE: <windows.h> must precede all other includes in this TU. thread.hpp
+// (via utils.hpp below) hand-declares HANDLE/etc. when windows.h is absent,
+// which then conflicts with the real declarations. Keep this block first:
+// clang-format must not sort it.
+// clang-format off
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+// clang-format on
+#endif
+
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>

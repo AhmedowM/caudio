@@ -1,9 +1,10 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/utils/ring.hpp>
 #include <cmath>
 #include <common.hpp>
+#include <cstddef>
 #include <span>
 TEST_CASE("output callback no alloc") {
     CAUDIO_SKIP_IF_NOAUDIO();

@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
+#include <stop_token>
 #include <thread>
 #include <vector>
 namespace caudio::utils::test {

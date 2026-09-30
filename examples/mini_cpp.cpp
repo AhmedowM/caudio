@@ -1,11 +1,12 @@
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/player/player_core.hpp>
+#include <caudio/utils/error.hpp>
 #include <chrono>
 #include <expected>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <utility>
 using namespace caudio::player;
 using namespace caudio::utils;
 

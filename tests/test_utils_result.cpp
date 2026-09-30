@@ -1,7 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/result.hpp>
 #include <string>
-#include <string_view>
 namespace caudio::utils::test {
 
 bool result_toString_all() {

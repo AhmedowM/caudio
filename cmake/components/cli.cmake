@@ -22,9 +22,6 @@ target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/service/service.cppm
-  modules/service/service_paths.cppm
-  modules/service/service_status.cppm
-  modules/service/service_audio.cppm
   modules/service/service_core.cppm
   modules/service/shm_status.cppm
   modules/service/ipc_channel.cppm

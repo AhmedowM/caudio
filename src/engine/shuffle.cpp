@@ -1,5 +1,8 @@
+#include <algorithm>
+#include <cstdint>
 #include <engine/shuffle.hpp>
 #include <random>
+#include <vector>
 
 namespace caudio::engine::detail {
 

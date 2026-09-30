@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #if defined(_WIN32) || defined(_WIN64)
 // No windows.h here to avoid intrin conflict; Win32 decls go after export module
 #else
@@ -9,13 +10,9 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
-#include <cstring>
 #include <expected>
-#include <functional>
-#include <string>
 #include <string_view>
 #include <thread>
-#include <utility>
 
 #if defined(_WIN32) || defined(_WIN64)
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
@@ -191,7 +188,9 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{StatusCode::InvalidArg, std::string_view("empty name")});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(jt.native_handle()));
+    // reinterpret_cast both ways (void* <-> integer): static_cast from
+    // void* is rejected by Clang/MSVC (GCC accepts it as an extension).
+    HANDLE h = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(jt.native_handle()));
     return detail::setNativeHandleName(h, name);
 #else
     pthread_t th = jt.native_handle();
@@ -242,7 +241,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
         return std::unexpected(Error{StatusCode::InvalidArg, std::string_view("empty name")});
     }
 #if defined(_WIN32) || defined(_WIN64)
-    HANDLE h = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(t.native_handle()));
+    HANDLE h = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(t.native_handle()));
     return detail::setNativeHandleName(h, name);
 #else
 #if defined(__linux__) && !defined(__APPLE__)

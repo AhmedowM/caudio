@@ -5,37 +5,33 @@
 #define NOMINMAX
 #endif
 // NOTE: on Windows the real <windows.h> comes first on purpose. Hand-rolled
-// Win32 declarations were removed: they conflict with the real ones whenever
-// both end up in one TU (only identical redefinitions are legal). Keep this
 // block first: clang-format must not sort it.
 // clang-format off
 #ifdef _WIN32
 #include <windows.h>
+// Granular API headers used directly; kept after windows.h (Windows-only:
+// none of these exist on POSIX).
+#include <errhandlingapi.h>
+#include <fileapi.h>
+#include <handleapi.h>
+#include <minwinbase.h>
+#include <minwindef.h>
+#include <namedpipeapi.h>
+#include <processthreadsapi.h>
+#include <synchapi.h>
+#include <winerror.h>
+#include <winnt.h>
 #endif
 // clang-format on
 #include "service_paths.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <charconv>
-#include <chrono>
-#include <cmath>
 #include <cstdint>
-#include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <fstream>
-#include <memory>
-#include <mutex>
 #include <optional>
-#include <span>
 #include <string>
-#include <string_view>
-#include <thread>
-#include <utility>
-#include <variant>
-#include <vector>
+#include <system_error>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -49,11 +45,6 @@
 #endif
 
 #include <caudio/config.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/ipc.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
 
 #include "config_detail.hpp"
 

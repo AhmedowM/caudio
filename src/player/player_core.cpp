@@ -1,7 +1,21 @@
+#include <atomic>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/player_core.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/math.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/utils/ring.hpp>
+#include <chrono>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <stop_token>
 
 namespace caudio::player {
 

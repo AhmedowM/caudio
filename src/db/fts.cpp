@@ -1,7 +1,9 @@
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <db/fts.hpp>
 #include <string>
+#include <string_view>
 
 namespace caudio::db::internal {
 

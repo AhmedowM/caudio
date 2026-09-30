@@ -2,15 +2,23 @@
 #include <caudio/client/client_core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
-#include <caudio/ipc/protocol.hpp>
-#include <caudio/service/ipc_channel.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
 #include <caudio/service/shm_status.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
+#include <expected>
+#include <filesystem>
 #include <future>
 #include <memory>
 #include <mutex>
+#include <stop_token>
+#include <string>
+#include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "config_detail.hpp"

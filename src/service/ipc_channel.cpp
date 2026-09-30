@@ -1,14 +1,11 @@
 #include <array>
-#include <caudio/config.hpp>
 #include <caudio/service/ipc_channel.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <expected>
-#include <filesystem>
 #include <span>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>

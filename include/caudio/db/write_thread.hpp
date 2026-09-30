@@ -1,16 +1,17 @@
 #pragma once
 
 #include <atomic>
-#include <caudio/utils.hpp>
-#include <chrono>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
 #include <condition_variable>
+#include <cstddef>
 #include <expected>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 #include <string>
 #include <thread>
-#include <utility>
 
 /**
  * @file write_thread.hpp

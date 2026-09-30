@@ -1,5 +1,22 @@
+#include <cerrno>
+// NOTE: no direct FFmpeg includes here -- most libav* 8.x headers lack
+// extern "C" guards, so including them directly mangles symbols (link
+// failure). All libav declarations come from ffmpeg_impl.hpp's
+// extern "C" block below.
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <expected>
+#include <memory>
+#include <span>
+#include <string>
+#include <string_view>
 
 #include "ffmpeg_impl.hpp"
 

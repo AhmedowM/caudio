@@ -24,22 +24,19 @@
 
 #pragma once
 
+#include <caudio/utils/error.hpp>
 #if defined(_WIN32)
 #include <cstdio>
 #else
 #include <cstdio>
 #endif
-#include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <expected>
 #include <filesystem>
 #include <memory>
 #include <mutex>
 #include <span>
-#include <string>
-#include <string_view>
 #include <vector>
 
 namespace caudio::player {

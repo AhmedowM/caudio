@@ -1,15 +1,20 @@
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 using namespace caudio::engine;
 using namespace caudio::db;

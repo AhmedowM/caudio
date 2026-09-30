@@ -1,12 +1,26 @@
+#include <array>
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/output.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/utils/ring.hpp>
 #include <chrono>
 #include <common.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <limits>
+#include <memory>
+#include <string>
+#include <system_error>
 #include <thread>
+#include <utility>
 #include <vector>
 using namespace caudio::player;
 using namespace caudio::utils;

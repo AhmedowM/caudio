@@ -1,9 +1,12 @@
 #include <sqlite3.h>
 
-#include <caudio/utils.hpp>
-#include <db/detail.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <db/stmt_helpers.hpp>
 #include <db/transaction.hpp>
+#include <expected>
 #include <string>
+#include <utility>
 
 namespace caudio::db {
 

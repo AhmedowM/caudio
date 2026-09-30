@@ -3,6 +3,8 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <memory>
@@ -48,7 +50,9 @@
 
 #include <caudio/db/db_types.hpp>
 #include <caudio/engine/engine_types.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
+#include <caudio/utils/ring.hpp>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

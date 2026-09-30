@@ -1,6 +1,11 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/search.hpp>
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
 using namespace caudio::db;
 using namespace caudio::utils;
 

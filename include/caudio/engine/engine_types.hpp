@@ -1,5 +1,6 @@
 #pragma once
-#include <caudio/utils.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>

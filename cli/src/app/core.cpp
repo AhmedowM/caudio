@@ -11,14 +11,31 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+// Granular API headers used directly (spawnDaemon): kept after windows.h.
 // clang-format on
+#include <errhandlingapi.h>
+#include <handleapi.h>
+#include <libloaderapi.h>
+#include <minwindef.h>
+#include <processthreadsapi.h>
 #endif
 
-#include "core.hpp"
-
 #include <CLI/CLI.hpp>
+#include <caudio/client/client_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/json.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/player/player_core.hpp>
+#include <caudio/service/service_core.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/version_config.hpp>
 #include <memory>
+#include <stop_token>
+#include <system_error>
 
+#include "core.hpp"
 #include "parse.hpp"
 
 #ifdef _WIN32
@@ -83,20 +100,13 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <mach-o/dyld.h>
 #endif
 #endif
-#include <caudio/client.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/player.hpp>
-#include <caudio/service.hpp>
-#include <caudio/utils.hpp>
 #include <caudio/utils/print.hpp>
-#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -107,7 +117,6 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <fstream>
 #include <iostream>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <thread>

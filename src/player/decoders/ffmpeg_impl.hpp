@@ -24,8 +24,11 @@
 #include <string_view>
 #include <vector>
 
+#if defined(__GNUC__) && !defined(__clang__)
+// -Wglobal-module exists only in GCC; Clang rejects the unknown group.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wglobal-module"
+#endif
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
@@ -35,7 +38,9 @@ extern "C" {
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 }
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
+#endif
 
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>

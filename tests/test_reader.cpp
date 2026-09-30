@@ -1,12 +1,16 @@
 #include <array>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <span>
+#include <string>
 #include <vector>
 using namespace caudio::player;
 using namespace caudio::utils;

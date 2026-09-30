@@ -1,13 +1,13 @@
 #pragma once
 #include <atomic>
-#include <caudio/utils.hpp>
+#include <caudio/utils/ring.hpp>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
-#include <random>
 #include <string>
+#include <system_error>
 #include <thread>
 /**
  * @file common.hpp

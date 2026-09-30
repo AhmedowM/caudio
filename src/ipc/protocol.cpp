@@ -1,5 +1,23 @@
+#include <caudio/db/db_types.hpp>
 #include <caudio/db/json.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <expected>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace caudio::ipc::detail {
 

@@ -1,10 +1,6 @@
 #pragma once
-#include <algorithm>
-#include <cctype>
-#include <cstdint>
 #include <string>
 #include <string_view>
-#include <vector>
 
 /**
  * @file fts.hpp

@@ -5,24 +5,11 @@
  */
 #pragma once
 
-#include <caudio/config.hpp>
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils.hpp>
-#include <chrono>
-#include <format>
+#include <cstddef>
 #include <iostream>
 #include <ostream>
-#include <print>
-#include <span>
 #include <string>
-#include <string_view>
-#include <utility>
-#include <variant>
-#include <vector>
 
 namespace caudio::client {
 

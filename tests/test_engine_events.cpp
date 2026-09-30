@@ -1,10 +1,19 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/engine_types.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
+#include <caudio/utils/result.hpp>
 #include <common.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
 using namespace caudio::utils;
 using namespace caudio::engine;
 using namespace caudio::db;

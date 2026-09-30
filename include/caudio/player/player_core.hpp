@@ -38,21 +38,19 @@
 
 #pragma once
 
-#include <algorithm>
 #include <atomic>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/ring.hpp>
 #include <chrono>
-#include <cmath>
 #include <condition_variable>
-#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <vector>
 
 namespace caudio::player {
 // Decoder/Reader/AudioOutput live in their own public headers; Player holds

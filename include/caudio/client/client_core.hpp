@@ -5,34 +5,19 @@
  */
 #pragma once
 
+#include <caudio/utils/error.hpp>
 #include <chrono>
-#include <expected>
 #include <filesystem>
-#include <future>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <stop_token>
 #include <string>
 #include <string_view>
-#include <thread>
-#include <utility>
-#include <vector>
 
 #ifndef _WIN32
 #include <poll.h>
 #endif
 
-#include <caudio/client/ipc_client.hpp>
-#include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
-#include <caudio/ipc.hpp>
 #include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/service/shm_status.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::client {
 

@@ -2,11 +2,13 @@
 
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/write_thread.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
+#include <caudio/utils/result.hpp>
+#include <chrono>
 #include <expected>
 #include <string>
-#include <string_view>
 #include <thread>
 using namespace caudio::utils;
 

@@ -6,17 +6,11 @@
  * @defgroup caudio_config caudio configuration
  */
 
-#include <array>
-#include <caudio/utils.hpp>
-#include <cstdint>
-#include <cstdlib>
-#include <expected>
+#include <caudio/utils/error.hpp>
 #include <filesystem>
-#include <format>
-#include <fstream>
-#include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace caudio::config {
 

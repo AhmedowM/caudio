@@ -4,7 +4,6 @@
 #include <format>
 #include <string>
 #include <string_view>
-#include <utility>
 
 /**
  * @file error.hpp

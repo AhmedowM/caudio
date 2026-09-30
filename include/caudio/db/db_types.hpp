@@ -1,6 +1,6 @@
 #pragma once
 #include <array>
-#include <caudio/utils.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>

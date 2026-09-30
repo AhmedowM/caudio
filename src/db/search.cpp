@@ -1,11 +1,19 @@
 #include <sqlite3.h>
 
 #include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/utils.hpp>
-#include <db/detail.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <db/fts.hpp>
 #include <db/statement.hpp>
+#include <db/stmt_helpers.hpp>
+#include <expected>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace caudio::db {
 

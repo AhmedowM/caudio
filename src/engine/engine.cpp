@@ -1,14 +1,41 @@
 #include <sqlite3.h>
 
+#include <atomic>
 #include <caudio/db/db_core.hpp>
-#include <caudio/engine.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/engine_types.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/player_core.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/math.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/utils/ring.hpp>
+#include <chrono>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <db/stmt_helpers.hpp>
 #include <engine/history.hpp>
 #include <engine/shuffle.hpp>
+#include <expected>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <random>
+#include <shared_mutex>
+#include <span>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace caudio::engine {
 

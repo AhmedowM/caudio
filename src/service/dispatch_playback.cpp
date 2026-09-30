@@ -1,34 +1,15 @@
-#include <algorithm>
-#include <atomic>
-#include <caudio/config.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
+#include <caudio/engine/engine_types.hpp>
 #include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/player.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/service/ipc_server.hpp>
 #include <caudio/service/service_core.hpp>
-#include <caudio/service/shm_status.hpp>
-#include <caudio/utils.hpp>
-#include <caudio/utils/print.hpp>
-#include <chrono>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
 #include <cmath>
 #include <cstdint>
 #include <expected>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <memory>
 #include <optional>
-#include <span>
-#include <string>
 #include <string_view>
-#include <thread>
-#include <utility>
-#include <variant>
-#include <vector>
 
 namespace caudio::service {
 

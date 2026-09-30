@@ -29,19 +29,14 @@
 
 #pragma once
 
-#include <algorithm>
 #include <atomic>
-#include <caudio/utils.hpp>
-#include <cmath>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/ring.hpp>
 #include <cstdint>
-#include <cstdio>
 #include <expected>
 #include <memory>
-#include <mutex>
-#include <ranges>
 #include <span>
 #include <string>
-#include <thread>
 #include <vector>
 
 /// Opaque miniaudio device handle; full type visible only in output.cpp.

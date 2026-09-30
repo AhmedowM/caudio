@@ -1,13 +1,31 @@
 #include <blake3.h>
 #include <sqlite3.h>
 
+#include <array>
 #include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/player/decoder.hpp>
-#include <caudio/utils.hpp>
-#include <db/detail.hpp>
-#include <db/statement.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <db/fingerprint.hpp>
+#include <db/stmt_helpers.hpp>
+#include <expected>
+#include <filesystem>
 #include <fstream>
+#include <functional>
+#include <generator>
+#include <ios>
+#include <mutex>
+#include <shared_mutex>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace caudio::db {
 

@@ -1,9 +1,16 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/db/json.hpp>
+#include <caudio/utils/json.hpp>
 #include <common.hpp>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <string>
+#include <system_error>
+#include <utility>
 using namespace caudio::db;
 using namespace caudio::utils;
 using namespace caudio::test_helpers;

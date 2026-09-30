@@ -1,8 +1,21 @@
+#include <stdio.h>
+
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <expected>
+#include <filesystem>
+#include <memory>
+#include <mutex>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 namespace caudio::player {
 

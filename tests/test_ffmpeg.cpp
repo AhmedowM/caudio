@@ -1,8 +1,9 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
-#include <cstring>
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/reader.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
 #include <filesystem>
 #include <span>
 #include <vector>

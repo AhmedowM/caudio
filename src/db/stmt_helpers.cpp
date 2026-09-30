@@ -1,9 +1,11 @@
 #include <sqlite3.h>
 
-#include <caudio/utils.hpp>
+#include <caudio/db/db_types.hpp>
+#include <cstdint>
 #include <cstring>
 #include <db/stmt_helpers.hpp>
 #include <string>
+#include <string_view>
 
 namespace caudio::db::internal {
 

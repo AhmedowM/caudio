@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/log.hpp>
 #include <string>
 #include <string_view>
-#include <typeinfo>
+#include <utility>
 #include <vector>
 namespace caudio::utils::test {
 

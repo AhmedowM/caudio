@@ -1,6 +1,20 @@
 #include <miniaudio.h>
 
+#include <algorithm>
+#include <atomic>
 #include <caudio/player/output.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/math.hpp>
+#include <caudio/utils/result.hpp>
+#include <caudio/utils/ring.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <memory>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace caudio::player {
 

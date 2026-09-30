@@ -1,19 +1,10 @@
 #pragma once
 
-#include <array>
 #include <caudio/db/db_types.hpp>
-#include <caudio/utils.hpp>
-#include <cstddef>
-#include <cstdint>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
 #include <expected>
 #include <filesystem>
-#include <fstream>
-#include <mutex>
-#include <shared_mutex>
-#include <span>
-#include <sstream>
-#include <string>
-#include <vector>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

@@ -28,7 +28,7 @@
 #pragma once
 
 #include <caudio/player/reader.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>

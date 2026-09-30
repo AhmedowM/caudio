@@ -1,13 +1,19 @@
 #include <sqlite3.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/engine_types.hpp>
 #include <common.hpp>
+#include <cstdint>
 #include <engine/shuffle.hpp>
 #include <filesystem>
+#include <memory>
+#include <random>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
 using namespace caudio::db;
 using namespace caudio::engine;

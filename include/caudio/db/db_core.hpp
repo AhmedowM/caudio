@@ -1,19 +1,18 @@
 #pragma once
 
+#include <array>
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/write_thread.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <cstdint>
 #include <cstring>
 #include <expected>
-#include <functional>
-#include <limits>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <span>
 #include <string>
 #include <string_view>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
 

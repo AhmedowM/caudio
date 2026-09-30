@@ -5,25 +5,20 @@
  */
 #pragma once
 
+#include <caudio/utils/error.hpp>
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <array>
 #include <atomic>
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <expected>
 #include <filesystem>
-#include <memory>
-#include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #ifndef _WIN32
@@ -33,16 +28,10 @@
 
 #include <cerrno>
 #include <cstring>
-#else
-#include <windows.h>
 #endif
 
-#include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::client {
 

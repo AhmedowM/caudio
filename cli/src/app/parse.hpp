@@ -2,6 +2,7 @@
 #include <charconv>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <expected>
 #include <optional>
 #include <string>

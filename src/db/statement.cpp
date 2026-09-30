@@ -1,10 +1,15 @@
 #include <sqlite3.h>
 
-#include <algorithm>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <db/statement.hpp>
+#include <expected>
 #include <limits>
+#include <span>
 #include <string>
+#include <string_view>
 
 namespace caudio::db {
 

@@ -6,6 +6,8 @@
 #include <expected>
 #include <mutex>
 #include <optional>
+#include <stop_token>
+#include <string_view>
 #include <utility>
 #include <vector>
 

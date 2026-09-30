@@ -2,13 +2,14 @@
 
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/db/db_core.hpp>
+#include <caudio/db/db_types.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstdint>
 #include <expected>
-#include <filesystem>
 #include <string>
 #include <string_view>
-#include <thread>
+#include <utility>
 using namespace caudio::db;
 using namespace caudio::utils;
 

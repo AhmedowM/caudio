@@ -1,8 +1,9 @@
 #include "service_audio.hpp"
 
-#include <caudio/player.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/player/decoder.hpp>
+#include <caudio/player/reader.hpp>
 #include <cstdint>
+#include <filesystem>
 
 namespace caudio::service::detail {
 

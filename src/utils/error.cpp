@@ -1,4 +1,6 @@
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <string_view>
 
 namespace caudio::utils {
 

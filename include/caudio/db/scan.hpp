@@ -1,29 +1,21 @@
 #pragma once
 
 #include <algorithm>
-#include <array>
 #include <caudio/db/db_types.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
+#include <string_view>
 
 namespace caudio::db {
 // Defined in db_core.hpp (full Database API); reference params need only this.
 class Database;
 } // namespace caudio::db
 #include <cctype>
-#include <chrono>
-#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <filesystem>
-#include <fstream>
 #include <functional>
 #include <generator>
-#include <mutex>
-#include <shared_mutex>
-#include <span>
 #include <string>
-#include <system_error>
 #include <vector>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).

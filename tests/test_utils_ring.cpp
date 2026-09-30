@@ -1,10 +1,11 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/utils/ring.hpp>
 #include <chrono>
+#include <cstddef>
 #include <span>
+#include <stop_token>
 #include <thread>
-#include <vector>
 namespace caudio::utils::test {
 
 bool ring_write_read_wrap() {

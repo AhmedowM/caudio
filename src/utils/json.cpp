@@ -1,5 +1,18 @@
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <expected>
+#include <iterator>
+#include <limits>
+#include <memory>
 #include <nlohmann/json.hpp>
+#include <string>
+#include <string_view>
+
+#include "nlohmann/json_fwd.hpp"
 
 namespace caudio::utils {
 

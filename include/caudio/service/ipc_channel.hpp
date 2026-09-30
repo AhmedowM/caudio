@@ -8,17 +8,9 @@
  */
 #pragma once
 
-#include <array>
-#include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
-#include <cstdint>
-#include <cstdlib>
-#include <expected>
-#include <filesystem>
 #include <span>
-#include <string>
-#include <string_view>
-#include <utility>
 #include <vector>
 
 namespace caudio::service {
