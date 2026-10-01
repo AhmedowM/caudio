@@ -1,6 +1,7 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/thread.hpp>
 #include <cstddef>
+#include <cstring>
 #include <string>
 #include <string_view>
 
