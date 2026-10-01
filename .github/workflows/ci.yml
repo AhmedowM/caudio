@@ -72,7 +72,8 @@ jobs:
           # "$(brew --prefix llvm)/bin/clang" explicitly). GCC builds
           # miniaudio with the dummy backend (no audio); AppleClang lags
           # our C++23 baseline. Both are fatal at configure time.
-          brew install llvm || brew upgrade llvm || true
+          brew update || echo "brew update failed, continuing with snapshot"
+          brew install llvm || brew upgrade llvm
           LLVM_PREFIX="$(brew --prefix llvm)"
           echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
           "$LLVM_PREFIX/bin/clang" --version
@@ -177,14 +178,14 @@ jobs:
       - name: Package (TGZ)
         if: matrix.compiler != 'msvc'
         run: |
-          cpack --config build/${{ matrix.preset }}/CPackConfig.cmake -G TGZ || (cd build/${{ matrix.preset }} && cpack -G TGZ) || echo "CPack TGZ failed"
+          cpack --config build/${{ matrix.preset }}/CPackConfig.cmake -G "TGZ;ZIP" || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP") || echo "CPack TGZ failed"
         shell: bash
 
       - name: Package (TGZ, MSVC config)
         if: matrix.compiler == 'msvc'
         run: |
           # Multi-config generator: -C selects which built config to package.
-          cpack -C Debug --config build/${{ matrix.preset }}/CPackConfig.cmake -G TGZ || (cd build/${{ matrix.preset }} && cpack -G TGZ -C Debug) || echo "CPack TGZ failed"
+          cpack -C Debug --config build/${{ matrix.preset }}/CPackConfig.cmake -G "TGZ;ZIP" || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP" -C Debug) || echo "CPack TGZ failed"
         shell: bash
 
       - name: Upload artifact - package

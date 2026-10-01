@@ -56,11 +56,14 @@ jobs:
           # Policy: LLVM Clang only on Apple (brew `llvm` is keg-only, so it
           # never shadows system clang -- the toolchain resolves
           # "$(brew --prefix llvm)/bin/clang" explicitly).
-          brew install llvm || brew upgrade llvm || true
+          brew update || echo "brew update failed, continuing with snapshot"
+          brew install llvm || brew upgrade llvm
           LLVM_PREFIX="$(brew --prefix llvm)"
           echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
           "$LLVM_PREFIX/bin/clang" --version
           "$LLVM_PREFIX/bin/clang++" --version
+          LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
+          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<generator>, move_only_function): $LLVM_MAJOR" && exit 1)
 
       - name: Setup GCC (Windows)
         if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
@@ -128,14 +131,14 @@ jobs:
           # the build tree so packages land in the build dir. A bare
           # `cpack --config` from the repo root writes them to the root
           # (CPACK_OUTPUT_DIRECTORY is not honored there -- verified).
-          cmake --build --preset ${{ matrix.preset }} --target package || (cd build/${{ matrix.preset }} && cpack -G TGZ) || echo "CPack failed"
+          cmake --build --preset ${{ matrix.preset }} --target package || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP") || echo "CPack failed"
         shell: bash
 
       - name: Package (MSVC config)
         if: matrix.compiler == 'msvc'
         run: |
           # Multi-config generator: -C selects which built config to package.
-          (cd build/${{ matrix.preset }} && cpack -G TGZ -C Release) || echo "CPack failed"
+          (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP" -C Release) || echo "CPack failed"
         shell: bash
 
       - name: List packages

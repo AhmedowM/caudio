@@ -16,9 +16,6 @@ if(APPLE)
         "baseline. Use a *-clang preset or pass "
         "-DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON.")
     endif()
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    add_compile_options(-stdlib=libc++)
-    add_link_options(-stdlib=libc++)
   endif()
 elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(WARNING "MinGW GCC works but ships larger binaries (+winpthread "
