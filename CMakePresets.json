@@ -13,6 +13,91 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
+      },
+      "inherits": "toolchain-auto"
+    },
+    {
+      "name": "toolchain-gcc",
+      "hidden": true,
+      "displayName": "Compiler mixin: canonical GCC (only CI/Release compiler)",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/gcc.cmake"
+      }
+    },
+    {
+      "name": "toolchain-clang",
+      "hidden": true,
+      "displayName": "Compiler mixin: Clang (local dev / perf comparison)",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/clang.cmake"
+      }
+    },
+    {
+      "name": "toolchain-msvc",
+      "hidden": true,
+      "displayName": "Compiler mixin: MSVC (local dev only; needs VS generator or vcvars)",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/msvc.cmake"
+      }
+    },
+    {
+      "name": "toolchain-auto",
+      "hidden": true,
+      "displayName": "Compiler mixin: host default (Linux GCC, macOS brew LLVM, Windows MSVC-if-usable else PATH)",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/auto.cmake"
+      }
+    },
+    {
+      "name": "dev-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CAUDIO_ENABLE_TESTS": "ON",
+        "CAUDIO_ENABLE_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "ci-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CAUDIO_ENABLE_TESTS": "ON",
+        "CAUDIO_TEST_NOAUDIO": "ON"
+      }
+    },
+    {
+      "name": "modules-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CAUDIO_ENABLE_MODULES": "ON",
+        "CAUDIO_BUILD_CLI": "OFF"
+      }
+    },
+    {
+      "name": "release-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAUDIO_REQUIRE_GIT_VERSION": "ON"
+      }
+    },
+    {
+      "name": "release-lto-base",
+      "hidden": true,
+      "inherits": "release-base",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
+      }
+    },
+    {
+      "name": "minsize-base",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
       }
     },
     {
@@ -22,21 +107,19 @@
     },
     {
       "name": "dev",
-      "inherits": "base",
-      "displayName": "Local development: tests + examples",
-      "cacheVariables": {
-        "CAUDIO_ENABLE_TESTS": "ON",
-        "CAUDIO_ENABLE_EXAMPLES": "ON"
-      }
+      "inherits": [
+        "dev-base",
+        "toolchain-auto"
+      ],
+      "displayName": "Local development: tests + examples"
     },
     {
       "name": "ci",
-      "inherits": "base",
-      "displayName": "Headless CI: tests, no audio device",
-      "cacheVariables": {
-        "CAUDIO_ENABLE_TESTS": "ON",
-        "CAUDIO_TEST_NOAUDIO": "ON"
-      }
+      "inherits": [
+        "ci-base",
+        "toolchain-auto"
+      ],
+      "displayName": "Headless CI: tests, no audio device"
     },
     {
       "name": "ci-sanitizers",
@@ -48,12 +131,11 @@
     },
     {
       "name": "modules",
-      "inherits": "base",
-      "displayName": "C++23 module smoke: modules on, no CLI/tests/examples",
-      "cacheVariables": {
-        "CAUDIO_ENABLE_MODULES": "ON",
-        "CAUDIO_BUILD_CLI": "OFF"
-      }
+      "inherits": [
+        "modules-base",
+        "toolchain-auto"
+      ],
+      "displayName": "C++23 module smoke: modules on, no CLI/tests/examples"
     },
     {
       "name": "minimal",
@@ -74,12 +156,11 @@
     },
     {
       "name": "release",
-      "inherits": "base",
-      "displayName": "Optimized release build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CAUDIO_REQUIRE_GIT_VERSION": "ON"
-      }
+      "inherits": [
+        "release-base",
+        "toolchain-auto"
+      ],
+      "displayName": "Optimized release build"
     },
     {
       "name": "release-no-cli",
@@ -91,11 +172,11 @@
     },
     {
       "name": "release-lto",
-      "inherits": "release",
-      "displayName": "Release + link-time optimization",
-      "cacheVariables": {
-        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
-      }
+      "inherits": [
+        "release-lto-base",
+        "toolchain-auto"
+      ],
+      "displayName": "Release + link-time optimization"
     },
     {
       "name": "release-lto-no-cli",
@@ -108,11 +189,11 @@
     },
     {
       "name": "minsize",
-      "inherits": "base",
-      "displayName": "Smallest binary: MinSizeRel",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "MinSizeRel"
-      }
+      "inherits": [
+        "minsize-base",
+        "toolchain-auto"
+      ],
+      "displayName": "Smallest binary: MinSizeRel"
     },
     {
       "name": "minsize-no-cli",
@@ -182,6 +263,254 @@
         "CAUDIO_BUILD_DOCS": "ON",
         "CAUDIO_BUILD_SHARED": "ON",
         "CAUDIO_ENABLE_MODULES": "ON"
+      }
+    },
+    {
+      "name": "dev-clang",
+      "inherits": [
+        "toolchain-clang",
+        "dev-base"
+      ],
+      "displayName": "Local development with Clang: tests + examples"
+    },
+    {
+      "name": "dev-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "dev-base"
+      ],
+      "displayName": "Local development with MSVC: tests + examples (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "ci-clang",
+      "inherits": [
+        "toolchain-clang",
+        "ci-base"
+      ],
+      "displayName": "Headless CI with Clang: tests, no audio device"
+    },
+    {
+      "name": "ci-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "ci-base"
+      ],
+      "displayName": "Headless CI with MSVC: tests, no audio device (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "modules-clang",
+      "inherits": [
+        "toolchain-clang",
+        "modules-base"
+      ],
+      "displayName": "C++23 module smoke with Clang: modules on, no CLI/tests/examples"
+    },
+    {
+      "name": "modules-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "modules-base"
+      ],
+      "displayName": "C++23 module smoke with MSVC: modules on, no CLI/tests/examples (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release-clang",
+      "inherits": [
+        "toolchain-clang",
+        "release-base"
+      ],
+      "displayName": "Optimized release build with Clang"
+    },
+    {
+      "name": "release-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "release-base"
+      ],
+      "displayName": "Optimized release build with MSVC (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release-lto-clang",
+      "inherits": [
+        "toolchain-clang",
+        "release-lto-base"
+      ],
+      "displayName": "Release + link-time optimization with Clang"
+    },
+    {
+      "name": "release-lto-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "release-lto-base"
+      ],
+      "displayName": "Release + link-time optimization with MSVC (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "minsize-clang",
+      "inherits": [
+        "toolchain-clang",
+        "minsize-base"
+      ],
+      "displayName": "Smallest binary with Clang: MinSizeRel"
+    },
+    {
+      "name": "minsize-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "minsize-base"
+      ],
+      "displayName": "Smallest binary with MSVC: MinSizeRel (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "custom",
+      "inherits": "base",
+      "displayName": "Custom build dir via CAUDIO_BUILD_DIR env var (compiler from PATH)",
+      "binaryDir": "$env{CAUDIO_BUILD_DIR}",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "$env{CAUDIO_BUILD_DIR}",
+        "rhs": ""
+      },
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": null
+      }
+    },
+    {
+      "name": "dev-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "dev-base"
+      ],
+      "displayName": "Local development with GCC: tests + examples",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "ci-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "ci-base"
+      ],
+      "displayName": "Headless CI with GCC: tests, no audio device",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "modules-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "modules-base"
+      ],
+      "displayName": "C++23 module smoke with GCC: modules on, no CLI/tests/examples",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "release-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "release-base"
+      ],
+      "displayName": "Optimized release build with GCC",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "release-lto-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "release-lto-base"
+      ],
+      "displayName": "Release + link-time optimization with GCC",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "minsize-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "minsize-base"
+      ],
+      "displayName": "Smallest binary with GCC: MinSizeRel",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
       }
     }
   ],
@@ -270,6 +599,107 @@
       "name": "all",
       "configurePreset": "all",
       "jobs": 4
+    },
+    {
+      "name": "dev-clang",
+      "configurePreset": "dev-clang",
+      "jobs": 4
+    },
+    {
+      "name": "dev-msvc",
+      "configurePreset": "dev-msvc",
+      "configuration": "Debug",
+      "jobs": 4
+    },
+    {
+      "name": "ci-clang",
+      "configurePreset": "ci-clang",
+      "jobs": 4
+    },
+    {
+      "name": "ci-msvc",
+      "configurePreset": "ci-msvc",
+      "configuration": "Debug",
+      "jobs": 4
+    },
+    {
+      "name": "modules-clang",
+      "configurePreset": "modules-clang",
+      "jobs": 4
+    },
+    {
+      "name": "modules-msvc",
+      "configurePreset": "modules-msvc",
+      "configuration": "Debug",
+      "jobs": 4
+    },
+    {
+      "name": "release-clang",
+      "configurePreset": "release-clang",
+      "jobs": 4
+    },
+    {
+      "name": "release-msvc",
+      "configurePreset": "release-msvc",
+      "configuration": "Release",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-clang",
+      "configurePreset": "release-lto-clang",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-msvc",
+      "configurePreset": "release-lto-msvc",
+      "configuration": "Release",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-clang",
+      "configurePreset": "minsize-clang",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-msvc",
+      "configurePreset": "minsize-msvc",
+      "configuration": "MinSizeRel",
+      "jobs": 4
+    },
+    {
+      "name": "custom",
+      "configurePreset": "custom",
+      "jobs": 4
+    },
+    {
+      "name": "dev-gcc",
+      "configurePreset": "dev-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "ci-gcc",
+      "configurePreset": "ci-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "modules-gcc",
+      "configurePreset": "modules-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "release-gcc",
+      "configurePreset": "release-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-gcc",
+      "configurePreset": "release-lto-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-gcc",
+      "configurePreset": "minsize-gcc",
+      "jobs": 4
     }
   ],
   "testPresets": [
@@ -306,6 +736,68 @@
     {
       "name": "all",
       "configurePreset": "all",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "dev-clang",
+      "configurePreset": "dev-clang",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "dev-msvc",
+      "configurePreset": "dev-msvc",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-clang",
+      "configurePreset": "ci-clang",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-msvc",
+      "configurePreset": "ci-msvc",
+      "configuration": "Debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "dev-gcc",
+      "configurePreset": "dev-gcc",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-gcc",
+      "configurePreset": "ci-gcc",
       "output": {
         "outputOnFailure": true
       },

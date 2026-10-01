@@ -149,7 +149,7 @@ void WriterThread::worker(std::stop_token st) {
         }
         in_flight_.fetch_sub(1, std::memory_order_acq_rel);
         {
-            std::lock_guard<std::mutex> lk(mtx_);
+            std::lock_guard<std::mutex> notifyLk(mtx_);
             cv_.notify_all();
         }
         if (op.cb) {

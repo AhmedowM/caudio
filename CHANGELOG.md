@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.0] - 2026-10-01
+
+### Added
+- Compiler toolchain files (`cmake/toolchains/`: `gcc`, `clang`, `msvc`,
+  host-default `auto`, shared brew-LLVM resolver) + `CompilerPolicy.cmake`:
+  Apple/GCC and Apple/AppleClang fail at configure (dummy audio backend /
+  C++23 gaps; `CAUDIO_ALLOW_UNSUPPORTED_COMPILER` escape hatch), MinGW warns
+  on binary size
+- Compiler preset variants (`dev`/`ci`/`modules`/`release`/`release-lto`/
+  `minsize` × `-gcc`/`-clang`/`-msvc`) over hidden `*-base` purpose presets;
+  bare presets now select the host-default compiler via `auto`; `custom`
+  preset for arbitrary build dirs; `-msvc` presets use the Visual Studio
+  2026 generator (no vcvars needed)
+- CI matrix across compilers: Linux `ci-gcc`, macOS `ci-clang` (brew LLVM),
+  Windows `ci-gcc` (MinGW) + `ci-msvc`
+
+### Changed
+- **BREAKING (install)** Library de-noise: `db/detail`, `db/fingerprint`,
+  `db/fts`, `db/queue` internals, `db/schema`, `db/statement`,
+  `db/stmt_helpers`, `db/transaction`, `engine/history`, `engine/shuffle`
+  moved to `src/` (not installed); `_impl` splits merged; fat headers
+  slimmed; `HistoryEntry` unified on `db::`; vendor headers no longer
+  installed
+- Uniform `component_core` naming (`client_core`, `service_core`,
+  `engine_core`, module `:core` partitions)
+- Clang targets the native MSVC ABI on Windows (MinGW `--target` override
+  and `-fsized-deallocation` dropped after full verification)
+- `vendor/` include dirs marked `SYSTEM` (vendored headers stay
+  warning-clean under all compilers); `_CRT_SECURE_NO_WARNINGS` now also
+  covers Clang-on-Windows
+
+### Fixed
+- Downstream module exports: `sqlite3`/`blake3` dangling
+  `INSTALL_INTERFACE` vendor path removed (broke every `find_package`
+  configure); deleted `service :paths`/`:status`/`:audio` partitions
+  (wrapped non-installed `src/` internals, broke downstream BMI rebuild);
+  full 7-module downstream import smoke green
+- MSVC warnings: `#pragma GCC` guarded (`thread.cpp`), `lk` shadowing
+  renamed (`write_thread.cpp`), `int64_t`→`int32_t` narrowing casts
+  (`queue.cpp`)
+
 ## [0.36.0] - 2026-09-28
 
 ### Added

@@ -13,11 +13,15 @@ Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) no
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
         using SetThreadDescriptionFn = HRESULT(WINAPI*)(HANDLE, PCWSTR);
+#ifndef _MSC_VER
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-function-type"
+#endif
         auto pSetDesc =
             reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(k32, "SetThreadDescription"));
+#ifndef _MSC_VER
 #pragma GCC diagnostic pop
+#endif
         if (pSetDesc) {
             int wlen = MultiByteToWideChar(kUtf8CodePage, 0, name.data(),
                                            static_cast<int>(name.size()), nullptr, 0);

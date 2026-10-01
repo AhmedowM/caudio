@@ -21,20 +21,23 @@ jobs:
       matrix:
         # NOTE: ubuntu-latest is 24.04 today but migrates to 26.04 in Nov 2026
         # (new kernel/CMake/FFmpeg, PPA gcc-16 support TBD) -- re-validate then.
+        # Compiler lives in the preset (ci-gcc/ci-clang/ci-msvc); `compiler`
+        # below is display + artifact naming only. macOS is LLVM Clang --
+        # GCC builds miniaudio with the dummy backend (no audio).
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             compiler: gcc-16
-            cc: gcc-16
-            cxx: g++-16
+            preset: ci-gcc
           - os: macos-latest
-            compiler: gcc-16
-            cc: gcc-16
-            cxx: g++-16
+            compiler: clang
+            preset: ci-clang
           - os: windows-latest
-            compiler: gcc-16
-            cc: gcc
-            cxx: g++
+            compiler: windows-gcc
+            preset: ci-gcc
+          - os: windows-latest
+            compiler: msvc
+            preset: ci-msvc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -61,20 +64,22 @@ jobs:
           sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
           gcc --version; g++ --version
 
-      - name: Setup GCC (macOS)
+      - name: Setup LLVM Clang (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew update
-          brew install gcc@16 || brew install gcc
-          # Homebrew installs versioned binaries without shadowing system clang
-          for b in /opt/homebrew/bin/g++-16 /usr/local/bin/g++-16 /opt/homebrew/bin/gcc-16 /usr/local/bin/gcc-16; do
-            if [ -x "$b" ]; then echo "found $b"; "$b" --version; fi
-          done
-          gcc-16 --version || g++-16 --version || gcc --version
-          g++-16 --version
+          # Policy: LLVM Clang only on Apple (brew `llvm` is keg-only, so it
+          # never shadows system clang -- the toolchain resolves
+          # "$(brew --prefix llvm)/bin/clang" explicitly). GCC builds
+          # miniaudio with the dummy backend (no audio); AppleClang lags
+          # our C++23 baseline. Both are fatal at configure time.
+          brew install llvm || brew upgrade llvm || true
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+          "$LLVM_PREFIX/bin/clang" --version
+          "$LLVM_PREFIX/bin/clang++" --version
 
       - name: Setup GCC (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         id: msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -83,7 +88,7 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
 
       - name: Add MinGW to PATH (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         run: |
           # setup-msys2 installs under RUNNER_TEMP, not C:/msys64: resolve via
           # the action's msys2-location output.
@@ -93,7 +98,7 @@ jobs:
         shell: bash
 
       - name: Verify GCC 16 (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         run: |
           command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
           command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
@@ -132,54 +137,66 @@ jobs:
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
 
       - name: Configure
-        env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
-        run: cmake --preset ci
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Expose DLLs (Windows)
         if: runner.os == 'Windows'
         run: |
           # Test executables run at build time (Catch2 discovery) and test
-          # time. The loader needs FFmpeg DLLs AND the toolchain runtime
-          # (libstdc++-6.dll etc.); neither is on PATH by default.
-          # 0xc0000135 == STATUS_DLL_NOT_FOUND.
+          # time. The loader needs FFmpeg DLLs AND, for MinGW, the toolchain
+          # runtime (libstdc++-6.dll etc.); neither is on PATH by default.
+          # 0xc0000135 == STATUS_DLL_NOT_FOUND. (MSVC links the system UCRT.)
           # NOTE: the Windows loader needs ABSOLUTE Windows-style dirs.
           # Relative entries resolve against each process CWD (useless) and
           # Git-Bash POSIX paths (/d/...) are unreadable to it -- always
           # convert with cygpath -w.
-          dll=$(find build/ci/_deps -name 'avcodec-*.dll' | head -n 1)
-          test -n "$dll" || (echo "FFmpeg DLLs not found under build/ci/_deps" && exit 1)
+          dll=$(find build/${{ matrix.preset }}/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            # System FFmpeg (e.g. choco): DLLs sit next to ffmpeg.exe itself.
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
           cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
-          cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+          if [ "${{ matrix.compiler }}" = "windows-gcc" ]; then
+            cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+          fi
           echo "PATH additions:"; tail -n 2 "$GITHUB_PATH"
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ci
+        run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ci
+        run: ctest --preset ${{ matrix.preset }}
 
       - name: Package (TGZ)
+        if: matrix.compiler != 'msvc'
         run: |
-          cpack --config build/ci/CPackConfig.cmake -G TGZ || cpack -G TGZ --config build/ci/CPackConfig.cmake || (cd build/ci && cpack -G TGZ) || echo "CPack TGZ failed"
+          cpack --config build/${{ matrix.preset }}/CPackConfig.cmake -G TGZ || (cd build/${{ matrix.preset }} && cpack -G TGZ) || echo "CPack TGZ failed"
+        shell: bash
+
+      - name: Package (TGZ, MSVC config)
+        if: matrix.compiler == 'msvc'
+        run: |
+          # Multi-config generator: -C selects which built config to package.
+          cpack -C Debug --config build/${{ matrix.preset }}/CPackConfig.cmake -G TGZ || (cd build/${{ matrix.preset }} && cpack -G TGZ -C Debug) || echo "CPack TGZ failed"
         shell: bash
 
       - name: Upload artifact - package
         uses: actions/upload-artifact@v4
         with:
           name: caudio-package-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/ci/*.tar.gz
+          path: build/${{ matrix.preset }}/*.tar.gz
           if-no-files-found: warn
 
       - name: Upload artifact - docs
         uses: actions/upload-artifact@v4
         with:
           name: caudio-docs-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/ci/docs/html
+          path: build/${{ matrix.preset }}/docs/html
           if-no-files-found: warn
 
   sanitizers:
@@ -257,25 +274,25 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake --preset ci
+        run: cmake --preset ci-gcc
 
       - name: Build
-        run: cmake --build --preset ci
+        run: cmake --build --preset ci-gcc
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ci
+        run: ctest --preset ci-gcc
 
       - name: Install to /tmp/caudio-install
-        run: cmake --install build/ci --prefix /tmp/caudio-install
+        run: cmake --install build/ci-gcc --prefix /tmp/caudio-install
 
       - name: Verify install layout
         run: |
           echo "=== install tree ==="
           find /tmp/caudio-install -type f | head -n 100
           echo "=== caudio --version ==="
-          /tmp/caudio-install/bin/caudio --version || build/ci/caudio --version || echo "caudio --version check failed"
+          /tmp/caudio-install/bin/caudio --version || build/ci-gcc/caudio --version || echo "caudio --version check failed"
           echo "=== version.hpp ==="
           test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
           echo "=== no module sources in header-mode install ==="
@@ -339,13 +356,13 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake --preset modules
+        run: cmake --preset modules-gcc
 
       - name: Build
-        run: cmake --build --preset modules
+        run: cmake --build --preset modules-gcc
 
       - name: Install to /tmp/caudio-install-mod
-        run: cmake --install build/modules --prefix /tmp/caudio-install-mod
+        run: cmake --install build/modules-gcc --prefix /tmp/caudio-install-mod
 
       - name: Verify module sources shipped
         run: |

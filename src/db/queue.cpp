@@ -237,7 +237,7 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
     Queue q;
     q.id = st.columnInt(0);
     q.name = st.columnText(1);
-    q.repeat_mode = st.columnInt(2);
+    q.repeat_mode = static_cast<int32_t>(st.columnInt(2));
     q.library_id = st.columnInt(3);
     return q;
 }
@@ -255,7 +255,7 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
         Queue q;
         q.id = st.columnInt(0);
         q.name = st.columnText(1);
-        q.repeat_mode = st.columnInt(2);
+        q.repeat_mode = static_cast<int32_t>(st.columnInt(2));
         q.library_id = st.columnInt(3);
         out.push_back(std::move(q));
     }

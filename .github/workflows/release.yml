@@ -17,20 +17,23 @@ jobs:
       matrix:
         # NOTE: ubuntu-latest is 24.04 today but migrates to 26.04 in Nov 2026
         # (new kernel/CMake/FFmpeg, PPA gcc-16 support TBD) -- re-validate then.
+        # Compiler lives in the preset (same scheme as ci.yml); `compiler`
+        # below is display + artifact naming only. macOS is LLVM Clang --
+        # GCC builds miniaudio with the dummy backend (no audio).
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             compiler: gcc-16
-            cc: gcc-16
-            cxx: g++-16
+            preset: release-gcc
           - os: macos-latest
-            compiler: gcc-16
-            cc: gcc-16
-            cxx: g++-16
+            compiler: clang
+            preset: release-clang
           - os: windows-latest
-            compiler: gcc-16
-            cc: gcc
-            cxx: g++
+            compiler: windows-gcc
+            preset: release-gcc
+          - os: windows-latest
+            compiler: msvc
+            preset: release-msvc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,15 +50,20 @@ jobs:
           gcc-16 --version; g++-16 --version
           sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
 
-      - name: Setup GCC (macOS)
+      - name: Setup LLVM Clang (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew update
-          brew install gcc@16 || brew install gcc
-          gcc-16 --version; g++-16 --version
+          # Policy: LLVM Clang only on Apple (brew `llvm` is keg-only, so it
+          # never shadows system clang -- the toolchain resolves
+          # "$(brew --prefix llvm)/bin/clang" explicitly).
+          brew install llvm || brew upgrade llvm || true
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+          "$LLVM_PREFIX/bin/clang" --version
+          "$LLVM_PREFIX/bin/clang++" --version
 
       - name: Setup GCC (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         id: msys2
         uses: msys2/setup-msys2@v2
         with:
@@ -64,12 +72,12 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
 
       - name: Add MinGW to PATH (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         run: echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
         shell: bash
 
       - name: Verify GCC 16 (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
         run: |
           command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
           command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
@@ -108,27 +116,32 @@ jobs:
       # Release packaging only -- testing lives in ci.yml. The release preset
       # requires a git tag (tag-triggered workflow checks out fetch-depth 0).
       - name: Configure (release preset)
-        env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
-        run: cmake --preset release
+        run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: cmake --build --preset release
+        run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Package
+        if: matrix.compiler != 'msvc'
         run: |
           # `cmake --build --target package` FIRST: it runs cpack with CWD in
-          # the build tree so packages land in build/release/. A bare
+          # the build tree so packages land in the build dir. A bare
           # `cpack --config` from the repo root writes them to the root
           # (CPACK_OUTPUT_DIRECTORY is not honored there -- verified).
-          cmake --build --preset release --target package || (cd build/release && cpack -G TGZ) || echo "CPack failed"
+          cmake --build --preset ${{ matrix.preset }} --target package || (cd build/${{ matrix.preset }} && cpack -G TGZ) || echo "CPack failed"
+        shell: bash
+
+      - name: Package (MSVC config)
+        if: matrix.compiler == 'msvc'
+        run: |
+          # Multi-config generator: -C selects which built config to package.
+          (cd build/${{ matrix.preset }} && cpack -G TGZ -C Release) || echo "CPack failed"
         shell: bash
 
       - name: List packages
         run: |
-          echo "=== packages in build/release/ ==="
-          ls -lh build/release/*.tar.gz build/release/*.zip
+          echo "=== packages in build/${{ matrix.preset }}/ ==="
+          ls -lh build/${{ matrix.preset }}/*.tar.gz build/${{ matrix.preset }}/*.zip
         shell: bash
 
       - name: Upload artifact - packages
@@ -136,8 +149,8 @@ jobs:
         with:
           name: caudio-packages-${{ matrix.os }}-${{ matrix.compiler }}
           path: |
-            build/release/*.tar.gz
-            build/release/*.zip
+            build/${{ matrix.preset }}/*.tar.gz
+            build/${{ matrix.preset }}/*.zip
           # Only TGZ/ZIP are produced (CPACK_GENERATOR); a missing package
           # must fail loudly -- never ship a raw .exe as a "release" again.
           if-no-files-found: error

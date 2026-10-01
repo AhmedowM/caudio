@@ -92,6 +92,19 @@ endif()
 # different *_EXPORTS/PIC flags breaks dependents with CRC mismatch).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Compiler policy (default-per-host selection lives in presets via
+# cmake/toolchains/auto.cmake; this is the backstop for raw configures).
+include(cmake/CompilerPolicy.cmake)
+
+# Windows/Clang-or-MSVC: silence "unsafe CRT" deprecation noise (C4996 on
+# fopen/getenv/_wfopen, -Wdeprecated-declarations under Clang). The portable
+# calls are correct; the _s variants would fork the code path for
+# non-shipping compilers. CI/Release is GCC-only, so this affects local
+# Windows builds only.
+if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32))
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+endif()
+
 # Options -- FFmpeg is required primary (dr_* deleted, vendor cleaned)
 option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system -> vcpkg/Conan -> prebuilt -> source)" ON)
 option(CAUDIO_ENABLE_TESTS "build tests" OFF)
@@ -173,11 +186,14 @@ configure_file(
 add_library(sqlite3 STATIC vendor/sqlite3.c)
 add_library(caudio::sqlite3 ALIAS sqlite3)
 set_target_properties(sqlite3 PROPERTIES OUTPUT_NAME sqlite3)
-target_include_directories(sqlite3 PRIVATE vendor)
+target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 # BUILD_INTERFACE only: vendor headers are NOT installed (nothing installed
 # references them), so no INSTALL_INTERFACE -- a dangling install path breaks
 # downstream configure with "non-existent path" errors.
-target_include_directories(sqlite3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
+# SYSTEM: vendored amalgamation -- dependents (db/*.cpp include sqlite3.h)
+# must not inherit its extension-token noise under Clang. Propagates.
+target_include_directories(sqlite3 SYSTEM PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
@@ -443,17 +459,17 @@ include(CPack)
 if(CAUDIO_ENABLE_EXAMPLES)
   add_executable(caudio_mini examples/mini_cpp.cpp)
   target_link_libraries(caudio_mini PRIVATE caudio::player caudio::utils)
-  target_include_directories(caudio_mini PRIVATE vendor)
+  target_include_directories(caudio_mini SYSTEM PRIVATE vendor)
   target_compile_features(caudio_mini PRIVATE cxx_std_23)
 
   add_executable(caudio_player_db_demo examples/player_db_demo.cpp)
   target_link_libraries(caudio_player_db_demo PRIVATE caudio::player caudio::db caudio::utils)
-  target_include_directories(caudio_player_db_demo PRIVATE vendor)
+  target_include_directories(caudio_player_db_demo SYSTEM PRIVATE vendor)
   target_compile_features(caudio_player_db_demo PRIVATE cxx_std_23)
 
   add_executable(caudio_engine_demo examples/engine_demo.cpp)
   target_link_libraries(caudio_engine_demo PRIVATE caudio::engine caudio::db caudio::player caudio::utils)
-  target_include_directories(caudio_engine_demo PRIVATE vendor)
+  target_include_directories(caudio_engine_demo SYSTEM PRIVATE vendor)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
@@ -479,7 +495,8 @@ if(CAUDIO_ENABLE_TESTS)
     target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
     # + src/: white-box tests cover src-internal helpers (engine detail fns)
     # directly. Build-tree only -- src/ is never installed.
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src vendor)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(${name} SYSTEM PRIVATE vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
     if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
