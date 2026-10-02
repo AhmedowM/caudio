@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.1] - 2026-10-02
+
+### Fixed
+- macOS/brew-LLVM build: libc++ ships neither `std::generator` nor
+  `std::move_only_function`, so `db/scan` and `db/write_thread` now use
+  in-tree `caudio::utils::Generator` (coroutine-based,
+  `utils/generator.hpp`) and `caudio::utils::MoveOnlyFunction`
+  (type-erased, `utils/function.hpp`)
+- Brew libc++ toolchain hardened: `-cxx-isystem` (wins over FFmpeg
+  `-isystem` regardless of flag order), `-stdlib=libc++` at compile and
+  link time, versioned `libc++*.dylib` lookup
+- CI macOS setup: `brew update` before install, LLVM >= 20 version probe;
+  packages built as TGZ+ZIP
+
 ## [0.37.0] - 2026-10-01
 
 ### Added
