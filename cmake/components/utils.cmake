@@ -11,6 +11,8 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   modules/utils/print.cppm
   modules/utils/thread.cppm
   modules/utils/version.cppm
+  modules/utils/function.cppm
+  modules/utils/generator.cppm
 )
 
 set(CAUDIO_UTILS_SOURCES

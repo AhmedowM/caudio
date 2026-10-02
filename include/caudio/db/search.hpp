@@ -51,12 +51,11 @@ std::expected<std::vector<Track>, caudio::utils::Error>
 searchLike(Database& db, std::string_view query, int limit = 50);
 
 /**
- * @brief Public wrapper for `internal::sanitizeFtsTerm`.
+ * @brief Sanitizes a raw FTS5 query term.
  * @ingroup caudio_db
  * @param term Raw user input.
  * @return Sanitized FTS5 term (empty means match-nothing).
  * @details Strips FTS5 operators and escapes quotes by doubling them.
- * @see caudio::db::internal::sanitizeFtsTerm
  */
 std::string sanitizeFtsTerm(std::string_view term);
 

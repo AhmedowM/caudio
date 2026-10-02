@@ -302,7 +302,7 @@ class Database final {
     mutable std::mutex cacheMutex_; // stmtCacheMutex_
 
   private:
-    // Inline helpers -- reduce duplication between insert/update (internal::bindTrack coverage)
+    // Inline helpers -- reduce duplication between insert/update binds
     /**
      * @brief Binds all Track fields for INSERT statement (24 parameters).
      * @ingroup caudio_db
@@ -696,12 +696,6 @@ class Database final {
      */
     std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error>
     libraryStatsDetailed();
-
-    // insert overload for legacy database.cppm signature
-    std::expected<void, caudio::utils::Error> insertTrackLegacy(int64_t libraryId,
-                                                                std::string_view name,
-                                                                std::string_view path,
-                                                                std::string_view fpHex = {});
 
 }; // class Database
 

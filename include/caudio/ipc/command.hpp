@@ -906,17 +906,19 @@ struct DeviceSet final {
 
 /**
  * @struct DeviceTest
- * @brief Test an audio output device with a test tone.
+ * @brief Check an audio output device is available.
  * @ingroup caudio_ipc
  *
  * @json_example {"type": "DeviceTest", "id": "hw:0,0"}
  *
- * @param id Device ID to test. If omitted, tests the default device.
+ * @param id Device ID to check. If omitted, checks the default device.
  * @return Empty (success with no data).
+ * @details Enumeration-only: verifies the id resolves against the listed
+ * devices. Emits no sound.
  */
 struct DeviceTest final {
     /**
-     * @brief Device ID to test. If omitted, tests the default device.
+     * @brief Device ID to check. If omitted, checks the default device.
      */
     std::optional<std::string> id{};
 };

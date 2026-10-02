@@ -59,8 +59,8 @@ computeFingerprint(const std::filesystem::path& path);
  * @param path Path view to hash (used when file cannot be read or hex parse fails).
  * @return 32-byte pseudo-digest (FNV-1a seeded + LCG expansion).
  * @details Not cryptographically strong; only used to ensure every track has a
- * non-zero UNIQUE fingerprint when I/O fails (e.g., in `trackFromJson()` or
- * `insertTrackLegacy()`). Never used for deduplication of readable files.
+ * non-zero UNIQUE fingerprint when I/O fails (e.g., in `trackFromJson()`).
+ * Never used for deduplication of readable files.
  * @par Thread safety
  * Pure function, thread-safe.
  */

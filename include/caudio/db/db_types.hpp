@@ -77,7 +77,7 @@ struct Playlist {
  * @ingroup caudio_db
  * @details Maps to `queue`. The table enforces `UNIQUE(queue_id, position)`
  * as a safety net; the single-writer invariant is maintained by
- * `Database::dbMutex_` (see schema.hpp and queue.hpp).
+ * `Database::dbMutex_`.
  */
 struct QueueItem {
     int64_t id{};        ///< Row id (PK).

@@ -125,7 +125,6 @@ struct EngineCallbacks {
     std::function<void(int64_t queue_id)> on_queue_changed{}; ///< Fired on QueueChanged.
     std::function<void(caudio::utils::StatusCode err, std::string_view msg)>
         on_error{};      ///< Fired on Error.
-    void* user{nullptr}; // unused -- reserved
 };
 
 /**
@@ -135,7 +134,10 @@ struct EngineCallbacks {
  * `gaplessMs` is the preroll window for gapless transition (default 300 ms);
  * `historyThresholdPct`/`historyThresholdSecs` are thresholds for
  * shouldMarkPlayed (defaults 60 / 90). `enableMonitorThread` gates
- * monitorLoop creation.
+ * monitorLoop creation. `allowSimulatedPlayback` (default off) gates the
+ * timer-only fallback for tracks whose file/decoder/device cannot be
+ * opened; with it off, play/next/prev return an error instead of
+ * reporting Playing with no sound.
  */
 struct EngineConfig {
     bool enableMonitorThread{true}; ///< Whether to start monitorLoop.
@@ -143,6 +145,10 @@ struct EngineConfig {
     int gaplessMs{300};             ///< Gapless preroll window in ms (300 ms).
     int historyThresholdPct{60};    ///< History pct threshold (60%).
     int historyThresholdSecs{90};   ///< History absolute seconds threshold (90 s).
+    bool allowSimulatedPlayback{false}; ///< Timer-only fallback for unplayable tracks (no audio
+                                        ///< device; wall-clock position). Tests/headless only:
+                                        ///< with it off, play/next/prev fail instead of
+                                        ///< reporting Playing with zero sound.
     EngineCallbacks callbacks{};    ///< Initial callbacks (also via setCallbacks).
 };
 

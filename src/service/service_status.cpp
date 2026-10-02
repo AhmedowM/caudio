@@ -63,21 +63,8 @@ inline constexpr DWORD kWaitTimeoutW = 258UL;
 inline constexpr DWORD kOpenExistingW = 3UL;
 inline constexpr BOOL kFalseW = 0;
 inline const HANDLE kInvalidHandleValueW = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
-// winbase.h mirror (named members: anonymous struct/union is a GNU
-// extension Clang rejects under -Wpedantic; the struct is currently
-// unused -- LPOVERLAPPED above covers the decls).
-struct OVERLAPPED {
-    void* Internal{nullptr};
-    void* InternalHigh{nullptr};
-    union {
-        struct {
-            DWORD Offset;
-            DWORD OffsetHigh;
-        } offsetPart;
-        void* Pointer;
-    } offsetOrPointer;
-    HANDLE hEvent{nullptr};
-};
+// winbase.h mirror avoided: LPOVERLAPPED above covers the decls and no
+// OVERLAPPED member access is needed in this file.
 extern "C" {
 __declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
                                                    DWORD, DWORD, HANDLE);

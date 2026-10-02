@@ -34,6 +34,7 @@ TEST_CASE("gapless CAS arms once via Engine", "[engine_gapless]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     cfg.gaplessMs = 300;
@@ -80,6 +81,7 @@ TEST_CASE("gapless 300ms lookahead triggers next once", "[engine_gapless]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     cfg.gaplessMs = 300;
@@ -127,6 +129,7 @@ TEST_CASE("gapless not triggered when remaining > gap", "[engine_gapless]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     cfg.gaplessMs = 300;

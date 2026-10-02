@@ -32,7 +32,7 @@ caudio::utils::Json trackToJson(const Track& t);
  * @return Track on success, or `Error` with `StatusCode::Corrupt` if parsing fails.
  * @details Missing keys use defaults; `library_id == 0` is normalized to 1.
  * If `fingerprint` is missing or not valid hex, a fallback fingerprint
- * derived from `path` is used (`internal::fallbackFingerprint`).
+ * derived from `path` is used.
  * @par Thread safety
  * Pure function, thread-safe.
  * @see trackToJson

@@ -10,3 +10,5 @@ export import :mpsc_queue;
 export import :print;
 export import :thread;
 export import :version;
+export import :function;
+export import :generator;

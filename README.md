@@ -94,7 +94,7 @@ Run `caudio --help` or `caudio <subcommand> --help` for details. All commands (e
 | `caudio history clear` | Clear history |
 | `caudio device list [--json]` | List audio output devices |
 | `caudio device set <id>` | Set default device |
-| `caudio device test [--id <id>]` | Play test tone on device |
+| `caudio device test [--id <id>]` | Check device is available |
 | `caudio config get <key>` | Get config value |
 | `caudio config set <key> <value>` | Set config value |
 | `caudio config list [--json]` | List config |

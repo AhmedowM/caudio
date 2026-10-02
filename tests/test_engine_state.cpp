@@ -35,6 +35,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
             REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
         }
         EngineConfig cfg;
+        cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
@@ -117,6 +118,7 @@ TEST_CASE("engine state open without file creates default", "[engine_state]") {
 
 TEST_CASE("engine state volume clamped 0-1", "[engine_state]") {
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -143,6 +145,7 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());

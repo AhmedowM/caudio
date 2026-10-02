@@ -164,7 +164,10 @@ class Engine final {
      * @return Success or Error State/Busy/NotFound/Internal.
      * @retval StatusCode::State if no db.
      * @retval StatusCode::Busy if queueMutex_ try_lock fails.
-     * @retval StatusCode::NotFound if queue empty.
+     * @retval StatusCode::NotFound if queue empty, or track file not
+     * playable without allowSimulatedPlayback.
+     * @retval StatusCode::Device if the audio device cannot be created
+     * without allowSimulatedPlayback.
      * @details State machine:
      * - Paused -> Playing: resume (no dequeue), restart monotonic clock,
      *   start AudioOutput.
@@ -364,7 +367,7 @@ class Engine final {
     /**
      * @brief Advances to the next track per RepeatMode/shuffle.
      * @ingroup caudio_engine
-     * @return Success or Error State/Busy/NotFound.
+     * @return Success or Error State/Busy/NotFound/Device.
      * @details Fast-path: if !shuffle && repeat==One && hasCurrent, seeks
      * decoder to 0 under decodeMtx_ and resets ring without touching the
      * queue. Otherwise locks queueMutex_ try_lock, calls queueNextLocked
@@ -380,7 +383,7 @@ class Engine final {
     /**
      * @brief Moves to the previous track.
      * @ingroup caudio_engine
-     * @return Success or Error State/Busy/NotFound ("at start"/"no perm").
+     * @return Success or Error State/Busy/NotFound/Device ("at start"/"no perm").
      * @details Locks queueMutex_ try_lock then queuePrevLocked + doPlayTrack.
      * Shuffle path steps cursor back by 2 and clamps; non-shuffle mirrors.
      * @par Thread safety
@@ -610,7 +613,7 @@ class Engine final {
      * @param on True to enable shuffle, false to disable.
      * @return `std::expected<void, Error>` -- success or error from persistShuffleBlobLocked.
      * @details If enabling and perm empty: clears perm/cursor, gets queue count, generates new
-     * permutation via `detail::shufflePerm` with random_device, persists via
+     * random permutation (random_device-seeded), persists via
      * persistShuffleBlobLocked. If disabling: clears perm, sets shuffle=false, persists. No-op if
      * state unchanged and perm non-empty. Updates `state_.shuffleEnabled` on success.
      * @par Thread safety
@@ -618,7 +621,6 @@ class Engine final {
      * persistShuffleBlobLocked.
      * @see setShuffle
      * @see persistShuffleBlobLocked
-     * @see detail::shufflePerm
      */
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on);
 
@@ -676,11 +678,15 @@ class Engine final {
      * @brief Initializes decoder/reader/ring/output for a track and starts playback.
      * @ingroup caudio_engine
      * @param t Track to play (path used to open reader/decoder).
-     * @return `std::expected<void, Error>` -- always success (errors stored in lastErr_).
+     * @return `std::expected<void, Error>` -- success, or NotFound for an
+     * unplayable track file / Device for audio-device failure (both gated
+     * behind allowSimulatedPlayback, which falls back to timer playback).
      * @details Resets prior decoder/reader/ring/output. Attempts to open FileReader +
      * Decoder::open from track path. On success: sets duration_, creates SpscRing (8192*ch
      * frames), AudioOutput, calls preroll() to fill ring to half capacity, starts output. On
-     * failure: falls back to metadata duration (no audio output), sets lastErr_. Updates state:
+     * failure without allowSimulatedPlayback: returns an error and leaves
+     * playback stopped (no state change, no TrackStarted event); with it:
+     * falls back to metadata duration (no audio output), sets lastErr_. Updates state:
      * currentTrack_, hasCurrent_=true, markedPlayed_=false, gaplessArmed_=false,
      * startedMs_=nowMs(), state_.currentTrackId, cursorPos, playbackState_=Playing, playStart_=now,
      * pausePos_=0. Calls saveState() if DB attached. Pushes TrackStarted event. Notifies decodeCv_
@@ -736,8 +742,8 @@ class Engine final {
      * @brief Marks current track as played in history if thresholds met (exactly-once via CAS).
      * @ingroup caudio_engine
      * @details Called from engineTick(). Early exits if: no DB, no current track, already marked.
-     * Checks thresholds via detail::shouldMarkPlayed(duration, position, false, pct, secs)
-     * using config historyThresholdPct (default 60) and historyThresholdSecs (default 90).
+     * Checks the history thresholds from config (historyThresholdPct default 60,
+     * historyThresholdSecs default 90).
      * Uses atomic CAS on markedPlayed_ (false->true) for exactly-once semantics.
      * Inside transaction (BEGIN IMMEDIATE): fetches track play_count, updates tracks
      * (play_count+1, last_played=now), inserts into history (track_id, started_at,
@@ -747,7 +753,6 @@ class Engine final {
      * Called from monitorLoop (single-threaded). Locks dbMutex_ exclusively.
      * @see engineTick
      * @see monitorLoop
-     * @see detail::shouldMarkPlayed
      */
     void doHistoryMark();
 

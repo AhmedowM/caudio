@@ -1480,29 +1480,4 @@ Database::libraryStatsDetailed() {
 
     return d;
 }
-
-std::expected<void, caudio::utils::Error> Database::insertTrackLegacy(int64_t libraryId,
-                                                                      std::string_view name,
-                                                                      std::string_view path,
-                                                                      std::string_view fpHex) {
-    Track t;
-    t.library_id = libraryId;
-    t.title = std::string(name);
-    t.path = std::string(path);
-    if (!fpHex.empty()) {
-        if (!caudio::utils::fromHex(fpHex, t.fingerprint)) {
-            // fallback for non-hex or wrong length: raw copy
-            std::memset(t.fingerprint.data(), 0, 32);
-            for (size_t i = 0; i < fpHex.size() && i < 32; i++)
-                t.fingerprint[i] = (uint8_t)fpHex[i];
-        }
-    } else {
-        // generate fingerprint from path via fnv fallback
-        t.fingerprint = internal::fallbackFingerprint(t.path);
-    }
-    auto r = insertTrack(t);
-    if (!r)
-        return std::unexpected{r.error()};
-    return {};
-}
 } // namespace caudio::db

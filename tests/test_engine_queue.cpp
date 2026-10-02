@@ -36,6 +36,7 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -85,6 +86,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -143,6 +145,7 @@ TEST_CASE("engine queue repeat All loops", "[engine_queue]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -206,6 +209,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     REQUIRE(r2.has_value());
     REQUIRE(db->queueEnqueue(1, *r2, -1).has_value());
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -239,6 +243,7 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
             REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
         }
         EngineConfig cfg;
+        cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
@@ -272,6 +277,7 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
 
 TEST_CASE("engine queue invalid repeat returns InvalidArg", "[engine_queue]") {
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -336,6 +342,7 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -373,6 +380,7 @@ TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -410,6 +418,7 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
             REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
         }
         EngineConfig cfg;
+        cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
@@ -448,11 +457,42 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         sqlite3_finalize(st2);
         sqlite3_close(ch);
     }
-    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto e2Res = Engine::open(
+        dbPath, EngineConfig{.enableMonitorThread = false, .allowSimulatedPlayback = true});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());
     // next should continue from cursor 2 -> third track
     REQUIRE(eng2->next().has_value());
     eng2.reset();
+    safeRemoveDb(dbPath);
+}
+
+TEST_CASE("engine play missing file fails without simulation", "[engine_queue]") {
+    // No audio device needed: the error path must trigger before any output.
+    std::string dbPath = tempDbPath("eng_q_nosim").string();
+    auto dbRes = Database::open(dbPath);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    Track t;
+    t.path = "no-such-file.wav";
+    t.duration = 1.0;
+    for (int b = 0; b < 32; ++b)
+        t.fingerprint[b] = (uint8_t)(0xC0 + b);
+    auto r = db->insertTrack(t);
+    REQUIRE(r.has_value());
+    REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+    EngineConfig cfg; // allowSimulatedPlayback defaults to false
+    cfg.enableMonitorThread = false;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    auto eng = std::move(eRes.value());
+    REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+    auto pr = eng->play(1);
+    REQUIRE(!pr.has_value());
+    REQUIRE(pr.error().code == StatusCode::NotFound);
+    // stays stopped and emits no TrackStarted event
+    REQUIRE(eng->state() == PlaybackState::Stopped);
+    REQUIRE(!eng->pollEvent().has_value());
+    eng.reset();
     safeRemoveDb(dbPath);
 }

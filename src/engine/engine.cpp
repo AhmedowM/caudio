@@ -1028,7 +1028,8 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
         output_.reset();
     }
 
-    // attempt to open reader & decoder if file exists; otherwise fallback to simulated
+    // attempt to open reader & decoder; without allowSimulatedPlayback an
+    // unplayable track is an error, never silent timer playback
     bool opened = false;
     if (!path.empty()) {
         auto rRes = caudio::player::FileReader::open(path);
@@ -1073,9 +1074,26 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
         }
     }
     if (!opened) {
-        // fallback to track metadata duration
+        if (!cfg_.allowSimulatedPlayback) {
+            const std::string msg =
+                lastErr_.empty() ? "track file not playable: " + path : lastErr_;
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::NotFound, msg)};
+        }
+        // timer-only fallback to track metadata duration (no audio output)
         duration_ = t.duration > 0 ? t.duration : 1.0;
         // no ring/output needed for simulated playback
+    } else if (!output_) {
+        // decoder opened but no audio device (Player::openReader fails here
+        // with Device); timer fallback only when explicitly opted in
+        if (!cfg_.allowSimulatedPlayback) {
+            decoder_.reset();
+            reader_.reset();
+            ring_.reset();
+            const std::string msg = lastErr_.empty() ? "audio device unavailable" : lastErr_;
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Device, msg)};
+        }
     }
     currentTrack_ = t;
     // update state

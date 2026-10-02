@@ -3,7 +3,6 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/player/output.hpp>
-#include <caudio/player/player_core.hpp>
 #include <caudio/service/service_core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
@@ -182,16 +181,8 @@ Service::handle(const caudio::ipc::DeviceTest& cmd) {
             testId = "auto";
         }
     }
-    // For "auto", use default device (empty ID in miniaudio)
-    // Create a temporary player to test the device
-    auto playerRes = caudio::player::Player::create();
-    if (!playerRes) {
-        return std::unexpected{playerRes.error()};
-    }
-    // Generate a short test tone (1 second of 440Hz sine wave at -20dB)
-    // This is a simple test - just verify device can be opened
-    // The actual tone generation would require more complex setup
-    // For now, return success if we can enumerate the device
+    // Enumeration-only check: there is no test-tone path (no AudioOutput is
+    // created here). Success means the id resolves against a listed device.
     auto devList = caudio::player::enumerateDevices();
     bool found = false;
     for (const auto& d : devList.devices) {

@@ -52,6 +52,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
     REQUIRE(ins.has_value());
     REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -100,6 +101,7 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
         REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
     }
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -148,6 +150,7 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
         REQUIRE(tid == *ins);
     };
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     cfg.callbacks = cbs;
     auto eRes = Engine::create(cfg);
@@ -172,6 +175,7 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
 
 TEST_CASE("Engine drainEvents null checks", "[engine_events]") {
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());

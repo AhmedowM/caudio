@@ -82,6 +82,7 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     REQUIRE(db->queueEnqueue(1, tid, -1).has_value());
     // engine with small thresholds: 10% and 1 sec, poll 10ms
     EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     cfg.historyThresholdPct = 10;

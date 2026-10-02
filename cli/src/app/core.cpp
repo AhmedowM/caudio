@@ -682,7 +682,7 @@ int App::run(int argc, char** argv) {
     auto* devSet = deviceCmd->add_subcommand("set", "Set default audio device");
     devSet->add_option("id", devSetId, "Device ID")->required();
     std::string devTestId;
-    auto* devTest = deviceCmd->add_subcommand("test", "Test audio device (play tone)");
+    auto* devTest = deviceCmd->add_subcommand("test", "Check audio device is available");
     devTest->add_option("--id", devTestId, "Device ID (default: current config)");
     bool infoJson = false;
     auto* infoCmd = cli_->add_subcommand("info", "Show current track info");
