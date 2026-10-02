@@ -76,6 +76,12 @@ endif()
 
 project(caudio VERSION ${PROJECT_VERSION} LANGUAGES CXX C)
 
+# Install dirs first: CaudioHelpers forms `$<INSTALL_INTERFACE:...>` entries
+# from these variables at target-declaration time (eager expansion), so they
+# must exist before any component is declared -- previously masked by
+# nlohmann's own include(GNUInstallDirs) running earlier via FetchContent.
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -205,35 +211,17 @@ if(NOT MSVC)
   target_compile_options(blake3 PRIVATE -w)
 endif()
 
-# FetchContent deps needed before components. Lazy: prefer a system/vcpkg/Conan
-# package first so plain configures don't pay for a git clone; fetch only as
-# fallback. nlohmann_json is PRIVATE (backend for src/utils/json.cpp only):
-# its headers never enter installed headers, so no JSON_Install and no
-# find_dependency downstream. Components get it as plain PRIVATE -I
-# (CAUDIO_NLOHMANN_PRIVATE_INCLUDE): even a PRIVATE target link would force
-# it into install(EXPORT).
+# FetchContent deps needed before components. CLI11/Catch2 are lazy: prefer
+# a system/vcpkg/Conan package first so plain configures don't pay for a git
+# clone; fetch only as fallback. nlohmann_json is vendored instead
+# (vendor/nlohmann/, see vendor/README.md): it is PRIVATE (backend for
+# src/utils/json.cpp only) -- its headers never enter installed headers, so
+# no JSON_Install and no find_dependency downstream. Components get it as
+# plain PRIVATE -I (CAUDIO_NLOHMANN_PRIVATE_INCLUDE): even a PRIVATE target
+# link would force it into install(EXPORT).
 include(FetchContent)
-find_package(nlohmann_json QUIET)
-if(NOT nlohmann_json_FOUND)
-  FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.12.0
-  )
-  FetchContent_MakeAvailable(nlohmann_json)
-else()
-  message(STATUS "nlohmann_json found (system): backend includes come from nlohmann_json::nlohmann_json")
-endif()
-# Private backend include dirs for src/ only. Plain PRIVATE -I (never a
-# target link): linking nlohmann_json::nlohmann_json even PRIVATEly would
-# force it into install(EXPORT caudioTargets) and drag find_dependency back.
-# Same SOURCE_DIR pattern as CAUDIO_CLI11_EXTRA_INCLUDE below.
-if(DEFINED nlohmann_json_SOURCE_DIR)
-  set(CAUDIO_NLOHMANN_PRIVATE_INCLUDE ${nlohmann_json_SOURCE_DIR}/include)
-else()
-  set(CAUDIO_NLOHMANN_PRIVATE_INCLUDE
-    $<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>)
-endif()
+# Vendored single-header backend, version locked in vendor/README.md.
+set(CAUDIO_NLOHMANN_PRIVATE_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/vendor)
 
 # CLI11 is private to the caudio executable: skip entirely with CAUDIO_BUILD_CLI=OFF.
 option(CAUDIO_BUILD_CLI "build the caudio executable (requires CLI11)" ON)
@@ -244,6 +232,7 @@ if(CAUDIO_BUILD_CLI)
       CLI11
       GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
       GIT_TAG v2.7.2
+      GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(CLI11)
     set(CAUDIO_CLI11_EXTRA_INCLUDE ${CLI11_SOURCE_DIR}/include)
@@ -312,7 +301,7 @@ if(CAUDIO_BUILD_DOCS)
 endif()
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
-include(GNUInstallDirs)
+# (GNUInstallDirs included once, right after project() above.)
 set(CAUDIO_INSTALL_LIBS
   utils
   player
@@ -473,14 +462,23 @@ if(CAUDIO_ENABLE_EXAMPLES)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
-# Tests -- Catch2 via FetchContent (143 tests: utils/player/db/engine/ipc/cli paths)
+# Tests -- Catch2 via system package or FetchContent (144 tests: utils/player/db/engine/ipc/cli paths)
 if(CAUDIO_ENABLE_TESTS)
-  FetchContent_Declare(
-    Catch2
-    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.16.0
-  )
-  FetchContent_MakeAvailable(Catch2)
+  find_package(Catch2 QUIET)
+  if(NOT Catch2_FOUND)
+    # Keep Catch2 out of our install/packages (cf. JSON_Install=OFF above).
+    set(CATCH_INSTALL_DOCS OFF)
+    set(CATCH_INSTALL_EXTRAS OFF)
+    FetchContent_Declare(
+      Catch2
+      GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+      GIT_TAG v3.16.0
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+  else()
+    message(STATUS "Catch2 found (system): tests link Catch2::Catch2WithMain")
+  endif()
   include(CTest)
   include(Catch)
   enable_testing()

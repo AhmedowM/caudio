@@ -11,8 +11,14 @@
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | recent (tools + dev packages) | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. CI uses Ubuntu system FFmpeg; auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
 | **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
-| **Catch2** | 3.16.0 | Auto-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
+| **Catch2** | 3.16.0 | System package preferred, else shallow-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
 | **Git** | 2.30+ | For `git describe --tags` version stamping |
+
+> **Windows note:** first configures fetch shallow dependency copies per
+> preset build dir (gitignored); exclude the repo from Windows Defender
+> real-time scanning — it otherwise multiplies git + configure times.
+> Prefer a Ninja + `vcvars` shell over the Visual Studio generator for
+> iteration speed.
 
 ### Clone and Configure
 

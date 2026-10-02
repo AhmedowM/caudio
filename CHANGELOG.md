@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-rc2] - 2026-10-02
+
+### Added
+- nlohmann/json v3.12.0 vendored in `vendor/nlohmann/` (`json.hpp`, `json_fwd.hpp`):
+  eliminates ~180MB git clone on every configure, zero network, zero FetchContent
+  logic. `CMakeLists.txt` simplified to single `CAUDIO_NLOHMANN_PRIVATE_INCLUDE`.
+
+### Changed
+- `GIT_SHALLOW TRUE` on all FetchContent declares (nlohmann_json, CLI11, Catch2):
+  reduces fresh configure time from ~93s to ~15–25s on typical CI networks.
+
 ## [0.37.1] - 2026-10-02
 
 ### Fixed
