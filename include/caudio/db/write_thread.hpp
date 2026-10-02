@@ -2,11 +2,11 @@
 
 #include <atomic>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/function.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <condition_variable>
 #include <cstddef>
 #include <expected>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <stop_token>
@@ -44,7 +44,7 @@ namespace caudio::db {
 struct WriteOp {
     std::string sql;                       ///< Raw SQL (used when `stmt` is null).
     std::unique_ptr<SqliteStatement> stmt; ///< Prepared statement to step.
-    std::move_only_function<void(std::expected<void, caudio::utils::Error>)>
+    caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)>
         cb; ///< Completion callback.
 
     // All special members are out-of-line (write_thread.cpp): the header only
@@ -59,7 +59,7 @@ struct WriteOp {
      * @param c Completion callback (may be empty).
      */
     WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
-            std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c);
+            caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c);
     WriteOp(const WriteOp&) = delete;
     WriteOp& operator=(const WriteOp&) = delete;
     WriteOp(WriteOp&&) noexcept;
@@ -143,7 +143,7 @@ class WriterThread final {
      */
     std::expected<void, caudio::utils::Error>
     push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
-         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb);
+         caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb);
     /**
      * @brief Enqueues a raw-SQL write operation (no prepared statement).
      * @ingroup caudio_db
@@ -158,7 +158,7 @@ class WriterThread final {
      */
     std::expected<void, caudio::utils::Error>
     push(std::string sql,
-         std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb);
+         caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb);
 
     /**
      * @brief Waits until the queue is empty and no op is in flight.

@@ -21,7 +21,7 @@
 - **SHM 10 fps** -- lock-free `AtomicShmStatus` shared-memory block polled by TUI at 10 Hz (`src/service/shm_status.cpp`)
 - **IPC JSON+framing** -- `protocol::frame` 4-byte length prefix + `ordered_json` (`src/ipc/protocol.cpp`), Unix Domain Socket / Windows Named Pipe
 - **Daemon lifecycle** -- single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, `STATUS` via `--watch`
-- **C++23 modules** -- `import caudio;` umbrella, `std::expected`, `std::print`, `std::generator` scan, `std::jthread`/`std::stop_token`
+- **C++23 modules** -- `import caudio;` umbrella, `std::expected`, `std::print`, `Generator` scan, `std::jthread`/`std::stop_token`
 
 ## Quick Start
 

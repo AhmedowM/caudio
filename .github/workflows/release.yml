@@ -63,7 +63,7 @@ jobs:
           "$LLVM_PREFIX/bin/clang" --version
           "$LLVM_PREFIX/bin/clang++" --version
           LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
-          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<generator>, move_only_function): $LLVM_MAJOR" && exit 1)
+          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<expected>, <print>): $LLVM_MAJOR" && exit 1)
 
       - name: Setup GCC (Windows)
         if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'

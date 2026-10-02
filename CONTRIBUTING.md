@@ -6,7 +6,7 @@
 
 | Tool | Minimum Version | Notes |
 |---|---|---|
-| **Compiler** | GCC 14+ / Clang 17+ / AppleClang 17+ | C++23 required (`std::expected`, `std::print`, `std::generator`, modules). MinGW GCC 14+ on Windows. |
+| **Compiler** | GCC 14+ / Clang 17+ / AppleClang 17+ | C++23 required (`std::expected`, `std::print`, modules). Scan/generator + move-only callbacks are polyfilled in-tree (libc++ lacks both). MinGW GCC 14+ on Windows. |
 | **CMake** | 3.28+ | Required for `FILE_SET CXX_MODULES` and BMI handling |
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | recent (tools + dev packages) | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. CI uses Ubuntu system FFmpeg; auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |

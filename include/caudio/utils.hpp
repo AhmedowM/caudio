@@ -15,9 +15,13 @@
  * - print: portable print/println facade (see print.hpp)
  * - json: opaque Json/JsonRef value type (nlohmann stays behind src/ walls)
  * - version: version constants and helpers
+ * - function: portable MoveOnlyFunction (libc++ lacks std::move_only_function)
+ * - generator: portable Generator (libc++ lacks std::generator)
  */
 
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/function.hpp>
+#include <caudio/utils/generator.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>

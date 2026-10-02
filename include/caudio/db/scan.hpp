@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <caudio/db/db_types.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/generator.hpp>
 #include <string_view>
 
 namespace caudio::db {
@@ -14,7 +15,6 @@ class Database;
 #include <expected>
 #include <filesystem>
 #include <functional>
-#include <generator>
 #include <string>
 #include <vector>
 
@@ -64,7 +64,8 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
  * @see scanDirectory
  * @see scanLibrary
  */
-std::generator<Track> scan(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
+caudio::utils::Generator<Track> scan(const std::filesystem::path& root,
+                                     ScanMode mode = ScanMode::Sampled);
 
 /**
  * @brief Scans a directory and collects all tracks into a vector.

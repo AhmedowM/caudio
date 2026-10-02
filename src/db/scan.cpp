@@ -7,6 +7,7 @@
 #include <caudio/db/scan.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/generator.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstddef>
@@ -17,7 +18,6 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
-#include <generator>
 #include <ios>
 #include <mutex>
 #include <shared_mutex>
@@ -29,7 +29,7 @@
 
 namespace caudio::db {
 
-std::generator<Track> scan(const std::filesystem::path& root, ScanMode mode) {
+caudio::utils::Generator<Track> scan(const std::filesystem::path& root, ScanMode mode) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         co_return;

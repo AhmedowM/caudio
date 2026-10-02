@@ -3,6 +3,7 @@
 #include <atomic>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/function.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
@@ -10,7 +11,6 @@
 #include <db/statement.hpp>
 #include <db/stmt_helpers.hpp>
 #include <expected>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <stop_token>
@@ -24,7 +24,7 @@ namespace caudio::db {
 WriteOp::WriteOp() = default;
 
 WriteOp::WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
-                 std::move_only_function<void(std::expected<void, caudio::utils::Error>)> c)
+                 caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c)
     : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
 
 WriteOp::WriteOp(WriteOp&&) noexcept = default;
@@ -76,7 +76,7 @@ void WriterThread::close() {
 
 std::expected<void, caudio::utils::Error>
 WriterThread::push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
-                   std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
+                   caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
     WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
     auto r = queue_->push(std::move(op));
     if (!r)
@@ -87,7 +87,7 @@ WriterThread::push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
 
 std::expected<void, caudio::utils::Error>
 WriterThread::push(std::string sql,
-                   std::move_only_function<void(std::expected<void, caudio::utils::Error>)> cb) {
+                   caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
     return push(std::move(sql), std::unique_ptr<SqliteStatement>{}, std::move(cb));
 }
 
