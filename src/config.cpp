@@ -371,13 +371,17 @@ caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::fi
         out.reserve(j.size());
         for (std::size_t i = 0, n = j.size(); i < n; ++i) {
             auto kkExp = j.keyAt(i);
-            auto vvExp = j.at(i);
-            if (!kkExp || !vvExp)
+            if (!kkExp)
                 continue;
             const std::string kk = std::move(*kkExp);
-            const Json vv = std::move(*vvExp);
             if (kk.empty() || kk == "type")
                 continue;
+            // NOTE: at(size_t) only serves arrays (resolveConstImpl rejects
+            // non-arrays), so look the value up by key for objects.
+            auto vvExp = j.at(kk);
+            if (!vvExp)
+                continue;
+            const Json vv = std::move(*vvExp);
             std::string vs;
             if (vv.isString())
                 vs = vv.get<std::string>();

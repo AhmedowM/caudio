@@ -222,6 +222,17 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
         a.insert(a.begin(), {"--config", cfgS});
         return runCli(a);
     };
+    // Best-effort shutdown on any path: a REQUIRE failure must not leak a
+    // daemon (on Windows a live daemon locks caudio.exe for the next build).
+    struct DaemonGuard {
+        decltype(run)* runFn;
+        ~DaemonGuard() {
+            try {
+                (*runFn)({"shutdown"});
+            } catch (...) {
+            }
+        }
+    } guard{&run};
     auto start = run({"start"});
     REQUIRE(start.exitCode == 0);
     REQUIRE(contains(start.out, "started"));
@@ -279,6 +290,15 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto get = run({"config", "get", "cli_golden_key"});
     REQUIRE(get.exitCode == 0);
     REQUIRE(contains(get.out, "hello"));
+    auto getJ = run({"config", "get", "cli_golden_key", "--json"});
+    REQUIRE(getJ.exitCode == 0);
+    REQUIRE(contains(getJ.out, "\"value\""));
+    auto setNum = run({"config", "set", "cli_golden_num", "42"});
+    REQUIRE(setNum.exitCode == 0);
+    auto list = run({"config", "list"});
+    REQUIRE(list.exitCode == 0);
+    REQUIRE(contains(list.out, "cli_golden_key = hello"));
+    REQUIRE(contains(list.out, "cli_golden_num = 42"));
     // Empty the queue, then play must fail fast without touching audio.
     auto clear = run({"queue", "clear"});
     REQUIRE(clear.exitCode == 0);
@@ -323,6 +343,16 @@ TEST_CASE("cli playback one-liners", "[cli]") {
         a.insert(a.begin(), {"--config", cfgS});
         return runCli(a);
     };
+    // Same best-effort shutdown guard as the lifecycle test above.
+    struct PlaybackGuard {
+        decltype(run)* runFn;
+        ~PlaybackGuard() {
+            try {
+                (*runFn)({"shutdown"});
+            } catch (...) {
+            }
+        }
+    } playGuard{&run};
     auto EpicFail = [&](const char* what) {
         std::error_code ec;
         fs::remove_all(dir, ec);

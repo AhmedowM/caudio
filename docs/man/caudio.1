@@ -78,7 +78,7 @@ Start daemon. By default spawns a background process (fork/CreateProcess
 with \fBDETACHED_PROCESS\fR) and polls for socket readiness. With
 \fB\-\-foreground\fR runs in the foreground (for systemd or debugging).
 Creates DB parent directories if needed and derives the socket path
-from the DB path via \fBcaudio::cli::socketPathFor\fR.
+from the DB path via \fBcaudio::config::socketPathFor\fR.
 .TP
 .B shutdown
 Stop daemon. Sends \fBShutdown\fR IPC command and polls for socket and
@@ -114,6 +114,7 @@ Go to previous track.
 Seek to position. \fITIME\fR can be absolute (\fBmm:ss\fR or seconds,
 e.g. \fB1:30\fR or \fB90\fR) or relative (\fB+N\fR/\fB\-N\fR). Relative
 seeks fetch current position via \fBStatusReq\fR and clamp to 0.
+Prints nothing on success; errors go to stderr.
 .TP
 .B status [\-\-json] [\-\-watch] [\-\-follow] [\-\-interval \fIMS\fR]
 Show playback status (state, position, duration, volume, shuffle,
@@ -135,7 +136,7 @@ statistics).
 List tracks in the active queue.
 .TP
 .B queue queues
-List all queues with track counts.
+Print totals: queued tracks, queue count, playlist count.
 .TP
 .B queue switch \fIQID\fR
 Switch active queue by ID. Engine validates that the queue exists.
@@ -153,21 +154,22 @@ Move track within queue from index \fIFROM\fR to \fITO\fR (atomic
 clear+re\-enqueue transaction).
 .TP
 .B queue clear
-Clear entire queue atomically.
+Clear entire queue atomically. Playback of the current track continues.
 .TP
 .B queue shuffle [\fIon\fR|\fIoff\fR]
-Set shuffle mode. No argument toggles.
+Set shuffle mode. No argument toggles. The resulting state is printed.
 .TP
 .B queue repeat [\fIoff\fR|\fIone\fR|\fIall\fR]
-Set repeat mode. No argument shows current mode. \fBall\fR maps to
-\fBRepeatMode::Queue\fR.
+Set repeat mode (\fBall\fR maps to
+\fBRepeatMode::All\fR). No argument cycles \fBoff\fR \-> \fBall\fR \->
+\fBone\fR \-> \fBoff\fR and prints the new mode.
 .SS Playlist
 .TP
 .B playlist list [\-\-json]
 List all playlists.
 .TP
-.B playlist tracks \fIPID\fR
-List tracks in playlist \fIPID\fR.
+.B playlist tracks \fIPID\fR [\-\-json]
+List tracks in playlist \fIPID\fR under a \fBPlaylist (N tracks):\fR header.
 .TP
 .B playlist load \fIPID\fR [\-\-play]
 Load playlist \fIPID\fR into the queue (clears first). With \fB\-\-play\fR
@@ -238,11 +240,12 @@ Set default audio output device.
 Check audio device is available (enumeration only, no sound). Defaults to current config device.
 .SS Config
 .TP
-.B config get \fIKEY\fR
+.B config get \fIKEY\fR [\-\-json]
 Get config value for \fIKEY\fR.
 .TP
 .B config set \fIKEY\fR \fIVALUE\fR
 Set config value. \fIVALUE\fR is stored as JSON or plain string.
+Prints nothing on success.
 .TP
 .B config list [\-\-json]
 List all config key/value pairs.
@@ -263,12 +266,22 @@ Blocks until playback finishes.
 .SH EXAMPLES
 .TP
 Start daemon and play a file:
-.B caudio start;
-caudio queue add ~/ Music / album / track.flac;
-caudio play;
-caudio status.TP Search and queue :.B caudio library search
-                                   "beatles" --limit 10 .br.B caudio queue add
-                                   "beatles" --search.br.B caudio next; caudio status --json
+.B caudio start
+.br
+caudio queue add ~/Music/album/track.flac
+.br
+caudio play
+.br
+caudio status
+.TP
+Search and queue:
+.B caudio library search
+                                   "beatles" --limit 10
+.br
+.B caudio queue add
+                                   "beatles" --search
+.br
+.B caudio next; caudio status --json
 .TP
 Library scan and stats:
 .B caudio library scan --path ~/Music --mode sampled
@@ -279,33 +292,73 @@ Live status polling (for scripts/TUI):
 .B caudio status --watch --interval 200
 .TP
 Volume control:
-.B caudio volume 75;
-caudio volume + 5;
-caudio volume mute;
-caudio volume.TP Playlist workflows :.B caudio playlist save "My Mix";
-caudio playlist export 1 / tmp / mix.m3u-- format m3u.br.B caudio playlist import / tmp /
-        mix.m3u-- name "Imported".SH FILES.TP.I ~/.config / caudio / config.json(POSIX).TP.I
-        % LOCALAPPDATA %\\caudio\\config.json(Windows) Default config file.Overridden by \fB\-\-
-    config\fR.Stores DB path,
+.B caudio volume 75
+.br
+caudio volume +5
+.br
+caudio volume mute
+.br
+caudio volume
+.TP
+Playlist workflows:
+.B caudio playlist save "My Mix";
+caudio playlist export 1 /tmp/mix.m3u --format m3u
+.br
+.B caudio playlist import /tmp/
+        mix.m3u --name "Imported"
+.SH FILES
+.TP
+.I ~/.config/caudio/config.json (POSIX)
+.TP
+.I
+        %LOCALAPPDATA%\\caudio\\config.json (Windows) Default config file. Overridden by \fB\-\-
+    config\fR. Stores DB path,
     socket path, device, log level,
-    etc..TP.I ~/.local / share / caudio / caudio.db(POSIX).TP.I % LOCALAPPDATA
-        %\\caudio\\caudio.db(Windows) Default SQLite database path.Contains tracks,
+    etc.
+.TP
+.I ~/.local/share/caudio/caudio.db (POSIX)
+.TP
+.I %LOCALAPPDATA%\\caudio\\caudio.db (Windows)
+Default SQLite database path. Contains tracks,
     queues, playlists, history,
-    FTS5 index.Parent directories are created automatically..TP.I / tmp / caudio -
-            <hash>.sock(POSIX).TP.I \\\\.\\pipe\\caudio -
-            <hash>(Windows) IPC socket /
-                named pipe
-                    .Canonical path derived from DB path hash via
-\fBcaudio::cli::socketPathFor\fR.Hash is BLAKE3 of the DB path..TP.I
-                / tmp / caudio
-            - <hash>.pid
-        or % LOCALAPPDATA % / caudio /
-                   caudio.pid Daemon pid file
-                       .Path derived from DB path via \fBcaudio::cli::pidPathFor\fR..TP.I
-                   / dev / shm / caudio
-               - <hash>(POSIX) or
-        named shared memory(Windows)
+    FTS5 index. Parent directories are created automatically.
+.TP
+.I /tmp/caudio-
+            <hash>.sock (POSIX).
+.TP
+.I \\\\.\\pipe\\caudio-
+            <hash> (Windows) IPC socket / named pipe.
+Canonical path derived from DB path hash via
+\fBcaudio::config::socketPathFor\fR. Hash is BLAKE3 of the DB path.
+POSIX base is \fB$XDG_RUNTIME_DIR\fR, else \fB$XDG_DATA_HOME\fR, else
+\fB/tmp/caudio\fR.
+.TP
+.I
+/tmp/caudio-<hash>.pid
+or %LOCALAPPDATA%/caudio/
+caudio.pid Daemon pid file.
+Path derived from DB path via \fBcaudio::config::pidPathFor\fR.
+.TP
+.I
+/dev/shm/caudio-<hash> (POSIX) or
+named shared memory (Windows)
 SHM status block (\fBAtomicShmStatus\fR) for 10 fps TUI polling.
+.SH EXIT STATUS
+.TP
+.B 0
+Success (including \fBstart\fR when the daemon is already running).
+.TP
+.B 1
+Runtime, daemon-side, or validation error.
+.TP
+.B 105
+CLI11 option-value validation failure (e.g. bad \fB\-\-format\fR).
+.TP
+.B 106
+Missing required argument.
+.TP
+.B 109
+Unknown command or argument.
 .SH SEE ALSO
 .BR cmake (1),
 .BR ninja (1),

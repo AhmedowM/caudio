@@ -1035,7 +1035,12 @@ int App::run(int argc, char** argv) {
             return 1;
         }
         double target = *parsed;
-        bool isRelative = !seekStr.empty() && (seekStr.front() == '+' || seekStr.front() == '-');
+        // parseSeek trims whitespace, so detect +/- on the trimmed form too:
+        // " +5" is a +5 delta, not absolute 5.
+        std::string_view sv = seekStr;
+        while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
+            sv.remove_prefix(1);
+        bool isRelative = !sv.empty() && (sv.front() == '+' || sv.front() == '-');
         if (isRelative) {
             caudio::client::Client client{config_.dbPath, config_.socketPath};
             auto sres = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
