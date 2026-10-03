@@ -9,6 +9,11 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
 /**
  * @file common.hpp
  * @brief Shared test helpers (temp paths, busy-wait, NOAUDIO switch).
@@ -77,7 +82,18 @@ inline std::filesystem::path tempDbPath(const std::string& prefix) {
 inline std::filesystem::path tempDirPath(const std::string& prefix) {
     static std::atomic<int> ctr2{1000};
     auto dir = std::filesystem::temp_directory_path();
-    std::string name = prefix + "_" + std::to_string(ctr2.fetch_add(1));
+    // Unique across runs, not just within one process: counter alone
+    // restarts at 1000 every run, so a leaked daemon/config from an aborted
+    // run would collide (same socket hash) with the next run. Timestamp +
+    // pid make reuse practically impossible, even under parallel ctest.
+#ifdef _WIN32
+    auto pid = static_cast<unsigned long long>(::_getpid());
+#else
+    auto pid = static_cast<unsigned long long>(::getpid());
+#endif
+    std::string name = prefix + "_" + std::to_string(ctr2.fetch_add(1)) + "_" +
+                       std::to_string(pid) + "_" +
+                       std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     auto p = dir / name;
     std::filesystem::create_directories(p);
     return p;

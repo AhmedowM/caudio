@@ -172,7 +172,7 @@ inline std::expected<ParsedVolume, std::string> parseVolume(std::string_view s) 
             return std::unexpected<std::string>{"invalid volume"};
         }
         if (iv < 0 || iv > 100)
-            return std::unexpected<std::string>{"volume out of range"};
+            return std::unexpected<std::string>{"out of range"};
         return ParsedVolume{static_cast<float>(iv), std::nullopt, std::nullopt};
     }
 }

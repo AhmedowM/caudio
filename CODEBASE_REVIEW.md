@@ -283,7 +283,7 @@ after 1.0 if SDK size matters.
 - **Install verified both modes:** header-only install ships headers + `FindFFmpeg.cmake`, no `.cppm`; modules-ON install ships 43 `.cppm` files under `<prefix>/modules/` (moved out of `include/` 2026-09-28; was 56 under `include/caudio/modules/`, 44 before the `:paths`/`:status`/`:audio` partitions were deleted 2026-09-30 as wrappers of non-installed `src/service/*` internals, 41 before `:function`/`:generator` were added 2026-10-02). Downstream full-module smoke (all 7 modules imported, live symbol per module) green.
 - **`version_config.hpp` flow:** `cmake/version.hpp.in → configure_file → BINARY_DIR/include/caudio/version_config.hpp → install(FILES …)` is coherent.
 - **Sanitizer helper:** target-scoped with WIN32/MSVC guards; per-test repetition removed via single `caudio_add_catch_test` helper.
-- **Test skip mechanism:** `CAUDIO_TEST_NOAUDIO` compile def + env fallback + `CAUDIO_SKIP_IF_NOAUDIO()` macro, consistently used; ctest 144/144 green in default config (GCC + Clang + MSVC, 2026-10-02; one pre-existing m4a fixture skip).
+- **Test skip mechanism:** `CAUDIO_TEST_NOAUDIO` compile def + env fallback + `CAUDIO_SKIP_IF_NOAUDIO()` macro, consistently used; ctest 158/158 green in default config (GCC + Clang + MSVC, 2026-10-02; one pre-existing m4a fixture skip).
 - **Umbrella layering docs:** `include/caudio.hpp` layer rule matches `cmake/components/*.cmake` DEPS; no public-header→`src/` private-header include remains.
 - **No commented-out code blocks** of significance in sampled CMake/sources.
 - **`.clang-format` / `.clang-tidy` / `.editorconfig`** exist and are referenced; `CAUDIO_ENABLE_CLANG_TIDY` wires correctly when the binary exists.

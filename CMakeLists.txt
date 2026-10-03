@@ -537,4 +537,24 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_TEST_DATA)
 
   caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_ALLOW_MULTIPLE_DEFINITION)
+
+  # CLI golden tests: spawn the real executable with hermetic temp configs
+  # and assert on stdout/stderr/exit codes (help texts, parse errors,
+  # no-daemon errors, full daemon lifecycle). Needs the CLI binary, so it
+  # only exists when CAUDIO_BUILD_CLI is on.
+  if(TARGET caudio_cli)
+    add_executable(test_cli_golden tests/test_cli_golden.cpp)
+    target_link_libraries(test_cli_golden PRIVATE Catch2::Catch2WithMain)
+    target_include_directories(test_cli_golden PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(test_cli_golden SYSTEM PRIVATE vendor)
+    target_compile_features(test_cli_golden PRIVATE cxx_std_23)
+    target_compile_definitions(test_cli_golden PRIVATE TEST_CLI_BIN="$<TARGET_FILE:caudio_cli>")
+    target_compile_definitions(test_cli_golden PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+    if(CAUDIO_ENABLE_SANITIZERS)
+      caudio_apply_sanitizers(test_cli_golden)
+    endif()
+    catch_discover_tests(test_cli_golden)
+    add_test(NAME test_cli_golden COMMAND test_cli_golden)
+    set_tests_properties(test_cli_golden PROPERTIES SKIP_RETURN_CODE 4)
+  endif()
 endif()
