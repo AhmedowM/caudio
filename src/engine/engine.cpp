@@ -188,6 +188,9 @@ Engine::ExpectedVoid Engine::resume() {
 }
 
 Engine::ExpectedVoid Engine::stop() {
+    auto s = playbackState_.load(std::memory_order_acquire);
+    if (s == PlaybackState::Stopped)
+        return {};
     playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
     if (output_)
         output_->stop();
@@ -195,6 +198,16 @@ Engine::ExpectedVoid Engine::stop() {
         ring_->reset();
     pausePos_ = 0;
     hasCurrent_.store(false, std::memory_order_release);
+    // Rewind the cursor to the stopped track: cursor addresses the NEXT track,
+    // so a later play would otherwise skip the stopped one. Already-stopped
+    // returns above, so double-stop cannot rewind twice.
+    if (tryLockQueue()) {
+        if (queue_.cursor > 0) {
+            queue_.cursor--;
+            (void)persistCursorLocked();
+        }
+        unlockQueue();
+    }
     return {};
 }
 

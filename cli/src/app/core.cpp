@@ -926,7 +926,8 @@ int App::run(int argc, char** argv) {
             return detail::trackWho(*st);
         return std::string{"unknown track"};
     };
-    if (playCmd->parsed()) {
+    // Shared play flow (used by `play`, and by `resume` when stopped).
+    auto doPlay = [&](bool asJson) -> int {
         // Prior state decides the wording (resumed vs fresh); one extra roundtrip.
         bool wasPaused = false;
         double priorPos = 0;
@@ -943,7 +944,7 @@ int App::run(int argc, char** argv) {
         auto res = sendRaw(cmd);
         if (!res)
             return printErr(res.error());
-        if (playJson)
+        if (asJson)
             return printJson(*res);
         if (std::get_if<caudio::ipc::Status>(&*res)) {
             std::string who = transportWho(res);
@@ -956,12 +957,20 @@ int App::run(int argc, char** argv) {
             fmt.print(*res, std::cout);
         }
         return 0;
-    }
+    };
+    if (playCmd->parsed())
+        return doPlay(playJson);
     if (pauseCmd->parsed()) {
         caudio::ipc::Command cmd{caudio::ipc::Pause{}};
         auto res = sendRaw(cmd);
-        if (!res)
-            return printErr(res.error());
+        if (!res) {
+            const auto& e = res.error();
+            if (e.code == caudio::utils::StatusCode::State && e.message == "not playing") {
+                caudio::println(std::cerr, "pause: nothing playing");
+                return 0;
+            }
+            return printErr(e);
+        }
         if (pauseJson)
             return printJson(*res);
         if (std::get_if<caudio::ipc::Status>(&*res)) {
@@ -979,8 +988,29 @@ int App::run(int argc, char** argv) {
     if (resumeCmd->parsed()) {
         caudio::ipc::Command cmd{caudio::ipc::Resume{}};
         auto res = sendRaw(cmd);
-        if (!res)
-            return printErr(res.error());
+        if (!res) {
+            const auto& e = res.error();
+            if (e.code == caudio::utils::StatusCode::State && e.message == "not paused") {
+                // Forgiving resume: playing -> warn; stopped -> play from cursor.
+                bool playing = false;
+                bool probed = false;
+                caudio::client::Client probe{config_.dbPath, config_.socketPath};
+                if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+                    if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
+                        probed = true;
+                        playing = (st->state == caudio::engine::PlaybackState::Playing);
+                    }
+                }
+                if (probed && playing) {
+                    caudio::println(std::cerr, "resume: already playing");
+                    return 0;
+                }
+                if (!probed)
+                    return printErr(e);
+                return doPlay(resumeJson);
+            }
+            return printErr(e);
+        }
         if (resumeJson)
             return printJson(*res);
         if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
@@ -1019,8 +1049,14 @@ int App::run(int argc, char** argv) {
     if (prevCmd->parsed()) {
         caudio::ipc::Command cmd{caudio::ipc::Prev{}};
         auto res = sendRaw(cmd);
-        if (!res)
-            return printErr(res.error());
+        if (!res) {
+            const auto& e = res.error();
+            if (e.code == caudio::utils::StatusCode::NotFound && e.message == "at start") {
+                caudio::println(std::cerr, "prev: at queue start");
+                return 0;
+            }
+            return printErr(e);
+        }
         if (prevJson)
             return printJson(*res);
         caudio::println("Playing {}", transportWho(res));

@@ -284,6 +284,12 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto plj = run({"playlist", "tracks", "1", "--json"});
     REQUIRE(plj.exitCode == 0);
     REQUIRE(contains(plj.out, "\"PlaylistData\""));
+    auto pauseIdle = run({"pause"});
+    REQUIRE(pauseIdle.exitCode == 0);
+    REQUIRE(contains(pauseIdle.err, "nothing playing"));
+    auto prevStart = run({"prev"});
+    REQUIRE(prevStart.exitCode == 0);
+    REQUIRE(contains(prevStart.err, "at queue start"));
     auto set = run({"config", "set", "cli_golden_key", "hello"});
     REQUIRE(set.exitCode == 0);
     REQUIRE(set.out.empty());
@@ -303,6 +309,9 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto clear = run({"queue", "clear"});
     REQUIRE(clear.exitCode == 0);
     REQUIRE(contains(clear.out, "cleared"));
+    auto resumeEmpty = run({"resume"});
+    REQUIRE(resumeEmpty.exitCode == 1);
+    REQUIRE(contains(resumeEmpty.err, "empty queue"));
     auto shuf = run({"queue", "shuffle", "on"});
     REQUIRE(shuf.exitCode == 0);
     REQUIRE(contains(shuf.out, "Shuffle: on"));
@@ -388,6 +397,10 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     }
     REQUIRE(run({"library", "add", wav.generic_string()}).exitCode == 0);
     REQUIRE(run({"queue", "add", wav.generic_string()}).exitCode == 0);
+    fs::path ogg = wav.parent_path() / "sample.ogg";
+    REQUIRE(fs::exists(ogg));
+    REQUIRE(run({"library", "add", ogg.generic_string()}).exitCode == 0);
+    REQUIRE(run({"queue", "add", ogg.generic_string()}).exitCode == 0);
     auto play = run({"play"});
     REQUIRE(play.exitCode == 0);
     REQUIRE(contains(play.out, "Playing "));
@@ -398,12 +411,44 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     auto resume = run({"resume"});
     REQUIRE(resume.exitCode == 0);
     REQUIRE(contains(resume.out, "Resuming sample.wav from "));
-    auto seek = run({"seek", "30"});
+    // Seek silence while playing (seek 0 stays at head, so no auto-advance
+    // can fire before the assertions below).
+    auto seek = run({"seek", "0"});
     REQUIRE(seek.exitCode == 0);
     REQUIRE(seek.out.empty());
+    auto pauseA = run({"pause"});
+    REQUIRE(pauseA.exitCode == 0);
+    REQUIRE(contains(pauseA.out, "Paused sample.wav at "));
     auto stop = run({"stop"});
     REQUIRE(stop.exitCode == 0);
     REQUIRE(contains(stop.out, "Stopped"));
+    // Play-after-stop replays the stopped track instead of advancing.
+    auto again = run({"play"});
+    REQUIRE(again.exitCode == 0);
+    REQUIRE(contains(again.out, "Playing sample.wav"));
+    auto pause2 = run({"pause"});
+    REQUIRE(pause2.exitCode == 0);
+    REQUIRE(contains(pause2.out, "Paused sample.wav at "));
+    auto resume2 = run({"resume"});
+    REQUIRE(resume2.exitCode == 0);
+    REQUIRE(contains(resume2.out, "Resuming sample.wav from "));
+    auto stopA = run({"stop"});
+    REQUIRE(stopA.exitCode == 0);
+    auto nx1 = run({"next"});
+    REQUIRE(nx1.exitCode == 0);
+    REQUIRE(contains(nx1.out, "Playing sample.wav"));
+    auto nx = run({"next"});
+    REQUIRE(nx.exitCode == 0);
+    REQUIRE(contains(nx.out, "Playing sample.ogg"));
+    auto stop2 = run({"stop"});
+    REQUIRE(stop2.exitCode == 0);
+    auto pauseIdle = run({"pause"});
+    REQUIRE(pauseIdle.exitCode == 0);
+    REQUIRE(contains(pauseIdle.err, "nothing playing"));
+    // Resume-after-stop plays the stopped track from its head.
+    auto resumeStopped = run({"resume"});
+    REQUIRE(resumeStopped.exitCode == 0);
+    REQUIRE(contains(resumeStopped.out, "Playing sample.ogg"));
     REQUIRE(run({"shutdown"}).exitCode == 0);
     std::error_code ec;
     fs::remove_all(dir, ec);

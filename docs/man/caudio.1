@@ -86,29 +86,30 @@ pid file removal. Reports an error if the daemon is still running.
 .SS Playback control
 .TP
 .B play
-Start playback. If paused, resumes;
-if playing
-    , restarts;
-if stopped,
-starts from queue head.
+Start playback. If paused, resumes; if playing, restarts; if stopped,
+replays the stopped track (or starts from queue head when nothing was
+stopped).
 .TP
 .B pause
-Pause playback, preserving position.
+Pause playback, preserving position. Warns without failing when nothing
+is playing.
 .TP
 .B resume
-Resume from paused position.
+Resume from paused position. Warns without failing when already playing;
+plays from cursor when stopped.
 .TP
 .B restart
 Seek to 0 and ensure playing state.
 .TP
 .B stop
-Stop playback and clear current track.
+Stop playback and clear current track. A later play replays the stopped
+track.
 .TP
 .B next
 Advance to next track. Handles \fBRepeatMode::One\fR and shuffle.
 .TP
 .B prev
-Go to previous track.
+Go to previous track. Warns without failing at queue start.
 .TP
 .B seek \fITIME\fR
 Seek to position. \fITIME\fR can be absolute (\fBmm:ss\fR or seconds,
