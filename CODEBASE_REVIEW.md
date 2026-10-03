@@ -299,6 +299,12 @@ after 1.0 if SDK size matters.
 - **FetchContent lazy:** `find_package(CLI11/Catch2)` first, fetch only as fallback (nlohmann_json is vendored in `vendor/nlohmann/`, no fetch at all — see `vendor/README.md`); CLI11 + the `caudio` executable skipped entirely with `CAUDIO_BUILD_CLI=OFF` (verified configure + build). nlohmann reaches components as plain PRIVATE `-I` (`CAUDIO_NLOHMANN_PRIVATE_INCLUDE` = `vendor/`); `CAUDIO_CLI11_EXTRA_INCLUDE` covers the exe (empty when system package provides the target).
 - **AI comments:** stale `import`-wording narration in `tests/common.hpp` deleted; per-method `@par Thread safety` blocks verified as concise one-line locking contracts (kept); canonical locking section lives in `engine/engine_core.hpp` file docs (moved out of the `engine.hpp` umbrella 2026-09-28).
 
+## Deferred post-1.0 (CLI behavior audit, 2026-10-03)
+
+- **Playback-policy config options:** behaviors like whether `queue clear` stops playback,
+  whether natural queue end stops or loops, and similar policy choices should become
+  config-file options. Deferred: 1.0 keeps current behavior (`clear` leaves playback running)
+
 ---
 
 *Method note: findings derive from glob/grep/read sampling per the task brief (not a full per-file audit). Line numbers are as observed at review time; verify with grep before editing. Items addressed in batches B1–B9, C1–C5, shared-lib gating, version/fetch/comment cleanup plus the namespace rename were removed in the 2026-09-27 pass; dependency bumps, library de-noise + naming unification, the documentation audit, and the include-hygiene/module-export pass were removed in the 2026-09-30 pass. KISS-4 deferred by user decision. Shared-library audit (§5, with MSVC repro + MinGW shared build evidence) added 2026-10-02; declined NAME-7 row removed same day. MSVC archive-bloat audit (§6, with `llvm-size`/`llvm-nm` per-TU evidence across all library objects + `extern template` recipe) added same day. No files other than this report were modified.*

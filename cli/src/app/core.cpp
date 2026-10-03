@@ -627,8 +627,10 @@ int App::run(int argc, char** argv) {
     auto* plList = plCmd->add_subcommand("list", "List playlists");
     plList->add_flag("--json", plJson, "JSON output");
     std::int64_t plTracksPid = 0;
+    bool plTracksJson = false;
     auto* plTracks = plCmd->add_subcommand("tracks", "Tracks in playlist");
     plTracks->add_option("pid", plTracksPid, "Playlist id")->required();
+    plTracks->add_flag("--json", plTracksJson, "JSON output");
     std::int64_t plLoadPid = 0;
     bool plLoadPlay = false;
     bool plLoadJson = false;
@@ -753,14 +755,14 @@ int App::run(int argc, char** argv) {
     previewCmd->add_option("file", previewFile, "File path")->required();
     auto* cfgCmd = cli_->add_subcommand("config", "Config operations");
     std::string cfgGetKey;
+    bool cfgGetJson = false;
     auto* cfgGet = cfgCmd->add_subcommand("get", "Get config value");
     cfgGet->add_option("key", cfgGetKey, "Key")->required();
+    cfgGet->add_flag("--json", cfgGetJson, "JSON output");
     std::string cfgSetKey, cfgSetVal;
-    bool cfgSetJson = false;
     auto* cfgSet = cfgCmd->add_subcommand("set", "Set config value");
     cfgSet->add_option("key", cfgSetKey, "Key")->required();
     cfgSet->add_option("value", cfgSetVal, "Value")->required();
-    cfgSet->add_flag("--json", cfgSetJson, "JSON output");
     bool cfgListJson = false;
     auto* cfgList = cfgCmd->add_subcommand("list", "List config");
     cfgList->add_flag("--json", cfgListJson, "JSON output");
@@ -1060,7 +1062,6 @@ int App::run(int argc, char** argv) {
             return printErr(res.error());
         if (seekJson)
             return printJson(*res);
-        caudio::println("Seeked to {}", detail::fmtClock(target));
         return 0;
     }
     if (statusCmd->parsed()) {
@@ -1187,30 +1188,68 @@ int App::run(int argc, char** argv) {
                 return 1;
             }
             caudio::ipc::Command cmd{caudio::ipc::QueueShuffle{on}};
-            std::string line =
-                on.has_value() ? std::format("Shuffle: {}", *on ? "on" : "off") : "Shuffle toggled";
-            return confirm(sendRaw(cmd), qShuffleJson, line);
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (qShuffleJson)
+                return printJson(*res);
+            // Report the resulting state (the daemon answers Status).
+            bool stateOn = on.value_or(false);
+            bool known = on.has_value();
+            if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
+                stateOn = st->shuffle;
+                known = true;
+            }
+            if (!known) {
+                caudio::println("Shuffle toggled");
+                return 0;
+            }
+            caudio::println("Shuffle: {}", stateOn ? "on" : "off");
+            return 0;
         }
         if (qRepeat->parsed()) {
-            std::optional<caudio::engine::RepeatMode> m;
-            std::string mode;
-            if (qRepeatArg == "off") {
-                m = caudio::engine::RepeatMode::Off;
-                mode = "off";
-            } else if (qRepeatArg == "one") {
-                m = caudio::engine::RepeatMode::One;
-                mode = "one";
-            } else if (qRepeatArg == "all") {
-                m = caudio::engine::RepeatMode::All;
-                mode = "all";
-            } else if (!qRepeatArg.empty()) {
+            using RM = caudio::engine::RepeatMode;
+            std::optional<RM> m;
+            if (qRepeatArg == "off")
+                m = RM::Off;
+            else if (qRepeatArg == "one")
+                m = RM::One;
+            else if (qRepeatArg == "all")
+                m = RM::All;
+            else if (!qRepeatArg.empty()) {
                 caudio::println(std::cerr, "repeat: invalid mode '{}' (expected off|one|all)",
                                 qRepeatArg);
                 return 1;
+            } else {
+                // Bare repeat cycles off -> all -> one -> off.
+                caudio::client::Client probe{config_.dbPath, config_.socketPath};
+                if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+                    if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
+                        if (st->repeat == RM::Off)
+                            m = RM::All;
+                        else if (st->repeat == RM::All)
+                            m = RM::One;
+                        else
+                            m = RM::Off;
+                    }
+                }
+                if (!m.has_value()) {
+                    caudio::println(std::cerr, "repeat: could not read current mode");
+                    return 1;
+                }
             }
             caudio::ipc::Command cmd{caudio::ipc::QueueRepeat{m}};
-            std::string line = mode.empty() ? "Repeat toggled" : "Repeat: " + mode;
-            return confirm(sendRaw(cmd), qRepeatJson, line);
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (qRepeatJson)
+                return printJson(*res);
+            RM finalMode = *m;
+            if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
+                finalMode = st->repeat;
+            caudio::println("Repeat: {}",
+                            finalMode == RM::All ? "all" : finalMode == RM::One ? "one" : "off");
+            return 0;
         }
         std::cout << queueCmd->help() << "\n";
         return 0;
@@ -1222,7 +1261,7 @@ int App::run(int argc, char** argv) {
         }
         if (plTracks->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{plTracksPid}};
-            return sendViaClient(cmd, false);
+            return sendViaClient(cmd, plTracksJson);
         }
         if (plLoad->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::PlaylistLoad{plLoadPid, plLoadPlay}};
@@ -1366,11 +1405,14 @@ int App::run(int argc, char** argv) {
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::ConfigGet{cfgGetKey}};
-            return sendViaClient(cmd, false);
+            return sendViaClient(cmd, cfgGetJson);
         }
         if (cfgSet->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::ConfigSet{cfgSetKey, cfgSetVal}};
-            return confirm(sendRaw(cmd), cfgSetJson, std::format("{} = {}", cfgSetKey, cfgSetVal));
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            return 0;
         }
         if (cfgList->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::ConfigList{}};

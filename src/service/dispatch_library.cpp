@@ -470,7 +470,7 @@ Service::handle(const caudio::ipc::PlaylistTracks& cmd) {
         return std::unexpected{tracks.error()};
     std::span<const caudio::db::Track> span{*tracks};
     std::vector<caudio::db::Track> out(span.begin(), span.end());
-    return Result{QueueTracks{std::move(out)}};
+    return Result{PlaylistData{std::move(out), {}}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
