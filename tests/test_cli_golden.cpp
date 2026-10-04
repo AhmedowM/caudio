@@ -498,6 +498,7 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
         std::ofstream f(cfg, std::ios::binary);
         f << "{\"dbPath\": \"" << dir.generic_string() << "/library.db\"}";
     }
+    REQUIRE(run({"config", "set", "cli_golden_key", "hello"}).exitCode == 0);
     auto pauseIdle = run({"pause"});
     REQUIRE(pauseIdle.exitCode == 0);
     REQUIRE(contains(pauseIdle.err, "nothing playing"));
@@ -556,6 +557,19 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto down2 = run({"shutdown"});
     REQUIRE(down2.exitCode == 0);
     REQUIRE(contains(down2.out, "stopped"));
+    // Play autostarts the daemon when down (empty queue errors, daemon stays).
+    auto autoPlay = run({"play"});
+    REQUIRE(autoPlay.exitCode == 1);
+    REQUIRE(contains(autoPlay.err, "empty queue"));
+    auto autoStatus = run({"status"});
+    REQUIRE(autoStatus.exitCode == 0);
+    // config get answers locally without a daemon... (daemon is up here;
+    // covered daemonless below).
+    auto down3 = run({"shutdown"});
+    REQUIRE(down3.exitCode == 0);
+    auto localGet = run({"config", "get", "cli_golden_key"});
+    REQUIRE(localGet.exitCode == 0);
+    REQUIRE(contains(localGet.out, "hello"));
     fs::remove_all(dir, ec);
 }
 

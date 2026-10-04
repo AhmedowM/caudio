@@ -551,10 +551,11 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 #endif
 }
 
-int App::handleStart(bool foreground) {
+int App::handleStart(bool foreground, bool quiet) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
-        caudio::println("daemon already running at {}", config_.socketPath);
+        if (!quiet)
+            caudio::println("daemon already running at {}", config_.socketPath);
         return 0;
     }
     // Ensure db parent dirs exist before trying to start service (foreground)
@@ -603,7 +604,8 @@ int App::handleStart(bool foreground) {
         for (int i = 0; i < 15; ++i) {
             auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             if (conn2) {
-                caudio::println("daemon started at {}", config_.socketPath);
+                if (!quiet)
+                    caudio::println("daemon started at {}", config_.socketPath);
                 return 0;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -1121,6 +1123,21 @@ int App::run(int argc, char** argv) {
         fmt.print(*res, std::cout);
         return 0;
     };
+    // Play-like sends autostart the daemon when it is down (quick launch).
+    // quietAutostart keeps --json output clean.
+    auto sendPlay = [&](const caudio::ipc::Command& cmd, bool quietAutostart)
+        -> std::expected<caudio::ipc::Result, caudio::utils::Error> {
+        auto res = sendRaw(cmd);
+        if (!res) {
+            const auto& e = res.error();
+            if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running") {
+                if (handleStart(false, quietAutostart) != 0)
+                    return std::unexpected{e};
+                return sendRaw(cmd);
+            }
+        }
+        return res;
+    };
     // Custom confirmation: JSON dumps the raw result, text prints `line`.
     auto confirm = [&](std::expected<caudio::ipc::Result, caudio::utils::Error>&& res, bool asJson,
                        const std::string& line) -> int {
@@ -1171,7 +1188,7 @@ int App::run(int argc, char** argv) {
         if (files.empty())
             return hardFail ? 1 : 0;
         caudio::ipc::Command cmd{caudio::ipc::PlayFiles{files, posSave}};
-        auto res = sendRaw(cmd);
+        auto res = sendPlay(cmd, false);
         if (!res)
             return printErr(res.error());
         if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
@@ -1221,7 +1238,7 @@ int App::run(int argc, char** argv) {
             }
         }
         caudio::ipc::Command cmd{caudio::ipc::Play{}};
-        auto res = sendRaw(cmd);
+        auto res = sendPlay(cmd, asJson);
         if (!res)
             return printErr(res.error());
         if (asJson)
@@ -2434,8 +2451,16 @@ int App::run(int argc, char** argv) {
         return handlePreview(previewFile);
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::ConfigGet{cfgGetKey}};
-            return sendViaClient(cmd, cfgGetJson);
+            // Answered from the local file: no daemon needed.
+            auto v = caudio::config::configGetRaw(config_.configPath, cfgGetKey);
+            if (!v)
+                return printErr(v.error());
+            caudio::ipc::Result r{caudio::ipc::ConfigValue{cfgGetKey, *v}};
+            if (cfgGetJson)
+                return printJson(r);
+            caudio::client::OutputFormatter fmt{false};
+            fmt.print(r, std::cout);
+            return 0;
         }
         if (cfgSet->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::ConfigSet{cfgSetKey, cfgSetVal}};

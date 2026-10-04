@@ -52,7 +52,7 @@ class App {
     int run(int argc, char** argv);
 
   private:
-    int handleStart(bool foreground);
+    int handleStart(bool foreground, bool quiet = false);
     int handleShutdown();
     int handlePreview(const std::string& file);
     std::expected<void, std::uint32_t> spawnDaemon(const caudio::config::Config& cfg);

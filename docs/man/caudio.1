@@ -92,7 +92,7 @@ pid file removal. Reports an error if the daemon is still running.
 .B play
 Start playback. If paused, resumes; if playing, restarts; if stopped,
 replays the stopped track (or starts from queue head when nothing was
-stopped).
+stopped). Starts the daemon first when it is not running.
 .TP
 .B pause
 Pause playback, preserving position. Warns without failing when nothing
@@ -288,7 +288,8 @@ Check audio device is available (enumeration only, no sound). Defaults to curren
 .SS Config
 .TP
 .B config get \fIKEY\fR [\-\-json]
-Get config value for \fIKEY\fR.
+Get config value for \fIKEY\fR. Answered from the local file; needs no
+daemon.
 .TP
 .B config set \fIKEY\fR \fIVALUE\fR
 Set config value. \fIVALUE\fR is stored as JSON or plain string.
