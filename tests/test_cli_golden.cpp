@@ -350,6 +350,13 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto after = run({"status"});
     REQUIRE(after.exitCode == 1);
     REQUIRE(contains(after.err, "daemon not running"));
+    // Full cleanup verified by a clean restart on the same config.
+    auto restart = run({"start"});
+    REQUIRE(restart.exitCode == 0);
+    REQUIRE(contains(restart.out, "started"));
+    auto down2 = run({"shutdown"});
+    REQUIRE(down2.exitCode == 0);
+    REQUIRE(contains(down2.out, "stopped"));
     fs::remove_all(dir, ec);
 }
 
@@ -464,6 +471,16 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     auto resumeStopped = run({"resume"});
     REQUIRE(resumeStopped.exitCode == 0);
     REQUIRE(contains(resumeStopped.out, "Playing sample.ogg"));
+    // Natural end with repeat Off stops instead of looping: ogg (last track)
+    // was just started, so wait it out, then status must show Stopped and
+    // play must wrap to the head (wav).
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    auto ended = run({"status"});
+    REQUIRE(ended.exitCode == 0);
+    REQUIRE(contains(ended.out, "State: Stopped"));
+    auto rewind = run({"play"});
+    REQUIRE(rewind.exitCode == 0);
+    REQUIRE(contains(rewind.out, "Playing sample.wav"));
     REQUIRE(run({"shutdown"}).exitCode == 0);
     std::error_code ec;
     fs::remove_all(dir, ec);

@@ -416,6 +416,14 @@ Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
 }
 
 Engine::ExpectedVoid Engine::next() {
+    return advanceLocked(false);
+}
+
+Engine::ExpectedVoid Engine::autoNext() {
+    return advanceLocked(true);
+}
+
+Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
@@ -449,6 +457,29 @@ Engine::ExpectedVoid Engine::next() {
     }
     if (!tryLockQueue())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+    if (stopAtEnd && queue_.repeat == RepeatMode::Off) {
+        // Natural track end: halt instead of wrapping. The cursor stays parked
+        // past the end, so a later play wraps to the head. Manual next() still
+        // wraps (same repeat mode).
+        bool atEnd = false;
+        if (queue_.shuffle) {
+            atEnd = queue_.cursor >= queue_.perm.size();
+        } else {
+            size_t cnt = db_->queueCountLocked(queue_.queue_id);
+            atEnd = queue_.cursor >= cnt;
+        }
+        if (atEnd) {
+            unlockQueue();
+            playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+            if (output_)
+                output_->stop();
+            if (ring_)
+                ring_->reset();
+            pausePos_ = 0;
+            hasCurrent_.store(false, std::memory_order_release);
+            return {};
+        }
+    }
     caudio::db::Track t;
     auto r = queueNextLocked(t);
     if (!r) {
@@ -1388,7 +1419,7 @@ void Engine::engineTick() {
                     bool expected = false;
                     if (gaplessArmed_.compare_exchange_strong(
                             expected, true, std::memory_order_acq_rel, std::memory_order_acquire)) {
-                        auto nr = next();
+                        auto nr = autoNext();
                         if (!nr)
                             gaplessArmed_.store(false, std::memory_order_release);
                     }

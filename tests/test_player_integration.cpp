@@ -181,6 +181,10 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
     REQUIRE(eng->play(1).has_value());
+    // Loop the single track: natural end stops on repeat Off, which would
+    // end playback mid-test and fail the seeks below (this test races seeks,
+    // not end behavior).
+    REQUIRE(eng->setRepeat(caudio::engine::RepeatMode::All).has_value());
     // sequential seeks while playing (decode thread races with seek's ring reset)
     // we do small delays to let decode thread interleave but avoid true concurrent seeks which
     // cause data race

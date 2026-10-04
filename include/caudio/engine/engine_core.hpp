@@ -392,6 +392,19 @@ class Engine final {
     ExpectedVoid next();
 
     /**
+     * @brief Monitor auto-advance: like next(), but halts at queue end.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy/NotFound/Device.
+     * @details With repeat Off and the cursor past the end, stops playback
+     * (cursor stays parked so a later play wraps to the head) instead of
+     * wrapping like next(). Repeat One/All behave like next().
+     * @par Thread safety
+     * Thread-safe; same locking as next().
+     * @see next
+     */
+    ExpectedVoid autoNext();
+
+    /**
      * @brief Moves to the previous track.
      * @ingroup caudio_engine
      * @return Success or Error State/Busy/NotFound/Device ("at start"/"no perm").
@@ -662,6 +675,18 @@ class Engine final {
      * @see persistShuffleBlobLocked
      */
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out);
+
+    /**
+     * @brief Shared next/autoNext body (queueMutex_ NOT held on entry).
+     * @ingroup caudio_engine
+     * @param stopAtEnd When true with repeat Off, halts at queue end instead
+     * of wrapping (cursor stays parked past the end).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_.
+     * @see next
+     * @see autoNext
+     */
+    ExpectedVoid advanceLocked(bool stopAtEnd);
 
     /**
      * @brief Moves queue cursor to previous track per shuffle/repeat mode (queueMutex_ held).

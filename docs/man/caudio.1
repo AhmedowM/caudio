@@ -106,7 +106,10 @@ Stop playback and clear current track. A later play replays the stopped
 track.
 .TP
 .B next
-Advance to next track. Handles \fBRepeatMode::One\fR and shuffle.
+Advance to next track. Handles \fBRepeatMode::One\fR and shuffle. At queue
+end wraps to the head (reshuffling when shuffle is on), in every repeat
+mode. Natural track end behaves the same except with repeat
+\fBoff\fR, which stops instead of wrapping.
 .TP
 .B prev
 Go to previous track. Warns without failing at queue start.
