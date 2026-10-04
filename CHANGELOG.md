@@ -5,6 +5,135 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.43.2] - 2026-10-04
+
+### Fixed
+- Negative `history --limit` values fall back to the default instead of
+  reaching SQL.
+
+## [v0.43.1] - 2026-10-04
+
+### Added
+- `play` and direct play autostart the daemon when it is down (quiet
+  under `--json`).
+- `config get` answers from the local file; no daemon needed.
+
+## [v0.43.0] - 2026-10-04
+
+### Added
+- Direct play: bare `caudio PATH...` plays files immediately in a new
+  queue via a `PlayFiles` command (temporary and purged on daemon
+  shutdown; `--save` keeps it permanently). Shared ensure-track helper
+  backs the add paths. `preview` stays as a hidden legacy alias.
+- `queue list` shows a Temp marker; `queues.temp` column with migration.
+
+### Fixed
+- `play` while playing restarts the current track instead of starting the
+  new queue (direct-play flow stops first).
+
+## [v0.42.0] - 2026-10-04
+
+### Added
+- `library scan --full-hash` replaces `--mode`; output is `X tracks
+  added` only; rescan guard (path+mtime) stops untouched files from
+  duplicating, including across fingerprint modes.
+- `library search` matches filenames; table
+  `id/title/artist/album/genre/filename` with query highlighting.
+- `library stats --most-played N`, `--queue all|ID` (repeatable),
+  `--playlist ID` (repeatable); `--detailed` removed.
+- `library remove` confirmations name the track
+  (`Removed from library <label>`); files on disk untouched.
+- `playlist create NAME`, `playlist add PID (--id ID… | PATH…
+  [--recursive])` with duplicate warns; `tag get [FIELD]` with raw or
+  single-key JSON output.
+- `playlist import` returns matched/skipped/duplicate counts in the CLI
+  result (was daemon stderr only); separator-insensitive path matching.
+- `config import` validates JSON shape and known-key types before atomic
+  replace; `config get --json` returns `{key: value}`.
+- `switch` and `tag get` name missing ids; `--log-level` rejects bad values.
+
+### Changed
+- Duplicate-only adds exit success (warn on stderr, no rows created).
+
+### Fixed
+- `playlist save` tolerates legacy duplicate queue rows.
+
+## [v0.41.0] - 2026-10-04
+
+### Added
+- `queue add` takes repeatable file/folder/glob PATHs (sorted client-side
+  expansion), `--id ID`, `--playlist ID [--replace]`, `--recursive`;
+  missing library rows auto-added with metadata extraction; appended
+  tracks extend the shuffle permutation; per-track `Added …` lines plus
+  `X tracks added` total; empty globs hint on stderr with success.
+- `queue remove` requires `--id` (library id) or `--pos` (queue
+  position) — no bare numbers; also accepts PATH/glob/folder selectors;
+  per-track `Removed from queue <…>` confirmations, no count.
+- `queue create NAME` / `queue delete QID` (active queue guarded).
+- `playlist load` targets a NEW queue (playback and current queue stay
+  intact); `--replace` overwrites the active queue; `--play` switches
+  and plays. `queue add --playlist` appends playlist tracks.
+
+### Changed
+- Server-side duplicate suppression: warn-only re-adds create no rows
+  (previously message-only — the server still duplicated).
+
+## [v0.40.0] - 2026-10-04
+
+### Added
+- `queue tracks [--order added|playback] [--json]` lists the active queue
+  in playback (shuffle) order with a current-track marker (`>`, green on
+  TTY); `--order added` shows insertion order.
+- `queue list` now lists queues for real (ID/Name/Tracks/Active);
+  `queue queues` stays as a hidden alias; new `Queues` IPC result.
+
+### Changed
+- Natural track end with repeat Off **stops** (cursor parked past end,
+  later `play` wraps to head); manual `next` still wraps in every mode
+  (`autoNext()`/`advanceLocked()` split in engine).
+
+## [v0.39.0] - 2026-10-04
+
+### Added
+- Volume mute-restore model: `mute`/`volume 0` snapshots the level into
+  persisted `pre_mute_volume`; `unmute` restores it (was fixed 50%).
+  `Volume: muted` prints only when muted, else `Volume: N%`; `status`
+  reports the real mute state (was hardcoded `no`).
+
+### Changed
+- Play after stop replays the stopped track (`stop()` rewinds the
+  cursor; no-op when already stopped).
+- `pause` warns `nothing playing` instead of failing when idle; `resume`
+  plays from the cursor when stopped and warns `already playing` when
+  playing; `prev` warns `at queue start` instead of failing.
+
+### Fixed
+- `config list` returning zero entries (array-only indexed access on JSON
+  objects); relative-seek whitespace detection (`" +5"` applied as
+  absolute); man EXAMPLES/FILES de-garbled plus new EXIT STATUS section
+  (0/1/105/106/109).
+
+## [v0.38.1] - 2026-10-04
+
+### Added
+- `seek` prints nothing on success; `config set` silent on success;
+  `config get --json`; `playlist tracks --json` with `Playlist (N
+  tracks):` header (was `Queue (N tracks):`).
+
+### Changed
+- Bare `queue shuffle` reports the resulting state; bare `queue repeat`
+  cycles off→all→one→off and reports it (was no-op `Repeat toggled`).
+
+## [v0.38.0] - 2026-10-03
+
+### Added
+- CLI confirmations instead of bare `OK`, remedy hints on daemon-down
+  errors, valid grammars echoed on validation errors, compact watch
+  lines, transport one-liners without ids/queue positions, `--json` on
+  mutating commands.
+- Hermetic golden test harness (`tests/test_cli_golden.cpp`) with unique
+  temp dirs per run.
+
 ## [1.0.0-rc2] - 2026-10-02
 
 ### Added
