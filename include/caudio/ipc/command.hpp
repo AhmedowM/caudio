@@ -236,6 +236,28 @@ struct QueueDelete final {
 };
 
 /**
+ * @struct PlayFiles
+ * @brief Play files now in a (temporary) queue.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlayFiles", "paths": ["/music/a.mp3"], "save": false}
+ *
+ * @param paths Absolute audio file paths.
+ * @param save When false the queue is temporary (purged on daemon shutdown).
+ * @return Status object with updated playback state.
+ */
+struct PlayFiles final {
+    /**
+     * @brief Absolute audio file paths.
+     */
+    std::vector<std::string> paths{};
+    /**
+     * @brief Keep the queue permanently (default: temporary).
+     */
+    bool save{false};
+};
+
+/**
  * @struct QueueSwitch
  * @brief Switch the active queue by ID.
  * @ingroup caudio_ipc
@@ -1025,7 +1047,7 @@ struct DeviceTest final {
  */
 using Command =
     std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
-                 QueueList, QueueQueues, QueueCreate, QueueDelete, QueueSwitch, QueueAdd,
+                 QueueList, QueueQueues, QueueCreate, QueueDelete, PlayFiles, QueueSwitch, QueueAdd,
                  QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList,
                  PlaylistCreate, PlaylistAdd, PlaylistTracks, PlaylistLoad,
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,

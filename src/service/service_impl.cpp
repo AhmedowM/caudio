@@ -214,6 +214,15 @@ void Service::shutdown() {
         server_->shutdown();
     if (engine_)
         engine_->shutdown();
+    // Drop ephemeral direct-play queues (their tracks stay in the library).
+    if (db_) {
+        if (auto qs = db_->listQueues()) {
+            for (auto& q : *qs) {
+                if (q.temp)
+                    (void)db_->deleteQueue(q.id);
+            }
+        }
+    }
     // cleanup pid file and socket
     try {
         std::error_code ec;

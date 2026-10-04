@@ -143,9 +143,11 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
     }
     // Migration: add active_queue_id column if missing (for existing DBs)
     // Migration: add pre_mute_volume column if missing (for existing DBs)
+    // Migration: add queues.temp column if missing (for existing DBs)
     for (const char* mig :
          {"ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
-          "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5"}) {
+          "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5",
+          "ALTER TABLE queues ADD COLUMN temp INTEGER DEFAULT 0"}) {
         char* migErr = nullptr;
         int migRc = sqlite3_exec(raw, mig, nullptr, nullptr, &migErr);
         if (migErr) {
@@ -1172,6 +1174,13 @@ std::expected<void, caudio::utils::Error> Database::setQueueRepeat(int64_t qid, 
         qid = 1;
     std::unique_lock lk{dbMutex_};
     return caudio::db::setQueueRepeatLocked(db_.get(), qid, repeat_mode);
+}
+
+std::expected<void, caudio::utils::Error> Database::setQueueTemp(int64_t qid, bool temp) {
+    if (qid == 0)
+        qid = 1;
+    std::unique_lock lk{dbMutex_};
+    return caudio::db::setQueueTempLocked(db_.get(), qid, temp);
 }
 
 size_t Database::queueCountLocked(int64_t qid) {

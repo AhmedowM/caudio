@@ -180,6 +180,18 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
                                                                int repeat_mode);
 
 /**
+ * @brief Sets the temporary flag for a queue (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @param temp New flag (temporary queues are purged on daemon shutdown).
+ * @return Success or Error NotFound/Internal.
+ * @par Thread safety
+ * Caller must hold Database::mutex() exclusively.
+ */
+std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_t qid, bool temp);
+
+/**
  * @brief Alias for queueListLocked (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.

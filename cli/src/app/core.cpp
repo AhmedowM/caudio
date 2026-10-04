@@ -692,6 +692,10 @@ int App::run(int argc, char** argv) {
     cli_->add_option("--config", configPathStr, "Config file");
     cli_->add_option("--log-level", logLevelStr, "trace|debug|info|warn|error");
     cli_->add_option("--device", deviceStr, "Audio output device");
+    std::vector<std::string> posPaths;
+    bool posSave = false;
+    cli_->add_option("path", posPaths, "Audio file, folder, or glob (direct play)");
+    cli_->add_flag("--save", posSave, "Keep the direct-play queue (default: temporary)");
     bool daemonFlag = false;
     cli_->add_flag("--daemon", daemonFlag, "Internal daemon flag")->group("");
     bool globalFg = false;
@@ -967,6 +971,7 @@ int App::run(int argc, char** argv) {
     std::string previewFile;
     auto* previewCmd = cli_->add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
+    previewCmd->group("");
     auto* cfgCmd = cli_->add_subcommand("config", "Config operations");
     std::string cfgGetKey;
     bool cfgGetJson = false;
@@ -1126,6 +1131,61 @@ int App::run(int argc, char** argv) {
         caudio::println(std::cout, "{}", line);
         return 0;
     };
+    // Direct play: `caudio PATH... [--save]` with no subcommand. Files are
+    // fingerprinted into the library; the queue itself is temporary unless
+    // --save keeps it. Output is human-readable text.
+    bool anySub = false;
+    for (auto* sc : cli_->get_subcommands()) {
+        if (sc->parsed()) {
+            anySub = true;
+            break;
+        }
+    }
+    if (!posPaths.empty() || posSave) {
+        if (anySub) {
+            caudio::println(std::cerr, "paths and --save take no subcommand");
+            return 1;
+        }
+        if (posPaths.empty()) {
+            caudio::println(std::cerr, "need a PATH (audio file, folder, or glob)");
+            return 1;
+        }
+        std::vector<std::string> files;
+        std::vector<std::string> unmatched;
+        for (auto& tok : posPaths)
+            detail::expandAddToken(tok, false, files, unmatched);
+        bool hardFail = false;
+        for (auto& u : unmatched) {
+            if (detail::hasGlobChars(u)) {
+                caudio::println(std::cerr, "No files matched: {}", u);
+            } else {
+                std::error_code ec;
+                if (std::filesystem::is_directory(u, ec) && !ec)
+                    caudio::println(std::cerr, "No files matched: {}", u);
+                else {
+                    caudio::println(std::cerr, "no such file: {}", u);
+                    hardFail = true;
+                }
+            }
+        }
+        if (files.empty())
+            return hardFail ? 1 : 0;
+        caudio::ipc::Command cmd{caudio::ipc::PlayFiles{files, posSave}};
+        auto res = sendRaw(cmd);
+        if (!res)
+            return printErr(res.error());
+        if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
+            std::string who = detail::trackWho(*st);
+            if (posSave)
+                caudio::println("Playing {}", who);
+            else
+                caudio::println("Playing {} (temporary queue)", who);
+            return 0;
+        }
+        caudio::client::OutputFormatter fmt{false};
+        fmt.print(*res, std::cout);
+        return 0;
+    }
     if (startCmd->parsed())
         return handleStart(fg || globalFg);
     if (shutdownCmd->parsed())

@@ -172,6 +172,10 @@ struct QueueEntry final {
      * @brief Whether this is the active queue.
      */
     bool active{false};
+    /**
+     * @brief Whether this is an ephemeral direct-play queue.
+     */
+    bool temp{false};
 };
 
 /**

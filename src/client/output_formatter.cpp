@@ -140,13 +140,13 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             } else if constexpr (std::is_same_v<T, caudio::ipc::Queues>) {
                 caudio::println(os, "Queues ({}):", v.entries.size());
-                caudio::println(os, "{:>3} {:>6}  {:<40} {:>8} {:>6}", "#", "ID", "Name",
-                                 "Tracks", "Active");
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:>8} {:>6} {:>4}", "#", "ID", "Name",
+                                 "Tracks", "Active", "Temp");
                 for (std::size_t i = 0; i < v.entries.size(); ++i) {
                     const auto& q = v.entries[i];
-                    caudio::println(os, "{:3} {:6}  {:<40} {:>8} {:>6}", i, q.id,
+                    caudio::println(os, "{:3} {:6}  {:<40} {:>8} {:>6} {:>4}", i, q.id,
                                      truncateField(q.name.empty() ? "(unnamed)" : q.name, 40),
-                                     q.tracks, q.active ? "*" : "");
+                                     q.tracks, q.active ? "*" : "", q.temp ? "yes" : "");
                 }
             } else if constexpr (std::is_same_v<T, caudio::ipc::QueueCreated>) {
                 caudio::println(os, "Created queue {} '{}'", v.id, v.name);

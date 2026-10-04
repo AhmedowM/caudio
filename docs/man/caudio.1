@@ -8,6 +8,10 @@ caudio \- C++23 headless music player daemon and CLI
 .br
 .B caudio
 [\fIOPTIONS\fR]
+[\fIPATH\fR ...] [\fB\-\-save\fR]
+.br
+.B caudio
+[\fIOPTIONS\fR]
 \fBstart\fR [\fB\-\-foreground\fR]
 .br
 .B caudio
@@ -302,11 +306,16 @@ replace the live config. Invalid files are rejected untouched.
 .TP
 .B config reset [\fIKEY\fR]
 Reset config \fIKEY\fR or all keys to defaults.
-.SS Preview
+.SS Direct play
 .TP
-.B preview \fIFILE\fR
-Ephemeral playback of \fIFILE\fR without daemon (direct \fBcaudio::player::Player\fR).
-Blocks until playback finishes.
+.B caudio [\fIPATH\fR ...] [\-\-save]
+Play files right away in a new queue: each \fIPATH\fR is a file, folder,
+or glob. Files are fingerprinted into the library; the queue itself is
+temporary (purged on daemon shutdown) unless \fB\-\-save\fR keeps it
+permanently. A path matching a subcommand name must be written with a
+directory prefix (e.g. \fB./status\fR); on Windows an absolute path
+must use backslashes or a directory prefix, since a leading \fB/\fR
+parses as a flag.
 .SH EXAMPLES
 .TP
 Start daemon and play a file:

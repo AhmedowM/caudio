@@ -48,6 +48,7 @@ using ::caudio::ipc::LibraryStatsDetailedData;
 using ::caudio::ipc::Next;
 using ::caudio::ipc::Pause;
 using ::caudio::ipc::Play;
+using ::caudio::ipc::PlayFiles;
 using ::caudio::ipc::PlaylistAdd;
 using ::caudio::ipc::PlaylistCreate;
 using ::caudio::ipc::PlaylistCreated;

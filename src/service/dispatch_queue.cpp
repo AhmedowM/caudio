@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "service_audio.hpp"
+#include "track_resolve.hpp"
 
 namespace caudio::service {
 
@@ -97,7 +98,7 @@ Service::handle(const caudio::ipc::QueueQueues&) {
         auto items = db_->queueList(q.id);
         std::size_t n = items ? items->size() : 0;
         out.entries.push_back(
-            caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active});
+            caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active, q.temp});
     }
     return Result{std::move(out)};
 }
@@ -125,6 +126,59 @@ Service::handle(const caudio::ipc::QueueDelete& qd) {
     if (!r)
         return std::unexpected{r.error()};
     return Result{Empty{}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlayFiles& cmd) {
+    if (cmd.paths.empty())
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "play files: missing paths")};
+    // Validate everything first: no half-built queues on failure.
+    for (auto& ps : cmd.paths) {
+        std::filesystem::path p(ps);
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(p, ec) || ec)
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                            "track not found: " + ps)};
+        if (!caudio::db::detail::hasAudioExt(p))
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Unsupported, "unsupported file type: " + ps)};
+    }
+    std::vector<int64_t> ids;
+    ids.reserve(cmd.paths.size());
+    for (auto& ps : cmd.paths) {
+        auto trRes = detail::ensureLibraryTrack(*db_, std::filesystem::path(ps));
+        if (!trRes)
+            return std::unexpected{trRes.error()};
+        ids.push_back(trRes->id);
+    }
+    std::string first =
+        std::filesystem::path(cmd.paths.front()).filename().generic_string();
+    auto qid = db_->createQueue("temp: " + first);
+    if (!qid)
+        return std::unexpected{qid.error()};
+    if (!cmd.save) {
+        auto tr = db_->setQueueTemp(*qid, true);
+        if (!tr)
+            return std::unexpected{tr.error()};
+    }
+    auto er = db_->queueEnqueueBatch(*qid, ids);
+    if (!er)
+        return std::unexpected{er.error()};
+    engine_->noteEnqueued(*qid, ids.size());
+    // Stop first: play() while playing restarts the current track instead
+    // of starting the new queue.
+    auto stp = engine_->stop();
+    if (!stp)
+        return std::unexpected{stp.error()};
+    auto sw = engine_->switchQueue(*qid);
+    if (!sw)
+        return std::unexpected{sw.error()};
+    auto pr = engine_->play(*qid);
+    if (!pr)
+        return std::unexpected{pr.error()};
+    updateShmStatus();
+    return statusResult();
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -158,62 +212,11 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
                 return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
                                                                 "track not found: " + qa.query)};
             }
-            auto fpRes = caudio::db::internal::computeFingerprint(p);
-            if (!fpRes)
-                return std::unexpected{fpRes.error()};
-            caudio::db::Track t;
-            t.path = p.generic_string();
-            t.fingerprint = *fpRes;
-            t.duration = detail::durationFromDecoder(p);
-            {
-                std::error_code ec2;
-                auto sz = std::filesystem::file_size(p, ec2);
-                if (!ec2)
-                    t.size = static_cast<int64_t>(sz);
-                auto ftime = std::filesystem::last_write_time(p, ec2);
-                if (!ec2)
-                    t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
-            }
-            // Extract metadata (title, artist, album, etc.) like library add.
-            if (auto meta = caudio::player::extractMetadata(t.path); meta) {
-                t.title = std::move(meta->title);
-                t.artist = std::move(meta->artist);
-                t.album = std::move(meta->album);
-                t.album_artist = std::move(meta->album_artist);
-                t.genre = std::move(meta->genre);
-                t.year = meta->year;
-                t.track_num = meta->track_num;
-                t.disc_num = meta->disc_num;
-                if (meta->duration > 0)
-                    t.duration = meta->duration;
-                t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
-                t.channels = static_cast<uint32_t>(meta->channels);
-                t.bitrate = meta->bitrate;
-            }
-            int64_t newId = 0;
-            auto ins = db_->insertTrack(t);
-            if (ins) {
-                newId = *ins;
-                t.id = newId;
-            } else {
-                if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {
-                    auto existing = db_->findByFingerprint(t.fingerprint);
-                    if (existing) {
-                        t = std::move(*existing);
-                        newId = t.id;
-                    } else {
-                        auto byPath = db_->findByPath(t.path);
-                        if (byPath) {
-                            t = std::move(*byPath);
-                            newId = t.id;
-                        } else {
-                            return std::unexpected{ins.error()};
-                        }
-                    }
-                } else {
-                    return std::unexpected{ins.error()};
-                }
-            }
+            auto trRes = detail::ensureLibraryTrack(*db_, p);
+            if (!trRes)
+                return std::unexpected{trRes.error()};
+            caudio::db::Track t = std::move(*trRes);
+            int64_t newId = t.id;
             // Skip the enqueue when already queued: duplicates warn
             // client-side, they must not create rows.
             bool present = false;

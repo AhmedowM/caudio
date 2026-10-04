@@ -224,10 +224,14 @@ TEST_CASE("cli no-daemon errors point at start", "[cli]") {
     REQUIRE(contains(v.err, "daemon not running"));
 }
 
-TEST_CASE("cli preview missing file fails fast", "[cli]") {
-    auto r = runCli(withCfg("gold_prev", {"preview", "no-such-file-xyz.wav"}));
+TEST_CASE("cli direct play needs existing files", "[cli]") {
+    // NOTE: relative name (CLI11 treats /abs paths as flags on Windows).
+    auto r = runCli(withCfg("gold_pos1", {"gold-missing-xyz.mp3"}));
     REQUIRE(r.exitCode == 1);
-    REQUIRE(contains(r.err, "file not found"));
+    REQUIRE(contains(r.err, "no such file"));
+    auto g = runCli(withCfg("gold_pos2", {"./*.zzz-no-match"}));
+    REQUIRE(g.exitCode == 0);
+    REQUIRE(contains(g.err, "No files matched"));
 }
 
 TEST_CASE("cli daemon lifecycle", "[cli]") {
@@ -681,6 +685,17 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     auto rewind = run({"play"});
     REQUIRE(rewind.exitCode == 0);
     REQUIRE(contains(rewind.out, "Playing sample.wav"));
+    // Direct play opens a temporary queue; --save keeps it permanently.
+    auto direct = run({wav.generic_string()});
+    REQUIRE(direct.exitCode == 0);
+    REQUIRE(contains(direct.out, "Playing sample.wav (temporary queue)"));
+    auto kept = run({"--save", ogg.generic_string()});
+    REQUIRE(kept.exitCode == 0);
+    REQUIRE(contains(kept.out, "Playing sample.ogg"));
+    REQUIRE(!contains(kept.out, "temporary"));
+    auto qltemp = run({"queue", "list"});
+    REQUIRE(qltemp.exitCode == 0);
+    REQUIRE(contains(qltemp.out, "temp: sample.wav"));
     REQUIRE(run({"shutdown"}).exitCode == 0);
     std::error_code ec;
     fs::remove_all(dir, ec);

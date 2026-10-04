@@ -121,6 +121,7 @@ inline constexpr std::string_view kSchema =
     "id INTEGER PRIMARY KEY,"
     "name TEXT NOT NULL,"
     "repeat_mode INTEGER DEFAULT 0,"
+    "temp INTEGER DEFAULT 0,"
     "library_id INTEGER DEFAULT 1 REFERENCES libraries(id)"
     ");"
     "INSERT OR IGNORE INTO queues (id, name, repeat_mode, library_id) VALUES (1, 'default', 0, 1);"

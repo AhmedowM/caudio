@@ -227,7 +227,7 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    auto e = st.prepare(db, "SELECT id, name, repeat_mode, library_id FROM queues WHERE id=?");
+    auto e = st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues WHERE id=?");
     if (!e)
         return std::unexpected{e.error()};
     st.bindInt(1, qid);
@@ -238,7 +238,8 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
     q.id = st.columnInt(0);
     q.name = st.columnText(1);
     q.repeat_mode = static_cast<int32_t>(st.columnInt(2));
-    q.library_id = st.columnInt(3);
+    q.temp = st.columnInt(3) != 0;
+    q.library_id = st.columnInt(4);
     return q;
 }
 
@@ -247,7 +248,7 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    auto e = st.prepare(db, "SELECT id, name, repeat_mode, library_id FROM queues ORDER BY id");
+    auto e = st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues ORDER BY id");
     if (!e)
         return std::unexpected{e.error()};
     std::vector<Queue> out;
@@ -256,7 +257,8 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
         q.id = st.columnInt(0);
         q.name = st.columnText(1);
         q.repeat_mode = static_cast<int32_t>(st.columnInt(2));
-        q.library_id = st.columnInt(3);
+        q.temp = st.columnInt(3) != 0;
+        q.library_id = st.columnInt(4);
         out.push_back(std::move(q));
     }
     return out;
@@ -324,6 +326,27 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
     if (!e)
         return std::unexpected{e.error()};
     st.bindInt(1, repeat_mode);
+    st.bindInt(2, qid);
+    int rc = st.stepDone();
+    if (rc != SQLITE_DONE)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(db))};
+    if (sqlite3_changes(db) == 0)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
+    return {};
+}
+
+std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_t qid, bool temp) {
+    if (qid == 0)
+        qid = 1;
+    if (!db)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+    SqliteStatement st;
+    auto e = st.prepare(db, "UPDATE queues SET temp=? WHERE id=?");
+    if (!e)
+        return std::unexpected{e.error()};
+    st.bindInt(1, temp ? 1 : 0);
     st.bindInt(2, qid);
     int rc = st.stepDone();
     if (rc != SQLITE_DONE)

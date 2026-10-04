@@ -254,6 +254,15 @@ Json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, QueueDelete>) {
                 j["type"] = "QueueDelete";
                 j["qid"] = v.qid;
+            } else if constexpr (std::is_same_v<T, PlayFiles>) {
+                j["type"] = "PlayFiles";
+                j["paths"] = Json::array();
+                for (const auto& p : v.paths) {
+                    Json e;
+                    e = p;
+                    j["paths"].push_back(e);
+                }
+                j["save"] = v.save;
             } else if constexpr (std::is_same_v<T, QueueSwitch>) {
                 j["type"] = "QueueSwitch";
                 j["qid"] = v.qid;
@@ -487,6 +496,22 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
             if (j.contains("qid") && j["qid"].isNumber())
                 qid = j["qid"].get<int64_t>();
             return Command{QueueDelete{qid}};
+        }
+        if (t == "PlayFiles") {
+            PlayFiles p{};
+            if (j.contains("paths") && j["paths"].isArray()) {
+                const Json arr = j["paths"];
+                for (std::size_t i = 0, n = arr.size(); i < n; ++i) {
+                    auto je = arr.at(i);
+                    if (!je)
+                        return std::unexpected{je.error()};
+                    if (je->isString())
+                        p.paths.push_back(je->get<std::string>());
+                }
+            }
+            if (j.contains("save") && j["save"].isBoolean())
+                p.save = j["save"].get<bool>();
+            return Command{std::move(p)};
         }
         if (t == "QueueSwitch") {
             int64_t qid = 1;
@@ -810,6 +835,7 @@ Json toJson(const Result& r) {
                     e["name"] = q.name;
                     e["tracks"] = q.tracks;
                     e["active"] = q.active;
+                    e["temp"] = q.temp;
                     j["queues"].push_back(e);
                 }
                 return j;
@@ -1080,6 +1106,8 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                         e.tracks = trExp->get<std::size_t>();
                     if (auto acExp = je->at("active"); acExp && acExp->isBoolean())
                         e.active = acExp->get<bool>();
+                    if (auto tmExp = je->at("temp"); tmExp && tmExp->isBoolean())
+                        e.temp = tmExp->get<bool>();
                     qs.entries.push_back(std::move(e));
                 }
             }

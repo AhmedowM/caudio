@@ -600,6 +600,17 @@ class Database final {
 
     std::expected<void, caudio::utils::Error> setQueueRepeat(int64_t qid, int repeat_mode);
 
+    /**
+     * @brief Sets the temporary flag for a queue.
+     * @ingroup caudio_db
+     * @param qid Queue id.
+     * @param temp New flag.
+     * @return Success or Error.
+     * @par Thread safety
+     * Thread-safe: unique_lock.
+     */
+    std::expected<void, caudio::utils::Error> setQueueTemp(int64_t qid, bool temp);
+
     size_t queueCountLocked(int64_t qid);
 
     // History
