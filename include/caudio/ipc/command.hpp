@@ -177,11 +177,18 @@ struct VolumeSet final {
  * @brief List all tracks in the active queue.
  * @ingroup caudio_ipc
  *
- * @json_example {"type": "QueueList"}
+ * @json_example {"type": "QueueList", "order": "playback"}
  *
+ * @param order Track order: "playback" (shuffle order, default) or "added"
+ * (insertion order).
  * @return QueueTracks object with vector of tracks.
  */
-struct QueueList final {};
+struct QueueList final {
+    /**
+     * @brief Track order ("playback" or "added").
+     */
+    std::string order{"playback"};
+};
 
 /**
  * @struct QueueQueues
@@ -190,7 +197,7 @@ struct QueueList final {};
  *
  * @json_example {"type": "QueueQueues"}
  *
- * @return LibraryStatsData object with queue/track/playlist counts.
+ * @return Queues object with queue entries (id, name, track count, active).
  */
 struct QueueQueues final {};
 

@@ -82,6 +82,22 @@ bool contains(const std::string& hay, const std::string& needle) {
     return hay.find(needle) != std::string::npos;
 }
 
+// Count table rows prefixed with "> " (current-track marker).
+int markedRows(const std::string& out) {
+    int n = 0;
+    std::size_t pos = 0;
+    while (pos < out.size()) {
+        std::size_t eol = out.find('\n', pos);
+        std::string line = out.substr(pos, eol == std::string::npos ? eol : eol - pos);
+        if (line.size() >= 2 && line[0] == '>' && line[1] == ' ')
+            ++n;
+        if (eol == std::string::npos)
+            break;
+        pos = eol + 1;
+    }
+    return n;
+}
+
 // Hermetic config: every CLI invocation that can reach the daemon gets
 // --config pointing at a fresh temp dir, so db/socket/pid never touch the
 // real user locations (socket derives from the unique dbPath hash).
@@ -287,10 +303,31 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(add.exitCode == 0);
     auto ql = run({"queue", "list"});
     REQUIRE(ql.exitCode == 0);
-    REQUIRE(contains(ql.out, "1 tracks"));
+    REQUIRE(contains(ql.out, "Queues (1):"));
     auto qj = run({"queue", "list", "--json"});
     REQUIRE(qj.exitCode == 0);
-    REQUIRE(contains(qj.out, "\"tracks\""));
+    REQUIRE(contains(qj.out, "\"Queues\""));
+    auto qa = run({"queue", "queues"});
+    REQUIRE(qa.exitCode == 0);
+    REQUIRE(contains(qa.out, "Queues (1):"));
+    auto qt = run({"queue", "tracks"});
+    REQUIRE(qt.exitCode == 0);
+    REQUIRE(contains(qt.out, "Queue (1 tracks):"));
+    REQUIRE(markedRows(qt.out) == 0);
+    auto qto = run({"queue", "tracks", "--order", "added"});
+    REQUIRE(qto.exitCode == 0);
+    REQUIRE(contains(qto.out, "Queue (1 tracks):"));
+    auto qtj = run({"queue", "tracks", "--json"});
+    REQUIRE(qtj.exitCode == 0);
+    REQUIRE(contains(qtj.out, "\"QueueTracks\""));
+    // Shuffle-order path (single-track perm trivially matches).
+    auto shufT = run({"queue", "shuffle", "on"});
+    REQUIRE(shufT.exitCode == 0);
+    auto qts = run({"queue", "tracks"});
+    REQUIRE(qts.exitCode == 0);
+    REQUIRE(contains(qts.out, "Queue (1 tracks):"));
+    auto shufT2 = run({"queue", "shuffle", "off"});
+    REQUIRE(shufT2.exitCode == 0);
     auto save = run({"playlist", "save", "goldmix"});
     REQUIRE(save.exitCode == 0);
     auto plt = run({"playlist", "tracks", "1"});
@@ -462,6 +499,11 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     auto nx = run({"next"});
     REQUIRE(nx.exitCode == 0);
     REQUIRE(contains(nx.out, "Playing sample.ogg"));
+    // Current-track row in queue tracks is prefixed with '>'.
+    auto qtm = run({"queue", "tracks"});
+    REQUIRE(qtm.exitCode == 0);
+    REQUIRE(contains(qtm.out, "Queue (2 tracks):"));
+    REQUIRE(markedRows(qtm.out) == 1);
     auto stop2 = run({"stop"});
     REQUIRE(stop2.exitCode == 0);
     auto pauseIdle = run({"pause"});

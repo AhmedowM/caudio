@@ -272,6 +272,14 @@ class Engine final {
     /** @brief Returns whether shuffle is enabled. @ingroup caudio_engine
      * @return True if shuffle mode active. */
     bool shuffle() const noexcept;
+    /** @brief Returns the shuffle permutation (positions) for a queue.
+     * @ingroup caudio_engine
+     * @param qid Queue id.
+     * @return Perm copy when shuffle applies to qid, else empty (insertion order).
+     * Empty on lock contention too (callers fall back to insertion order).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_. */
+    std::vector<int64_t> shufflePermFor(int64_t qid) noexcept;
 
     /** @brief Returns current repeat mode. @ingroup caudio_engine
      * @return RepeatMode (Off/All/One). */

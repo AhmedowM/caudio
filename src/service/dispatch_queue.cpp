@@ -37,7 +37,10 @@ using caudio::ipc::QueueShuffle;
 using caudio::ipc::QueueSwitch;
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueList&) {
+Service::handle(const caudio::ipc::QueueList& ql) {
+    if (ql.order != "playback" && ql.order != "added" && !ql.order.empty())
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "queue list: invalid order (added|playback)")};
     int64_t qid = engine_->activeQueueId();
     // validation: queue exists
     {
@@ -55,6 +58,29 @@ Service::handle(const caudio::ipc::QueueList&) {
         if (tr)
             tracks.push_back(std::move(*tr));
     }
+    if (ql.order != "added") {
+        // Playback (shuffle) order: perm holds queue positions. A stale perm
+        // (queue mutated after shuffle) contributes its valid entries first;
+        // anything missing follows in insertion order.
+        auto perm = engine_->shufflePermFor(qid);
+        if (!perm.empty()) {
+            std::vector<caudio::db::Track> ordered;
+            ordered.reserve(tracks.size());
+            std::vector<char> seen(tracks.size(), 0);
+            for (int64_t p : perm) {
+                if (p >= 0 && (std::size_t)p < tracks.size() &&
+                    !seen[(std::size_t)p]) {
+                    ordered.push_back(tracks[(std::size_t)p]);
+                    seen[(std::size_t)p] = 1;
+                }
+            }
+            for (std::size_t i = 0; i < tracks.size(); ++i) {
+                if (!seen[i])
+                    ordered.push_back(tracks[i]);
+            }
+            tracks = std::move(ordered);
+        }
+    }
     return Result{QueueTracks{std::move(tracks)}};
 }
 
@@ -63,15 +89,15 @@ Service::handle(const caudio::ipc::QueueQueues&) {
     auto qs = db_->listQueues();
     if (!qs)
         return std::unexpected{qs.error()};
-    caudio::ipc::LibraryStatsData ls{};
-    ls.queues = qs->size();
-    // also fill tracks/playlists for completeness
-    auto st = db_->getStats();
-    if (st) {
-        ls.tracks = static_cast<std::size_t>(st->num_tracks);
-        ls.playlists = static_cast<std::size_t>(st->num_playlists);
+    int64_t active = engine_->activeQueueId();
+    caudio::ipc::Queues out{};
+    for (auto& q : *qs) {
+        auto items = db_->queueList(q.id);
+        std::size_t n = items ? items->size() : 0;
+        out.entries.push_back(
+            caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active});
     }
-    return Result{ls};
+    return Result{std::move(out)};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>

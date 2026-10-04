@@ -44,7 +44,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
     }
 
     std::visit(
-        [&os](const auto& v) {
+        [&os, this](const auto& v) {
             using T = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<T, caudio::ipc::Status>) {
                 std::string stateStr = caudio::ipc::detail::playbackStateToString(v.state);
@@ -83,12 +83,27 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os, "Queue ({} tracks):", tracksSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
-                                "Title", "Dur");
+                                 "Title", "Dur");
                 for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
                     const auto& t = tracksSpan[i];
-                    caudio::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                    bool mark = (highlightTrackId_ != 0 && t.id == highlightTrackId_);
+                    std::string line =
+                        std::format("{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
                                     truncateField(t.artist, 40), truncateField(t.title, 40),
                                     formatTime(t.duration));
+                    if (mark && color_)
+                        line = "\33[32m" + line + "\33[0m";
+                    caudio::println(os, "{} {}", mark ? ">" : " ", line);
+                }
+            } else if constexpr (std::is_same_v<T, caudio::ipc::Queues>) {
+                caudio::println(os, "Queues ({}):", v.entries.size());
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:>8} {:>6}", "#", "ID", "Name",
+                                 "Tracks", "Active");
+                for (std::size_t i = 0; i < v.entries.size(); ++i) {
+                    const auto& q = v.entries[i];
+                    caudio::println(os, "{:3} {:6}  {:<40} {:>8} {:>6}", i, q.id,
+                                     truncateField(q.name.empty() ? "(unnamed)" : q.name, 40),
+                                     q.tracks, q.active ? "*" : "");
                 }
             } else if constexpr (std::is_same_v<T, caudio::ipc::VolumeInfo>) {
                 int pct = static_cast<int>(v.vol * 100.0f);

@@ -145,6 +145,51 @@ struct QueueTracks final {
     std::vector<caudio::db::Track> tracks{};
 };
 
+/**
+ * @struct QueueEntry
+ * @brief One queue in a Queues listing.
+ * @ingroup caudio_ipc
+ *
+ * @param id Queue id.
+ * @param name Queue display name.
+ * @param tracks Number of tracks in the queue.
+ * @param active Whether this is the active queue.
+ */
+struct QueueEntry final {
+    /**
+     * @brief Queue id.
+     */
+    int64_t id{0};
+    /**
+     * @brief Queue display name.
+     */
+    std::string name{};
+    /**
+     * @brief Number of tracks in the queue.
+     */
+    std::size_t tracks{0};
+    /**
+     * @brief Whether this is the active queue.
+     */
+    bool active{false};
+};
+
+/**
+ * @struct Queues
+ * @brief List of queues (returned by QueueQueues).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "Queues", "queues": [{"id": 1, "name": "q", "tracks": 3}]}
+ *
+ * @param entries Queue entries.
+ */
+struct Queues final {
+    /**
+     * @brief Queue entries.
+     */
+    std::vector<QueueEntry> entries{};
+};
+
 // ---------------------------------------------------------------------------
 // Volume Results
 // ---------------------------------------------------------------------------
@@ -557,7 +602,7 @@ using CliError = caudio::utils::Error;
  * @see protocol.cppm for IPC framing
  */
 using Result =
-    std::variant<Status, QueueTracks, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData,
+    std::variant<Status, QueueTracks, Queues, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData,
                  Tracks, Playlists, PlaylistData, ConfigValue, ConfigValues, SingleTrack, TrackInfo,
                  History, Empty, CliError, Devices>;
 

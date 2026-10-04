@@ -139,10 +139,13 @@ statistics).
 .SS Queue
 .TP
 .B queue list [\-\-json]
-List tracks in the active queue.
+List all queues (id, name, track count, active marker). \fBqueue
+queues\fR is a hidden alias.
 .TP
-.B queue queues
-Print totals: queued tracks, queue count, playlist count.
+.B queue tracks [\-\-order added|playback] [\-\-json]
+List tracks in the active queue in playback order (shuffle order by
+default) or insertion order (\fB\-\-order added\fR). The current track
+row is marked with \fB>\fR (green on color terminals).
 .TP
 .B queue switch \fIQID\fR
 Switch active queue by ID. Engine validates that the queue exists.

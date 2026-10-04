@@ -23,6 +23,8 @@ namespace caudio::client {
  */
 class OutputFormatter {
     bool json_{false};
+    bool color_{false};
+    int64_t highlightTrackId_{0};
 
     /** @brief mm:ss rendering for durations. */
     static std::string formatTime(double secs);
@@ -33,8 +35,17 @@ class OutputFormatter {
     /**
      * @brief Construct formatter.
      * @param json If true, output JSON; otherwise formatted table/text.
+     * @param color If true, highlight the marked row with ANSI color (TTY only).
      */
-    explicit OutputFormatter(bool json = false) : json_(json) {}
+    explicit OutputFormatter(bool json = false, bool color = false) : json_(json), color_(color) {}
+
+    /**
+     * @brief Mark one track id in QueueTracks tables (current track).
+     * @param id Track id to prefix with `>`; 0 disables.
+     */
+    void setHighlightTrackId(int64_t id) {
+        highlightTrackId_ = id;
+    }
 
     /**
      * @brief Print a Result to an output stream.

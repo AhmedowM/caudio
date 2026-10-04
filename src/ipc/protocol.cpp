@@ -245,6 +245,7 @@ Json toJson(const Command& cmd) {
                     j["deltaPct"] = nullptr;
             } else if constexpr (std::is_same_v<T, QueueList>) {
                 j["type"] = "QueueList";
+                j["order"] = v.order;
             } else if constexpr (std::is_same_v<T, QueueQueues>) {
                 j["type"] = "QueueQueues";
             } else if constexpr (std::is_same_v<T, QueueSwitch>) {
@@ -452,8 +453,12 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
                 v.deltaPct = j["deltaPct"].get<int>();
             return Command{std::move(v)};
         }
-        if (t == "QueueList")
-            return Command{QueueList{}};
+        if (t == "QueueList") {
+            QueueList q{};
+            if (j.contains("order") && j["order"].isString())
+                q.order = j["order"].get<std::string>();
+            return Command{std::move(q)};
+        }
         if (t == "QueueQueues")
             return Command{QueueQueues{}};
         if (t == "QueueSwitch") {
@@ -744,6 +749,19 @@ Json toJson(const Result& r) {
                 for (const auto& t : v.tracks)
                     j["tracks"].push_back(caudio::db::trackToJson(t));
                 return j;
+            } else if constexpr (std::is_same_v<T, Queues>) {
+                Json j;
+                j["type"] = "Queues";
+                j["queues"] = Json::array();
+                for (const auto& q : v.entries) {
+                    Json e = Json::object();
+                    e["id"] = q.id;
+                    e["name"] = q.name;
+                    e["tracks"] = q.tracks;
+                    e["active"] = q.active;
+                    j["queues"].push_back(e);
+                }
+                return j;
             } else if constexpr (std::is_same_v<T, VolumeInfo>) {
                 Json j;
                 j["type"] = "VolumeInfo";
@@ -950,6 +968,28 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 }
             }
             return Result{std::move(qt)};
+        }
+        if (t == "Queues") {
+            Queues qs{};
+            if (j.contains("queues") && j["queues"].isArray()) {
+                const Json arr = j["queues"];
+                for (std::size_t qi = 0, qn = arr.size(); qi < qn; ++qi) {
+                    auto je = arr.at(qi);
+                    if (!je)
+                        return std::unexpected{je.error()};
+                    QueueEntry e{};
+                    if (auto idExp = je->at("id"); idExp && idExp->isNumber())
+                        e.id = idExp->get<int64_t>();
+                    if (auto nameExp = je->at("name"); nameExp && nameExp->isString())
+                        e.name = nameExp->get<std::string>();
+                    if (auto trExp = je->at("tracks"); trExp && trExp->isNumber())
+                        e.tracks = trExp->get<std::size_t>();
+                    if (auto acExp = je->at("active"); acExp && acExp->isBoolean())
+                        e.active = acExp->get<bool>();
+                    qs.entries.push_back(std::move(e));
+                }
+            }
+            return Result{std::move(qs)};
         }
         if (t == "VolumeInfo") {
             VolumeInfo vi{};

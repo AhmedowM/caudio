@@ -307,6 +307,16 @@ RepeatMode Engine::repeat() const noexcept {
     return queue_.repeat;
 }
 
+std::vector<int64_t> Engine::shufflePermFor(int64_t qid) noexcept {
+    if (!tryLockQueue())
+        return {};
+    std::vector<int64_t> out;
+    if (queue_.queue_id == qid && queue_.shuffle && !queue_.perm.empty())
+        out = queue_.perm;
+    unlockQueue();
+    return out;
+}
+
 std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));

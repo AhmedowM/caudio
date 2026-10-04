@@ -1,5 +1,10 @@
 #include <cstdio>
 #ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+#ifdef _WIN32
 // NOTE: <windows.h> must precede all other includes in this TU. thread.hpp
 // hand-declares HANDLE/HMODULE/etc. when windows.h is absent, which then
 // conflicts with the real declarations pulled in by CLI11. Keep this block
@@ -249,6 +254,17 @@ std::string trackWho(const caudio::ipc::Status& st) {
             return fn;
     }
     return "unknown track";
+}
+
+// ANSI color only on interactive terminals honoring NO_COLOR.
+bool useColor() {
+    if (std::getenv("NO_COLOR") != nullptr)
+        return false;
+#ifdef _WIN32
+    return ::_isatty(::_fileno(stdout)) != 0;
+#else
+    return ::isatty(STDOUT_FILENO) != 0;
+#endif
 }
 
 } // namespace detail
@@ -581,11 +597,18 @@ int App::run(int argc, char** argv) {
     volumeCmd->add_flag("--json", volumeJson, "JSON output");
     auto* queueCmd = cli_->add_subcommand("queue", "Queue operations");
     bool qJson = false;
-    auto* qList = queueCmd->add_subcommand("list", "List queue tracks");
+    auto* qList = queueCmd->add_subcommand("list", "List all queues");
     qList->add_flag("--json", qJson, "JSON output");
     bool qQueuesJson = false;
-    auto* qQueues = queueCmd->add_subcommand("queues", "List all queues");
-    qQueues->add_flag("--json", qQueuesJson, "JSON output");
+    auto* qQueuesAlias =
+        queueCmd->add_subcommand("queues", "List all queues (alias)")->group("");
+    qQueuesAlias->add_flag("--json", qQueuesJson, "JSON output");
+    std::string qTracksOrder = "playback";
+    bool qTracksJson = false;
+    auto* qTracks = queueCmd->add_subcommand("tracks", "List tracks in active queue");
+    qTracks->add_option("--order", qTracksOrder, "Track order: added|playback")
+        ->check(CLI::IsMember({"added", "playback"}));
+    qTracks->add_flag("--json", qTracksJson, "JSON output");
     std::int64_t qSwitchId = 0;
     bool qSwitchJson = false;
     auto* qSwitch = queueCmd->add_subcommand("switch", "Switch active queue");
@@ -1170,13 +1193,27 @@ int App::run(int argc, char** argv) {
         return sendViaClient(cmd, volumeJson);
     }
     if (queueCmd->parsed()) {
-        if (qList->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::QueueList{}};
-            return sendViaClient(cmd, qJson);
-        }
-        if (qQueues->parsed()) {
+        if (qList->parsed() || qQueuesAlias->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
-            return sendViaClient(cmd, qQueuesJson);
+            return sendViaClient(cmd, qList->parsed() ? qJson : qQueuesJson);
+        }
+        if (qTracks->parsed()) {
+            caudio::ipc::Command cmd{caudio::ipc::QueueList{qTracksOrder}};
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (qTracksJson)
+                return printJson(*res);
+            int64_t curId = 0;
+            caudio::client::Client probe{config_.dbPath, config_.socketPath};
+            if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+                if (auto* st = std::get_if<caudio::ipc::Status>(&*ps))
+                    curId = st->track_id;
+            }
+            caudio::client::OutputFormatter fmt{false, detail::useColor()};
+            fmt.setHighlightTrackId(curId);
+            fmt.print(*res, std::cout);
+            return 0;
         }
         if (qSwitch->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::QueueSwitch{qSwitchId}};
