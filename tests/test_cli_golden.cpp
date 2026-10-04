@@ -255,6 +255,21 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(set72.exitCode == 0);
     auto vol2 = run({"volume"});
     REQUIRE(contains(vol2.out, "72%"));
+    auto mute = run({"volume", "mute"});
+    REQUIRE(mute.exitCode == 0);
+    REQUIRE(contains(mute.out, "Volume: muted"));
+    auto unmute = run({"volume", "unmute"});
+    REQUIRE(unmute.exitCode == 0);
+    REQUIRE(contains(unmute.out, "72%"));
+    auto zero = run({"volume", "0"});
+    REQUIRE(zero.exitCode == 0);
+    REQUIRE(contains(zero.out, "Volume: muted"));
+    auto unmute2 = run({"volume", "unmute"});
+    REQUIRE(unmute2.exitCode == 0);
+    REQUIRE(contains(unmute2.out, "72%"));
+    auto clamp = run({"volume", "+150"});
+    REQUIRE(clamp.exitCode == 0);
+    REQUIRE(contains(clamp.out, "100%"));
     // One dummy audio file: scan tolerates missing metadata.
     fs::path music = dir / "music";
     std::error_code ec;

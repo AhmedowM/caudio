@@ -53,7 +53,10 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 int volPct = static_cast<int>(v.vol * 100.0f);
                 caudio::println(os, "State: {}", stateStr);
                 caudio::println(os, "Pos: {} / {}", posStr, durStr);
-                caudio::println(os, "Volume: {}% (muted: {})", volPct, v.muted ? "yes" : "no");
+                if (v.muted)
+                    caudio::println(os, "Volume: muted");
+                else
+                    caudio::println(os, "Volume: {}%", volPct);
                 caudio::println(os, "Shuffle: {} Repeat: {}", v.shuffle ? "on" : "off",
                                 caudio::ipc::detail::repeatModeToString(v.repeat));
                 if (!v.artist.empty() && !v.title.empty()) {
@@ -89,7 +92,10 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             } else if constexpr (std::is_same_v<T, caudio::ipc::VolumeInfo>) {
                 int pct = static_cast<int>(v.vol * 100.0f);
-                caudio::println(os, "Volume: {}% (muted: {})", pct, v.muted ? "yes" : "no");
+                if (v.muted)
+                    caudio::println(os, "Volume: muted");
+                else
+                    caudio::println(os, "Volume: {}%", pct);
             } else if constexpr (std::is_same_v<T, caudio::ipc::LibraryStatsData>) {
                 caudio::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
                                 v.playlists);

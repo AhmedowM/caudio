@@ -121,6 +121,8 @@ Service::handle(const caudio::ipc::VolumeSet& v) {
     float cur = engine_->volume();
     float target = cur;
     bool hasTarget = false;
+    // Absolute 0 counts as mute (it remembers the restore level); any
+    // explicit non-zero level becomes the new restore level.
     if (v.level.has_value()) {
         float lvl = *v.level;
         if (!std::isfinite(lvl)) {
@@ -133,6 +135,16 @@ Service::handle(const caudio::ipc::VolumeSet& v) {
         if (lvl > 100.0f)
             lvl = 100.0f;
         target = lvl / 100.0f;
+        if (target <= 0.0f) {
+            if (cur > 0.0f) {
+                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                    return std::unexpected{pr.error()};
+            }
+            target = 0.0f;
+        } else {
+            if (auto pr = engine_->setPreMuteVolume(target); !pr)
+                return std::unexpected{pr.error()};
+        }
         hasTarget = true;
     }
     if (v.deltaPct.has_value()) {
@@ -144,15 +156,29 @@ Service::handle(const caudio::ipc::VolumeSet& v) {
         if (np > 100.0f)
             np = 100.0f;
         target = np / 100.0f;
+        if (target <= 0.0f) {
+            if (cur > 0.0f) {
+                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                    return std::unexpected{pr.error()};
+            }
+            target = 0.0f;
+        } else {
+            if (auto pr = engine_->setPreMuteVolume(target); !pr)
+                return std::unexpected{pr.error()};
+        }
         hasTarget = true;
     }
     if (v.mute.has_value()) {
         if (*v.mute) {
+            if (cur > 0.0f) {
+                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                    return std::unexpected{pr.error()};
+            }
             target = 0.0f;
             hasTarget = true;
         } else {
             if (cur == 0.0f && !hasTarget) {
-                target = 0.5f;
+                target = engine_->preMuteVolume();
                 hasTarget = true;
             }
         }

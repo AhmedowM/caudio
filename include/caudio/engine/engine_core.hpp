@@ -244,6 +244,17 @@ class Engine final {
     /** @brief Returns current volume [0,1]. @ingroup caudio_engine
      * @return Volume level (atomic load, relaxed). */
     float volume() const noexcept;
+    /** @brief Returns the unmute restore level (0,1]. @ingroup caudio_engine
+     * @details Last non-zero level before mute (persisted pre_mute_volume).
+     * @return Restore level (atomic load, relaxed). */
+    float preMuteVolume() const noexcept;
+    /** @brief Sets the unmute restore level (sanitized, persisted on next save).
+     * @ingroup caudio_engine
+     * @param g Level in (0,1]; anything else becomes 0.5.
+     * @details Callers follow with setVolume(), which persists via saveState().
+     * @par Thread safety
+     * Thread-safe; atomic store. */
+    ExpectedVoid setPreMuteVolume(float g);
     /** @brief Returns current playback state. @ingroup caudio_engine
      * @return PlaybackState (atomic load, acquire). */
     PlaybackState state() const noexcept;
@@ -829,6 +840,7 @@ class Engine final {
     std::atomic<bool> hasCurrent_{false};
     double duration_{0};
     std::atomic<float> volume_{1.0f};
+    std::atomic<float> preMute_{0.5f};
     std::atomic<PlaybackState> playbackState_{PlaybackState::Stopped};
     std::chrono::steady_clock::time_point playStart_{};
     double pausePos_{0};

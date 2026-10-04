@@ -268,6 +268,19 @@ float Engine::volume() const noexcept {
     return volume_.load(std::memory_order_relaxed);
 }
 
+Engine::ExpectedVoid Engine::setPreMuteVolume(float g) {
+    if (!(g > 0.0f) || g > 1.0f)
+        g = 0.5f;
+    state_.preMuteVolume = g;
+    preMute_.store(g, std::memory_order_relaxed);
+    // Persisted by the setVolume() call that always follows in mute flows.
+    return {};
+}
+
+float Engine::preMuteVolume() const noexcept {
+    return preMute_.load(std::memory_order_relaxed);
+}
+
 PlaybackState Engine::state() const noexcept {
     return playbackState_.load(std::memory_order_acquire);
 }
@@ -652,6 +665,22 @@ std::optional<caudio::utils::Error> Engine::loadState() {
             // clamp later via queueCount if needed; don't reset to 0
         }
         queue_.queue_id = state_.activeQueueId;
+        // Best-effort pre_mute_volume (missing on old DBs -> keep 0.5 default).
+        {
+            sqlite3_stmt* pm = nullptr;
+            if (sqlite3_prepare_v2(h, "SELECT pre_mute_volume FROM engine_state WHERE id=1", -1,
+                                   &pm, nullptr) == SQLITE_OK) {
+                caudio::db::internal::StmtGuard pmGuard(pm);
+                pm = pmGuard.get();
+                if (sqlite3_step(pm) == SQLITE_ROW) {
+                    float v = (float)sqlite3_column_double(pm, 0);
+                    if (v > 0.0f && v <= 1.0f) {
+                        state_.preMuteVolume = v;
+                        preMute_.store(v, std::memory_order_relaxed);
+                    }
+                }
+            }
+        }
         // validate queue exists; fallback to 1 if not
         {
             sqlite3_stmt* chk = nullptr;
@@ -764,6 +793,17 @@ std::expected<void, caudio::utils::Error> Engine::saveState() {
         if (rc != SQLITE_DONE)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "step failed"));
+        // Best-effort pre_mute_volume (no-op on old DBs without the column).
+        {
+            sqlite3_stmt* pm = nullptr;
+            if (sqlite3_prepare_v2(db, "UPDATE engine_state SET pre_mute_volume=? WHERE id=1",
+                                   -1, &pm, nullptr) == SQLITE_OK) {
+                caudio::db::internal::StmtGuard pmGuard(pm);
+                pm = pmGuard.get();
+                sqlite3_bind_double(pm, 1, (double)state_.preMuteVolume);
+                (void)sqlite3_step(pm);
+            }
+        }
         return {};
     });
 }

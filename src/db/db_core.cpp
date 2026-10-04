@@ -142,11 +142,12 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
         }
     }
     // Migration: add active_queue_id column if missing (for existing DBs)
-    {
+    // Migration: add pre_mute_volume column if missing (for existing DBs)
+    for (const char* mig :
+         {"ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
+          "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5"}) {
         char* migErr = nullptr;
-        int migRc = sqlite3_exec(
-            raw, "ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1", nullptr,
-            nullptr, &migErr);
+        int migRc = sqlite3_exec(raw, mig, nullptr, nullptr, &migErr);
         if (migErr) {
             sqlite3_free(migErr);
             migErr = nullptr;

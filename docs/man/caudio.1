@@ -126,7 +126,9 @@ compact JSON per line in JSON mode.
 .TP
 .B volume [\fILEVEL\fR]
 Get or set volume. \fILEVEL\fR: \fB0\fR\-100 (absolute), \fB+N\fR/\fB\-N\fR
-(delta), \fBmute\fR/\fBunmute\fR. No argument prints current volume.
+(delta, clamped), \fBmute\fR/\fBunmute\fR. Absolute \fB0\fR counts as
+\fBmute\fR. Muting remembers the current level; \fBunmute\fR restores it.
+No argument prints current volume (\fBVolume: muted\fR when muted).
 .TP
 .B info [\-\-json]
 Show detailed info for the currently playing track (metadata + play

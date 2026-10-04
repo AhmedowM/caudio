@@ -133,7 +133,7 @@ std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::eng
     s.pos = eng.position();
     s.dur = eng.duration();
     s.vol = eng.volume();
-    s.muted = false;
+    s.muted = eng.volume() == 0.0f;
     s.shuffle = eng.shuffle();
     s.repeat = eng.repeat();
     s.track_id = eng.currentTrackId();
