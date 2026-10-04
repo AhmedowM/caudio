@@ -185,6 +185,8 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const c
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::HistoryList& cmd) {
     int limit = cmd.limit.value_or(50);
+    if (limit <= 0)
+        limit = 50;
     auto hist = engine_->listHistory(limit);
     if (!hist)
         return std::unexpected{hist.error()};

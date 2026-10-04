@@ -392,6 +392,8 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto libRm = run({"library", "remove", (music / "full.mp3").generic_string()});
     REQUIRE(libRm.exitCode == 0);
     REQUIRE(contains(libRm.out, "Removed from library full.mp3"));
+    auto histNeg = run({"history", "list", "--limit", "-5"});
+    REQUIRE(histNeg.exitCode == 0);
     { std::ofstream f(music / "song2.mp3", std::ios::binary); f << "second dummy"; }
     auto addDir = run({"queue", "add", music.generic_string()});
     REQUIRE(addDir.exitCode == 0);
