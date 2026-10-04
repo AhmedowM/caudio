@@ -71,42 +71,39 @@ Service::handle(const caudio::ipc::LibraryScan& cmd) {
             pp = std::filesystem::current_path();
         root = pp / "music";
     }
-    auto mode = (cmd.mode == "full" ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
+    auto mode = (cmd.full_hash ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
     // Prefer scanLibrary if a library matches root -- gives dedup + batched
     // transaction
     if (auto libs = db_->libraryList(); libs) {
         for (auto& l : *libs) {
             if (std::filesystem::path(l.path) == root) {
-                auto sr = caudio::db::scanLibrary(*db_, l.id);
+                std::size_t before = 0;
+                if (auto st = db_->getStats())
+                    before = static_cast<std::size_t>(st->num_tracks);
+                auto sr = caudio::db::scanLibrary(*db_, l.id, {}, mode);
                 if (!sr)
                     return std::unexpected{sr.error()};
-                caudio::ipc::LibraryStatsData d2{};
-                if (auto st = db_->getStats()) {
-                    d2.tracks = static_cast<std::size_t>(st->num_tracks);
-                    d2.queues = static_cast<std::size_t>(st->num_queue_items);
-                    d2.playlists = static_cast<std::size_t>(st->num_playlists);
-                }
-                return Result{std::move(d2)};
+                std::size_t after = before;
+                if (auto st = db_->getStats())
+                    after = static_cast<std::size_t>(st->num_tracks);
+                return Result{caudio::ipc::ScanReport{after >= before ? after - before : 0}};
             }
         }
     }
     // Fallback: simple insert (batched path uses scanLibrary above which is already
-    // per-500 transactional)
+    // per-500 transactional). Files already recorded with matching size+mtime
+    // are skipped, so rescans (including cross-mode ones) do not duplicate
+    // untouched files.
     std::size_t n = 0;
     for (auto t : caudio::db::scan(root, mode)) {
+        if (auto ex = db_->findByPath(t.path);
+            ex && ex->size == t.size && ex->mtime == t.mtime)
+            continue;
         auto r = db_->insertTrack(t);
         if (r)
             ++n;
     }
-    caudio::ipc::LibraryStatsData d{};
-    d.tracks = n;
-    d.queues = 0;
-    d.playlists = 0;
-    if (auto st = db_->getStats()) {
-        d.queues = static_cast<std::size_t>(st->num_queue_items);
-        d.playlists = static_cast<std::size_t>(st->num_playlists);
-    }
-    return Result{std::move(d)};
+    return Result{caudio::ipc::ScanReport{n}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -117,7 +114,7 @@ Service::handle(const caudio::ipc::LibrarySearch& cmd) {
     // fallback to like handled inside search; if empty still return
     std::span<const caudio::db::Track> span{*tracks};
     std::vector<caudio::db::Track> out(span.begin(), span.end());
-    return Result{Tracks{std::move(out)}};
+    return Result{caudio::ipc::SearchResults{cmd.query, std::move(out)}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -133,8 +130,8 @@ Service::handle(const caudio::ipc::LibraryStats&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::LibraryStatsDetailed&) {
-    auto st = db_->libraryStatsDetailed();
+Service::handle(const caudio::ipc::LibraryStatsDetailed& cmd) {
+    auto st = db_->libraryStatsDetailed(cmd.top_n >= 0 ? cmd.top_n : 10);
     if (!st)
         return std::unexpected{st.error()};
     caudio::ipc::LibraryStatsDetailedData d{};
@@ -350,8 +347,28 @@ Service::handle(const caudio::ipc::LibraryRemove& cmd) {
         } catch (...) {
         }
     }
-    // try by path
+    // try by path (separator-insensitive: stored rows mix native and
+    // generic forms depending on which command added them)
     auto byPath = db_->findByPath(cmd.query);
+    if (!byPath) {
+        std::string alt = cmd.query;
+        bool changed = false;
+        for (char& c : alt) {
+#ifdef _WIN32
+            if (c == '/') {
+                c = '\\';
+                changed = true;
+            }
+#else
+            if (c == '\\') {
+                c = '/';
+                changed = true;
+            }
+#endif
+        }
+        if (changed)
+            byPath = db_->findByPath(alt);
+    }
     if (byPath) {
         auto r = db_->deleteTrack(byPath->id);
         if (!r)

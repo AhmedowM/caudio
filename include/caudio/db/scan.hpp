@@ -106,6 +106,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
  */
 std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
-            std::function<void(int64_t, int64_t, std::string_view)> progress = {});
+            std::function<void(int64_t, int64_t, std::string_view)> progress = {},
+            ScanMode mode = ScanMode::Sampled);
 
 } // namespace caudio::db

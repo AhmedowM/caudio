@@ -25,6 +25,7 @@ class OutputFormatter {
     bool json_{false};
     bool color_{false};
     int64_t highlightTrackId_{0};
+    std::string highlightNeedle_;
 
     /** @brief mm:ss rendering for durations. */
     static std::string formatTime(double secs);
@@ -45,6 +46,14 @@ class OutputFormatter {
      */
     void setHighlightTrackId(int64_t id) {
         highlightTrackId_ = id;
+    }
+
+    /**
+     * @brief Highlight a query substring in SearchResults cells.
+     * @param needle Case-insensitive substring; empty disables.
+     */
+    void setHighlightNeedle(std::string needle) {
+        highlightNeedle_ = std::move(needle);
     }
 
     /**

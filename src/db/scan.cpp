@@ -38,7 +38,7 @@ caudio::utils::Generator<Track> scan(const std::filesystem::path& root, ScanMode
          it != std::filesystem::recursive_directory_iterator(); ++it) {
         if (it->is_regular_file(ec) && detail::hasAudioExt(it->path())) {
             Track t;
-            t.path = it->path().string();
+            t.path = it->path().generic_string();
             std::error_code e2;
             auto sz = it->file_size(e2);
             if (!e2)
@@ -92,7 +92,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode) {
 
 std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
-            std::function<void(int64_t, int64_t, std::string_view)> progress) {
+            std::function<void(int64_t, int64_t, std::string_view)> progress, ScanMode mode) {
     if (libraryId == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     auto libs = db.libraryList();
@@ -163,7 +163,7 @@ scanLibrary(Database& db, int64_t libraryId,
         batchPending = 0;
     };
 
-    for (auto trk : scan(root, ScanMode::Sampled)) {
+    for (auto trk : scan(root, mode)) {
         if (!inTx) {
             auto b = beginBatch();
             if (!b)

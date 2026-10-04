@@ -4,8 +4,10 @@
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/utils.hpp>
 #include <caudio/utils/print.hpp>
+#include <cctype>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
 #include <format>
 #include <iostream>
 #include <span>
@@ -35,6 +37,47 @@ std::string OutputFormatter::truncateField(const std::string& s, std::size_t max
         return s.substr(0, maxLen);
     return s.substr(0, maxLen - 3) + "...";
 }
+
+namespace {
+
+// Wrap all case-insensitive occurrences of needle in ANSI green.
+std::string highlightAll(const std::string& text, std::string_view needle, bool color) {
+    if (!color || needle.empty())
+        return text;
+    std::string out;
+    std::size_t pos = 0;
+    auto lower = [](char c) {
+        return (char)std::tolower((unsigned char)c);
+    };
+    while (pos < text.size()) {
+        std::size_t hit = std::string::npos;
+        for (std::size_t i = pos; i + needle.size() <= text.size(); ++i) {
+            bool match = true;
+            for (std::size_t k = 0; k < needle.size(); ++k) {
+                if (lower(text[i + k]) != lower(needle[k])) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                hit = i;
+                break;
+            }
+        }
+        if (hit == std::string::npos) {
+            out += text.substr(pos);
+            break;
+        }
+        out += text.substr(pos, hit - pos);
+        out += "\33[32m";
+        out += text.substr(hit, needle.size());
+        out += "\33[0m";
+        pos = hit + needle.size();
+    }
+    return out;
+}
+
+} // namespace
 
 void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) const {
     if (json_) {
@@ -142,13 +185,38 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os, "Tracks ({}):", tracksSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
-                                "Title", "Dur");
+                                 "Title", "Dur");
                 for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
                     const auto& t = tracksSpan[i];
                     caudio::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
                                     truncateField(t.artist, 40), truncateField(t.title, 40),
                                     formatTime(t.duration));
                 }
+            } else if constexpr (std::is_same_v<T, caudio::ipc::SearchResults>) {
+                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                if (tracksSpan.size() == 1)
+                    caudio::println(os, "1 track found:");
+                else
+                    caudio::println(os, "{} tracks found:", tracksSpan.size());
+                caudio::println(os, "{:>3} {:>6}  {:<30} {:<25} {:<20} {:<12} {:<25}", "#", "ID",
+                                 "Title", "Artist", "Album", "Genre", "File");
+                for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
+                    const auto& t = tracksSpan[i];
+                    std::string fn =
+                        std::filesystem::path(t.path).filename().generic_string();
+                    caudio::println(
+                        os, "{:3} {:6}  {:<30} {:<25} {:<20} {:<12} {:<25}", i, t.id,
+                        highlightAll(truncateField(t.title, 30), highlightNeedle_, color_),
+                        highlightAll(truncateField(t.artist, 25), highlightNeedle_, color_),
+                        highlightAll(truncateField(t.album, 20), highlightNeedle_, color_),
+                        highlightAll(truncateField(t.genre, 12), highlightNeedle_, color_),
+                        highlightAll(truncateField(fn, 25), highlightNeedle_, color_));
+                }
+            } else if constexpr (std::is_same_v<T, caudio::ipc::ScanReport>) {
+                if (v.added == 1)
+                    caudio::println(os, "1 track added");
+                else
+                    caudio::println(os, "{} tracks added", v.added);
             } else if constexpr (std::is_same_v<T, caudio::ipc::Playlists>) {
                 std::span<const caudio::db::Playlist> playlistSpan(v.playlists.data(),
                                                                    v.playlists.size());

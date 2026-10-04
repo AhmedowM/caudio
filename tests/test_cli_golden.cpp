@@ -137,8 +137,7 @@ TEST_CASE("cli group help lists leaf commands", "[cli]") {
     REQUIRE(contains(q.out, "repeat"));
     auto l = runCli({"library", "scan", "--help"});
     REQUIRE(l.exitCode == 0);
-    REQUIRE(contains(l.out, "sampled"));
-    REQUIRE(contains(l.out, "full"));
+    REQUIRE(contains(l.out, "full-hash"));
 }
 
 TEST_CASE("cli version prints", "[cli]") {
@@ -296,9 +295,18 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     }
     auto scan = run({"library", "scan", "--path", music.generic_string()});
     REQUIRE(scan.exitCode == 0);
+    REQUIRE(contains(scan.out, "1 track added"));
+    { std::ofstream f(music / "full.mp3", std::ios::binary); f << "full-hash dummy"; }
+    auto scanFull = run({"library", "scan", "--path", music.generic_string(), "--full-hash"});
+    REQUIRE(scanFull.exitCode == 0);
+    REQUIRE(contains(scanFull.out, "1 track added"));
     auto stats = run({"library", "stats"});
     REQUIRE(stats.exitCode == 0);
-    REQUIRE(contains(stats.out, "Tracks: 1"));
+    REQUIRE(contains(stats.out, "Tracks: 2"));
+    auto search = run({"library", "search", "song"});
+    REQUIRE(search.exitCode == 0);
+    REQUIRE(contains(search.out, "1 track found:"));
+    REQUIRE(contains(search.out, "song.mp3"));
     auto add = run({"queue", "add", (music / "song.mp3").generic_string()});
     REQUIRE(add.exitCode == 0);
     auto ql = run({"queue", "list"});
@@ -336,11 +344,24 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto plj = run({"playlist", "tracks", "1", "--json"});
     REQUIRE(plj.exitCode == 0);
     REQUIRE(contains(plj.out, "\"PlaylistData\""));
+    auto stMp = run({"library", "stats", "--most-played", "0"});
+    REQUIRE(stMp.exitCode == 0);
+    REQUIRE(contains(stMp.out, "Library Stats (Detailed):"));
+    auto stQ = run({"library", "stats", "--queue", "all"});
+    REQUIRE(stQ.exitCode == 0);
+    REQUIRE(contains(stQ.out, "Queues ("));
+    auto stP = run({"library", "stats", "--playlist", "1"});
+    REQUIRE(stP.exitCode == 0);
+    REQUIRE(contains(stP.out, "Playlist 'goldmix': 1 track"));
+    auto libRm = run({"library", "remove", (music / "full.mp3").generic_string()});
+    REQUIRE(libRm.exitCode == 0);
+    REQUIRE(contains(libRm.out, "Removed from library full.mp3"));
     { std::ofstream f(music / "song2.mp3", std::ios::binary); f << "second dummy"; }
     auto addDir = run({"queue", "add", music.generic_string()});
     REQUIRE(addDir.exitCode == 0);
+    REQUIRE(contains(addDir.out, "Added full.mp3"));
     REQUIRE(contains(addDir.out, "Added song2.mp3"));
-    REQUIRE(contains(addDir.out, "1 track added"));
+    REQUIRE(contains(addDir.out, "2 tracks added"));
     REQUIRE(contains(addDir.err, "already in queue"));
     auto addIdMissing = run({"queue", "add", "--id", "99999"});
     REQUIRE(addIdMissing.exitCode == 1);
@@ -356,11 +377,14 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(addSearchEmpty.exitCode == 1);
     auto remPos = run({"queue", "remove", "--pos", "1"});
     REQUIRE(remPos.exitCode == 0);
-    REQUIRE(contains(remPos.out, "Removed from queue song2.mp3"));
+    REQUIRE(contains(remPos.out, "Removed from queue full.mp3"));
     REQUIRE(!contains(remPos.out, "tracks"));
     auto remId = run({"queue", "remove", "--id", "1"});
     REQUIRE(remId.exitCode == 0);
     REQUIRE(contains(remId.out, "Removed from queue song.mp3"));
+    auto remPath = run({"queue", "remove", (music / "song2.mp3").generic_string()});
+    REQUIRE(remPath.exitCode == 0);
+    REQUIRE(contains(remPath.out, "Removed from queue song2.mp3"));
     auto remEmpty = run({"queue", "remove", "--pos", "0"});
     REQUIRE(remEmpty.exitCode == 1);
     auto remBare = run({"queue", "remove", "0"});

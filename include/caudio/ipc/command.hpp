@@ -541,13 +541,12 @@ struct PlaylistImport final {
  * @brief Scan a directory for audio files and add them to the library.
  * @ingroup caudio_ipc
  *
- * @json_example {"type": "LibraryScan", "path": "/music", "mode": "sampled"}
+ * @json_example {"type": "LibraryScan", "path": "/music", "full_hash": false}
  *
  * @param path Root directory to scan. If omitted, uses the music directory adjacent to the
  * database.
- * @param mode Scan mode: "sampled" (fast, first/last 64KB) or "full" (entire file). Defaults to
- * "sampled".
- * @return Empty (success with no data).
+ * @param full_hash Full-file BLAKE3 instead of the default sampled fingerprint.
+ * @return ScanReport object with the added track count.
  */
 struct LibraryScan final {
     /**
@@ -556,10 +555,9 @@ struct LibraryScan final {
      */
     std::optional<std::string> path{};
     /**
-     * @brief Scan mode: "sampled" (fast, first/last 64KB) or "full" (entire file).
-     * Defaults to "sampled".
+     * @brief Full-file BLAKE3 instead of the default sampled fingerprint.
      */
-    std::string mode{"sampled"};
+    bool full_hash{false};
 };
 
 /**
@@ -600,11 +598,17 @@ struct LibraryStats final {};
  * @brief Get detailed library statistics including play history.
  * @ingroup caudio_ipc
  *
- * @json_example {"type": "LibraryStatsDetailed"}
+ * @json_example {"type": "LibraryStatsDetailed", "top_n": 10}
  *
+ * @param top_n Maximum most-played entries (0 = totals only).
  * @return LibraryStatsDetailedData object with detailed statistics and most-played tracks.
  */
-struct LibraryStatsDetailed final {};
+struct LibraryStatsDetailed final {
+    /**
+     * @brief Maximum most-played entries (0 = totals only).
+     */
+    int top_n{10};
+};
 
 /**
  * @struct LibraryAdd

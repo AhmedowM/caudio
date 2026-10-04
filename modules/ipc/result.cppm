@@ -21,6 +21,8 @@ using ::caudio::ipc::QueueCreated;
 using ::caudio::ipc::QueueEntry;
 using ::caudio::ipc::QueueTracks;
 using ::caudio::ipc::Queues;
+using ::caudio::ipc::ScanReport;
+using ::caudio::ipc::SearchResults;
 using ::caudio::ipc::ReplyExpected;
 using ::caudio::ipc::Result;
 using ::caudio::ipc::SingleTrack;

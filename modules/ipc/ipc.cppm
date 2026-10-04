@@ -80,6 +80,8 @@ using ::caudio::ipc::Restart;
 using ::caudio::ipc::Result;
 using ::caudio::ipc::resultFromJson;
 using ::caudio::ipc::Resume;
+using ::caudio::ipc::ScanReport;
+using ::caudio::ipc::SearchResults;
 using ::caudio::ipc::Seek;
 using ::caudio::ipc::serializeReply;
 using ::caudio::ipc::serializeRequest;

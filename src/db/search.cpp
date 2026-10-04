@@ -76,7 +76,8 @@ searchFts(Database& db, std::string_view query, int limit) {
         "library_id "
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
-        "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE LIMIT ?";
+        "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE OR path LIKE ? ESCAPE '\\' "
+        "COLLATE NOCASE LIMIT ?";
     SqliteStatement st;
     if (auto e = st.prepare(h, likeSql); !e)
         return std::unexpected{e.error()};
@@ -85,7 +86,8 @@ searchFts(Database& db, std::string_view query, int limit) {
     st.bindText(3, pat);
     st.bindText(4, pat);
     st.bindText(5, pat);
-    st.bindInt(6, limit > 0 ? limit : 50);
+    st.bindText(6, pat);
+    st.bindInt(7, limit > 0 ? limit : 50);
     std::vector<Track> out;
     while (st.step()) {
         Track t;
@@ -113,7 +115,8 @@ searchLike(Database& db, std::string_view query, int limit) {
         "library_id "
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
-        "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE LIMIT ?";
+        "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE OR path LIKE ? ESCAPE '\\' "
+        "COLLATE NOCASE LIMIT ?";
     SqliteStatement st;
     if (auto e = st.prepare(h, likeSql); !e)
         return std::unexpected{e.error()};
@@ -122,7 +125,8 @@ searchLike(Database& db, std::string_view query, int limit) {
     st.bindText(3, pat);
     st.bindText(4, pat);
     st.bindText(5, pat);
-    st.bindInt(6, limit > 0 ? limit : 50);
+    st.bindText(6, pat);
+    st.bindInt(7, limit > 0 ? limit : 50);
     std::vector<Track> out;
     while (st.step()) {
         Track t;

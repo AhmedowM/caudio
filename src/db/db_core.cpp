@@ -1419,7 +1419,7 @@ std::expected<DbStats, caudio::utils::Error> Database::getStats() {
 }
 
 std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error>
-Database::libraryStatsDetailed() {
+Database::libraryStatsDetailed(int topN) {
     std::shared_lock lk{dbMutex_};
     if (!db_)
         return std::unexpected{
@@ -1462,11 +1462,12 @@ Database::libraryStatsDetailed() {
         st.reset();
     }
 
-    // Most played tracks (top 10)
-    {
+    // Most played tracks (top N; none when N is 0).
+    if (topN > 0) {
         std::string sql =
             std::string(internal::kSelectTracksCols) +
-            " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT 10";
+            " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT " +
+            std::to_string(topN);
         auto sRes = getCachedForUse(sql);
         if (sRes) {
             SqliteStatement& st = *(*sRes);

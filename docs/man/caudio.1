@@ -218,17 +218,24 @@ Import playlist from file \fIPATH\fR. If \fB\-\-name\fR omitted, derived
 from filename.
 .SS Library
 .TP
-.B library scan [\-\-path \fIPATH\fR] [\-\-mode sampled|full]
+.B library scan [\-\-path \fIPATH\fR] [\-\-full\-hash] [\-\-json]
 Scan library for audio files. Default path is the music directory
-adjacent to the DB. \fBsampled\fR (fast, first/last 64 KiB) or
-\fBfull\fR (entire file) for BLAKE3 fingerprint.
+adjacent to the DB. Prints how many tracks were newly added.
+\fB\-\-full\-hash\fR uses full-file BLAKE3 instead of the default
+sampled fingerprint (slower). The two fingerprint modes are
+incompatible: rescanning the same files with a different mode re-adds
+them as new tracks.
 .TP
 .B library search \fIQUERY\fR [\-\-limit \fIN\fR] [\-\-json]
-FTS5 search with \fBLIKE\fR fallback. Default limit 50.
+FTS5 search with \fBLIKE\fR fallback over metadata and filename.
+Prints a match table with the query highlighted on color terminals.
 .TP
-.B library stats [\-\-json] [\-\-detailed]
-Show library counts (tracks/queues/playlists). With \fB\-\-detailed\fR
-includes most\-played and total play time.
+.B library stats [\-\-most\-played \fIN\fR] [\-\-queue all|\fIQID\fR] [\-\-playlist \fIPID\fR] [\-\-json]
+Show library counts (tracks/queues/playlists). With
+\fB\-\-most\-played \fIN\fR\fR also shows totals and the top-N most
+played (\fB0\fR for totals only). \fB\-\-queue\fR and
+\fB\-\-playlist\fR append brief overviews (repeatable);
+\fB\-\-json\fR takes neither.
 .TP
 .B library list [\-\-query \fIQ\fR] [\-\-artist \fIA\fR] [\-\-album \fIA\fR] [\-\-genre \fIG\fR] [\-\-limit \fIN\fR] [\-\-offset \fIN\fR] [\-\-json]
 List library tracks with optional filtering and pagination.
@@ -237,7 +244,8 @@ List library tracks with optional filtering and pagination.
 Add file or directory to library with metadata extraction.
 .TP
 .B library remove \fIID\fR
-Remove track from library by ID or path.
+Remove track from library by ID or path. The confirmation names the
+track; files on disk are untouched.
 .SS Tags
 .TP
 .B tag edit \fIID\fR \fIFIELD\fR \fIVALUE\fR
@@ -308,9 +316,9 @@ Search and queue:
 .B caudio next; caudio status --json
 .TP
 Library scan and stats:
-.B caudio library scan --path ~/Music --mode sampled
+.B caudio library scan --path ~/Music --full-hash
 .br
-.B caudio library stats --detailed --json
+.B caudio library stats --most-played 10 --json
 .TP
 Live status polling (for scripts/TUI):
 .B caudio status --watch --interval 200

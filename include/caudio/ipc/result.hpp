@@ -339,7 +339,7 @@ struct LibraryStatsDetailedData final {
 
 /**
  * @struct Tracks
- * @brief List of tracks (returned by LibrarySearch, LibraryList).
+ * @brief List of tracks (returned by LibraryList).
  * @ingroup caudio_ipc
  *
  * @json_example {"type": "Tracks", "tracks": [{"id": 1, "title": "Song", ...}]}
@@ -349,6 +349,27 @@ struct LibraryStatsDetailedData final {
 struct Tracks final {
     /**
      * @brief Vector of tracks.
+     */
+    std::vector<caudio::db::Track> tracks{};
+};
+
+/**
+ * @struct SearchResults
+ * @brief Library search hits with the query (returned by LibrarySearch).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "SearchResults", "query": "beatles", "tracks": [...]}
+ *
+ * @param query Search query string (for match highlighting).
+ * @param tracks Matching tracks.
+ */
+struct SearchResults final {
+    /**
+     * @brief Search query string.
+     */
+    std::string query{};
+    /**
+     * @brief Matching tracks.
      */
     std::vector<caudio::db::Track> tracks{};
 };
@@ -388,6 +409,22 @@ struct PlaylistData final {
      * @brief Export format (e.g., "m3u").
      */
     std::string format{};
+};
+
+/**
+ * @struct ScanReport
+ * @brief Library scan outcome (returned by LibraryScan).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "ScanReport", "added": 12}
+ *
+ * @param added Number of newly inserted tracks.
+ */
+struct ScanReport final {
+    /**
+     * @brief Number of newly inserted tracks.
+     */
+    std::size_t added{0};
 };
 
 // ---------------------------------------------------------------------------
@@ -645,9 +682,9 @@ using CliError = caudio::utils::Error;
  */
 using Result =
     std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
-                 LibraryStatsData, LibraryStatsDetailedData, Tracks, Playlists, PlaylistData,
-                 ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError,
-                 Devices>;
+                 LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults, Playlists,
+                 PlaylistData, ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty,
+                 CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

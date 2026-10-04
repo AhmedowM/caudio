@@ -324,7 +324,7 @@ Json toJson(const Command& cmd) {
                     j["path"] = *v.path;
                 else
                     j["path"] = nullptr;
-                j["mode"] = v.mode;
+                j["full_hash"] = v.full_hash;
             } else if constexpr (std::is_same_v<T, LibrarySearch>) {
                 j["type"] = "LibrarySearch";
                 j["query"] = v.query;
@@ -333,6 +333,7 @@ Json toJson(const Command& cmd) {
                 j["type"] = "LibraryStats";
             } else if constexpr (std::is_same_v<T, LibraryStatsDetailed>) {
                 j["type"] = "LibraryStatsDetailed";
+                j["top_n"] = v.top_n;
             } else if constexpr (std::is_same_v<T, LibraryAdd>) {
                 j["type"] = "LibraryAdd";
                 j["path"] = v.path;
@@ -596,8 +597,10 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
             LibraryScan v{};
             if (j.contains("path") && !j["path"].isNull() && j["path"].isString())
                 v.path = j["path"].get<std::string>();
-            if (j.contains("mode") && j["mode"].isString())
-                v.mode = j["mode"].get<std::string>();
+            if (j.contains("full_hash") && j["full_hash"].isBoolean())
+                v.full_hash = j["full_hash"].get<bool>();
+            else if (j.contains("mode") && j["mode"].isString())
+                v.full_hash = (j["mode"].get<std::string>() == "full");
             return Command{std::move(v)};
         }
         if (t == "LibrarySearch") {
@@ -611,8 +614,12 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
         }
         if (t == "LibraryStats")
             return Command{LibraryStats{}};
-        if (t == "LibraryStatsDetailed")
-            return Command{LibraryStatsDetailed{}};
+        if (t == "LibraryStatsDetailed") {
+            LibraryStatsDetailed v{};
+            if (j.contains("top_n") && j["top_n"].isNumber())
+                v.top_n = j["top_n"].get<int>();
+            return Command{std::move(v)};
+        }
         if (t == "LibraryAdd") {
             std::string p;
             bool rec = false;
@@ -827,6 +834,19 @@ Json toJson(const Result& r) {
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
                     j["tracks"].push_back(caudio::db::trackToJson(t));
+                return j;
+            } else if constexpr (std::is_same_v<T, SearchResults>) {
+                Json j;
+                j["type"] = "SearchResults";
+                j["query"] = v.query;
+                j["tracks"] = Json::array();
+                for (const auto& t : v.tracks)
+                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                return j;
+            } else if constexpr (std::is_same_v<T, ScanReport>) {
+                Json j;
+                j["type"] = "ScanReport";
+                j["added"] = v.added;
                 return j;
             } else if constexpr (std::is_same_v<T, Playlists>) {
                 Json j;
@@ -1108,6 +1128,30 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 }
             }
             return Result{std::move(trs)};
+        }
+        if (t == "SearchResults") {
+            SearchResults sr{};
+            if (j.contains("query") && j["query"].isString())
+                sr.query = j["query"].get<std::string>();
+            if (j.contains("tracks") && j["tracks"].isArray()) {
+                const Json tracks = j["tracks"];
+                for (std::size_t ti = 0, tn = tracks.size(); ti < tn; ++ti) {
+                    auto jt = tracks.at(ti);
+                    if (!jt)
+                        return std::unexpected{jt.error()};
+                    auto tr = caudio::db::trackFromJson(*jt);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    sr.tracks.push_back(std::move(*tr));
+                }
+            }
+            return Result{std::move(sr)};
+        }
+        if (t == "ScanReport") {
+            ScanReport sr{};
+            if (j.contains("added") && j["added"].isNumber())
+                sr.added = j["added"].get<std::size_t>();
+            return Result{std::move(sr)};
         }
         if (t == "Playlists") {
             Playlists pl{};
