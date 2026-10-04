@@ -39,6 +39,8 @@ using ::caudio::ipc::Prev;
 using ::caudio::ipc::Preview;
 using ::caudio::ipc::QueueAdd;
 using ::caudio::ipc::QueueClear;
+using ::caudio::ipc::QueueCreate;
+using ::caudio::ipc::QueueDelete;
 using ::caudio::ipc::QueueList;
 using ::caudio::ipc::QueueMove;
 using ::caudio::ipc::QueueQueues;

@@ -149,6 +149,13 @@ row is marked with \fB>\fR (green on color terminals).
 .TP
 .B queue switch \fIQID\fR
 Switch active queue by ID. Engine validates that the queue exists.
+Switching resets the cursor to the head.
+.TP
+.B queue create \fINAME\fR
+Create a new empty queue named \fINAME\fR.
+.TP
+.B queue delete \fIQID\fR
+Delete queue \fIQID\fR. The active queue cannot be deleted.
 .TP
 .B queue add [\fIPATH\fR ...] [\-\-id \fIID\fR] [\-\-search] [\-\-recursive] [\-\-json]
 Add files to the queue. Each \fIPATH\fR is a file, folder, or glob
@@ -156,9 +163,14 @@ Add files to the queue. Each \fIPATH\fR is a file, folder, or glob
 automatically with metadata. \fB\-\-id\fR adds one library track by id.
 \fB\-\-search\fR adds FTS matches for a single query. Already-queued
 tracks warn and are skipped. Prints per-track confirmations plus a total.
+\fB\-\-playlist \fIPID\fR\fR appends playlist tracks instead of paths;
+with \fB\-\-replace\fR the active queue is cleared first.
 .TP
-.B queue remove \fIID\fR
-Remove from queue by queue position or track ID.
+.B queue remove [\fIPATH\fR ...] [\-\-id \fIID\fR] [\-\-pos \fIPOS\fR] [\-\-recursive] [\-\-json]
+Remove from the active queue by file/folder/glob, library id
+(\fB\-\-id\fR), or queue position (\fB\-\-pos\fR). The three selectors
+are exclusive; a bare number is rejected. Prints one confirmation per
+removed track.
 .TP
 .B queue move \fIFROM\fR \fITO\fR
 Move track within queue from index \fIFROM\fR to \fITO\fR (atomic
@@ -182,9 +194,10 @@ List all playlists.
 .B playlist tracks \fIPID\fR [\-\-json]
 List tracks in playlist \fIPID\fR under a \fBPlaylist (N tracks):\fR header.
 .TP
-.B playlist load \fIPID\fR [\-\-play]
-Load playlist \fIPID\fR into the queue (clears first). With \fB\-\-play\fR
-starts playback.
+.B playlist load \fIPID\fR [\-\-play] [\-\-replace]
+Load playlist \fIPID\fR into a new queue (playback and the current queue
+stay intact). With \fB\-\-play\fR switches to the new queue and starts
+playback. With \fB\-\-replace\fR overwrites the active queue instead.
 .TP
 .B playlist save \fINAME\fR [\-\-queue \fIQID\fR]
 Save queue as a new playlist named \fINAME\fR. Optionally specify queue

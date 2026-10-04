@@ -254,6 +254,8 @@ class Service final {
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::QueueAdd& qa);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueClear&);
+    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueCreate& qc);
+    std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueDelete& qd);
     std::expected<caudio::ipc::Result, caudio::utils::Error> handle(const caudio::ipc::QueueList&);
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::QueueMove& qm);

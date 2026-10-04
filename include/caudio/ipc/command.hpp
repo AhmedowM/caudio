@@ -202,6 +202,40 @@ struct QueueList final {
 struct QueueQueues final {};
 
 /**
+ * @struct QueueCreate
+ * @brief Create a new empty queue.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "QueueCreate", "name": "mix"}
+ *
+ * @param name Display name for the new queue.
+ * @return QueueCreated object with the new queue id and name.
+ */
+struct QueueCreate final {
+    /**
+     * @brief Display name for the new queue.
+     */
+    std::string name{};
+};
+
+/**
+ * @struct QueueDelete
+ * @brief Delete a queue by id (never the active queue).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "QueueDelete", "qid": 2}
+ *
+ * @param qid Queue ID to delete.
+ * @return Empty (success with no data).
+ */
+struct QueueDelete final {
+    /**
+     * @brief Queue ID to delete.
+     */
+    int64_t qid{1};
+};
+
+/**
  * @struct QueueSwitch
  * @brief Switch the active queue by ID.
  * @ingroup caudio_ipc
@@ -368,8 +402,9 @@ struct PlaylistTracks final {
  * @json_example {"type": "PlaylistLoad", "pid": 1, "play": true}
  *
  * @param pid Playlist ID to load.
- * @param play If true, start playback immediately after loading.
- * @return Status object with updated playback state.
+ * @param play If true, switch to the new queue and start playback.
+ * @param replace If true, replace the active queue instead of a new queue.
+ * @return PlaylistLoaded object with the target queue id and status.
  */
 struct PlaylistLoad final {
     /**
@@ -377,9 +412,13 @@ struct PlaylistLoad final {
      */
     int64_t pid{0};
     /**
-     * @brief If true, start playback immediately after loading.
+     * @brief If true, switch to the target queue and start playback.
      */
     bool play{false};
+    /**
+     * @brief If true, replace the active queue instead of a new queue.
+     */
+    bool replace{false};
 };
 
 /**
@@ -943,8 +982,8 @@ struct DeviceTest final {
  */
 using Command =
     std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
-                 QueueList, QueueQueues, QueueSwitch, QueueAdd, QueueRemove, QueueMove, QueueClear,
-                 QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
+                 QueueList, QueueQueues, QueueCreate, QueueDelete, QueueSwitch, QueueAdd,
+                 QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
                  LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd,
                  LibraryRemove, LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList,

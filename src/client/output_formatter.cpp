@@ -105,6 +105,10 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                                      truncateField(q.name.empty() ? "(unnamed)" : q.name, 40),
                                      q.tracks, q.active ? "*" : "");
                 }
+            } else if constexpr (std::is_same_v<T, caudio::ipc::QueueCreated>) {
+                caudio::println(os, "Created queue {} '{}'", v.id, v.name);
+            } else if constexpr (std::is_same_v<T, caudio::ipc::PlaylistLoaded>) {
+                caudio::println(os, "Loaded playlist into queue {}", v.queue_id);
             } else if constexpr (std::is_same_v<T, caudio::ipc::VolumeInfo>) {
                 int pct = static_cast<int>(v.vol * 100.0f);
                 if (v.muted)

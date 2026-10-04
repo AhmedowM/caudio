@@ -397,6 +397,20 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
     unmatched.push_back(token);
 }
 
+// Comparable path key: absolute + normalized (+ lowercase on Windows).
+// Queued rows stored as relative paths resolve against the CLI working
+// directory, which matches rows the CLI itself added.
+std::string pathKey(const std::string& p) {
+    std::error_code ec;
+    auto abs = std::filesystem::absolute(p, ec);
+    std::string s = ec ? p : abs.lexically_normal().generic_string();
+#ifdef _WIN32
+    for (auto& c : s)
+        c = (char)std::tolower((unsigned char)c);
+#endif
+    return s;
+}
+
 } // namespace detail
 using detail::parseSeek;
 using detail::parseTime;
@@ -748,18 +762,38 @@ int App::run(int argc, char** argv) {
     std::string qAddId;
     bool qAddSearch = false;
     bool qAddRecursive = false;
+    std::int64_t qAddPlaylist = 0;
+    bool qAddReplace = false;
     bool qAddJson = false;
     auto* qAdd = queueCmd->add_subcommand("add", "Add to queue");
     qAdd->add_option("path", qAddPaths, "File, folder, or glob (repeatable)");
     qAdd->add_option("--id", qAddId, "Library track id");
     qAdd->add_flag("--search", qAddSearch, "Treat path as FTS query (single)");
     qAdd->add_flag("--recursive", qAddRecursive, "Recurse into folders");
+    qAdd->add_option("--playlist", qAddPlaylist, "Playlist id to append");
+    qAdd->add_flag("--replace", qAddReplace, "Clear queue first (with --playlist)");
     qAdd->add_flag("--json", qAddJson, "JSON output");
+    std::vector<std::string> qRemovePaths;
     std::string qRemoveId;
+    std::string qRemovePos;
+    bool qRemoveRecursive = false;
     bool qRemoveJson = false;
     auto* qRemove = queueCmd->add_subcommand("remove", "Remove from queue");
-    qRemove->add_option("id", qRemoveId, "index or id")->required();
+    qRemove->add_option("path", qRemovePaths, "File, folder, or glob (repeatable)");
+    qRemove->add_option("--id", qRemoveId, "Library track id");
+    qRemove->add_option("--pos", qRemovePos, "Queue position");
+    qRemove->add_flag("--recursive", qRemoveRecursive, "Recurse into folders");
     qRemove->add_flag("--json", qRemoveJson, "JSON output");
+    std::string qCreateName;
+    bool qCreateJson = false;
+    auto* qCreate = queueCmd->add_subcommand("create", "Create a new queue");
+    qCreate->add_option("name", qCreateName, "Queue name")->required();
+    qCreate->add_flag("--json", qCreateJson, "JSON output");
+    std::int64_t qDeleteQid = 0;
+    bool qDeleteJson = false;
+    auto* qDelete = queueCmd->add_subcommand("delete", "Delete a queue");
+    qDelete->add_option("qid", qDeleteQid, "Queue id")->required();
+    qDelete->add_flag("--json", qDeleteJson, "JSON output");
     std::size_t qFrom = 0, qTo = 0;
     bool qMoveJson = false;
     auto* qMove = queueCmd->add_subcommand("move", "Move within queue");
@@ -790,10 +824,12 @@ int App::run(int argc, char** argv) {
     plTracks->add_flag("--json", plTracksJson, "JSON output");
     std::int64_t plLoadPid = 0;
     bool plLoadPlay = false;
+    bool plLoadReplace = false;
     bool plLoadJson = false;
     auto* plLoad = plCmd->add_subcommand("load", "Load playlist into queue");
     plLoad->add_option("pid", plLoadPid, "Playlist id")->required();
     plLoad->add_flag("--play", plLoadPlay, "Play after load");
+    plLoad->add_flag("--replace", plLoadReplace, "Replace active queue");
     plLoad->add_flag("--json", plLoadJson, "JSON output");
     std::string plSaveName;
     std::int64_t plSaveQid = 0;
@@ -1391,8 +1427,37 @@ int App::run(int argc, char** argv) {
             return confirm(sendRaw(cmd), qSwitchJson,
                            std::format("Switched to queue {}", qSwitchId));
         }
+        if (qCreate->parsed()) {
+            caudio::ipc::Command cmd{caudio::ipc::QueueCreate{qCreateName}};
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (qCreateJson)
+                return printJson(*res);
+            if (auto* qc = std::get_if<caudio::ipc::QueueCreated>(&*res)) {
+                caudio::println("Created queue {} '{}'", qc->id, qc->name);
+                return 0;
+            }
+            caudio::client::OutputFormatter fmt{false};
+            fmt.print(*res, std::cout);
+            return 0;
+        }
+        if (qDelete->parsed()) {
+            caudio::ipc::Command cmd{caudio::ipc::QueueDelete{qDeleteQid}};
+            return confirm(sendRaw(cmd), qDeleteJson,
+                           std::format("Deleted queue {}", qDeleteQid));
+        }
         if (qAdd->parsed()) {
             bool hasId = !qAddId.empty();
+            bool hasPlaylist = qAddPlaylist != 0;
+            if (qAddReplace && !hasPlaylist) {
+                caudio::println(std::cerr, "queue add: --replace needs --playlist");
+                return 1;
+            }
+            if (hasPlaylist && (hasId || qAddSearch || !qAddPaths.empty())) {
+                caudio::println(std::cerr, "queue add: --playlist takes no PATH, --id, or --search");
+                return 1;
+            }
             if (hasId && (!qAddPaths.empty() || qAddSearch)) {
                 caudio::println(std::cerr, "queue add: --id takes no PATH or --search");
                 return 1;
@@ -1405,9 +1470,14 @@ int App::run(int argc, char** argv) {
                 caudio::println(std::cerr, "queue add: --id needs a numeric library id");
                 return 1;
             }
-            if (!hasId && !qAddSearch && qAddPaths.empty()) {
+            if (!hasId && !qAddSearch && !hasPlaylist && qAddPaths.empty()) {
                 caudio::println(std::cerr, "queue add: need a PATH, --id ID, or --search QUERY");
                 return 1;
+            }
+            if (hasPlaylist && qAddReplace) {
+                auto clr = sendRaw(caudio::ipc::Command{caudio::ipc::QueueClear{}});
+                if (!clr)
+                    return printErr(clr.error());
             }
             // Seed the known-id set so re-adds warn instead of duplicating.
             std::set<int64_t> seen;
@@ -1419,6 +1489,45 @@ int App::run(int argc, char** argv) {
                             seen.insert(t.id);
                     }
                 }
+            }
+            if (hasPlaylist) {
+                caudio::ipc::Command tcmd{caudio::ipc::PlaylistTracks{qAddPlaylist}};
+                auto tres = sendRaw(tcmd);
+                if (!tres)
+                    return printErr(tres.error());
+                auto* pd = std::get_if<caudio::ipc::PlaylistData>(&*tres);
+                if (!pd) {
+                    caudio::client::OutputFormatter fmt{false};
+                    fmt.print(*tres, std::cout);
+                    return 0;
+                }
+                if (pd->tracks.empty()) {
+                    caudio::println(std::cerr, "queue add: playlist {} has no tracks",
+                                    qAddPlaylist);
+                    return 1;
+                }
+                int added = 0;
+                caudio::ipc::QueueTracks collected{};
+                for (auto& t : pd->tracks) {
+                    caudio::ipc::Command cmd{caudio::ipc::QueueAdd{std::to_string(t.id), false}};
+                    auto res = sendRaw(cmd);
+                    if (!res) {
+                        printErr(res.error());
+                        continue;
+                    }
+                    if (qAddJson) {
+                        if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*res)) {
+                            for (auto& at : qt->tracks)
+                                collected.tracks.push_back(at);
+                        }
+                    } else {
+                        added += printAdded(*res, seen);
+                    }
+                }
+                if (qAddJson)
+                    return printJson(caudio::ipc::Result{std::move(collected)});
+                countLine(added);
+                return (added == 0) ? 1 : 0;
             }
             if (hasId || qAddSearch) {
                 caudio::ipc::Command cmd{
@@ -1482,16 +1591,139 @@ int App::run(int argc, char** argv) {
             return 0;
         }
         if (qRemove->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::QueueRemove{qRemoveId}};
-            auto res = sendRaw(cmd);
-            if (!res)
-                return printErr(res.error());
+            bool hasId = !qRemoveId.empty();
+            bool hasPos = !qRemovePos.empty();
+            bool hasPaths = !qRemovePaths.empty();
+            int modes = (hasId ? 1 : 0) + (hasPos ? 1 : 0) + (hasPaths ? 1 : 0);
+            if (modes == 0) {
+                caudio::println(std::cerr, "queue remove: need PATH, --id ID, or --pos POS");
+                return 1;
+            }
+            if (modes > 1) {
+                caudio::println(std::cerr, "queue remove: PATH, --id, and --pos are exclusive");
+                return 1;
+            }
+            if ((hasId && !isNumeric(qRemoveId)) || (hasPos && !isNumeric(qRemovePos))) {
+                caudio::println(std::cerr, "queue remove: --id and --pos need numeric values");
+                return 1;
+            }
+            // Snapshot insertion-order positions with labels for output.
+            struct RemTarget {
+                std::size_t pos{0};
+                caudio::db::Track track{};
+            };
+            std::vector<RemTarget> all;
+            {
+                caudio::client::Client probe{config_.dbPath, config_.socketPath};
+                auto ps = probe.send(caudio::ipc::Command{caudio::ipc::QueueList{"added"}});
+                if (!ps)
+                    return printErr(ps.error());
+                if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*ps)) {
+                    for (std::size_t i = 0; i < qt->tracks.size(); ++i)
+                        all.push_back(RemTarget{i, qt->tracks[i]});
+                } else {
+                    caudio::client::OutputFormatter fmt{false};
+                    fmt.print(*ps, std::cout);
+                    return 0;
+                }
+            }
+            std::vector<RemTarget> targets;
+            bool hardFail = false;
+            auto parseNum = [&](const std::string& s, long long& out) {
+                try {
+                    out = std::stoll(s);
+                    return true;
+                } catch (...) {
+                    caudio::println(std::cerr, "queue remove: value out of range: {}", s);
+                    return false;
+                }
+            };
+            if (hasPos) {
+                long long p = 0;
+                if (!parseNum(qRemovePos, p))
+                    return 1;
+                if (p < 0 || (std::size_t)p >= all.size()) {
+                    caudio::println(std::cerr, "queue remove: position out of range: {}", p);
+                    return 1;
+                }
+                targets.push_back(all[(std::size_t)p]);
+            } else if (hasId) {
+                long long id = 0;
+                if (!parseNum(qRemoveId, id))
+                    return 1;
+                for (auto& t : all) {
+                    if (t.track.id == id)
+                        targets.push_back(t);
+                }
+                if (targets.empty()) {
+                    caudio::println(std::cerr, "queue remove: track {} is not in the queue", id);
+                    return 1;
+                }
+            } else {
+                std::vector<std::string> files;
+                std::vector<std::string> unmatched;
+                for (auto& tok : qRemovePaths)
+                    detail::expandAddToken(tok, qRemoveRecursive, files, unmatched);
+                for (auto& u : unmatched) {
+                    if (isNumeric(u)) {
+                        caudio::println(
+                            std::cerr,
+                            "queue remove: '{}' is not a file (use --id/--pos for ids)",
+                            u);
+                        hardFail = true;
+                    } else if (detail::hasGlobChars(u)) {
+                        caudio::println(std::cerr, "No files matched: {}", u);
+                    } else {
+                        std::error_code ec;
+                        if (std::filesystem::is_directory(u, ec) && !ec)
+                            caudio::println(std::cerr, "No files matched: {}", u);
+                        else {
+                            caudio::println(std::cerr, "queue remove: no such file: {}", u);
+                            hardFail = true;
+                        }
+                    }
+                }
+                std::vector<bool> taken(all.size(), false);
+                for (auto& f : files) {
+                    std::string key = detail::pathKey(f);
+                    bool found = false;
+                    for (std::size_t i = 0; i < all.size(); ++i) {
+                        if (!taken[i] && detail::pathKey(all[i].track.path) == key) {
+                            targets.push_back(all[i]);
+                            taken[i] = true;
+                            found = true;
+                        }
+                    }
+                    if (!found) {
+                        caudio::println(std::cerr, "queue remove: not in queue: {}", f);
+                        hardFail = true;
+                    }
+                }
+            }
+            // Remove descending so positions stay valid.
+            std::sort(targets.begin(), targets.end(), [](const RemTarget& a, const RemTarget& b) {
+                return a.pos > b.pos;
+            });
+            int removed = 0;
+            std::vector<caudio::db::Track> removedTracks;
+            for (auto& t : targets) {
+                caudio::ipc::Command cmd{caudio::ipc::QueueRemove{std::to_string(t.pos)}};
+                auto res = sendRaw(cmd);
+                if (!res) {
+                    printErr(res.error());
+                    hardFail = true;
+                    continue;
+                }
+                if (!qRemoveJson)
+                    caudio::println("Removed from queue {}", detail::addedLabel(t.track));
+                removedTracks.push_back(t.track);
+                ++removed;
+            }
             if (qRemoveJson)
-                return printJson(*res);
-            std::size_t n = 0;
-            if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*res))
-                n = qt->tracks.size();
-            caudio::println("Removed {}. Queue: {} tracks", qRemoveId, n);
+                return printJson(
+                    caudio::ipc::Result{caudio::ipc::QueueTracks{std::move(removedTracks)}});
+            if (removed == 0)
+                return (targets.empty() && !hardFail) ? 0 : 1;
             return 0;
         }
         if (qMove->parsed()) {
@@ -1599,8 +1831,27 @@ int App::run(int argc, char** argv) {
             return sendViaClient(cmd, plTracksJson);
         }
         if (plLoad->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::PlaylistLoad{plLoadPid, plLoadPlay}};
-            return sendViaClient(cmd, plLoadJson);
+            caudio::ipc::Command cmd{
+                caudio::ipc::PlaylistLoad{plLoadPid, plLoadPlay, plLoadReplace}};
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (plLoadJson)
+                return printJson(*res);
+            if (auto* pl = std::get_if<caudio::ipc::PlaylistLoaded>(&*res)) {
+                if (plLoadReplace)
+                    caudio::println("Replaced queue {} with playlist {}", pl->queue_id,
+                                    plLoadPid);
+                else
+                    caudio::println("Loaded playlist {} into queue {}", plLoadPid,
+                                    pl->queue_id);
+                if (plLoadPlay)
+                    caudio::println("Playing {}", detail::trackWho(pl->status));
+                return 0;
+            }
+            caudio::client::OutputFormatter fmt{false};
+            fmt.print(*res, std::cout);
+            return 0;
         }
         if (plSave->parsed()) {
             std::optional<std::int64_t> qid;

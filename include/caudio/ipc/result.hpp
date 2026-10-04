@@ -190,6 +190,48 @@ struct Queues final {
     std::vector<QueueEntry> entries{};
 };
 
+/**
+ * @struct QueueCreated
+ * @brief New queue id (returned by QueueCreate).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "QueueCreated", "id": 3, "name": "mix"}
+ *
+ * @param id New queue id.
+ * @param name New queue name.
+ */
+struct QueueCreated final {
+    /**
+     * @brief New queue id.
+     */
+    int64_t id{0};
+    /**
+     * @brief New queue name.
+     */
+    std::string name{};
+};
+
+/**
+ * @struct PlaylistLoaded
+ * @brief Playlist load target and status (returned by PlaylistLoad).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlaylistLoaded", "queue_id": 3, "status": {...}}
+ *
+ * @param queue_id Target queue id (new queue, or active queue with replace).
+ * @param status Playback status after loading.
+ */
+struct PlaylistLoaded final {
+    /**
+     * @brief Target queue id.
+     */
+    int64_t queue_id{0};
+    /**
+     * @brief Playback status after loading.
+     */
+    Status status{};
+};
+
 // ---------------------------------------------------------------------------
 // Volume Results
 // ---------------------------------------------------------------------------
@@ -602,9 +644,10 @@ using CliError = caudio::utils::Error;
  * @see protocol.cppm for IPC framing
  */
 using Result =
-    std::variant<Status, QueueTracks, Queues, VolumeInfo, LibraryStatsData, LibraryStatsDetailedData,
-                 Tracks, Playlists, PlaylistData, ConfigValue, ConfigValues, SingleTrack, TrackInfo,
-                 History, Empty, CliError, Devices>;
+    std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
+                 LibraryStatsData, LibraryStatsDetailedData, Tracks, Playlists, PlaylistData,
+                 ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError,
+                 Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

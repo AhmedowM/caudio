@@ -478,16 +478,36 @@ Service::handle(const caudio::ipc::PlaylistLoad& cmd) {
     auto tracks = db_->playlistGetTracks(cmd.pid);
     if (!tracks)
         return std::unexpected{tracks.error()};
-    int64_t qid = 1;
-    auto clr = db_->queueClear(qid);
-    if (!clr)
-        return std::unexpected{clr.error()};
-    for (auto& t : std::span<const caudio::db::Track>(*tracks)) {
-        auto er = db_->queueEnqueue(qid, t.id);
+    auto pl = db_->getPlaylist(cmd.pid);
+    if (!pl)
+        return std::unexpected{pl.error()};
+    int64_t qid;
+    if (cmd.replace) {
+        // Replace the active queue (legacy behavior targeted queue 1).
+        qid = engine_->activeQueueId();
+        auto clr = db_->queueClear(qid);
+        if (!clr)
+            return std::unexpected{clr.error()};
+    } else {
+        auto created = db_->createQueue("playlist: " + pl->name);
+        if (!created)
+            return std::unexpected{created.error()};
+        qid = *created;
+    }
+    std::vector<int64_t> ids;
+    ids.reserve(tracks->size());
+    for (auto& t : std::span<const caudio::db::Track>(*tracks))
+        ids.push_back(t.id);
+    if (!ids.empty()) {
+        auto er = db_->queueEnqueueBatch(qid, ids);
         if (!er)
             return std::unexpected{er.error()};
     }
+    engine_->noteEnqueued(qid, ids.size());
     if (cmd.play) {
+        auto sw = engine_->switchQueue(qid);
+        if (!sw)
+            return std::unexpected{sw.error()};
         auto pr = engine_->play(qid);
         if (!pr)
             return std::unexpected{pr.error()};
@@ -496,7 +516,7 @@ Service::handle(const caudio::ipc::PlaylistLoad& cmd) {
     auto st = detail::buildStatus(*engine_, *db_);
     if (!st)
         return std::unexpected{st.error()};
-    return Result{*st};
+    return Result{caudio::ipc::PlaylistLoaded{qid, std::move(*st)}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -512,7 +532,13 @@ Service::handle(const caudio::ipc::PlaylistSave& cmd) {
     auto items = db_->queueList(qid);
     if (!items)
         return std::unexpected{items.error()};
+    // Queues may hold legacy duplicates; playlists forbid them.
+    std::vector<int64_t> seen;
+    seen.reserve(items->size());
     for (auto& it : std::span<const caudio::db::QueueItem>(*items)) {
+        if (std::find(seen.begin(), seen.end(), it.track_id) != seen.end())
+            continue;
+        seen.push_back(it.track_id);
         auto r = db_->playlistAddTrack(pid, it.track_id);
         if (!r)
             return std::unexpected{r.error()};

@@ -248,6 +248,12 @@ Json toJson(const Command& cmd) {
                 j["order"] = v.order;
             } else if constexpr (std::is_same_v<T, QueueQueues>) {
                 j["type"] = "QueueQueues";
+            } else if constexpr (std::is_same_v<T, QueueCreate>) {
+                j["type"] = "QueueCreate";
+                j["name"] = v.name;
+            } else if constexpr (std::is_same_v<T, QueueDelete>) {
+                j["type"] = "QueueDelete";
+                j["qid"] = v.qid;
             } else if constexpr (std::is_same_v<T, QueueSwitch>) {
                 j["type"] = "QueueSwitch";
                 j["qid"] = v.qid;
@@ -285,6 +291,7 @@ Json toJson(const Command& cmd) {
                 j["type"] = "PlaylistLoad";
                 j["pid"] = v.pid;
                 j["play"] = v.play;
+                j["replace"] = v.replace;
             } else if constexpr (std::is_same_v<T, PlaylistSave>) {
                 j["type"] = "PlaylistSave";
                 j["name"] = v.name;
@@ -461,6 +468,18 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
         }
         if (t == "QueueQueues")
             return Command{QueueQueues{}};
+        if (t == "QueueCreate") {
+            QueueCreate q{};
+            if (j.contains("name") && j["name"].isString())
+                q.name = j["name"].get<std::string>();
+            return Command{std::move(q)};
+        }
+        if (t == "QueueDelete") {
+            int64_t qid = 1;
+            if (j.contains("qid") && j["qid"].isNumber())
+                qid = j["qid"].get<int64_t>();
+            return Command{QueueDelete{qid}};
+        }
         if (t == "QueueSwitch") {
             int64_t qid = 1;
             if (j.contains("qid") && j["qid"].isNumber())
@@ -519,11 +538,14 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
         if (t == "PlaylistLoad") {
             int64_t pid = 0;
             bool play = false;
+            bool replace = false;
             if (j.contains("pid") && j["pid"].isNumber())
                 pid = j["pid"].get<int64_t>();
             if (j.contains("play") && j["play"].isBoolean())
                 play = j["play"].get<bool>();
-            return Command{PlaylistLoad{pid, play}};
+            if (j.contains("replace") && j["replace"].isBoolean())
+                replace = j["replace"].get<bool>();
+            return Command{PlaylistLoad{pid, play, replace}};
         }
         if (t == "PlaylistSave") {
             std::string name;
@@ -762,6 +784,18 @@ Json toJson(const Result& r) {
                     j["queues"].push_back(e);
                 }
                 return j;
+            } else if constexpr (std::is_same_v<T, QueueCreated>) {
+                Json j;
+                j["type"] = "QueueCreated";
+                j["id"] = v.id;
+                j["name"] = v.name;
+                return j;
+            } else if constexpr (std::is_same_v<T, PlaylistLoaded>) {
+                Json j;
+                j["type"] = "PlaylistLoaded";
+                j["queue_id"] = v.queue_id;
+                j["status"] = toJson(Result{v.status});
+                return j;
             } else if constexpr (std::is_same_v<T, VolumeInfo>) {
                 Json j;
                 j["type"] = "VolumeInfo";
@@ -990,6 +1024,30 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 }
             }
             return Result{std::move(qs)};
+        }
+        if (t == "QueueCreated") {
+            QueueCreated q{};
+            if (j.contains("id") && j["id"].isNumber())
+                q.id = j["id"].get<int64_t>();
+            if (j.contains("name") && j["name"].isString())
+                q.name = j["name"].get<std::string>();
+            return Result{std::move(q)};
+        }
+        if (t == "PlaylistLoaded") {
+            PlaylistLoaded p{};
+            if (j.contains("queue_id") && j["queue_id"].isNumber())
+                p.queue_id = j["queue_id"].get<int64_t>();
+            if (j.contains("status")) {
+                auto sub = resultFromJson(j["status"]);
+                if (!sub)
+                    return std::unexpected{sub.error()};
+                if (auto* st = std::get_if<Status>(&*sub))
+                    p.status = std::move(*st);
+                else
+                    return std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::Corrupt, "PlaylistLoaded status not a Status")};
+            }
+            return Result{std::move(p)};
         }
         if (t == "VolumeInfo") {
             VolumeInfo vi{};

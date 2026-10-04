@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
@@ -102,6 +103,31 @@ Service::handle(const caudio::ipc::QueueQueues&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::QueueCreate& qc) {
+    if (qc.name.empty())
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "queue create: missing name")};
+    auto id = db_->createQueue(qc.name);
+    if (!id)
+        return std::unexpected{id.error()};
+    return Result{caudio::ipc::QueueCreated{*id, qc.name}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::QueueDelete& qd) {
+    if (qd.qid == engine_->activeQueueId())
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::InvalidArg, "cannot delete the active queue")};
+    auto q = db_->getQueue(qd.qid);
+    if (!q)
+        return std::unexpected{q.error()};
+    auto r = db_->deleteQueue(qd.qid);
+    if (!r)
+        return std::unexpected{r.error()};
+    return Result{Empty{}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::QueueSwitch& qs) {
     auto q = db_->getQueue(qs.qid);
     if (!q)
@@ -184,10 +210,23 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
                     return std::unexpected{ins.error()};
                 }
             }
-            auto eq = db_->queueEnqueue(qid, newId);
-            if (!eq)
-                return std::unexpected{eq.error()};
-            engine_->noteEnqueued(qid, 1);
+            // Skip the enqueue when already queued: duplicates warn
+            // client-side, they must not create rows.
+            bool present = false;
+            if (auto items = db_->queueList(qid)) {
+                for (auto& it : *items) {
+                    if (it.track_id == newId) {
+                        present = true;
+                        break;
+                    }
+                }
+            }
+            if (!present) {
+                auto eq = db_->queueEnqueue(qid, newId);
+                if (!eq)
+                    return std::unexpected{eq.error()};
+                engine_->noteEnqueued(qid, 1);
+            }
             updateShmStatus();
             std::vector<caudio::db::Track> single;
             single.reserve(1);
@@ -253,16 +292,28 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
         }
     }
     // Batch enqueue in single transaction: atomic to concurrent queueList, rollback
-    // on failure
+    // on failure. Ids already queued are skipped (warn-only duplicates).
     {
-        std::vector<int64_t> ids;
-        ids.reserve(toAdd.size());
-        for (auto& t : toAdd)
-            ids.push_back(t.id);
-        auto er = db_->queueEnqueueBatch(qid, ids);
-        if (!er)
-            return std::unexpected{er.error()};
-        engine_->noteEnqueued(qid, ids.size());
+        std::vector<int64_t> fresh;
+        fresh.reserve(toAdd.size());
+        std::vector<int64_t> have;
+        if (auto items = db_->queueList(qid)) {
+            have.reserve(items->size());
+            for (auto& it : *items)
+                have.push_back(it.track_id);
+        }
+        for (auto& t : toAdd) {
+            if (std::find(have.begin(), have.end(), t.id) == have.end()) {
+                fresh.push_back(t.id);
+                have.push_back(t.id);
+            }
+        }
+        if (!fresh.empty()) {
+            auto er = db_->queueEnqueueBatch(qid, fresh);
+            if (!er)
+                return std::unexpected{er.error()};
+            engine_->noteEnqueued(qid, fresh.size());
+        }
     }
     updateShmStatus();
     return Result{QueueTracks{std::move(toAdd)}};
