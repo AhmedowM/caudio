@@ -191,6 +191,13 @@ Set repeat mode (\fBall\fR maps to
 .B playlist list [\-\-json]
 List all playlists.
 .TP
+.B playlist create \fINAME\fR
+Create an empty playlist named \fINAME\fR.
+.TP
+.B playlist add \fIPID\fR [\-\-id \fIID\fR ...] [\fIPATH\fR ...]
+Add library tracks (by id) or files (auto-added to the library) to
+playlist \fIPID\fR. Re-adds warn and are skipped.
+.TP
 .B playlist tracks \fIPID\fR [\-\-json]
 List tracks in playlist \fIPID\fR under a \fBPlaylist (N tracks):\fR header.
 .TP
@@ -215,7 +222,10 @@ Export playlist \fIPID\fR to file \fIPATH\fR. Formats: \fBm3u\fR (default),
 .TP
 .B playlist import \fIPATH\fR [\-\-name \fINAME\fR]
 Import playlist from file \fIPATH\fR. If \fB\-\-name\fR omitted, derived
-from filename.
+from filename. Lines are matched against the library
+(separator-insensitive); unmatched lines are skipped and already-listed
+tracks counted as duplicates. The report names matched, skipped, and
+duplicate counts.
 .SS Library
 .TP
 .B library scan [\-\-path \fIPATH\fR] [\-\-full\-hash] [\-\-json]
@@ -250,9 +260,10 @@ track; files on disk are untouched.
 .TP
 .B tag edit \fIID\fR \fIFIELD\fR \fIVALUE\fR
 Edit track tag. \fIFIELD\fR: \fBtitle\fR|\fBartist\fR|\fBalbum\fR|\fBalbum_artist\fR|\fBgenre\fR|\fByear\fR|\fBtrack_number\fR|\fBdisc_number\fR.
+Database only: audio files on disk are untouched.
 .TP
-.B tag get \fIID\fR [\-\-json]
-Get track tags for track \fIID\fR.
+.B tag get \fIID\fR [\fIFIELD\fR] [\-\-json]
+Get track tags for track \fIID\fR, or one field with \fIFIELD\fR.
 .SS History
 .TP
 .B history list [\-\-limit \fIN\fR] [\-\-json]
@@ -286,7 +297,8 @@ List all config key/value pairs.
 Copy config file to \fIPATH\fR.
 .TP
 .B config import \fIPATH\fR
-Copy file at \fIPATH\fR to config location.
+Validate \fIPATH\fR as a JSON object with correctly typed keys, then
+replace the live config. Invalid files are rejected untouched.
 .TP
 .B config reset [\fIKEY\fR]
 Reset config \fIKEY\fR or all keys to defaults.

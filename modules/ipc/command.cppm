@@ -28,6 +28,8 @@ using ::caudio::ipc::Next;
 using ::caudio::ipc::Pause;
 using ::caudio::ipc::Play;
 using ::caudio::ipc::PlaylistDelete;
+using ::caudio::ipc::PlaylistCreate;
+using ::caudio::ipc::PlaylistAdd;
 using ::caudio::ipc::PlaylistExport;
 using ::caudio::ipc::PlaylistImport;
 using ::caudio::ipc::PlaylistList;

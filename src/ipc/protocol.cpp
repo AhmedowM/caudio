@@ -287,6 +287,13 @@ Json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, PlaylistTracks>) {
                 j["type"] = "PlaylistTracks";
                 j["pid"] = v.pid;
+            } else if constexpr (std::is_same_v<T, PlaylistCreate>) {
+                j["type"] = "PlaylistCreate";
+                j["name"] = v.name;
+            } else if constexpr (std::is_same_v<T, PlaylistAdd>) {
+                j["type"] = "PlaylistAdd";
+                j["pid"] = v.pid;
+                j["track_id"] = v.track_id;
             } else if constexpr (std::is_same_v<T, PlaylistLoad>) {
                 j["type"] = "PlaylistLoad";
                 j["pid"] = v.pid;
@@ -535,6 +542,21 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
             if (j.contains("pid") && j["pid"].isNumber())
                 pid = j["pid"].get<int64_t>();
             return Command{PlaylistTracks{pid}};
+        }
+        if (t == "PlaylistCreate") {
+            std::string name;
+            if (j.contains("name") && j["name"].isString())
+                name = j["name"].get<std::string>();
+            return Command{PlaylistCreate{std::move(name)}};
+        }
+        if (t == "PlaylistAdd") {
+            int64_t pid = 0;
+            int64_t tid = 0;
+            if (j.contains("pid") && j["pid"].isNumber())
+                pid = j["pid"].get<int64_t>();
+            if (j.contains("track_id") && j["track_id"].isNumber())
+                tid = j["track_id"].get<int64_t>();
+            return Command{PlaylistAdd{pid, tid}};
         }
         if (t == "PlaylistLoad") {
             int64_t pid = 0;
@@ -863,6 +885,24 @@ Json toJson(const Result& r) {
                     j["tracks"].push_back(caudio::db::trackToJson(t));
                 j["format"] = v.format;
                 return j;
+            } else if constexpr (std::is_same_v<T, PlaylistCreated>) {
+                Json j;
+                j["type"] = "PlaylistCreated";
+                j["id"] = v.id;
+                j["name"] = v.name;
+                return j;
+            } else if constexpr (std::is_same_v<T, PlaylistImportReport>) {
+                Json j;
+                j["type"] = "PlaylistImportReport";
+                j["pid"] = v.pid;
+                j["name"] = v.name;
+                j["tracks"] = Json::array();
+                for (const auto& t : v.tracks)
+                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                j["matched"] = v.matched;
+                j["skipped"] = v.skipped;
+                j["duplicates"] = v.duplicates;
+                return j;
             } else if constexpr (std::is_same_v<T, ConfigValue>) {
                 Json j;
                 j["type"] = "ConfigValue";
@@ -1186,6 +1226,40 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
             if (j.contains("format") && j["format"].isString())
                 pd.format = j["format"].get<std::string>();
             return Result{std::move(pd)};
+        }
+        if (t == "PlaylistCreated") {
+            PlaylistCreated p{};
+            if (j.contains("id") && j["id"].isNumber())
+                p.id = j["id"].get<int64_t>();
+            if (j.contains("name") && j["name"].isString())
+                p.name = j["name"].get<std::string>();
+            return Result{std::move(p)};
+        }
+        if (t == "PlaylistImportReport") {
+            PlaylistImportReport r{};
+            if (j.contains("pid") && j["pid"].isNumber())
+                r.pid = j["pid"].get<int64_t>();
+            if (j.contains("name") && j["name"].isString())
+                r.name = j["name"].get<std::string>();
+            if (j.contains("tracks") && j["tracks"].isArray()) {
+                const Json tracks = j["tracks"];
+                for (std::size_t ti = 0, tn = tracks.size(); ti < tn; ++ti) {
+                    auto jt = tracks.at(ti);
+                    if (!jt)
+                        return std::unexpected{jt.error()};
+                    auto tr = caudio::db::trackFromJson(*jt);
+                    if (!tr)
+                        return std::unexpected{tr.error()};
+                    r.tracks.push_back(std::move(*tr));
+                }
+            }
+            if (j.contains("matched") && j["matched"].isNumber())
+                r.matched = j["matched"].get<std::size_t>();
+            if (j.contains("skipped") && j["skipped"].isNumber())
+                r.skipped = j["skipped"].get<std::size_t>();
+            if (j.contains("duplicates") && j["duplicates"].isNumber())
+                r.duplicates = j["duplicates"].get<std::size_t>();
+            return Result{std::move(r)};
         }
         if (t == "ConfigValue") {
             ConfigValue cv{};

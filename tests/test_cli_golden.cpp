@@ -157,6 +157,12 @@ TEST_CASE("cli rejects missing required arg", "[cli]") {
     REQUIRE(r.exitCode != 0);
 }
 
+TEST_CASE("cli validates log level", "[cli]") {
+    auto r = runCli({"--log-level", "bogus", "status"});
+    REQUIRE(r.exitCode == 1);
+    REQUIRE(contains(r.err, "log-level"));
+}
+
 TEST_CASE("cli seek validates time grammar", "[cli]") {
     auto bad = runCli(withCfg("gold_seek1", {"seek", "abc"}));
     REQUIRE(bad.exitCode == 1);
@@ -344,6 +350,32 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto plj = run({"playlist", "tracks", "1", "--json"});
     REQUIRE(plj.exitCode == 0);
     REQUIRE(contains(plj.out, "\"PlaylistData\""));
+    auto mkpl = run({"playlist", "create", "built"});
+    REQUIRE(mkpl.exitCode == 0);
+    REQUIRE(contains(mkpl.out, "built"));
+    long long builtPid = 0;
+    REQUIRE(std::sscanf(mkpl.out.c_str(), "Created playlist %lld", &builtPid) == 1);
+    auto padd = run({"playlist", "add", std::to_string(builtPid), "--id", "1"});
+    REQUIRE(padd.exitCode == 0);
+    REQUIRE(contains(padd.out, "Added song.mp3 to playlist"));
+    auto pdup = run({"playlist", "add", std::to_string(builtPid), "--id", "1"});
+    REQUIRE(pdup.exitCode == 0);
+    REQUIRE(contains(pdup.err, "already on playlist"));
+    auto ptrk = run({"playlist", "tracks", std::to_string(builtPid)});
+    REQUIRE(contains(ptrk.out, "Playlist (1 tracks):"));
+    {
+        std::ofstream f(dir / "imp.m3u", std::ios::binary);
+        f << "#EXTM3U\n"
+          << (music / "song.mp3").generic_string() << "\n"
+          << (music / "song.mp3").generic_string() << "\n"
+          << (music / "missing.mp3").generic_string() << "\n";
+    }
+    auto imp = run({"playlist", "import", (dir / "imp.m3u").generic_string()});
+    REQUIRE(imp.exitCode == 0);
+    REQUIRE(contains(imp.out, "Imported playlist"));
+    REQUIRE(contains(imp.out, "1 matched"));
+    REQUIRE(contains(imp.out, "1 skipped"));
+    REQUIRE(contains(imp.out, "1 duplicate"));
     auto stMp = run({"library", "stats", "--most-played", "0"});
     REQUIRE(stMp.exitCode == 0);
     REQUIRE(contains(stMp.out, "Library Stats (Detailed):"));
@@ -423,6 +455,45 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(addPl.exitCode == 0);
     REQUIRE(contains(addPl.out, "Added song.mp3"));
     REQUIRE(contains(addPl.out, "1 track added"));
+    auto tedit = run({"tag", "edit", "1", "title", "Hello"});
+    REQUIRE(tedit.exitCode == 0);
+    auto tgf = run({"tag", "get", "1", "title"});
+    REQUIRE(tgf.exitCode == 0);
+    REQUIRE(contains(tgf.out, "Hello"));
+    auto tgj = run({"tag", "get", "1", "year", "--json"});
+    REQUIRE(tgj.exitCode == 0);
+    REQUIRE(contains(tgj.out, "\"year\""));
+    auto tgbad = run({"tag", "get", "1", "bogus"});
+    REQUIRE(tgbad.exitCode == 1);
+    auto tgmiss = run({"tag", "get", "99999"});
+    REQUIRE(tgmiss.exitCode == 1);
+    REQUIRE(contains(tgmiss.err, "99999"));
+    auto swmiss = run({"queue", "switch", "999"});
+    REQUIRE(swmiss.exitCode == 1);
+    REQUIRE(contains(swmiss.err, "999"));
+    {
+        std::ofstream f(dir / "good.json", std::ios::binary);
+        f << "{\"custom_key\": \"v\"}";
+    }
+    auto impOk = run({"config", "import", (dir / "good.json").generic_string()});
+    REQUIRE(impOk.exitCode == 0);
+    {
+        std::ofstream f(dir / "bad.json", std::ios::binary);
+        f << "{oops";
+    }
+    auto impBad = run({"config", "import", (dir / "bad.json").generic_string()});
+    REQUIRE(impBad.exitCode == 1);
+    {
+        std::ofstream f(dir / "badtype.json", std::ios::binary);
+        f << "{\"logLevel\": \"loud\"}";
+    }
+    auto impType = run({"config", "import", (dir / "badtype.json").generic_string()});
+    REQUIRE(impType.exitCode == 1);
+    // Restore the hermetic config replaced by the import above.
+    {
+        std::ofstream f(cfg, std::ios::binary);
+        f << "{\"dbPath\": \"" << dir.generic_string() << "/library.db\"}";
+    }
     auto pauseIdle = run({"pause"});
     REQUIRE(pauseIdle.exitCode == 0);
     REQUIRE(contains(pauseIdle.err, "nothing playing"));

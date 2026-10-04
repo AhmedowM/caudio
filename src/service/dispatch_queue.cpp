@@ -130,8 +130,12 @@ Service::handle(const caudio::ipc::QueueDelete& qd) {
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::QueueSwitch& qs) {
     auto q = db_->getQueue(qs.qid);
-    if (!q)
+    if (!q) {
+        if (q.error().message.empty())
+            return std::unexpected{caudio::utils::makeError(
+                q.error().code, "queue not found: " + std::to_string(qs.qid))};
         return std::unexpected{q.error()};
+    }
     auto sw = engine_->switchQueue(qs.qid);
     if (!sw)
         return std::unexpected{sw.error()};

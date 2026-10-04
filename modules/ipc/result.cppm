@@ -15,6 +15,8 @@ using ::caudio::ipc::HistoryEntry;
 using ::caudio::ipc::LibraryStatsData;
 using ::caudio::ipc::LibraryStatsDetailedData;
 using ::caudio::ipc::PlaylistData;
+using ::caudio::ipc::PlaylistCreated;
+using ::caudio::ipc::PlaylistImportReport;
 using ::caudio::ipc::PlaylistLoaded;
 using ::caudio::ipc::Playlists;
 using ::caudio::ipc::QueueCreated;

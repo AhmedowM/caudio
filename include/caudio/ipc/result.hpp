@@ -412,6 +412,68 @@ struct PlaylistData final {
 };
 
 /**
+ * @struct PlaylistCreated
+ * @brief New playlist id (returned by PlaylistCreate).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlaylistCreated", "id": 2, "name": "mix"}
+ *
+ * @param id New playlist id.
+ * @param name New playlist name.
+ */
+struct PlaylistCreated final {
+    /**
+     * @brief New playlist id.
+     */
+    int64_t id{0};
+    /**
+     * @brief New playlist name.
+     */
+    std::string name{};
+};
+
+/**
+ * @struct PlaylistImportReport
+ * @brief Playlist import outcome (returned by PlaylistImport).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlaylistImportReport", "pid": 2, "matched": 9}
+ *
+ * @param pid Created playlist id.
+ * @param name Created playlist name.
+ * @param tracks Imported tracks.
+ * @param matched Lines matched to library tracks.
+ * @param skipped Lines with no library match.
+ * @param duplicates Lines already present (skipped).
+ */
+struct PlaylistImportReport final {
+    /**
+     * @brief Created playlist id.
+     */
+    int64_t pid{0};
+    /**
+     * @brief Created playlist name.
+     */
+    std::string name{};
+    /**
+     * @brief Imported tracks.
+     */
+    std::vector<caudio::db::Track> tracks{};
+    /**
+     * @brief Lines matched to library tracks.
+     */
+    std::size_t matched{0};
+    /**
+     * @brief Lines with no library match.
+     */
+    std::size_t skipped{0};
+    /**
+     * @brief Lines already present (skipped).
+     */
+    std::size_t duplicates{0};
+};
+
+/**
  * @struct ScanReport
  * @brief Library scan outcome (returned by LibraryScan).
  * @ingroup caudio_ipc
@@ -683,7 +745,7 @@ using CliError = caudio::utils::Error;
 using Result =
     std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
                  LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults, Playlists,
-                 PlaylistData, ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty,
+                 PlaylistData, PlaylistCreated, PlaylistImportReport, ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty,
                  CliError, Devices>;
 
 /**

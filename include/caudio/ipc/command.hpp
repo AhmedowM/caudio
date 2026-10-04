@@ -395,6 +395,45 @@ struct PlaylistTracks final {
 };
 
 /**
+ * @struct PlaylistCreate
+ * @brief Create an empty playlist.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlaylistCreate", "name": "mix"}
+ *
+ * @param name Display name for the new playlist.
+ * @return PlaylistCreated object with the new playlist id and name.
+ */
+struct PlaylistCreate final {
+    /**
+     * @brief Display name for the new playlist.
+     */
+    std::string name{};
+};
+
+/**
+ * @struct PlaylistAdd
+ * @brief Append a library track to a playlist.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "PlaylistAdd", "pid": 1, "track_id": 7}
+ *
+ * @param pid Playlist ID.
+ * @param track_id Library track ID.
+ * @return Empty (success with no data).
+ */
+struct PlaylistAdd final {
+    /**
+     * @brief Playlist ID.
+     */
+    int64_t pid{0};
+    /**
+     * @brief Library track ID.
+     */
+    int64_t track_id{0};
+};
+
+/**
  * @struct PlaylistLoad
  * @brief Load a playlist into the active queue and optionally start playback.
  * @ingroup caudio_ipc
@@ -987,7 +1026,8 @@ struct DeviceTest final {
 using Command =
     std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
                  QueueList, QueueQueues, QueueCreate, QueueDelete, QueueSwitch, QueueAdd,
-                 QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList, PlaylistTracks, PlaylistLoad,
+                 QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList,
+                 PlaylistCreate, PlaylistAdd, PlaylistTracks, PlaylistLoad,
                  PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport,
                  LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd,
                  LibraryRemove, LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList,

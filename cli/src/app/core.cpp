@@ -822,6 +822,22 @@ int App::run(int argc, char** argv) {
     auto* plTracks = plCmd->add_subcommand("tracks", "Tracks in playlist");
     plTracks->add_option("pid", plTracksPid, "Playlist id")->required();
     plTracks->add_flag("--json", plTracksJson, "JSON output");
+    std::string plCreateName;
+    bool plCreateJson = false;
+    auto* plCreate = plCmd->add_subcommand("create", "Create an empty playlist");
+    plCreate->add_option("name", plCreateName, "Playlist name")->required();
+    plCreate->add_flag("--json", plCreateJson, "JSON output");
+    std::int64_t plAddPid = 0;
+    std::vector<std::string> plAddIds;
+    std::vector<std::string> plAddPaths;
+    bool plAddRecursive = false;
+    bool plAddJson = false;
+    auto* plAdd = plCmd->add_subcommand("add", "Add tracks to playlist");
+    plAdd->add_option("pid", plAddPid, "Playlist id")->required();
+    plAdd->add_option("--id", plAddIds, "Library track id (repeatable)");
+    plAdd->add_option("path", plAddPaths, "File, folder, or glob (repeatable)");
+    plAdd->add_flag("--recursive", plAddRecursive, "Recurse into folders");
+    plAdd->add_flag("--json", plAddJson, "JSON output");
     std::int64_t plLoadPid = 0;
     bool plLoadPlay = false;
     bool plLoadReplace = false;
@@ -933,9 +949,11 @@ int App::run(int argc, char** argv) {
     tagEdit->add_option("value", tagEditValue, "New value")->required();
     tagEdit->add_flag("--json", tagEditJson, "JSON output");
     std::int64_t tagGetId = 0;
+    std::string tagGetField;
     bool tagGetJson = false;
     auto* tagGet = tagCmd->add_subcommand("get", "Get track tags");
     tagGet->add_option("id", tagGetId, "Track id")->required();
+    tagGet->add_option("field", tagGetField, "Single field (default: all)");
     tagGet->add_flag("--json", tagGetJson, "JSON output");
     auto* historyCmd = cli_->add_subcommand("history", "Playback history operations");
     bool historyJson = false;
@@ -1041,6 +1059,12 @@ int App::run(int argc, char** argv) {
             config_.logLevel = 3;
         else if (logLevelStr == "error")
             config_.logLevel = 4;
+        else {
+            caudio::println(std::cerr,
+                            "--log-level: invalid '{}' (expected trace|debug|info|warn|error)",
+                            logLevelStr);
+            return 1;
+        }
     }
     if (config_.socketPath.empty() && !config_.dbPath.empty()) {
         auto sp = caudio::config::socketPathFor(config_.dbPath);
@@ -1542,7 +1566,7 @@ int App::run(int argc, char** argv) {
                     return printJson(*res);
                 int added = printAdded(*res, seen);
                 countLine(added);
-                return added > 0 ? 0 : 1;
+                return 0;
             }
             // PATH mode: expand globs/folders client-side.
             std::vector<std::string> files;
@@ -1589,8 +1613,8 @@ int App::run(int argc, char** argv) {
             if (qAddJson)
                 return printJson(caudio::ipc::Result{std::move(collected)});
             countLine(added);
-            if (added == 0)
-                return (files.empty() && !hardFail) ? 0 : 1;
+            if (added == 0 && hardFail)
+                return 1;
             return 0;
         }
         if (qRemove->parsed()) {
@@ -1832,6 +1856,142 @@ int App::run(int argc, char** argv) {
         if (plTracks->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{plTracksPid}};
             return sendViaClient(cmd, plTracksJson);
+        }
+        if (plCreate->parsed()) {
+            caudio::ipc::Command cmd{caudio::ipc::PlaylistCreate{plCreateName}};
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (plCreateJson)
+                return printJson(*res);
+            if (auto* pc = std::get_if<caudio::ipc::PlaylistCreated>(&*res)) {
+                caudio::println("Created playlist {} '{}'", pc->id, pc->name);
+                return 0;
+            }
+            caudio::client::OutputFormatter fmt{false};
+            fmt.print(*res, std::cout);
+            return 0;
+        }
+        if (plAdd->parsed()) {
+            if (plAddIds.empty() && plAddPaths.empty()) {
+                caudio::println(std::cerr, "playlist add: need --id ID or PATH");
+                return 1;
+            }
+            std::vector<int64_t> ids;
+            for (auto& s : plAddIds) {
+                if (!isNumeric(s)) {
+                    caudio::println(std::cerr, "playlist add: --id needs numeric ids");
+                    return 1;
+                }
+                try {
+                    ids.push_back(std::stoll(s));
+                } catch (...) {
+                    caudio::println(std::cerr, "playlist add: id out of range: {}", s);
+                    return 1;
+                }
+            }
+            // PATHs: expand, ensure library rows, resolve exact ids.
+            std::vector<std::string> files;
+            std::vector<std::string> unmatched;
+            for (auto& tok : plAddPaths)
+                detail::expandAddToken(tok, plAddRecursive, files, unmatched);
+            bool hardFail = false;
+            for (auto& u : unmatched) {
+                if (isNumeric(u)) {
+                    caudio::println(std::cerr,
+                                    "playlist add: '{}' is not a file (use --id for ids)", u);
+                    hardFail = true;
+                } else if (detail::hasGlobChars(u)) {
+                    caudio::println(std::cerr, "No files matched: {}", u);
+                } else {
+                    std::error_code ec;
+                    if (std::filesystem::is_directory(u, ec) && !ec)
+                        caudio::println(std::cerr, "No files matched: {}", u);
+                    else {
+                        caudio::println(std::cerr, "playlist add: no such file: {}", u);
+                        hardFail = true;
+                    }
+                }
+            }
+            for (auto& f : files) {
+                caudio::ipc::Command acmd{caudio::ipc::LibraryAdd{f, false}};
+                auto ares = sendRaw(acmd);
+                if (!ares) {
+                    printErr(ares.error());
+                    hardFail = true;
+                    continue;
+                }
+                std::string fn = std::filesystem::path(f).filename().generic_string();
+                caudio::ipc::Command scmd{caudio::ipc::LibrarySearch{fn, 50}};
+                auto sres = sendRaw(scmd);
+                if (!sres) {
+                    printErr(sres.error());
+                    hardFail = true;
+                    continue;
+                }
+                auto* sr = std::get_if<caudio::ipc::SearchResults>(&*sres);
+                if (!sr) {
+                    caudio::client::OutputFormatter fmt{false};
+                    fmt.print(*sres, std::cout);
+                    hardFail = true;
+                    continue;
+                }
+                bool found = false;
+                for (auto& t : sr->tracks) {
+                    if (detail::pathKey(t.path) == detail::pathKey(f)) {
+                        ids.push_back(t.id);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    caudio::println(std::cerr, "playlist add: not in library: {}", f);
+                    hardFail = true;
+                }
+            }
+            int added = 0;
+            caudio::ipc::QueueTracks collected{};
+            for (auto tid : ids) {
+                caudio::ipc::Command cmd{caudio::ipc::PlaylistAdd{plAddPid, tid}};
+                auto res = sendRaw(cmd);
+                if (!res) {
+                    const auto& e = res.error();
+                    if (e.code == caudio::utils::StatusCode::AlreadyExists) {
+                        caudio::println(std::cerr, "already on playlist: track {}", tid);
+                        continue;
+                    }
+                    printErr(e);
+                    hardFail = true;
+                    continue;
+                }
+                if (plAddJson) {
+                    caudio::ipc::Command gcmd{caudio::ipc::TagGet{tid}};
+                    if (auto gres = sendRaw(gcmd)) {
+                        if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*gres))
+                            collected.tracks.push_back(st->track);
+                    }
+                } else {
+                    std::string label;
+                    caudio::ipc::Command gcmd{caudio::ipc::TagGet{tid}};
+                    if (auto gres = sendRaw(gcmd)) {
+                        if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*gres))
+                            label = detail::addedLabel(st->track);
+                    }
+                    if (label.empty())
+                        label = "track " + std::to_string(tid);
+                    caudio::println("Added {} to playlist {}", label, plAddPid);
+                }
+                ++added;
+            }
+            if (plAddJson)
+                return printJson(caudio::ipc::Result{std::move(collected)});
+            if (added == 1)
+                caudio::println("1 track added");
+            else
+                caudio::println("{} tracks added", added);
+            if (added == 0 && hardFail)
+                return 1;
+            return 0;
         }
         if (plLoad->parsed()) {
             caudio::ipc::Command cmd{
@@ -2126,8 +2286,74 @@ int App::run(int argc, char** argv) {
                            std::format("Updated {} for track {}", tagEditField, tagEditId));
         }
         if (tagGet->parsed()) {
+            static const std::array<std::string_view, 8> tagFields{
+                "title", "artist", "album", "album_artist",
+                "genre", "year", "track_number", "disc_number"};
+            if (!tagGetField.empty() &&
+                std::find(tagFields.begin(), tagFields.end(), tagGetField) ==
+                    tagFields.end()) {
+                caudio::println(std::cerr, "tag get: unknown field '{}' (expected one of "
+                                           "title|artist|album|album_artist|genre|year|"
+                                           "track_number|disc_number)",
+                                tagGetField);
+                return 1;
+            }
             caudio::ipc::Command cmd{caudio::ipc::TagGet{tagGetId}};
-            return sendViaClient(cmd, tagGetJson);
+            auto res = sendRaw(cmd);
+            if (!res)
+                return printErr(res.error());
+            if (tagGetField.empty()) {
+                if (tagGetJson)
+                    return printJson(*res);
+                caudio::client::OutputFormatter fmt{false};
+                fmt.print(*res, std::cout);
+                return 0;
+            }
+            auto* st = std::get_if<caudio::ipc::SingleTrack>(&*res);
+            if (!st) {
+                caudio::client::OutputFormatter fmt{tagGetJson};
+                fmt.print(*res, std::cout);
+                return 0;
+            }
+            const auto& t = st->track;
+            bool numeric = false;
+            std::string value;
+            if (tagGetField == "title")
+                value = t.title;
+            else if (tagGetField == "artist")
+                value = t.artist;
+            else if (tagGetField == "album")
+                value = t.album;
+            else if (tagGetField == "album_artist")
+                value = t.album_artist;
+            else if (tagGetField == "genre")
+                value = t.genre;
+            else if (tagGetField == "year") {
+                numeric = true;
+                value = std::to_string(t.year);
+            } else if (tagGetField == "track_number") {
+                numeric = true;
+                value = std::to_string(t.track_num);
+            } else if (tagGetField == "disc_number") {
+                numeric = true;
+                value = std::to_string(t.disc_num);
+            }
+            if (tagGetJson) {
+                caudio::utils::Json j = caudio::utils::Json::object();
+                if (numeric) {
+                    try {
+                        j[tagGetField] = std::stoll(value);
+                    } catch (...) {
+                        j[tagGetField] = value;
+                    }
+                } else {
+                    j[tagGetField] = value;
+                }
+                caudio::println("{}", j.dump());
+                return 0;
+            }
+            caudio::println("{}", value);
+            return 0;
         }
         std::cout << tagCmd->help() << "\n";
         return 0;

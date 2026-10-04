@@ -48,6 +48,8 @@ using caudio::ipc::LibraryScan;
 using caudio::ipc::LibrarySearch;
 using caudio::ipc::LibraryStats;
 using caudio::ipc::LibraryStatsDetailed;
+using caudio::ipc::PlaylistAdd;
+using caudio::ipc::PlaylistCreate;
 using caudio::ipc::PlaylistDelete;
 using caudio::ipc::PlaylistExport;
 using caudio::ipc::PlaylistImport;
@@ -465,8 +467,12 @@ Service::handle(const caudio::ipc::TagGet& cmd) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "tag get: invalid id")};
     auto tr = db_->getTrack(cmd.id);
-    if (!tr)
+    if (!tr) {
+        if (tr.error().message.empty())
+            return std::unexpected{caudio::utils::makeError(
+                tr.error().code, "track not found: " + std::to_string(cmd.id))};
         return std::unexpected{tr.error()};
+    }
     return Result{SingleTrack{std::move(*tr)}};
 }
 
@@ -560,6 +566,39 @@ Service::handle(const caudio::ipc::PlaylistSave& cmd) {
         if (!r)
             return std::unexpected{r.error()};
     }
+    return Result{Empty{}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistCreate& cmd) {
+    if (cmd.name.empty())
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "playlist create: missing name")};
+    auto id = db_->createPlaylist(cmd.name);
+    if (!id)
+        return std::unexpected{id.error()};
+    return Result{caudio::ipc::PlaylistCreated{*id, cmd.name}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::handle(const caudio::ipc::PlaylistAdd& cmd) {
+    auto pl = db_->getPlaylist(cmd.pid);
+    if (!pl)
+        return std::unexpected{pl.error()};
+    auto tr = db_->getTrack(cmd.track_id);
+    if (!tr)
+        return std::unexpected{tr.error()};
+    if (auto items = db_->playlistGetTracks(cmd.pid)) {
+        for (auto& t : std::span<const caudio::db::Track>(*items)) {
+            if (t.id == cmd.track_id) {
+                return std::unexpected{caudio::utils::makeError(
+                    caudio::utils::StatusCode::AlreadyExists, "already on playlist")};
+            }
+        }
+    }
+    auto r = db_->playlistAddTrack(cmd.pid, cmd.track_id);
+    if (!r)
+        return std::unexpected{r.error()};
     return Result{Empty{}};
 }
 
@@ -667,15 +706,48 @@ Service::handle(const caudio::ipc::PlaylistImport& cmd) {
     }
     std::vector<int64_t> trackIds;
     trackIds.reserve(lines.size());
-    size_t matched = 0, skipped = 0;
-    for (const auto& line : lines) {
-        auto tr = db_->findByPath(line);
-        if (tr) {
-            trackIds.push_back(tr->id);
-            ++matched;
-        } else {
-            ++skipped;
+    // Separator-insensitive lookup: stored rows mix native and generic forms.
+    auto findTrack = [&](const std::string& line, caudio::db::Track& out) -> bool {
+        if (auto tr = db_->findByPath(line)) {
+            out = std::move(*tr);
+            return true;
         }
+        std::string alt = line;
+        bool changed = false;
+        for (char& c : alt) {
+#ifdef _WIN32
+            if (c == '/') {
+                c = '\\';
+                changed = true;
+            }
+#else
+            if (c == '\\') {
+                c = '/';
+                changed = true;
+            }
+#endif
+        }
+        if (changed) {
+            if (auto tr = db_->findByPath(alt)) {
+                out = std::move(*tr);
+                return true;
+            }
+        }
+        return false;
+    };
+    size_t matched = 0, skipped = 0, duplicates = 0;
+    for (const auto& line : lines) {
+        caudio::db::Track tr;
+        if (!findTrack(line, tr)) {
+            ++skipped;
+            continue;
+        }
+        if (std::find(trackIds.begin(), trackIds.end(), tr.id) != trackIds.end()) {
+            ++duplicates;
+            continue;
+        }
+        trackIds.push_back(tr.id);
+        ++matched;
     }
     if (trackIds.empty()) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
@@ -685,19 +757,18 @@ Service::handle(const caudio::ipc::PlaylistImport& cmd) {
     auto pidRes = db_->createPlaylistFromTracks(name, trackIds);
     if (!pidRes)
         return std::unexpected{pidRes.error()};
-    caudio::ipc::PlaylistData pd{};
+    caudio::ipc::PlaylistImportReport rep{};
+    rep.pid = *pidRes;
+    rep.name = name;
+    rep.matched = matched;
+    rep.skipped = skipped;
+    rep.duplicates = duplicates;
     auto tracksRes = db_->playlistGetTracks(*pidRes);
     if (tracksRes) {
         for (auto& t : std::span<const caudio::db::Track>(*tracksRes))
-            pd.tracks.push_back(std::move(t));
+            rep.tracks.push_back(std::move(t));
     }
-    pd.format = ext;
-    if (skipped > 0) {
-        caudio::println(std::cerr, "playlist import: skipped {} unmatched tracks", skipped);
-    }
-    caudio::println(std::cerr, "playlist import: matched {} tracks, created playlist '{}' (id={})",
-                    matched, name, *pidRes);
-    return Result{std::move(pd)};
+    return Result{std::move(rep)};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>

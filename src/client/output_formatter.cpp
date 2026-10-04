@@ -217,6 +217,21 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                     caudio::println(os, "1 track added");
                 else
                     caudio::println(os, "{} tracks added", v.added);
+            } else if constexpr (std::is_same_v<T, caudio::ipc::PlaylistCreated>) {
+                caudio::println(os, "Created playlist {} '{}'", v.id, v.name);
+            } else if constexpr (std::is_same_v<T, caudio::ipc::PlaylistImportReport>) {
+                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                caudio::println(os, "Imported playlist '{}' ({} tracks, {} matched, {} skipped, "
+                                    "{} duplicates):",
+                                 v.name, tracksSpan.size(), v.matched, v.skipped, v.duplicates);
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
+                                 "Title", "Dur");
+                for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
+                    const auto& t = tracksSpan[i];
+                    caudio::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                    truncateField(t.artist, 40), truncateField(t.title, 40),
+                                    formatTime(t.duration));
+                }
             } else if constexpr (std::is_same_v<T, caudio::ipc::Playlists>) {
                 std::span<const caudio::db::Playlist> playlistSpan(v.playlists.data(),
                                                                    v.playlists.size());

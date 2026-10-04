@@ -236,6 +236,10 @@ class Service final {
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::PlaylistDelete& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistCreate& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::PlaylistAdd& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::PlaylistExport& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::PlaylistImport& cmd);
