@@ -336,6 +336,24 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto plj = run({"playlist", "tracks", "1", "--json"});
     REQUIRE(plj.exitCode == 0);
     REQUIRE(contains(plj.out, "\"PlaylistData\""));
+    { std::ofstream f(music / "song2.mp3", std::ios::binary); f << "second dummy"; }
+    auto addDir = run({"queue", "add", music.generic_string()});
+    REQUIRE(addDir.exitCode == 0);
+    REQUIRE(contains(addDir.out, "Added song2.mp3"));
+    REQUIRE(contains(addDir.out, "1 track added"));
+    REQUIRE(contains(addDir.err, "already in queue"));
+    auto addIdMissing = run({"queue", "add", "--id", "99999"});
+    REQUIRE(addIdMissing.exitCode == 1);
+    auto addIdBad = run({"queue", "add", "--id", "abc"});
+    REQUIRE(addIdBad.exitCode == 1);
+    auto addMissing = run({"queue", "add", (music / "nope.mp3").generic_string()});
+    REQUIRE(addMissing.exitCode == 1);
+    REQUIRE(contains(addMissing.err, "no such file"));
+    auto addEmpty = run({"queue", "add", (music / "*.xyz").generic_string()});
+    REQUIRE(addEmpty.exitCode == 0);
+    REQUIRE(contains(addEmpty.err, "No files matched"));
+    auto addSearchEmpty = run({"queue", "add", "xyz-no-match", "--search"});
+    REQUIRE(addSearchEmpty.exitCode == 1);
     auto pauseIdle = run({"pause"});
     REQUIRE(pauseIdle.exitCode == 0);
     REQUIRE(contains(pauseIdle.err, "nothing playing"));

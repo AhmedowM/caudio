@@ -150,10 +150,12 @@ row is marked with \fB>\fR (green on color terminals).
 .B queue switch \fIQID\fR
 Switch active queue by ID. Engine validates that the queue exists.
 .TP
-.B queue add \fIQUERY\fR [\-\-search]
-Add to queue. \fIQUERY\fR is interpreted as file path, track ID, or
-FTS query. \fB\-\-search\fR forces FTS search. New files are fingerprinted
-(BLAKE3).
+.B queue add [\fIPATH\fR ...] [\-\-id \fIID\fR] [\-\-search] [\-\-recursive] [\-\-json]
+Add files to the queue. Each \fIPATH\fR is a file, folder, or glob
+(expanded client-side and sorted); missing library rows are added
+automatically with metadata. \fB\-\-id\fR adds one library track by id.
+\fB\-\-search\fR adds FTS matches for a single query. Already-queued
+tracks warn and are skipped. Prints per-track confirmations plus a total.
 .TP
 .B queue remove \fIID\fR
 Remove from queue by queue position or track ID.

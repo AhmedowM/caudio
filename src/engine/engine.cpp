@@ -317,6 +317,19 @@ std::vector<int64_t> Engine::shufflePermFor(int64_t qid) noexcept {
     return out;
 }
 
+void Engine::noteEnqueued(int64_t qid, std::size_t count) noexcept {
+    if (count == 0 || !hasDb() || !tryLockQueue())
+        return;
+    if (queue_.queue_id == qid && queue_.shuffle && !queue_.perm.empty()) {
+        std::size_t n = db_->queueCountLocked(qid);
+        std::size_t start = (n >= count) ? n - count : 0;
+        for (std::size_t i = start; i < n; ++i)
+            queue_.perm.push_back((int64_t)i);
+        (void)persistShuffleBlobLocked();
+    }
+    unlockQueue();
+}
+
 std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));

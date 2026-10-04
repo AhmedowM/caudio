@@ -3,6 +3,7 @@
 #include <caudio/db/search.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/player/decoder.hpp>
 #include <caudio/service/service_core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
@@ -143,6 +144,22 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
                 if (!ec2)
                     t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
             }
+            // Extract metadata (title, artist, album, etc.) like library add.
+            if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+                t.title = std::move(meta->title);
+                t.artist = std::move(meta->artist);
+                t.album = std::move(meta->album);
+                t.album_artist = std::move(meta->album_artist);
+                t.genre = std::move(meta->genre);
+                t.year = meta->year;
+                t.track_num = meta->track_num;
+                t.disc_num = meta->disc_num;
+                if (meta->duration > 0)
+                    t.duration = meta->duration;
+                t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+                t.channels = static_cast<uint32_t>(meta->channels);
+                t.bitrate = meta->bitrate;
+            }
             int64_t newId = 0;
             auto ins = db_->insertTrack(t);
             if (ins) {
@@ -170,6 +187,7 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
             auto eq = db_->queueEnqueue(qid, newId);
             if (!eq)
                 return std::unexpected{eq.error()};
+            engine_->noteEnqueued(qid, 1);
             updateShmStatus();
             std::vector<caudio::db::Track> single;
             single.reserve(1);
@@ -183,6 +201,10 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
         if (!sr)
             return std::unexpected{sr.error()};
         toAdd = std::move(*sr);
+        if (toAdd.empty()) {
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::NotFound, "no matches for: " + qa.query)};
+        }
     } else {
         // try parse as int id
         bool parsed = false;
@@ -240,6 +262,7 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
         auto er = db_->queueEnqueueBatch(qid, ids);
         if (!er)
             return std::unexpected{er.error()};
+        engine_->noteEnqueued(qid, ids.size());
     }
     updateShmStatus();
     return Result{QueueTracks{std::move(toAdd)}};

@@ -27,9 +27,11 @@
 #endif
 
 #include <CLI/CLI.hpp>
+#include <algorithm>
 #include <caudio/client/client_core.hpp>
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/json.hpp>
+#include <caudio/db/scan.hpp>
 #include <caudio/engine/engine_types.hpp>
 #include <caudio/player/player_core.hpp>
 #include <caudio/service/service_core.hpp>
@@ -38,6 +40,7 @@
 #include <caudio/utils/result.hpp>
 #include <caudio/version_config.hpp>
 #include <memory>
+#include <set>
 #include <stop_token>
 #include <system_error>
 
@@ -265,6 +268,133 @@ bool useColor() {
 #else
     return ::isatty(STDOUT_FILENO) != 0;
 #endif
+}
+
+// Human label for added tracks: "artist - title: file.ext", artist/title
+// parts omitted when empty, bare filename when both are.
+std::string addedLabel(const caudio::db::Track& t) {
+    std::string fn = std::filesystem::path(t.path).filename().generic_string();
+    std::string who;
+    if (!t.artist.empty() && !t.title.empty())
+        who = t.artist + " - " + t.title;
+    else
+        who = t.artist + t.title;
+    if (!who.empty() && !fn.empty())
+        return who + ": " + fn;
+    if (!fn.empty())
+        return fn;
+    if (!who.empty())
+        return who;
+    return "track " + std::to_string(t.id);
+}
+
+// Case-insensitive wildcard match (* and ? only) for queue-add globs.
+bool wildcardMatch(std::string_view pat, std::string_view name) {
+    std::size_t px = 0, nx = 0, star = std::string_view::npos, ss = 0;
+    auto lower = [](char c) {
+        return (char)std::tolower((unsigned char)c);
+    };
+    while (nx < name.size()) {
+        if (px < pat.size() && (pat[px] == '?' || lower(pat[px]) == lower(name[nx]))) {
+            ++px;
+            ++nx;
+        } else if (px < pat.size() && pat[px] == '*') {
+            star = px++;
+            ss = nx;
+        } else if (star != std::string_view::npos) {
+            px = star + 1;
+            nx = ++ss;
+        } else {
+            return false;
+        }
+    }
+    while (px < pat.size() && pat[px] == '*')
+        ++px;
+    return px == pat.size();
+}
+
+bool hasGlobChars(std::string_view s) {
+    return s.find_first_of("*?") != std::string_view::npos;
+}
+
+// Expand one queue-add token: glob (non-recursive filename match in the
+// pattern's parent dir), folder (audio files, top-level unless recursive),
+// or single file absolutized to the CLI working directory. Anything else is
+// returned via unmatched for the caller to diagnose.
+void expandAddToken(const std::string& token, bool recursive, std::vector<std::string>& files,
+                    std::vector<std::string>& unmatched) {
+    std::error_code ec;
+    if (hasGlobChars(token)) {
+        std::filesystem::path p(token);
+        std::filesystem::path dir = p.parent_path();
+        if (dir.empty())
+            dir = ".";
+        std::string pat = p.filename().generic_string();
+        std::vector<std::string> hits;
+        for (auto it = std::filesystem::directory_iterator(dir, ec);
+             it != std::filesystem::directory_iterator(); ++it) {
+            if (ec)
+                break;
+            std::error_code e2;
+            if (!it->is_regular_file(e2) || e2)
+                continue;
+            std::string fn = it->path().filename().generic_string();
+            if (wildcardMatch(pat, fn) && caudio::db::detail::hasAudioExt(it->path())) {
+                auto abs = std::filesystem::absolute(it->path(), e2);
+                hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
+            }
+        }
+        if (hits.empty()) {
+            unmatched.push_back(token);
+            return;
+        }
+        std::sort(hits.begin(), hits.end());
+        files.insert(files.end(), hits.begin(), hits.end());
+        return;
+    }
+    std::filesystem::path p(token);
+    if (std::filesystem::is_directory(p, ec) && !ec) {
+        std::vector<std::string> hits;
+        if (recursive) {
+            for (auto it = std::filesystem::recursive_directory_iterator(
+                      p, std::filesystem::directory_options::skip_permission_denied, ec);
+                  it != std::filesystem::recursive_directory_iterator(); ++it) {
+                if (ec)
+                    break;
+                std::error_code e2;
+                if (it->is_regular_file(e2) && !e2 &&
+                    caudio::db::detail::hasAudioExt(it->path())) {
+                    auto abs = std::filesystem::absolute(it->path(), e2);
+                    hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
+                }
+            }
+        } else {
+            for (auto it = std::filesystem::directory_iterator(p, ec);
+                 it != std::filesystem::directory_iterator(); ++it) {
+                if (ec)
+                    break;
+                std::error_code e2;
+                if (it->is_regular_file(e2) && !e2 &&
+                    caudio::db::detail::hasAudioExt(it->path())) {
+                    auto abs = std::filesystem::absolute(it->path(), e2);
+                    hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
+                }
+            }
+        }
+        if (hits.empty()) {
+            unmatched.push_back(token);
+            return;
+        }
+        std::sort(hits.begin(), hits.end());
+        files.insert(files.end(), hits.begin(), hits.end());
+        return;
+    }
+    if (std::filesystem::is_regular_file(p, ec) && !ec) {
+        auto abs = std::filesystem::absolute(p, ec);
+        files.push_back(ec ? p.generic_string() : abs.generic_string());
+        return;
+    }
+    unmatched.push_back(token);
 }
 
 } // namespace detail
@@ -614,12 +744,16 @@ int App::run(int argc, char** argv) {
     auto* qSwitch = queueCmd->add_subcommand("switch", "Switch active queue");
     qSwitch->add_option("qid", qSwitchId, "Queue id")->required();
     qSwitch->add_flag("--json", qSwitchJson, "JSON output");
-    std::string qAddQuery;
+    std::vector<std::string> qAddPaths;
+    std::string qAddId;
     bool qAddSearch = false;
+    bool qAddRecursive = false;
     bool qAddJson = false;
     auto* qAdd = queueCmd->add_subcommand("add", "Add to queue");
-    qAdd->add_option("query", qAddQuery, "id|path|query")->required();
-    qAdd->add_flag("--search", qAddSearch, "Force FTS search")->group("");
+    qAdd->add_option("path", qAddPaths, "File, folder, or glob (repeatable)");
+    qAdd->add_option("--id", qAddId, "Library track id");
+    qAdd->add_flag("--search", qAddSearch, "Treat path as FTS query (single)");
+    qAdd->add_flag("--recursive", qAddRecursive, "Recurse into folders");
     qAdd->add_flag("--json", qAddJson, "JSON output");
     std::string qRemoveId;
     bool qRemoveJson = false;
@@ -1192,6 +1326,43 @@ int App::run(int argc, char** argv) {
         caudio::ipc::Command cmd{*pv};
         return sendViaClient(cmd, volumeJson);
     }
+    // Print Added lines for a QueueTracks result, warning on ids already seen
+    // (pre-existing queue members). Returns the newly added count.
+    auto printAdded = [&](const caudio::ipc::Result& res, std::set<int64_t>& seen) -> int {
+        auto* qt = std::get_if<caudio::ipc::QueueTracks>(&res);
+        if (!qt) {
+            caudio::client::OutputFormatter fmt{false};
+            fmt.print(res, std::cout);
+            return 0;
+        }
+        int added = 0;
+        for (auto& t : qt->tracks) {
+            std::string label = detail::addedLabel(t);
+            if (seen.contains(t.id)) {
+                caudio::println(std::cerr, "already in queue: {}", label);
+            } else {
+                caudio::println("Added {}", label);
+                seen.insert(t.id);
+                ++added;
+            }
+        }
+        return added;
+    };
+    auto countLine = [&](int added) {
+        if (added == 1)
+            caudio::println("1 track added");
+        else
+            caudio::println("{} tracks added", added);
+    };
+    auto isNumeric = [](const std::string& s) {
+        if (s.empty())
+            return false;
+        for (char c : s) {
+            if (!std::isdigit((unsigned char)c))
+                return false;
+        }
+        return true;
+    };
     if (queueCmd->parsed()) {
         if (qList->parsed() || qQueuesAlias->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
@@ -1221,8 +1392,94 @@ int App::run(int argc, char** argv) {
                            std::format("Switched to queue {}", qSwitchId));
         }
         if (qAdd->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::QueueAdd{qAddQuery, qAddSearch}};
-            return sendViaClient(cmd, qAddJson);
+            bool hasId = !qAddId.empty();
+            if (hasId && (!qAddPaths.empty() || qAddSearch)) {
+                caudio::println(std::cerr, "queue add: --id takes no PATH or --search");
+                return 1;
+            }
+            if (qAddSearch && qAddPaths.size() != 1) {
+                caudio::println(std::cerr, "queue add: --search takes exactly one query");
+                return 1;
+            }
+            if (hasId && !isNumeric(qAddId)) {
+                caudio::println(std::cerr, "queue add: --id needs a numeric library id");
+                return 1;
+            }
+            if (!hasId && !qAddSearch && qAddPaths.empty()) {
+                caudio::println(std::cerr, "queue add: need a PATH, --id ID, or --search QUERY");
+                return 1;
+            }
+            // Seed the known-id set so re-adds warn instead of duplicating.
+            std::set<int64_t> seen;
+            {
+                caudio::client::Client probe{config_.dbPath, config_.socketPath};
+                if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::QueueList{"added"}})) {
+                    if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*ps)) {
+                        for (auto& t : qt->tracks)
+                            seen.insert(t.id);
+                    }
+                }
+            }
+            if (hasId || qAddSearch) {
+                caudio::ipc::Command cmd{
+                    caudio::ipc::QueueAdd{hasId ? qAddId : qAddPaths[0], qAddSearch}};
+                auto res = sendRaw(cmd);
+                if (!res)
+                    return printErr(res.error());
+                if (qAddJson)
+                    return printJson(*res);
+                int added = printAdded(*res, seen);
+                countLine(added);
+                return added > 0 ? 0 : 1;
+            }
+            // PATH mode: expand globs/folders client-side.
+            std::vector<std::string> files;
+            std::vector<std::string> unmatched;
+            for (auto& tok : qAddPaths)
+                detail::expandAddToken(tok, qAddRecursive, files, unmatched);
+            bool hardFail = false;
+            for (auto& u : unmatched) {
+                if (isNumeric(u)) {
+                    caudio::println(std::cerr,
+                                    "queue add: '{}' is not a file (use --id for library ids)", u);
+                    hardFail = true;
+                } else if (detail::hasGlobChars(u)) {
+                    caudio::println(std::cerr, "No files matched: {}", u);
+                } else {
+                    std::error_code ec;
+                    if (std::filesystem::is_directory(u, ec) && !ec)
+                        caudio::println(std::cerr, "No files matched: {}", u);
+                    else {
+                        caudio::println(std::cerr, "queue add: no such file: {}", u);
+                        hardFail = true;
+                    }
+                }
+            }
+            int added = 0;
+            caudio::ipc::QueueTracks collected{};
+            for (auto& f : files) {
+                caudio::ipc::Command cmd{caudio::ipc::QueueAdd{f, false}};
+                auto res = sendRaw(cmd);
+                if (!res) {
+                    printErr(res.error());
+                    hardFail = true;
+                    continue;
+                }
+                if (qAddJson) {
+                    if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*res)) {
+                        for (auto& t : qt->tracks)
+                            collected.tracks.push_back(t);
+                    }
+                } else {
+                    added += printAdded(*res, seen);
+                }
+            }
+            if (qAddJson)
+                return printJson(caudio::ipc::Result{std::move(collected)});
+            countLine(added);
+            if (added == 0)
+                return (files.empty() && !hardFail) ? 0 : 1;
+            return 0;
         }
         if (qRemove->parsed()) {
             caudio::ipc::Command cmd{caudio::ipc::QueueRemove{qRemoveId}};

@@ -280,6 +280,15 @@ class Engine final {
      * @par Thread safety
      * Thread-safe; try_lock on queueMutex_. */
     std::vector<int64_t> shufflePermFor(int64_t qid) noexcept;
+    /** @brief Extends the shuffle permutation after tracks were appended.
+     * @ingroup caudio_engine
+     * @param qid Queue id the tracks were appended to.
+     * @param count Number of appended tracks (at the queue end).
+     * @details Best-effort: no-op unless shuffle applies to qid or the queue
+     * lock is contended (stale-perm fallbacks cover display and playback).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_. */
+    void noteEnqueued(int64_t qid, std::size_t count) noexcept;
 
     /** @brief Returns current repeat mode. @ingroup caudio_engine
      * @return RepeatMode (Off/All/One). */
