@@ -5,6 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.0.0-rc3] - 2026-10-04
+
+### Added
+- All v0.43.x CLI behavior program changes promoted to the 1.0.0-rc3
+  release candidate: forgiving transport, volume mute-restore, natural-end
+  stop, queue/list rework, queue add/remove/create/delete/load redesign,
+  playlist create/add/load/import, library scan/search/stats, tag field
+  selector, config import validation, play autostart, local config get,
+  direct file play with temp queues.
+- Direct play: bare `caudio PATH...` plays files immediately in a new
+  queue (temporary, purged on daemon shutdown; `--save` keeps it).
+  `play` and direct play autostart the daemon when down (quiet under
+  `--json`). `config get` answers from local file without daemon.
+- New commands: `queue tracks [--order added|playback]`, `queue create`,
+  `queue delete`, `playlist create`, `playlist add [--id/--path]`,
+  `playlist load --replace`, `tag get [FIELD]`, `playlist tracks --json`,
+  `config get --json`, `queue add --playlist [--replace]`.
+- New flags: `library stats --most-played/--queue/--playlist`,
+  `library scan --full-hash`, `queue add --id/--playlist/--recursive`,
+  `queue remove --id/--pos`, `tag get [FIELD]`, `config get --json`,
+  `playlist add --id/--path`, `playlist load --replace`,
+  `queue add --id/--playlist/--recursive/--replace`.
+
+### Changed
+- **Behavior**: Play after stop replays the stopped track; pause/resume/
+  prev warn instead of failing when idle/at start; resume-when-stopped
+  plays from the cursor; natural track end stops on repeat Off (manual
+  `next` still wraps); volume mute/zero remembers the level for unmute
+  (persisted), `Volume: muted` shown only when muted; bare `queue
+  repeat` cycles off/all/one; `seek`/`config set` print nothing on
+  success; duplicate adds warn without duplicating (server-side) and
+  exit success; `playlist load` targets a new queue; `playlist save`
+  tolerates legacy duplicate queue rows.
+- **Output**: `queue list` lists queues (with active/temp markers),
+  `queue queues` hidden alias; `queue tracks`, `playlist tracks`,
+  search results and import reports use `Playlist`/`Queues` headers
+  with counts; `library scan` reports added tracks; `library search`
+  matches filenames with match highlighting; `config import` validates
+  before replacing; switch/tag-get name missing ids; `--log-level`
+  rejects bad values.
+- **Removed**: `library scan --mode` (use `--full-hash`), `library stats
+  --detailed`, bare-numeric `queue remove`, `queue add` bare-query FTS
+  fallback (use `--search`); `preview` is deprecated (hidden from help,
+  use direct play).
+
+### Fixed
+- `config list` returning zero entries (array-only indexed access on
+  objects); relative-seek whitespace detection; `playlist tracks`
+  header; rescan duplicating untouched files; `queue add` skipping
+  metadata extraction; missing-file vs empty-glob errors; separator-
+  insensitive path removal/import; negative `history --limit`; man page
+  EXAMPLES/FILES garble plus new EXIT STATUS section.
+- Fingerprint modes documented as incompatible (cross-mode rescans
+  re-add); new scan rows store generic paths.
+
 ## [v0.43.2] - 2026-10-04
 
 ### Fixed

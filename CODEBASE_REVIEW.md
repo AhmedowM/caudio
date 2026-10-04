@@ -304,6 +304,23 @@ after 1.0 if SDK size matters.
 - **Playback-policy config options:** behaviors like whether `queue clear` stops playback,
   whether natural queue end stops or loops, and similar policy choices should become
   config-file options. Deferred: 1.0 keeps current behavior (`clear` leaves playback running)
+- **Daemon exit under 1s-loop load (cause unknown):** single mid-audit occurrence with short
+  looping fixtures and active audio output; all commands returned `daemon not running` until
+  restart. Rerun loop soak to reproduce before closing; do not ship 1.0 on an unwitnessed crash.
+- **Tag file sync (`tag edit` is DB-only):** edits update the DB row; audio files on disk stay
+  untouched (noted in man). Correct fix is file-first-then-rescan, which needs per-format
+  tag-write support (evaluate TagLib writer or equivalent). Do not silently diverge DB/file.
+- **Playback position persistence:** `pausePos_` is memory-only, so position is lost on daemon
+  restart. Persist on pause/stop/seek-throttle and restore on play-after-restart post-1.0.
+- **Listing format strings:** custom `--columns a,b,c` per listing deferred; `--json` covers
+  scripting. Revisit only with concrete demand, and then as an
+  allowlist, never free format strings.
+- **Cover-art extraction:** `tag get` has no cover support; needs a binary blob over IPC
+  (base64 field) plus `--out FILE`. Deferred post-1.0.
+- **Rapid-`next` transient `Busy`:** the non-blocking queue lock surfaces raw
+  `Error: Busy busy` under rapid calls (observed twice during the audit). Fix client-side
+  with retry-once after ~50ms, else map to a hint (`engine busy, retry`) instead of leaking
+  internals.
 
 ---
 

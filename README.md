@@ -50,11 +50,13 @@ Other ready-made presets: `ci` (headless tests, no audio), `ci-sanitizers` (ASan
 Typical first session:
 
 ```sh
-./build/dev/caudio library scan --path ~/Music --mode sampled
+./build/dev/caudio library scan --path ~/Music
 ./build/dev/caudio library search "beatles" --limit 10
 ./build/dev/caudio queue add ~/Music/album/track.flac
 ./build/dev/caudio play
 ./build/dev/caudio status --watch --interval 1000
+# ...or skip the queue entirely:
+./build/dev/caudio ~/Music/album/track.flac
 ```
 
 ## Configuration
@@ -88,61 +90,64 @@ Requirements:
 
 ## Usage
 
-Run `caudio --help` or `caudio <subcommand> --help`. Every command except `preview` talks to the daemon over IPC.
+Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the daemon over IPC; `config get`, client-side validation, and PATH expansion work without one, and `play` (plus direct play below) autostarts a missing daemon.
 
 | Command | Effect |
 |---|---|
+| `caudio [PATH]... [--save]` | Play files right away in a new queue (temporary, purged on shutdown; `--save` keeps it). PATH is a file, folder, or glob |
 | `caudio start [--foreground]` | Start daemon (background by default; `--foreground` for systemd/debug) |
 | `caudio shutdown` | Stop daemon (sends `Shutdown`, polls pid+socket) |
-| `caudio play` | Start/resume playback |
-| `caudio pause` | Pause playback |
-| `caudio resume` | Resume from pause |
+| `caudio play` | Start/resume playback (replays stopped track; autostarts daemon) |
+| `caudio pause` | Pause playback (warns when idle) |
+| `caudio resume` | Resume from pause (plays from cursor when stopped) |
 | `caudio restart` | Seek to 0 and play |
 | `caudio stop` | Stop playback |
-| `caudio next` / `prev` | Next / previous track (shuffle-aware, repeat-aware) |
-| `caudio seek <time>` | Seek -- `mm:ss`, seconds, or relative `+N`/`-N` |
-| `caudio status [--json] [--watch] [--interval <ms>]` | Show status; `--watch`/`--follow` polls every `--interval` ms (default 1000) |
-| `caudio volume [0-100\|+N\|-N\|mute\|unmute]` | Get or set volume |
-| `caudio queue list [--json]` | List tracks in active queue |
-| `caudio queue queues` | List all queues |
-| `caudio queue switch <qid>` | Switch active queue |
-| `caudio queue add <query> [--search]` | Add by path / track id / FTS query |
-| `caudio queue remove <id>` | Remove by position or track id |
+| `caudio next` / `prev` | Next / previous track (shuffle-aware, repeat-aware; `next` wraps, `prev` warns at start) |
+| `caudio seek <time>` | Seek -- `mm:ss`, seconds, or relative `+N`/`-N` (silent on success) |
+| `caudio status [--json] [--watch] [--interval <ms>]` | Show status; `--watch`/`--follow` polls every `--interval` ms (default 1000), JSON streams one object per line |
+| `caudio volume [0-100\|+N\|-N\|mute\|unmute]` | Get or set volume (`mute`/`0` remembers level, `unmute` restores) |
+| `caudio queue tracks [--order added\|playback] [--json]` | Tracks in active queue (playback order, current marked `>`) |
+| `caudio queue list [--json]` | List all queues (id, name, track count, active, temp) |
+| `caudio queue switch <qid>` | Switch active queue (cursor resets) |
+| `caudio queue create <name>` / `queue delete <qid>` | Create queue / delete queue (never the active one) |
+| `caudio queue add [PATH]... [--id <id>] [--playlist <pid> [--replace]] [--search] [--recursive] [--json]` | Add files (auto-library), ids, search hits, or playlist tracks; re-adds warn |
+| `caudio queue remove [PATH]... [--id <id>] [--pos <n>] [--json]` | Remove by path, library id, or queue position (exclusive) |
 | `caudio queue move <from> <to>` | Reorder queue |
-| `caudio queue clear` | Clear queue |
-| `caudio queue shuffle [on\|off]` | Toggle or set shuffle |
-| `caudio queue repeat [off\|one\|all]` | Set repeat mode |
+| `caudio queue clear` | Clear queue (playback of current track continues) |
+| `caudio queue shuffle [on\|off]` | Toggle or set shuffle (reports state) |
+| `caudio queue repeat [off\|one\|all]` | Set repeat mode (bare cycles and reports) |
 | `caudio playlist list [--json]` | List playlists |
-| `caudio playlist tracks <pid>` | Tracks in playlist |
-| `caudio playlist load <pid> [--play]` | Load playlist into queue |
+| `caudio playlist tracks <pid> [--json]` | Tracks in playlist |
+| `caudio playlist create <name>` | Create empty playlist |
+| `caudio playlist add <pid> [--id <id>...] [PATH]...` | Append tracks (re-adds warn) |
+| `caudio playlist load <pid> [--play] [--replace]` | Load into a new queue (`--replace`: overwrite active; `--play`: switch and play) |
 | `caudio playlist save <name> [--queue <qid>]` | Save queue as playlist |
 | `caudio playlist delete <pid>` | Delete playlist |
 | `caudio playlist rename <pid> <name>` | Rename playlist |
 | `caudio playlist export <pid> <path> [--format m3u\|pls\|json]` | Export to file |
-| `caudio playlist import <path> [--name <n>]` | Import from file |
-| `caudio library scan [--path <p>] [--mode sampled\|full]` | Scan directory |
-| `caudio library search <query> [--limit N] [--json]` | FTS5 search |
-| `caudio library stats [--json] [--detailed]` | Counts (+ most-played / total time with `--detailed`) |
+| `caudio playlist import <path> [--name <n>]` | Import from file (reports matched/skipped/duplicates) |
+| `caudio library scan [--path <p>] [--full-hash]` | Scan directory (reports added tracks) |
+| `caudio library search <query> [--limit N] [--json]` | FTS5 + filename search with match highlighting |
+| `caudio library stats [--most-played N] [--queue all\|<qid>] [--playlist <pid>] [--json]` | Counts, top-N, queue/playlist overviews |
 | `caudio library list [--query <q>] [--artist <a>] [--album <a>] [--genre <g>] [--limit N] [--offset N] [--json]` | Filtered listing |
 | `caudio library add <path> [--recursive]` | Add file/dir to library |
-| `caudio library remove <id>` | Remove track from library |
-| `caudio tag edit <id> <field> <value>` | Edit tag (`title`,`artist`,`album`,`album_artist`,`genre`,`year`,`track_number`,`disc_number`) |
-| `caudio tag get <id> [--json]` | Get track tags |
+| `caudio library remove <id-or-path>` | Remove track from library (files untouched) |
+| `caudio tag edit <id> <field> <value>` | Edit tag in database (`title`,`artist`,`album`,`album_artist`,`genre`,`year`,`track_number`,`disc_number`; files untouched) |
+| `caudio tag get <id> [field] [--json]` | Get track tags (or one field) |
 | `caudio info [--json]` | Current track info (metadata + play count) |
 | `caudio history list [--limit N] [--json]` | Playback history |
 | `caudio history clear` | Clear history |
 | `caudio device list [--json]` | List audio output devices |
 | `caudio device set <id>` | Set default device |
 | `caudio device test [--id <id>]` | Check device is available (enumeration only, no sound) |
-| `caudio config get <key>` | Get config value |
-| `caudio config set <key> <value>` | Set config value |
+| `caudio config get <key> [--json]` | Get config value (no daemon needed) |
+| `caudio config set <key> <value>` | Set config value (silent) |
 | `caudio config list [--json]` | List config |
 | `caudio config export <path>` | Export config file |
-| `caudio config import <path>` | Import config file |
+| `caudio config import <path>` | Validate and import config file |
 | `caudio config reset [key]` | Reset key or all to defaults |
-| `caudio preview <file>` | Ephemeral playback without daemon (direct `Player`) |
 
-Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::versionFull`, e.g. `vX.Y.Z`), `--help` / `-h`.
+Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::versionFull`, e.g. `vX.Y.Z`), `--help` / `-h`. Exit codes: `0` success, `1` runtime/validation error, `105` bad option value, `106` missing argument, `109` unknown command (see `EXIT STATUS` in `docs/man/caudio.1`).
 
 ### As a library
 

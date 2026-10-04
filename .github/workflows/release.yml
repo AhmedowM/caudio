@@ -183,6 +183,14 @@ jobs:
           echo "=== CHANGELOG check ==="
           ls -lh CHANGELOG.md || echo "CHANGELOG.md not found"
 
+      - name: Extract release notes
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          python3 scripts/extract-changelog.py
+          test -s release-notes.md
+        shell: bash
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -190,6 +198,7 @@ jobs:
             artifacts/**
             CHANGELOG.md
             VERSION
+          body_path: release-notes.md
           generate_release_notes: false
           fail_on_unmatched_files: false
         env:
