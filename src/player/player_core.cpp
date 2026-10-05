@@ -77,7 +77,11 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     decoder_ = std::move(decResult.value());
     reader_ = std::move(reader);
 
-    // Create ring buffer: capacity = 8192 * channels (like C ca_player.c:462)
+    // Create ring buffer: 8192 frames in all layouts (P-3). Capacity is in
+    // frames; buf_ holds cap_*channels floats. The old 8192*ch passed frames
+    // but scaled by channels twice (8192*ch*ch floats, ~1.1 MB at 5.1).
+    // NOTE: engine ring intentionally NOT flattened (see engine.cpp note) --
+    // Player has no daemon playback path, so this is inert there.
     uint32_t sr = decoder_->sampleRate();
     uint32_t ch = decoder_->channels();
     if (sr == 0)
@@ -85,7 +89,7 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     if (ch == 0)
         ch = 2;
 
-    ring_ = std::make_unique<caudio::utils::SpscRing<float>>(8192 * ch, ch);
+    ring_ = std::make_unique<caudio::utils::SpscRing<float>>(8192, ch);
 
     // Create audio output
     AudioOutput::Config cfg;
@@ -340,6 +344,9 @@ void Player::preroll() {
 
 void Player::decodeLoop(std::stop_token st) {
     constexpr std::size_t kMaxChunkFrames = 1024;
+    // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
+    std::vector<float> scratch;
+    scratch.reserve(kMaxChunkFrames * 8);
 
     while (!st.stop_requested()) {
         // Wait for openGate and decodeBusy
@@ -379,8 +386,10 @@ void Player::decodeLoop(std::stop_token st) {
         if (maxFrames == 0)
             maxFrames = 1;
 
-        std::vector<float> buffer(maxFrames * ch);
-        std::size_t frames = decoder_->decode(std::span<float>(buffer.data(), buffer.size()));
+        if (scratch.size() < maxFrames * ch)
+            scratch.resize(maxFrames * ch);
+        std::span<float> chunk(scratch.data(), maxFrames * ch);
+        std::size_t frames = decoder_->decode(chunk);
 
         if (frames == 0) {
             // EOF reached
@@ -392,7 +401,7 @@ void Player::decodeLoop(std::stop_token st) {
         }
 
         std::size_t samples = frames * ch;
-        std::size_t writtenFrames = ring_->write(std::span<float>(buffer.data(), samples));
+        std::size_t writtenFrames = ring_->write(std::span<float>(scratch.data(), samples));
         if (writtenFrames < frames) {
             // Ring full, will retry next iteration
         }

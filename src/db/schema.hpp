@@ -34,7 +34,7 @@ namespace caudio::db {
  * @brief Full DDL + pragmas executed on database open.
  * @ingroup caudio_db
  * @details Includes:
- * - WAL / NORMAL / cache_size / foreign_keys pragmas.
+ * - WAL / NORMAL / cache_size / busy_timeout / foreign_keys pragmas.
  * - Tables: libraries, tracks, playlists, playlist_items, queue, queues,
  *   history, bookmarks, lyrics, eq_presets, engine_state and the
  *   `tracks_fts` FTS5 virtual table with AI/AD/AU triggers.
@@ -45,7 +45,8 @@ namespace caudio::db {
 inline constexpr std::string_view kSchema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
-    "PRAGMA cache_size=-32768;"
+    "PRAGMA cache_size=-8000;"
+    "PRAGMA busy_timeout=5000;"
     "PRAGMA page_size=4096;"
     "PRAGMA foreign_keys=ON;"
     "CREATE TABLE IF NOT EXISTS libraries ("

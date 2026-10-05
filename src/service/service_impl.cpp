@@ -287,30 +287,27 @@ void Service::updateShmStatus() {
         return;
     auto& eng = *engine_;
     int64_t track_id = eng.currentTrackId();
+    // Single track fetch (C-2): title/artist/duration come from one lookup.
     std::string title, artist;
+    double duration = 0.0;
     if (track_id != 0) {
-        auto tr = db_->getTrack(track_id);
-        if (tr) {
+        if (auto tr = db_->getTrack(track_id); tr) {
             title = tr->title;
             artist = tr->artist;
+            duration = tr->duration;
         }
     }
-    // Get queue size for active queue
+    // O(1) queue size via COUNT(*) (C-2): the old queueList() materialized
+    // the full vector of items just for .size().
     size_t qSize = 0;
     {
         int64_t aq = eng.activeQueueId();
-        if (auto items = db_->queueList(aq); items) {
-            qSize = items->size();
-        }
+        qSize = db_->queueCountLocked(aq);
     }
     shmHandle_->updateFromEngine(eng, track_id, title, artist);
     shmHandle_->setQueueSize(qSize);
-    // duration is not directly available from engine, would need track info
     if (track_id != 0) {
-        auto tr = db_->getTrack(track_id);
-        if (tr) {
-            shmHandle_->setDuration(tr->duration);
-        }
+        shmHandle_->setDuration(duration);
     }
 }
 

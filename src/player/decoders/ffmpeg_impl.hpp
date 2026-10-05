@@ -107,6 +107,11 @@ struct Decoder::Impl {
     uint32_t channels_{0};
     uint64_t totalFrames_{0};
     uint64_t pos_{0};
+    // Reusable scratch packet/frame for decode() (P-1: avoids per-packet
+    // av_packet_alloc/av_frame_alloc churn on the decode thread).
+    // Decoder is NOT thread-safe; decode() is the sole user.
+    PacketPtr scratchPkt_{};
+    FramePtr scratchFrame_{};
 };
 
 } // namespace caudio::player

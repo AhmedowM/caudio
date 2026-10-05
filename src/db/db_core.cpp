@@ -18,6 +18,7 @@
 #include <expected>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <span>
 #include <string>
@@ -1188,6 +1189,15 @@ size_t Database::queueCountLocked(int64_t qid) {
         qid = 1;
     std::shared_lock lk{dbMutex_};
     return caudio::db::queueCountLocked(db_.get(), qid);
+}
+
+std::optional<size_t> Database::queueIndexOf(int64_t qid, int64_t trackId) {
+    if (qid == 0)
+        qid = 1;
+    if (trackId == 0)
+        return std::nullopt;
+    std::shared_lock lk{dbMutex_};
+    return caudio::db::queueIndexOfLocked(db_.get(), qid, trackId);
 }
 
 std::expected<void, caudio::utils::Error> Database::historyAdd(const HistoryEntry& e) {

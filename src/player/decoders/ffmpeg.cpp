@@ -114,26 +114,32 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
 
     std::size_t totalDecoded = 0;
     bool eofReached = false;
+    // Reusable scratch packet/frame (P-1). Lazily (re)allocated if init()
+    // failed to pre-allocate or cleanup() released them.
+    if (!scratchPkt_)
+        scratchPkt_.reset(av_packet_alloc());
+    if (!scratchFrame_)
+        scratchFrame_.reset(av_frame_alloc());
+    if (!scratchPkt_ || !scratchFrame_)
+        return 0;
+    AVPacket* pkt = scratchPkt_.get();
+    AVFrame* frame = scratchFrame_.get();
     while (totalDecoded < frames && !eofReached) {
-        PacketPtr pkt(av_packet_alloc());
-        if (!pkt)
-            break;
+        av_packet_unref(pkt);
 
-        int ret = av_read_frame(fmt_, pkt.get());
+        int ret = av_read_frame(fmt_, pkt);
         if (ret < 0) {
             // EOF: flush decoder internal buffers
             if (ret == AVERROR_EOF || ret < 0) {
                 (void)avcodec_send_packet(dec_, nullptr);
                 while (totalDecoded < frames) {
-                    FramePtr frame(av_frame_alloc());
-                    if (!frame)
-                        break;
-                    ret = avcodec_receive_frame(dec_, frame.get());
+                    av_frame_unref(frame);
+                    ret = avcodec_receive_frame(dec_, frame);
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                         break;
                     if (ret < 0)
                         break;
-                    int converted = convertFrame(frame.get(), out, totalDecoded, frames);
+                    int converted = convertFrame(frame, out, totalDecoded, frames);
                     if (converted > 0)
                         totalDecoded += static_cast<std::size_t>(converted);
                     if (converted <= 0)
@@ -153,11 +159,11 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
             continue;
         }
 
-        ret = avcodec_send_packet(dec_, pkt.get());
+        ret = avcodec_send_packet(dec_, pkt);
         if (ret == AVERROR(EAGAIN)) {
-            FramePtr frame(av_frame_alloc());
-            if (frame && avcodec_receive_frame(dec_, frame.get()) == 0) {
-                int converted = convertFrame(frame.get(), out, totalDecoded, frames);
+            av_frame_unref(frame);
+            if (avcodec_receive_frame(dec_, frame) == 0) {
+                int converted = convertFrame(frame, out, totalDecoded, frames);
                 if (converted > 0)
                     totalDecoded += static_cast<std::size_t>(converted);
             }
@@ -167,15 +173,13 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
             continue;
 
         while (totalDecoded < frames) {
-            FramePtr frame(av_frame_alloc());
-            if (!frame)
-                break;
-            ret = avcodec_receive_frame(dec_, frame.get());
+            av_frame_unref(frame);
+            ret = avcodec_receive_frame(dec_, frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                 break;
             if (ret < 0)
                 break;
-            int converted = convertFrame(frame.get(), out, totalDecoded, frames);
+            int converted = convertFrame(frame, out, totalDecoded, frames);
             if (converted > 0)
                 totalDecoded += static_cast<std::size_t>(converted);
             if (converted <= 0)
@@ -386,6 +390,15 @@ bool Decoder::Impl::init() {
         return false;
     }
 
+    // Pre-allocate reusable decode scratch (P-1). Lazy fallback in decode()
+    // covers the (near-impossible) alloc failure here.
+    scratchPkt_.reset(av_packet_alloc());
+    scratchFrame_.reset(av_frame_alloc());
+    if (!scratchPkt_ || !scratchFrame_) {
+        cleanup();
+        return false;
+    }
+
     sampleRate_ = static_cast<uint32_t>(dec_->sample_rate);
     channels_ = static_cast<uint32_t>(dec_->ch_layout.nb_channels);
 
@@ -415,6 +428,8 @@ bool Decoder::Impl::init() {
 }
 
 void Decoder::Impl::cleanup() {
+    scratchPkt_.reset();
+    scratchFrame_.reset();
     if (swr_) {
         swr_free(&swr_);
         swr_ = nullptr;

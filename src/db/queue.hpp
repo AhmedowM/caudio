@@ -7,6 +7,7 @@
 #include <db/statement.hpp>
 #include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -119,6 +120,22 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLocked(sqli
  * Caller must hold Database::mutex() (shared or exclusive).
  */
 size_t queueCountLocked(sqlite3* db, int64_t qid);
+
+/**
+ * @brief Finds the 0-based index of a track in a queue (caller holds DB mutex).
+ * @ingroup caudio_db
+ * @param db SQLite handle.
+ * @param qid Queue id (0 -> 1).
+ * @param trackId Track id to locate (first occurrence by position).
+ * @return 0-based index into the ORDER BY position listing, or std::nullopt
+ * if the track is not in the queue (or on prepare failure / null handle).
+ * @details O(log n) via the queue position index: resolves the track's
+ * minimum position, then counts predecessors. Matches the vector-index
+ * semantics of queueListLocked even if positions ever have gaps.
+ * @par Thread safety
+ * Caller must hold Database::mutex() (shared or exclusive).
+ */
+std::optional<size_t> queueIndexOfLocked(sqlite3* db, int64_t qid, int64_t trackId);
 
 /**
  * @brief Gets a queue container row (caller holds DB mutex).

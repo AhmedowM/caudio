@@ -147,18 +147,14 @@ std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::eng
     }
     try {
         int64_t activeQ = eng.activeQueueId();
-        auto items = db.queueList(activeQ);
-        if (items) {
-            s.q_size = items->size();
-            s.q_idx = 0;
-            if (s.track_id != 0 && !items->empty()) {
-                for (std::size_t i = 0; i < items->size(); ++i) {
-                    if ((*items)[i].track_id == s.track_id) {
-                        s.q_idx = i;
-                        break;
-                    }
-                }
-            }
+        // O(1) size via COUNT(*) + O(log n) position lookup (C-3): the old
+        // code materialized the full queue vector and scanned it linearly
+        // on every status call (including --watch each second).
+        s.q_size = db.queueCountLocked(activeQ);
+        s.q_idx = 0;
+        if (s.track_id != 0) {
+            if (auto idx = db.queueIndexOf(activeQ, s.track_id); idx)
+                s.q_idx = *idx;
         }
     } catch (...) {
     }

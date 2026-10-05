@@ -220,6 +220,38 @@ size_t queueCountLocked(sqlite3* db, int64_t qid) {
     return cnt;
 }
 
+std::optional<size_t> queueIndexOfLocked(sqlite3* db, int64_t qid, int64_t trackId) {
+    if (qid == 0)
+        qid = 1;
+    if (!db || trackId == 0)
+        return std::nullopt;
+    int64_t pos = -1;
+    {
+        SqliteStatement st;
+        auto e = st.prepare(db, "SELECT MIN(position) FROM queue WHERE queue_id=? AND track_id=?");
+        if (!e)
+            return std::nullopt;
+        st.bindInt(1, qid);
+        st.bindInt(2, trackId);
+        if (!st.step())
+            return std::nullopt;
+        if (sqlite3_column_type(st.get(), 0) == SQLITE_NULL)
+            return std::nullopt;
+        pos = st.columnInt(0);
+    }
+    {
+        SqliteStatement st;
+        auto e = st.prepare(db, "SELECT COUNT(*) FROM queue WHERE queue_id=? AND position<?");
+        if (!e)
+            return std::nullopt;
+        st.bindInt(1, qid);
+        st.bindInt(2, pos);
+        if (!st.step())
+            return std::nullopt;
+        return static_cast<size_t>(st.columnInt(0));
+    }
+}
+
 std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;

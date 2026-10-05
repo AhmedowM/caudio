@@ -916,6 +916,9 @@ class Engine final {
 
     // atomics spec required
     std::atomic<uint64_t> lastProgressMs_{0};
+    // M-3: volume-drag throttle -- setVolume() persists at most 1x/s
+    // (crash-window volume loss <= 1 s; shutdown/track-change saves cover it).
+    std::atomic<uint64_t> lastVolSaveMs_{0};
     // gaplessArmed_: 0->1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};

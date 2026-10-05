@@ -258,8 +258,17 @@ Engine::ExpectedVoid Engine::setVolume(float g) {
     if (output_)
         output_->setVolume(g);
     if (hasDb()) {
-        state_.cursorPos = (int64_t)queue_.cursor;
-        (void)saveState();
+        // Throttle persistence (M-3): a volume drag emits dozens of
+        // events/s; each saveState() is a WAL transaction rewriting the
+        // shuffle BLOB. Persist at most 1x/s here -- shutdown/track-change
+        // paths always persist, so the crash window is <= 1 s of volume.
+        const uint64_t now = detail::nowMs();
+        const uint64_t last = lastVolSaveMs_.load(std::memory_order_acquire);
+        if (now - last >= 1000) {
+            lastVolSaveMs_.store(now, std::memory_order_release);
+            state_.cursorPos = (int64_t)queue_.cursor;
+            (void)saveState();
+        }
     }
     return {};
 }
@@ -1152,6 +1161,11 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
                 if (duration_ <= 0)
                     duration_ = t.duration > 0 ? t.duration : 1.0;
                 // create ring and output
+                // NOTE (2026-10-05): kept at 8192*ch -- a flat 8192-frame cap
+                // measured +9 MB daemon RSS on an mp3 with an attached mjpeg
+                // cover (release-lto-clang, 67.7 -> 76.6 MB WS). Mechanism
+                // unknown (suspect indirect FFmpeg buffering/timing effect);
+                // do NOT re-shrink without a measured explanation.
                 uint32_t sr = decoder_->sampleRate();
                 uint32_t ch = decoder_->channels();
                 if (sr == 0)
@@ -1453,13 +1467,23 @@ void Engine::engineTick() {
 }
 
 void Engine::monitorLoop(std::stop_token st) {
-    int poll = cfg_.pollMs ? cfg_.pollMs : 10;
-    if (poll <= 0)
-        poll = 10;
+    // Two-tier waits (C-1): the 10 ms cadence is only needed while playing
+    // (300 ms gapless pre-roll window still gets ~12 looks at 25 ms).
+    // Idle backs off to 100 ms. An explicit EngineConfig::pollMs override is
+    // honored for the playing interval; idle is always >= 100 ms.
+    int cfgPoll = cfg_.pollMs ? cfg_.pollMs : 10;
+    if (cfgPoll <= 0)
+        cfgPoll = 10;
+    const bool customPoll = (cfgPoll != 10);
     std::unique_lock<std::mutex> lk(monMtx_);
     while (!st.stop_requested() && monRun_.load(std::memory_order_acquire)) {
         lk.unlock();
         engineTick();
+        int poll;
+        if (playbackState_.load(std::memory_order_acquire) == PlaybackState::Playing)
+            poll = customPoll ? cfgPoll : 25;
+        else
+            poll = customPoll ? (cfgPoll > 100 ? cfgPoll : 100) : 100;
         lk.lock();
         monCv_.wait_for(lk, std::chrono::milliseconds(poll), [&st, this] {
             return st.stop_requested() || !monRun_.load(std::memory_order_acquire);
@@ -1469,11 +1493,16 @@ void Engine::monitorLoop(std::stop_token st) {
 
 void Engine::decodeLoop(std::stop_token st) {
     constexpr std::size_t kMaxChunkFrames = 1024;
+    // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
+    std::vector<float> scratch;
+    scratch.reserve(kMaxChunkFrames * 8);
     while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
         auto ps = playbackState_.load(std::memory_order_acquire);
         if (ps != PlaybackState::Playing || !decoder_ || !ring_) {
             std::unique_lock<std::mutex> lk(decodeMtx_);
-            decodeCv_.wait_for(lk, std::chrono::milliseconds(10), [&st, this] {
+            // Idle backoff (C-1): woken immediately by decodeCv_ on
+            // play/seek/resume, so the longer timeout costs no latency.
+            decodeCv_.wait_for(lk, std::chrono::milliseconds(50), [&st, this] {
                 return st.stop_requested() ||
                        playbackState_.load(std::memory_order_acquire) == PlaybackState::Playing;
             });
@@ -1496,18 +1525,20 @@ void Engine::decodeLoop(std::stop_token st) {
         if (maxFrames == 0)
             maxFrames = 1;
 
-        std::vector<float> buf(maxFrames * ch);
+        if (scratch.size() < maxFrames * ch)
+            scratch.resize(maxFrames * ch);
+        std::span<float> chunk(scratch.data(), maxFrames * ch);
         size_t frames;
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek()
             if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
                 continue;
-            frames = decoder_->decode(std::span<float>(buf.data(), buf.size()));
+            frames = decoder_->decode(chunk);
         }
         if (frames == 0) {
             // EOF reached - wait a bit, let monitor handle next (gapless) or stop
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
             continue;
         }
         size_t samples = frames * ch;
@@ -1517,7 +1548,7 @@ void Engine::decodeLoop(std::stop_token st) {
             // Re-check state under lock to avoid race with seek() ring reset
             if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
                 continue;
-            writtenFrames = ring_->write(std::span<float>(buf.data(), samples));
+            writtenFrames = ring_->write(std::span<float>(scratch.data(), samples));
         }
         if (writtenFrames < frames) {
             // Ring full, will retry next iteration

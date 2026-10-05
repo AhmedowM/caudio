@@ -1510,8 +1510,10 @@ std::vector<std::byte> frame(std::string_view json) {
     out.push_back(static_cast<std::byte>((len >> 16) & 0xFF));
     out.push_back(static_cast<std::byte>((len >> 8) & 0xFF));
     out.push_back(static_cast<std::byte>(len & 0xFF));
-    for (char c : json)
-        out.push_back(static_cast<std::byte>(static_cast<unsigned char>(c)));
+    // Bulk insert (M-2): the old per-byte push_back loop defeated the
+    // reserve() above with per-byte size checks on some STLs.
+    const auto* bytes = reinterpret_cast<const std::byte*>(json.data());
+    out.insert(out.end(), bytes, bytes + json.size());
     return out;
 }
 

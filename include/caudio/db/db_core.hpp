@@ -4,11 +4,13 @@
 #include <caudio/db/db_types.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <span>
 #include <string>
@@ -612,6 +614,20 @@ class Database final {
     std::expected<void, caudio::utils::Error> setQueueTemp(int64_t qid, bool temp);
 
     size_t queueCountLocked(int64_t qid);
+
+    /**
+     * @brief Finds the 0-based index of a track in a queue.
+     * @ingroup caudio_db
+     * @param qid Queue id (0 -> 1).
+     * @param trackId Track id to locate (first occurrence by position).
+     * @return Index into the ORDER BY position listing, or std::nullopt if
+     * the track is not in the queue.
+     * @details O(log n) via the queue position index (see
+     * queueIndexOfLocked); O(1) extra memory vs queueList().
+     * @par Thread safety
+     * Thread-safe: shared_lock on dbMutex_.
+     */
+    std::optional<size_t> queueIndexOf(int64_t qid, int64_t trackId);
 
     // History
     /**

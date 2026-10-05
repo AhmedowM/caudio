@@ -141,7 +141,8 @@ struct EngineCallbacks {
  */
 struct EngineConfig {
     bool enableMonitorThread{true}; ///< Whether to start monitorLoop.
-    int pollMs{10};                 ///< Monitor poll interval in ms (10 ms).
+    int pollMs{10};                 ///< Monitor poll interval in ms (playing; idle backs off to
+                                    ///< >=100 ms, see Engine::monitorLoop).
     int gaplessMs{300};             ///< Gapless preroll window in ms (300 ms).
     int historyThresholdPct{60};    ///< History pct threshold (60%).
     int historyThresholdSecs{90};   ///< History absolute seconds threshold (90 s).
