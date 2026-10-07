@@ -4,6 +4,8 @@
 set(CAUDIO_APP_SOURCES
   src/app/lifecycle.cpp
   src/app/transport.cpp
+  src/app/playback.cpp
+  src/app/format.cpp
 )
 caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::utils Threads::Threads)
 ca_set_warnings(app)

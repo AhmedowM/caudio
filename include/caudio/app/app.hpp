@@ -9,6 +9,7 @@
 #include <expected>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 /**
  * @file app.hpp
@@ -161,6 +162,57 @@ class App {
      */
     int confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
                          bool asJson, const std::string& line);
+
+    /**
+     * @brief Human track label for the last transport result.
+     * @ingroup caudio_app
+     * @return Track label, or "unknown track" for non-status results.
+     */
+    std::string transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res);
+
+    /**
+     * @brief Shared play flow (used by play, and by resume when stopped).
+     * @ingroup caudio_app
+     * @param asJson Render raw JSON instead of the one-line confirmation.
+     * @details Probes paused state first so the wording (resumed vs fresh)
+     * matches; autostarts a down daemon via sendPlay().
+     */
+    int doPlay(bool asJson);
+
+    /**
+     * @brief Plays files immediately in a new queue.
+     * @ingroup caudio_app
+     * @param files Pre-expanded file list (glob expansion stays in frontends).
+     * @param save Keep the queue instead of purging it on shutdown.
+     */
+    int playFiles(const std::vector<std::string>& files, bool save);
+
+    /** @brief Pause playback (warns instead of failing when idle). @ingroup caudio_app */
+    int pause(bool asJson);
+    /**
+     * @brief Resume playback (forgiving: warns when playing, plays from
+     * cursor when stopped).
+     * @ingroup caudio_app
+     */
+    int resume(bool asJson);
+    /** @brief Restart the current track. @ingroup caudio_app */
+    int restart(bool asJson);
+    /** @brief Stop playback. @ingroup caudio_app */
+    int stop(bool asJson);
+    /** @brief Advance to the next track. @ingroup caudio_app */
+    int next(bool asJson);
+    /** @brief Move to the previous track (warns at queue start). @ingroup caudio_app */
+    int prev(bool asJson);
+    /**
+     * @brief Seek to an absolute position, or by delta when relative.
+     * @ingroup caudio_app
+     * @param target Seconds (absolute) or delta (relative to now).
+     * @param isRelative Resolve target against the current position first.
+     * @param asJson Render raw JSON instead of staying silent.
+     * @details Argument grammar (mm:ss, +/-) is parsed by frontends; the
+     * relative flag arrives pre-detected.
+     */
+    int seek(double target, bool isRelative, bool asJson);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).

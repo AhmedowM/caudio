@@ -1,6 +1,6 @@
 #pragma once
 
-#include <caudio/app/app.hpp>
+#include <caudio/app.hpp>
 #include <caudio/config.hpp>
 #include <caudio/db/db_types.hpp>
 #include <caudio/ipc/command.hpp>

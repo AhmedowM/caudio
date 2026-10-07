@@ -218,17 +218,6 @@ void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& t
     os << j.dump(2) << "\n";
 }
 
-// Compact one-line status for `status --watch` (cli-local; the library
-// formatter owns the full block). Keeps per-interval output to one line.
-std::string fmtClock(double secs) {
-    if (secs < 0)
-        secs = 0;
-    long total = static_cast<long>(secs);
-    if (long h = total / 3600; h > 0)
-        return std::format("{:02}:{:02}:{:02}", h, (total % 3600) / 60, total % 60);
-    return std::format("{:02}:{:02}", (total % 3600) / 60, total % 60);
-}
-
 std::string statusLine(const caudio::ipc::Status& st) {
     std::string s{caudio::ipc::detail::playbackStateToString(st.state)};
     std::string who;
@@ -238,25 +227,8 @@ std::string statusLine(const caudio::ipc::Status& st) {
         who = st.artist + st.title;
     if (!who.empty())
         s += " " + who;
-    s += " [" + fmtClock(st.pos) + "/" + fmtClock(st.dur) + "]";
+    s += " [" + caudio::app::fmtClock(st.pos) + "/" + caudio::app::fmtClock(st.dur) + "]";
     return s;
-}
-
-// Human track label for transport confirmations: no ids, no queue
-// positions (see `info` / `queue list` for those).
-std::string trackWho(const caudio::ipc::Status& st) {
-    if (!st.artist.empty() && !st.title.empty())
-        return st.artist + " - " + st.title;
-    if (!st.artist.empty())
-        return st.artist;
-    if (!st.title.empty())
-        return st.title;
-    if (!st.path.empty()) {
-        std::string fn = std::filesystem::path(st.path).filename().generic_string();
-        if (!fn.empty())
-            return fn;
-    }
-    return "unknown track";
 }
 
 // ANSI color only on interactive terminals honoring NO_COLOR.
@@ -903,21 +875,7 @@ int Shell::run(int argc, char** argv) {
         }
         if (files.empty())
             return hardFail ? 1 : 0;
-        caudio::ipc::Command cmd{caudio::ipc::PlayFiles{files, posSave}};
-        auto res = app_.sendPlay(cmd, false);
-        if (!res)
-            return app_.printErr(res.error());
-        if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
-            std::string who = detail::trackWho(*st);
-            if (posSave)
-                caudio::println("Playing {}", who);
-            else
-                caudio::println("Playing {} (temporary queue)", who);
-            return 0;
-        }
-        caudio::client::OutputFormatter fmt{false};
-        fmt.print(*res, std::cout);
-        return 0;
+        return app_.playFiles(files, posSave);
     }
     if (startCmd->parsed())
         return app_.startDaemon(fg || globalFg);
@@ -925,147 +883,20 @@ int Shell::run(int argc, char** argv) {
         return app_.shutdownDaemon();
     // Transport commands print one-line confirmations (no ids, no queue
     // positions -- see `info` / `queue list` for those). JSON dumps raw.
-    auto transportWho = [&](std::expected<caudio::ipc::Result, caudio::utils::Error>& res) {
-        if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
-            return detail::trackWho(*st);
-        return std::string{"unknown track"};
-    };
-    // Shared play flow (used by `play`, and by `resume` when stopped).
-    auto doPlay = [&](bool asJson) -> int {
-        // Prior state decides the wording (resumed vs fresh); one extra roundtrip.
-        bool wasPaused = false;
-        double priorPos = 0;
-        {
-            caudio::client::Client probe{config_.dbPath, config_.socketPath};
-            if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
-                if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
-                    wasPaused = (st->state == caudio::engine::PlaybackState::Paused);
-                    priorPos = st->pos;
-                }
-            }
-        }
-        caudio::ipc::Command cmd{caudio::ipc::Play{}};
-        auto res = app_.sendPlay(cmd, asJson);
-        if (!res)
-            return app_.printErr(res.error());
-        if (asJson)
-            return app_.printJson(*res);
-        if (std::get_if<caudio::ipc::Status>(&*res)) {
-            std::string who = transportWho(res);
-            if (wasPaused)
-                caudio::println("Resuming {} from {}", who, detail::fmtClock(priorPos));
-            else
-                caudio::println("Playing {}", who);
-        } else {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
-        }
-        return 0;
-    };
     if (playCmd->parsed())
-        return doPlay(playJson);
-    if (pauseCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Pause{}};
-        auto res = app_.sendRaw(cmd);
-        if (!res) {
-            const auto& e = res.error();
-            if (e.code == caudio::utils::StatusCode::State && e.message == "not playing") {
-                caudio::println(std::cerr, "pause: nothing playing");
-                return 0;
-            }
-            return app_.printErr(e);
-        }
-        if (pauseJson)
-            return app_.printJson(*res);
-        if (std::get_if<caudio::ipc::Status>(&*res)) {
-            std::string who = transportWho(res);
-            double at = 0;
-            if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
-                at = st->pos;
-            caudio::println("Paused {} at {}", who, detail::fmtClock(at));
-        } else {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
-        }
-        return 0;
-    }
-    if (resumeCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Resume{}};
-        auto res = app_.sendRaw(cmd);
-        if (!res) {
-            const auto& e = res.error();
-            if (e.code == caudio::utils::StatusCode::State && e.message == "not paused") {
-                // Forgiving resume: playing -> warn; stopped -> play from cursor.
-                bool playing = false;
-                bool probed = false;
-                caudio::client::Client probe{config_.dbPath, config_.socketPath};
-                if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
-                    if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
-                        probed = true;
-                        playing = (st->state == caudio::engine::PlaybackState::Playing);
-                    }
-                }
-                if (probed && playing) {
-                    caudio::println(std::cerr, "resume: already playing");
-                    return 0;
-                }
-                if (!probed)
-                    return app_.printErr(e);
-                return doPlay(resumeJson);
-            }
-            return app_.printErr(e);
-        }
-        if (resumeJson)
-            return app_.printJson(*res);
-        if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
-            caudio::println("Resuming {} from {}", detail::trackWho(*st),
-                            detail::fmtClock(st->pos));
-        } else {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
-        }
-        return 0;
-    }
-    if (restartCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Restart{}};
-        auto res = app_.sendRaw(cmd);
-        if (!res)
-            return app_.printErr(res.error());
-        if (restartJson)
-            return app_.printJson(*res);
-        caudio::println("Restarting {}", transportWho(res));
-        return 0;
-    }
-    if (stopCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Stop{}};
-        return app_.confirmTransport(app_.sendRaw(cmd), stopJson, "Stopped");
-    }
-    if (nextCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Next{}};
-        auto res = app_.sendRaw(cmd);
-        if (!res)
-            return app_.printErr(res.error());
-        if (nextJson)
-            return app_.printJson(*res);
-        caudio::println("Playing {}", transportWho(res));
-        return 0;
-    }
-    if (prevCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Prev{}};
-        auto res = app_.sendRaw(cmd);
-        if (!res) {
-            const auto& e = res.error();
-            if (e.code == caudio::utils::StatusCode::NotFound && e.message == "at start") {
-                caudio::println(std::cerr, "prev: at queue start");
-                return 0;
-            }
-            return app_.printErr(e);
-        }
-        if (prevJson)
-            return app_.printJson(*res);
-        caudio::println("Playing {}", transportWho(res));
-        return 0;
-    }
+        return app_.doPlay(playJson);
+    if (pauseCmd->parsed())
+        return app_.pause(pauseJson);
+    if (resumeCmd->parsed())
+        return app_.resume(resumeJson);
+    if (restartCmd->parsed())
+        return app_.restart(restartJson);
+    if (stopCmd->parsed())
+        return app_.stop(stopJson);
+    if (nextCmd->parsed())
+        return app_.next(nextJson);
+    if (prevCmd->parsed())
+        return app_.prev(prevJson);
     if (seekCmd->parsed()) {
         auto parsed = detail::parseSeek(seekStr);
         if (!parsed) {
@@ -1081,33 +912,7 @@ int Shell::run(int argc, char** argv) {
         while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
             sv.remove_prefix(1);
         bool isRelative = !sv.empty() && (sv.front() == '+' || sv.front() == '-');
-        if (isRelative) {
-            caudio::client::Client client{config_.dbPath, config_.socketPath};
-            auto sres = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
-            double pos = 0;
-            bool hasPos = false;
-            if (sres) {
-                if (auto* ps = std::get_if<caudio::ipc::Status>(&*sres)) {
-                    pos = ps->pos;
-                    hasPos = true;
-                }
-            }
-            if (hasPos) {
-                target = pos + target;
-                if (target < 0)
-                    target = 0;
-            } else {
-                if (target < 0)
-                    target = 0;
-            }
-        }
-        caudio::ipc::Command cmd{caudio::ipc::Seek{target}};
-        auto res = app_.sendRaw(cmd);
-        if (!res)
-            return app_.printErr(res.error());
-        if (seekJson)
-            return app_.printJson(*res);
-        return 0;
+        return app_.seek(target, isRelative, seekJson);
     }
     if (statusCmd->parsed()) {
         if (statusWatch) {
@@ -1793,7 +1598,7 @@ int Shell::run(int argc, char** argv) {
                     caudio::println("Loaded playlist {} into queue {}", plLoadPid,
                                     pl->queue_id);
                 if (plLoadPlay)
-                    caudio::println("Playing {}", detail::trackWho(pl->status));
+                    caudio::println("Playing {}", caudio::app::trackWho(pl->status));
                 return 0;
             }
             caudio::client::OutputFormatter fmt{false};
