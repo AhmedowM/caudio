@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -278,6 +279,67 @@ class App {
      * @ingroup caudio_app
      */
     int queueRepeat(const std::string& mode, bool asJson);
+
+    /**
+     * @brief Lists playlists.
+     * @ingroup caudio_app
+     */
+    int playlistList(bool asJson);
+
+    /**
+     * @brief Lists tracks on a playlist.
+     * @ingroup caudio_app
+     */
+    int playlistTracks(std::int64_t pid, bool asJson);
+
+    /**
+     * @brief Creates an empty playlist.
+     * @ingroup caudio_app
+     */
+    int playlistCreate(const std::string& name, bool asJson);
+
+    /**
+     * @brief Adds ids/paths to a playlist (resolving files via the library).
+     * @ingroup caudio_app
+     * @param pid Target playlist id.
+     * @param ids Library id strings (validated numeric here).
+     * @param paths PATH/glob/folder selectors, expanded via paths utilities.
+     * @param recursive Descend into folders (PATH mode only).
+     */
+    int playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
+                    const std::vector<std::string>& paths, bool recursive, bool asJson);
+
+    /**
+     * @brief Loads a playlist into a queue (optionally replacing/playing).
+     * @ingroup caudio_app
+     */
+    int playlistLoad(std::int64_t pid, bool play, bool replace, bool asJson);
+
+    /**
+     * @brief Saves a queue as a playlist.
+     * @ingroup caudio_app
+     * @param qid Source queue id, or nullopt for the active queue.
+     */
+    int playlistSave(const std::string& name, std::optional<std::int64_t> qid, bool asJson);
+
+    /** @brief Deletes a playlist. @ingroup caudio_app */
+    int playlistDelete(std::int64_t pid, bool asJson);
+
+    /** @brief Renames a playlist. @ingroup caudio_app */
+    int playlistRename(std::int64_t pid, const std::string& name, bool asJson);
+
+    /**
+     * @brief Exports a playlist to an m3u/pls/json file.
+     * @ingroup caudio_app
+     */
+    int playlistExport(std::int64_t pid, const std::string& path, const std::string& format);
+
+    /**
+     * @brief Imports a playlist file.
+     * @ingroup caudio_app
+     * @param name Playlist name, or nullopt to derive from the file.
+     */
+    int playlistImport(const std::string& path, std::optional<std::string> name, bool asJson);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).

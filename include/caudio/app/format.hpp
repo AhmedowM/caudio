@@ -2,7 +2,10 @@
 
 #include <caudio/db/db_types.hpp>
 #include <caudio/ipc/result.hpp>
+#include <ostream>
 #include <string>
+#include <string_view>
+#include <vector>
 
 /**
  * @file format.hpp
@@ -36,5 +39,19 @@ std::string trackWho(const caudio::ipc::Status& st);
  * are, "track <id>" when nothing else exists.
  */
 std::string addedLabel(const caudio::db::Track& t);
+
+/**
+ * @brief Writes tracks as M3U/PLS/plain text.
+ * @ingroup caudio_app
+ * @param format "m3u", "pls", or anything else for plain paths.
+ */
+void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
+                       std::string_view format);
+
+/**
+ * @brief Writes tracks as `{"format":"caudio-playlist",...}` JSON.
+ * @ingroup caudio_app
+ */
+void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks);
 
 } // namespace caudio::app

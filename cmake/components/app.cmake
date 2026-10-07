@@ -9,6 +9,7 @@ set(CAUDIO_APP_SOURCES
   src/app/paths.cpp
   src/app/detail.cpp
   src/app/queue.cpp
+  src/app/playlist.cpp
 )
 caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::db caudio::utils Threads::Threads)
 ca_set_warnings(app)

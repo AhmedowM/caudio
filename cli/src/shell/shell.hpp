@@ -34,12 +34,6 @@ std::expected<caudio::ipc::VolumeSet, caudio::utils::Error> parseVolume(std::str
 /// @brief parseTime result as a duration.
 std::chrono::duration<double> parseDuration(std::string_view s);
 
-/// @brief Writes tracks as M3U/PLS/plain text to `os`.
-void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
-                       std::string_view format);
-/// @brief Writes tracks as `{"format":"caudio-playlist",...}` JSON to `os`.
-void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks);
-
 } // namespace detail
 
 using detail::parseSeek;
