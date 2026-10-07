@@ -17,7 +17,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-// Granular API headers used directly (spawnDaemon): kept after windows.h.
+// Granular API headers used directly: kept after windows.h.
 // clang-format on
 #include <errhandlingapi.h>
 #include <handleapi.h>
@@ -417,268 +417,11 @@ using detail::parseTime;
 using detail::parseVolume;
 
 Shell::Shell(caudio::config::Config cfg)
-    : config_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
+    : config_(cfg), app_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
     cli_->set_version_flag("--version", std::string(caudio::versionFull));
 }
 
 Shell::~Shell() = default;
-
-std::filesystem::path Shell::pidPathForConfig() const {
-    // Canonical pid path -- single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
-    auto r = caudio::config::pidPathFor(config_.dbPath);
-    if (r)
-        return *r;
-    // Fallback when canonical derivation fails: pid file next to the database.
-    auto pp = config_.dbPath.parent_path();
-    if (pp.empty())
-        pp = std::filesystem::current_path();
-    return pp / "caudio.pid";
-}
-
-std::expected<void, std::uint32_t> Shell::spawnDaemon(const caudio::config::Config& cfg) {
-#ifdef _WIN32
-    wchar_t exeBuf[MAX_PATH]{};
-    DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) {
-        DWORD err = GetLastError();
-        if (err == 0)
-            err = 1;
-        return std::unexpected{static_cast<std::uint32_t>(err)};
-    }
-    // Build mutable wide command line: "<exePath>" --daemon --foreground [--config "<configPath>"]
-    std::wstring wCmd = L"\"";
-    wCmd += exeBuf;
-    wCmd += L"\" --daemon --foreground";
-    if (!cfg.configPath.empty()) {
-        // configPath may contain forward slashes; quoting protects both slash styles
-        std::wstring cfgW = cfg.configPath.wstring();
-        wCmd += L" --config \"";
-        wCmd += cfgW;
-        wCmd += L"\"";
-    }
-    // CreateProcessW requires mutable, null-terminated buffer
-    std::vector<wchar_t> buf(wCmd.size() + 1, L'\0');
-    for (size_t i = 0; i < wCmd.size(); ++i)
-        buf[i] = wCmd[i];
-    buf[wCmd.size()] = L'\0';
-    STARTUPINFOW si{};
-    si.cb = sizeof(si);
-    PROCESS_INFORMATION pi{};
-    // Use DETACHED_PROCESS only - CREATE_NEW_CONSOLE | DETACHED_PROCESS is invalid
-    // (ERROR_INVALID_PARAMETER 87)
-    BOOL ok = CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, DETACHED_PROCESS,
-                             nullptr, nullptr, &si, &pi);
-    if (!ok) {
-        DWORD err = GetLastError();
-        return std::unexpected{static_cast<std::uint32_t>(err)};
-    }
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    return {};
-#else
-    pid_t pid = fork();
-    if (pid < 0) {
-        return std::unexpected{static_cast<std::uint32_t>(errno)};
-    }
-    if (pid > 0)
-        return {};
-    // child
-    if (setsid() < 0)
-        _exit(1);
-    if (chdir("/") != 0) {
-    }
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-    std::string exePath;
-#ifdef __linux__
-    {
-        char linkBuf[4096]{};
-        ssize_t n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf) - 1);
-        if (n > 0) {
-            linkBuf[n] = '\0';
-            exePath = linkBuf;
-        } else {
-            exePath = argv0_.empty() ? "/proc/self/exe" : argv0_;
-        }
-    }
-#elif defined(__APPLE__)
-    {
-        char buf[4096]{};
-        uint32_t size = sizeof(buf);
-        if (_NSGetExecutablePath(buf, &size) == 0) {
-            exePath = buf;
-        } else {
-            std::vector<char> dyn(size);
-            if (_NSGetExecutablePath(dyn.data(), &size) == 0) {
-                exePath = dyn.data();
-            } else if (!argv0_.empty()) {
-                exePath = argv0_;
-            } else {
-                exePath = "./caudio";
-            }
-        }
-    }
-#else
-    // BSD / other POSIX: try /proc/curproc/file then fallback to argv0
-    {
-        char linkBuf[4096]{};
-        ssize_t n = readlink("/proc/curproc/file", linkBuf, sizeof(linkBuf) - 1);
-        if (n > 0) {
-            linkBuf[n] = '\0';
-            exePath = linkBuf;
-        } else {
-            n = readlink("/proc/self/exe", linkBuf, sizeof(linkBuf) - 1);
-            if (n > 0) {
-                linkBuf[n] = '\0';
-                exePath = linkBuf;
-            } else if (!argv0_.empty()) {
-                exePath = argv0_;
-            } else {
-                exePath = "./caudio";
-            }
-        }
-    }
-#endif
-    if (!cfg.configPath.empty()) {
-        std::string cfgStr = cfg.configPath.generic_string();
-        execl(exePath.c_str(), exePath.c_str(), "--config", cfgStr.c_str(), "--daemon",
-              "--foreground", nullptr);
-    } else {
-        execl(exePath.c_str(), exePath.c_str(), "--daemon", "--foreground", nullptr);
-    }
-    _exit(1);
-#endif
-}
-
-int Shell::handleStart(bool foreground, bool quiet) {
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-    if (conn) {
-        if (!quiet)
-            caudio::println("daemon already running at {}", config_.socketPath);
-        return 0;
-    }
-    // Death-watch: a previous daemon may be mid-teardown (pipe already dead
-    // but pid file present / lock still held while threads join). Spawning
-    // into that window dies on the lock, so wait until both the pipe is
-    // unreachable AND the pid file is gone (2 s max) before spawning.
-    {
-        auto pidPath = pidPathForConfig();
-        for (int i = 0; i < 20; ++i) {
-            auto c = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-            std::error_code ec;
-            bool pidExists = std::filesystem::exists(pidPath, ec);
-            if (!c && !pidExists)
-                break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-    }
-    // Ensure db parent dirs exist before trying to start service (foreground)
-    {
-        std::error_code ec2;
-        auto parent = config_.dbPath.parent_path();
-        if (!parent.empty())
-            std::filesystem::create_directories(parent, ec2);
-    }
-    caudio::service::ServiceConfig scfg;
-    scfg.dbPath = config_.dbPath;
-    scfg.socketPath = config_.socketPath;
-    scfg.configPath = config_.configPath;
-    scfg.logLevel = config_.logLevel;
-    if (foreground) {
-        auto svc = caudio::service::Service::create(scfg);
-        if (!svc) {
-            caudio::println(std::cerr, "start failed: {} (db: {})", svc.error().message,
-                            config_.dbPath.generic_string());
-            return 1;
-        }
-        caudio::println("starting daemon foreground at {} db={}", config_.socketPath,
-                        config_.dbPath.generic_string());
-        std::stop_source ss;
-        auto res = svc.value()->run(ss.get_token());
-        if (!res) {
-            caudio::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message,
-                            config_.dbPath.generic_string());
-            return 1;
-        }
-        return 0;
-    } else {
-        auto spawnRes = spawnDaemon(config_);
-        if (!spawnRes) {
-            std::uint32_t err = spawnRes.error();
-            std::string what;
-            try {
-                what = std::system_category().message(err);
-            } catch (...) {
-                what = "unknown error";
-            }
-            caudio::println(std::cerr, "start failed: couldn't start daemon ({}: {})", err, what);
-            return 1;
-        }
-        // Readiness = full StatusReq round-trip (proves the accept loop and the
-        // dispatcher are alive, not just that a pipe object exists -- a bare
-        // connect can succeed against a dying daemon's draining instance).
-        // Budget 5 s: a fresh spawn on a slow/Debug box can exceed the old
-        // 1.5 s connect-only budget.
-        std::string lastDetail;
-        for (int i = 0; i < 50; ++i) {
-            caudio::client::Client probe{config_.dbPath, config_.socketPath};
-            if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
-                                     std::chrono::milliseconds{500})) {
-                if (std::get_if<caudio::ipc::Status>(&*ps)) {
-                    if (!quiet)
-                        caudio::println("daemon started at {}", config_.socketPath);
-                    return 0;
-                }
-                lastDetail = "unexpected reply";
-            } else {
-                lastDetail = ps.error().message;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        caudio::println(std::cerr, "daemon start failed: socket not reachable at {}",
-                        config_.socketPath);
-        if (!lastDetail.empty())
-            caudio::println(std::cerr, "last error: {}", lastDetail);
-        return 1;
-    }
-}
-
-int Shell::handleShutdown() {
-    caudio::client::Client client{config_.dbPath, config_.socketPath};
-    auto cmd = caudio::ipc::Command{caudio::ipc::Shutdown{}};
-    auto res = client.send(cmd, std::chrono::milliseconds{2000});
-    if (!res) {
-        // if daemon not running, report
-        if (res.error().code == caudio::utils::StatusCode::State) {
-            caudio::println(std::cerr, "shutdown: daemon not running");
-            return 1;
-        }
-        // even if send failed, attempt to poll pid file
-    }
-    // poll pid file and socket until daemon exits
-    auto pidPath = pidPathForConfig();
-    for (int i = 0; i < 20; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        std::error_code ec;
-        bool pidExists = std::filesystem::exists(pidPath, ec);
-        auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-        if (!conn && !pidExists)
-            break;
-        if (!conn) {
-            // socket gone, check pid file stale
-            if (!pidExists)
-                break;
-        }
-    }
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-    if (conn) {
-        caudio::println(std::cerr, "shutdown: daemon still running at {}", config_.socketPath);
-        return 1;
-    }
-    caudio::println("daemon stopped");
-    return 0;
-}
 
 int Shell::handlePreview(const std::string& file) {
     std::filesystem::path p{file};
@@ -715,7 +458,7 @@ int Shell::handlePreview(const std::string& file) {
 }
 int Shell::run(int argc, char** argv) {
     if (argc > 0 && argv && argv[0])
-        argv0_ = argv[0];
+        app_.setArgv0(argv[0]);
     std::string configPathStr;
     std::string logLevelStr;
     std::string deviceStr;
@@ -1113,9 +856,13 @@ int Shell::run(int argc, char** argv) {
         if (!parent.empty())
             std::filesystem::create_directories(parent, ec2);
     }
+    // The App orchestrator was bound to the pre-parse config in the Shell
+    // ctor; sync it now that reload plus socket derivation are final. Every
+    // daemon interaction below must observe these paths.
+    app_.setConfig(config_);
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {
-        return handleStart(true);
+        return app_.startDaemon(true);
     }
     auto sendRaw = [&](const caudio::ipc::Command& cmd,
                        std::chrono::milliseconds timeout = std::chrono::milliseconds{
@@ -1159,7 +906,7 @@ int Shell::run(int argc, char** argv) {
         if (!res) {
             const auto& e = res.error();
             if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running") {
-                if (handleStart(false, quietAutostart) != 0) {
+                if (app_.startDaemon(false, quietAutostart) != 0) {
                     // The autostart may have raced a dying daemon (lock held
                     // at spawn). One more attempt after a short settle delay;
                     // surface the freshest error, not the original "down".
@@ -1240,9 +987,9 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (startCmd->parsed())
-        return handleStart(fg || globalFg);
+        return app_.startDaemon(fg || globalFg);
     if (shutdownCmd->parsed())
-        return handleShutdown();
+        return app_.shutdownDaemon();
     // Transport commands print one-line confirmations (no ids, no queue
     // positions -- see `info` / `queue list` for those). JSON dumps raw.
     auto confirmTransport = [&](std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,

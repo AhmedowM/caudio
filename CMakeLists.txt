@@ -249,6 +249,7 @@ include(cmake/components/player.cmake)
 include(cmake/components/db.cmake)
 include(cmake/components/engine.cmake)
 include(cmake/components/cli.cmake)
+include(cmake/components/app.cmake)
 include(cmake/components/combined.cmake)
 
 # Umbrella module (optional, headers are canonical)
@@ -273,7 +274,7 @@ set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp)
 target_include_directories(caudio_cli PRIVATE cli/src/shell vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(caudio_cli PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
+target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio_cli)
 ca_set_module_warnings(caudio_cli)
@@ -310,6 +311,7 @@ set(CAUDIO_INSTALL_LIBS
   ipc
   client
   service
+  app
   sqlite3
   blake3
 )
@@ -321,6 +323,7 @@ if(CAUDIO_BUILD_SHARED)
     engine_shared
     client_shared
     service_shared
+    app_shared
     combined
   )
 endif()

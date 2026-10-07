@@ -1,5 +1,6 @@
 #pragma once
 
+#include <caudio/app/app.hpp>
 #include <caudio/config.hpp>
 #include <caudio/db/db_types.hpp>
 #include <caudio/ipc/command.hpp>
@@ -52,15 +53,11 @@ class Shell {
     int run(int argc, char** argv);
 
   private:
-    int handleStart(bool foreground, bool quiet = false);
-    int handleShutdown();
     int handlePreview(const std::string& file);
-    std::expected<void, std::uint32_t> spawnDaemon(const caudio::config::Config& cfg);
-    std::filesystem::path pidPathForConfig() const;
 
     caudio::config::Config config_;
+    caudio::app::App app_;
     std::unique_ptr<CLI::App> cli_;
-    std::string argv0_;
 };
 
 } // namespace caudio::app::cli
