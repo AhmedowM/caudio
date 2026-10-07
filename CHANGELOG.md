@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Flatten module umbrellas to `modules/` root and shorten partition file
   names (`<comp>/core.cppm`, `<comp>/types.cppm`); the `caudio.player:core`
   partition drops its legacy `player_core` name
+- Move version helpers from `caudio::utils` to their own `caudio::version`
+  namespace (standalone `version.hpp`, like `config.hpp`)
 
 ## [v1.0.0-rc3] - 2026-10-04
 

@@ -14,7 +14,6 @@
  * - thread: sleepFor, sleepForMs, setThreadName
  * - print: portable print/println facade (see print.hpp)
  * - json: opaque Json/JsonRef value type (nlohmann stays behind src/ walls)
- * - version: version constants and helpers
  * - function: portable MoveOnlyFunction (libc++ lacks std::move_only_function)
  * - generator: portable Generator (libc++ lacks std::generator)
  */
@@ -30,4 +29,4 @@
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
 #include <caudio/utils/thread.hpp>
-#include <caudio/version.hpp>
+

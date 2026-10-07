@@ -119,10 +119,10 @@ struct Status final {
     std::size_t q_idx{0};
     /**
      * @brief Daemon/library version (full git tag).
-     * @details Populated by service_detail::buildStatus from caudio::versionFull.
-     * Default is versionFull so local builds without daemon still show version.
+     * @details Populated by the daemon (service_detail::buildStatus); empty
+     * when the producer did not set one.
      */
-    std::string version{caudio::versionFull};
+    std::string version;
 };
 
 // ---------------------------------------------------------------------------
@@ -749,8 +749,8 @@ using CliError = caudio::utils::Error;
 using Result =
     std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
                  LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults, Playlists,
-                 PlaylistData, PlaylistCreated, PlaylistImportReport, ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History, Empty,
-                 CliError, Devices>;
+                 PlaylistData, PlaylistCreated, PlaylistImportReport, ScanReport, ConfigValue,
+                 ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

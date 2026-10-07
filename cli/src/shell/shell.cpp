@@ -29,23 +29,23 @@
 #include <CLI/CLI.hpp>
 #include <algorithm>
 #include <caudio/client/core.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/db/json.hpp>
 #include <caudio/db/scan.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/player/core.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/result.hpp>
-#include <caudio/version_config.hpp>
+#include <caudio/version.hpp>
 #include <memory>
 #include <set>
 #include <stop_token>
 #include <system_error>
 
-#include "shell.hpp"
 #include "parse.hpp"
+#include "shell.hpp"
 
 // Transitional: app-internal reporting helpers for not-yet-moved groups
 // (playlist tracks). Frontends must use the public caudio/app/* headers.
@@ -196,7 +196,8 @@ using detail::parseTime;
 using detail::parseVolume;
 
 Shell::Shell(caudio::config::Config cfg)
-    : config_(cfg), app_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
+    : config_(cfg), app_(std::move(cfg)),
+      cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
     cli_->set_version_flag("--version", std::string(caudio::versionFull));
 }
 
@@ -267,8 +268,7 @@ int Shell::run(int argc, char** argv) {
     auto* qList = queueCmd->add_subcommand("list", "List all queues");
     qList->add_flag("--json", qJson, "JSON output");
     bool qQueuesJson = false;
-    auto* qQueuesAlias =
-        queueCmd->add_subcommand("queues", "List all queues (alias)")->group("");
+    auto* qQueuesAlias = queueCmd->add_subcommand("queues", "List all queues (alias)")->group("");
     qQueuesAlias->add_flag("--json", qQueuesJson, "JSON output");
     std::string qTracksOrder = "playback";
     bool qTracksJson = false;

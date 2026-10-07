@@ -123,6 +123,7 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/version.hpp>
 
 namespace caudio::service::detail {
 std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,

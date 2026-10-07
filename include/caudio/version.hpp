@@ -4,21 +4,23 @@
 
 /**
  * @file version.hpp
- * @brief Version utilities -- re-exports caudio::shortVersion constants and helpers.
- * @ingroup caudio_utils
+ * @brief Version helpers in caudio::version -- wraps the CMake-generated
+ * version_config.hpp constants.
+ * @defgroup caudio_version caudio version
+ * @ingroup caudio_version
  * @details Thin header that exposes version constants plus helpers
- * `version()` / `versionString()`. No API break -- additive only.
- * Includes the CMake-generated version_config.hpp for version constants.
+ * `version()` / `versionString()`. Includes the CMake-generated
+ * version_config.hpp for version constants.
  */
 
 // Include CMake-generated version constants
 #include <caudio/version_config.hpp>
 
-namespace caudio::utils {
+namespace caudio::version {
 
 /**
  * @brief Returns library full version (git tag).
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  * @return String view of caudio::versionFull.
  */
 inline std::string_view version() noexcept {
@@ -27,7 +29,7 @@ inline std::string_view version() noexcept {
 
 /**
  * @brief Returns library full version as owned string.
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  * @return Copy of caudio::versionFull.
  */
 inline std::string versionString() {
@@ -36,7 +38,7 @@ inline std::string versionString() {
 
 /**
  * @brief Returns short version (PROJECT_VERSION).
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  * @return String view of caudio::shortVersion.
  */
 inline std::string_view shortVersion() noexcept {
@@ -45,7 +47,7 @@ inline std::string_view shortVersion() noexcept {
 
 /**
  * @brief Returns version commit hash (short).
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  * @return String view of caudio::versionCommit.
  */
 inline std::string_view versionCommit() noexcept {
@@ -54,7 +56,7 @@ inline std::string_view versionCommit() noexcept {
 
 /**
  * @brief Version major component.
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  * @return versionMajor.
  */
 constexpr int versionMajor() noexcept {
@@ -63,7 +65,7 @@ constexpr int versionMajor() noexcept {
 
 /**
  * @brief Version minor component.
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  */
 constexpr int versionMinor() noexcept {
     return caudio::versionMinor;
@@ -71,10 +73,10 @@ constexpr int versionMinor() noexcept {
 
 /**
  * @brief Version patch component.
- * @ingroup caudio_utils
+ * @ingroup caudio_version
  */
 constexpr int versionPatch() noexcept {
     return caudio::versionPatch;
 }
 
-} // namespace caudio::utils
+} // namespace caudio::version
