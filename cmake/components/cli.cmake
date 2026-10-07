@@ -64,7 +64,7 @@ endif()
 set(CAUDIO_CLIENT_MODULE_SOURCES
   modules/client/client.cppm
   modules/client/ipc_client.cppm
-  modules/client/client_core.cppm
+  modules/client/core.cppm
   modules/client/output_formatter.cppm
 )
 set(CAUDIO_CLIENT_SOURCES

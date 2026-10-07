@@ -7,11 +7,11 @@
  * (time/volume grammar, globs) stays in the shell; these take parsed values.
  */
 
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
-#include <caudio/client/client_core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/output_formatter.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

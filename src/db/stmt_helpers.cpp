@@ -1,6 +1,6 @@
 #include <sqlite3.h>
 
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <cstdint>
 #include <cstring>
 #include <db/stmt_helpers.hpp>

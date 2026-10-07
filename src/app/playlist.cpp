@@ -8,10 +8,10 @@
  */
 
 #include <app/detail.hpp>
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
-#include <caudio/client/client_core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

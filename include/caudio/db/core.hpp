@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>

@@ -8,7 +8,7 @@
  * @see caudio::service::IpcServer
  * @see caudio::service::IpcChannel
  */
+#include <caudio/service/core.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/service_core.hpp>
 #include <caudio/service/shm_status.hpp>

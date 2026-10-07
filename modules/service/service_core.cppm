@@ -1,5 +1,5 @@
 module;
-#include <caudio/service/service_core.hpp>
+#include <caudio/service/core.hpp>
 
 export module caudio.service:core;
 

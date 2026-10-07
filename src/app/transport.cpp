@@ -8,8 +8,8 @@
  * one-line success contract shared by most commands.
  */
 
-#include <caudio/app/app.hpp>
-#include <caudio/client/client_core.hpp>
+#include <caudio/app/core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

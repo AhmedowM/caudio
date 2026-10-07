@@ -1,5 +1,5 @@
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/core.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>

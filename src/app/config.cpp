@@ -6,7 +6,7 @@
  * from the local file without a daemon; writes go through the daemon.
  */
 
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>

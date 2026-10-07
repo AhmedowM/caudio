@@ -1,6 +1,6 @@
 #pragma once
 
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/ipc/result.hpp>
 #include <ostream>
 #include <string>

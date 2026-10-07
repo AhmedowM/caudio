@@ -1,7 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/generator.hpp>
 #include <string_view>

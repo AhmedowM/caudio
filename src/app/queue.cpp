@@ -10,13 +10,13 @@
  */
 
 #include <app/detail.hpp>
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
-#include <caudio/client/client_core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/output_formatter.hpp>
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

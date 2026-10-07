@@ -5,7 +5,7 @@
  * @details Moved verbatim out of the CLI shell (Phase 0).
  */
 
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

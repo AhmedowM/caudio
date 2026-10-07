@@ -1,7 +1,7 @@
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine/engine_core.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/db/core.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/engine/core.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>

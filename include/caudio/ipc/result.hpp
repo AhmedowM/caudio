@@ -22,7 +22,7 @@
  * @see caudio::ipc::Command for request types
  */
 
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/utils.hpp>
 #include <cstddef>

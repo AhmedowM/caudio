@@ -1,11 +1,11 @@
 #include <algorithm>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/player/decoder.hpp>
-#include <caudio/service/service_core.hpp>
+#include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cctype>

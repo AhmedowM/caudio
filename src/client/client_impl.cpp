@@ -1,8 +1,8 @@
 #include <algorithm>
-#include <caudio/client/client_core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/shm_status.hpp>

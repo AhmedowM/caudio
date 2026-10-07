@@ -6,11 +6,11 @@
 
 #include <algorithm>
 #include <atomic>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/service_core.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>

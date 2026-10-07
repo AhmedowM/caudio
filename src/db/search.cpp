@@ -1,8 +1,8 @@
 #include <sqlite3.h>
 
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/core.hpp>
 #include <caudio/db/search.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <db/fts.hpp>

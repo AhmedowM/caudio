@@ -1,5 +1,5 @@
 module;
-#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/core.hpp>
 
 export module caudio.engine:core;
 

@@ -1,6 +1,6 @@
-#include <caudio/db/db_types.hpp>
 #include <caudio/db/json.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>

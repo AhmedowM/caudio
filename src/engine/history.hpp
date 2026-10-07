@@ -1,6 +1,6 @@
 #pragma once
 
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
 #include <cstdint>

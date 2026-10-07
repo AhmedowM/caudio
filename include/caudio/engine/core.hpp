@@ -48,8 +48,8 @@
  * pushEvent to callbacks under cbMutex_.
  */
 
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/ring.hpp>

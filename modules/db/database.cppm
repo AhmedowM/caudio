@@ -1,5 +1,5 @@
 module;
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <string_view>
 

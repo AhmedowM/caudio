@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/client/ipc_client.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/service_core.hpp>
+#include <caudio/service/core.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <filesystem>

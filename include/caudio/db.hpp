@@ -9,11 +9,11 @@
  * live in src/db/ and are NOT installed.
  */
 
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/core.hpp>
 #include <caudio/db/json.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils.hpp>
 

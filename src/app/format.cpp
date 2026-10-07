@@ -6,8 +6,8 @@
  */
 
 #include <caudio/app/format.hpp>
-#include <caudio/db/db_types.hpp>
 #include <caudio/db/json.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/json.hpp>
 #include <cmath>

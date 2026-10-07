@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
-#include <caudio/engine/engine_core.hpp>
+#include <caudio/engine/core.hpp>
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>

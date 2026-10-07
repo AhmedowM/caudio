@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/core.hpp>
 #include <caudio/db/json.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/utils/json.hpp>
 #include <common.hpp>
 #include <cstdint>

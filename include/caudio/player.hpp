@@ -14,9 +14,9 @@
 
 #pragma once
 
+#include <caudio/player/core.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
-#include <caudio/player/player_core.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils.hpp>
 #include <string_view>

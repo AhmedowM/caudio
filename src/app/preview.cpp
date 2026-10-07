@@ -7,8 +7,8 @@
  * for quick audition without touching the queue.
  */
 
-#include <caudio/app/app.hpp>
-#include <caudio/player/player_core.hpp>
+#include <caudio/app/core.hpp>
+#include <caudio/player/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>

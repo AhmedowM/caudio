@@ -64,7 +64,7 @@
  */
 
 #include <array>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

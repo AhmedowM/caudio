@@ -1,10 +1,10 @@
 #include <sqlite3.h>
 
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db/db_core.hpp>
-#include <caudio/db/db_types.hpp>
-#include <caudio/engine/engine_core.hpp>
-#include <caudio/engine/engine_types.hpp>
+#include <caudio/db/core.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/engine/core.hpp>
+#include <caudio/engine/types.hpp>
 #include <common.hpp>
 #include <cstdint>
 #include <filesystem>

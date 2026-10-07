@@ -8,7 +8,7 @@
 
 #include <algorithm>
 #include <array>
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

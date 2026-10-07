@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <array>
-#include <caudio/db/db_types.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/utils.hpp>
 #include <cstddef>
 #include <cstdint>

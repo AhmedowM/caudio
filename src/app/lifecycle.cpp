@@ -33,13 +33,13 @@
 #endif
 #endif
 
-#include <caudio/app/app.hpp>
-#include <caudio/client/client_core.hpp>
+#include <caudio/app/core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/service_core.hpp>
+#include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
 #include <chrono>

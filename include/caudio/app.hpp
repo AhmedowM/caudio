@@ -9,6 +9,6 @@
  * @see caudio::app::fmtClock
  * @see caudio::app::expandAddToken
  */
-#include <caudio/app/app.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>

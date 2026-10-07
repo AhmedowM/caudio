@@ -1,5 +1,5 @@
 module;
-#include <caudio/client/client_core.hpp>
+#include <caudio/client/core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>
 
