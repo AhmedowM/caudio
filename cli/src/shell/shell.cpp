@@ -886,39 +886,16 @@ int Shell::run(int argc, char** argv) {
     if (previewCmd->parsed())
         return handlePreview(previewFile);
     if (cfgCmd->parsed()) {
-        if (cfgGet->parsed()) {
-            // Answered from the local file: no daemon needed.
-            auto v = caudio::config::configGetRaw(config_.configPath, cfgGetKey);
-            if (!v)
-                return app_.printErr(v.error());
-            caudio::ipc::Result r{caudio::ipc::ConfigValue{cfgGetKey, *v}};
-            if (cfgGetJson)
-                return app_.printJson(r);
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(r, std::cout);
-            return 0;
-        }
-        if (cfgSet->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::ConfigSet{cfgSetKey, cfgSetVal}};
-            auto res = app_.sendRaw(cmd);
-            if (!res)
-                return app_.printErr(res.error());
-            return 0;
-        }
-        if (cfgList->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::ConfigList{}};
-            return app_.sendViaClient(cmd, cfgListJson);
-        }
-        if (cfgExport->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::ConfigExport{cfgExportPath}};
-            return app_.confirm(app_.sendRaw(cmd), cfgExportJson,
-                           std::format("Exported config to {}", cfgExportPath));
-        }
-        if (cfgImport->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::ConfigImport{cfgImportPath}};
-            return app_.confirm(app_.sendRaw(cmd), cfgImportJson,
-                           std::format("Imported config from {}", cfgImportPath));
-        }
+        if (cfgGet->parsed())
+            return app_.configGet(cfgGetKey, cfgGetJson);
+        if (cfgSet->parsed())
+            return app_.configSet(cfgSetKey, cfgSetVal);
+        if (cfgList->parsed())
+            return app_.configList(cfgListJson);
+        if (cfgExport->parsed())
+            return app_.configExport(cfgExportPath, cfgExportJson);
+        if (cfgImport->parsed())
+            return app_.configImport(cfgImportPath, cfgImportJson);
         if (cfgReset->parsed()) {
             std::optional<std::string> k;
             if (cfgReset->count("key") > 0 && !cfgResetKey.empty())
@@ -928,10 +905,7 @@ int Shell::run(int argc, char** argv) {
                 caudio::println(std::cerr, "config reset: empty key (omit --key to reset all)");
                 return 1;
             }
-            caudio::ipc::Command cmd{caudio::ipc::ConfigReset{k}};
-            std::string line =
-                k.has_value() ? std::format("Reset config key '{}'", *k) : "Reset all config";
-            return app_.confirm(app_.sendRaw(cmd), cfgResetJson, line);
+            return app_.configReset(k, cfgResetJson);
         }
         std::cout << cfgCmd->help() << "\n";
         return 0;

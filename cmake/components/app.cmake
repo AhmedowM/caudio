@@ -13,6 +13,7 @@ set(CAUDIO_APP_SOURCES
   src/app/library.cpp
   src/app/tags.cpp
   src/app/system.cpp
+  src/app/config.cpp
 )
 caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::db caudio::utils Threads::Threads)
 ca_set_warnings(app)
