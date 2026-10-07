@@ -96,10 +96,10 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
     {
         std::ifstream ifs(src, std::ios::binary);
         if (!ifs)
-            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io,
-                                                            "import file unreadable")};
-        content = std::string((std::istreambuf_iterator<char>(ifs)),
-                              std::istreambuf_iterator<char>());
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "import file unreadable")};
+        content =
+            std::string((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
     }
     auto parsed = caudio::utils::Json::tryParse(content);
     if (!parsed)
@@ -112,7 +112,8 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
         auto v = parsed->at(key);
         if (v && !v->isString())
             return caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
-                                            std::string("import key '") + key + "' must be a string");
+                                            std::string("import key '") + key +
+                                                "' must be a string");
         return std::nullopt;
     };
     for (const char* k : {"dbPath", "device", "socketPath", "db_path"}) {
@@ -122,9 +123,9 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
     for (const char* k : {"logLevel", "log_level"}) {
         auto v = parsed->at(k);
         if (v && !v->isNumber() && !v->isNull())
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::InvalidArg,
-                std::string("import key '") + k + "' must be a number")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                         std::string("import key '") + k + "' must be a number")};
     }
     std::filesystem::create_directories(dst.parent_path(), ec);
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);

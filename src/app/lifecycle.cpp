@@ -56,8 +56,7 @@
 
 namespace caudio::app {
 
-App::App(caudio::config::Config cfg) : config_(std::move(cfg)) {
-}
+App::App(caudio::config::Config cfg) : config_(std::move(cfg)) {}
 
 App::~App() = default;
 

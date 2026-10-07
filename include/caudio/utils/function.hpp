@@ -47,8 +47,7 @@ class MoveOnlyFunction<R(Args...)> {
     template <typename F>
         requires(!std::same_as<std::decay_t<F>, MoveOnlyFunction> &&
                  std::is_invocable_r_v<R, std::decay_t<F>&, Args...>)
-    MoveOnlyFunction(F&& f)
-        : ptr_(std::make_unique<Model<std::decay_t<F>>>(std::forward<F>(f))) {}
+    MoveOnlyFunction(F&& f) : ptr_(std::make_unique<Model<std::decay_t<F>>>(std::forward<F>(f))) {}
 
     /**
      * @brief Assigns an empty target. @ingroup caudio_utils

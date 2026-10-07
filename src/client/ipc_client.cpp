@@ -55,9 +55,9 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
             }
         }
         if (h == INVALID_HANDLE_VALUE) {
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Io,
-                "CreateFileW connect failed: " + std::to_string(err))};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                         "CreateFileW connect failed: " + std::to_string(err))};
         }
     }
     DWORD mode = PIPE_READMODE_BYTE;

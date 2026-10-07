@@ -62,8 +62,8 @@ int App::sendViaClient(const caudio::ipc::Command& cmd, bool asJson) {
 
 // Play-like sends autostart the daemon when it is down (quick launch).
 // quietAutostart keeps --json output clean.
-std::expected<caudio::ipc::Result, caudio::utils::Error> App::sendPlay(const caudio::ipc::Command& cmd,
-                                                                        bool quietAutostart) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+App::sendPlay(const caudio::ipc::Command& cmd, bool quietAutostart) {
     auto res = sendRaw(cmd);
     if (!res) {
         const auto& e = res.error();

@@ -60,7 +60,7 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     for (char c : pathStr)
         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
     HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                   kPipeUnlimited, 16384, 16384, 0, nullptr);
+                                  kPipeUnlimited, 16384, 16384, 0, nullptr);
     if (h == kInvalidHandle) {
         DWORD err = ::GetLastError();
         return std::unexpected{caudio::utils::makeError(
@@ -145,7 +145,7 @@ void IpcServer::run(std::stop_token st,
                     w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
                 HANDLE next =
                     ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                        kPipeUnlimited, 16384, 16384, 0, nullptr);
+                                       kPipeUnlimited, 16384, 16384, 0, nullptr);
                 if (next != kInvalidHandle) {
                     pipeHandle_ = next;
                 } else {

@@ -259,7 +259,8 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    auto e = st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues WHERE id=?");
+    auto e =
+        st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues WHERE id=?");
     if (!e)
         return std::unexpected{e.error()};
     st.bindInt(1, qid);
@@ -280,7 +281,8 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    auto e = st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues ORDER BY id");
+    auto e =
+        st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues ORDER BY id");
     if (!e)
         return std::unexpected{e.error()};
     std::vector<Queue> out;

@@ -1,7 +1,7 @@
 #include <algorithm>
-#include <caudio/db/types.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/player/decoder.hpp>
@@ -42,8 +42,8 @@ using caudio::ipc::QueueSwitch;
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::QueueList& ql) {
     if (ql.order != "playback" && ql.order != "added" && !ql.order.empty())
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
-                                                        "queue list: invalid order (added|playback)")};
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::InvalidArg, "queue list: invalid order (added|playback)")};
     int64_t qid = engine_->activeQueueId();
     // validation: queue exists
     {
@@ -71,8 +71,7 @@ Service::handle(const caudio::ipc::QueueList& ql) {
             ordered.reserve(tracks.size());
             std::vector<char> seen(tracks.size(), 0);
             for (int64_t p : perm) {
-                if (p >= 0 && (std::size_t)p < tracks.size() &&
-                    !seen[(std::size_t)p]) {
+                if (p >= 0 && (std::size_t)p < tracks.size() && !seen[(std::size_t)p]) {
                     ordered.push_back(tracks[(std::size_t)p]);
                     seen[(std::size_t)p] = 1;
                 }
@@ -97,8 +96,7 @@ Service::handle(const caudio::ipc::QueueQueues&) {
     for (auto& q : *qs) {
         auto items = db_->queueList(q.id);
         std::size_t n = items ? items->size() : 0;
-        out.entries.push_back(
-            caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active, q.temp});
+        out.entries.push_back(caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active, q.temp});
     }
     return Result{std::move(out)};
 }
@@ -117,8 +115,8 @@ Service::handle(const caudio::ipc::QueueCreate& qc) {
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::QueueDelete& qd) {
     if (qd.qid == engine_->activeQueueId())
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::InvalidArg, "cannot delete the active queue")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "cannot delete the active queue")};
     auto q = db_->getQueue(qd.qid);
     if (!q)
         return std::unexpected{q.error()};
@@ -141,8 +139,8 @@ Service::handle(const caudio::ipc::PlayFiles& cmd) {
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
                                                             "track not found: " + ps)};
         if (!caudio::db::detail::hasAudioExt(p))
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::Unsupported, "unsupported file type: " + ps)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
+                                                            "unsupported file type: " + ps)};
     }
     std::vector<int64_t> ids;
     ids.reserve(cmd.paths.size());
@@ -152,8 +150,7 @@ Service::handle(const caudio::ipc::PlayFiles& cmd) {
             return std::unexpected{trRes.error()};
         ids.push_back(trRes->id);
     }
-    std::string first =
-        std::filesystem::path(cmd.paths.front()).filename().generic_string();
+    std::string first = std::filesystem::path(cmd.paths.front()).filename().generic_string();
     auto qid = db_->createQueue("temp: " + first);
     if (!qid)
         return std::unexpected{qid.error()};
@@ -248,8 +245,8 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
             return std::unexpected{sr.error()};
         toAdd = std::move(*sr);
         if (toAdd.empty()) {
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::NotFound, "no matches for: " + qa.query)};
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                            "no matches for: " + qa.query)};
         }
     } else {
         // try parse as int id

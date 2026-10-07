@@ -5,9 +5,9 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/player/core.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
-#include <caudio/player/core.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/math.hpp>
@@ -859,8 +859,8 @@ std::expected<void, caudio::utils::Error> Engine::saveState() {
         // Best-effort pre_mute_volume (no-op on old DBs without the column).
         {
             sqlite3_stmt* pm = nullptr;
-            if (sqlite3_prepare_v2(db, "UPDATE engine_state SET pre_mute_volume=? WHERE id=1",
-                                   -1, &pm, nullptr) == SQLITE_OK) {
+            if (sqlite3_prepare_v2(db, "UPDATE engine_state SET pre_mute_volume=? WHERE id=1", -1,
+                                   &pm, nullptr) == SQLITE_OK) {
                 caudio::db::internal::StmtGuard pmGuard(pm);
                 pm = pmGuard.get();
                 sqlite3_bind_double(pm, 1, (double)state_.preMuteVolume);

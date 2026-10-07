@@ -74,9 +74,9 @@ void WriterThread::close() {
     }
 }
 
-std::expected<void, caudio::utils::Error>
-WriterThread::push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
-                   caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
+std::expected<void, caudio::utils::Error> WriterThread::push(
+    std::string sql, std::unique_ptr<SqliteStatement> stmt,
+    caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
     WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
     auto r = queue_->push(std::move(op));
     if (!r)
@@ -85,9 +85,9 @@ WriterThread::push(std::string sql, std::unique_ptr<SqliteStatement> stmt,
     return {};
 }
 
-std::expected<void, caudio::utils::Error>
-WriterThread::push(std::string sql,
-                   caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
+std::expected<void, caudio::utils::Error> WriterThread::push(
+    std::string sql,
+    caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
     return push(std::move(sql), std::unique_ptr<SqliteStatement>{}, std::move(cb));
 }
 

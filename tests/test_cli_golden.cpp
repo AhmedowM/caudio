@@ -123,8 +123,8 @@ TEST_CASE("cli help surfaces groups", "[cli]") {
     auto r = runCli({"--help"});
     REQUIRE(r.exitCode == 0);
     REQUIRE(contains(r.out, "SUBCOMMANDS"));
-    for (const char* tok : {"start", "shutdown", "play", "status", "queue", "playlist",
-                            "library", "tag", "history", "config", "device", "info"}) {
+    for (const char* tok : {"start", "shutdown", "play", "status", "queue", "playlist", "library",
+                            "tag", "history", "config", "device", "info"}) {
         INFO("missing token: " << tok);
         REQUIRE(contains(r.out, tok));
     }
@@ -201,11 +201,11 @@ TEST_CASE("cli status watch validates interval", "[cli]") {
 }
 
 TEST_CASE("cli enum options reject out-of-set values", "[cli]") {
-    auto e = runCli(
-        withCfg("gold_exp", {"playlist", "export", "--pid", "1", "--path", "x", "--format", "bogus"}));
+    auto e = runCli(withCfg(
+        "gold_exp", {"playlist", "export", "--pid", "1", "--path", "x", "--format", "bogus"}));
     REQUIRE(e.exitCode != 0);
-    auto t =
-        runCli(withCfg("gold_tag", {"tag", "edit", "--id", "1", "--field", "bogus", "--value", "x"}));
+    auto t = runCli(
+        withCfg("gold_tag", {"tag", "edit", "--id", "1", "--field", "bogus", "--value", "x"}));
     REQUIRE(t.exitCode != 0);
 }
 
@@ -306,7 +306,10 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto scan = run({"library", "scan", "--path", music.generic_string()});
     REQUIRE(scan.exitCode == 0);
     REQUIRE(contains(scan.out, "1 track added"));
-    { std::ofstream f(music / "full.mp3", std::ios::binary); f << "full-hash dummy"; }
+    {
+        std::ofstream f(music / "full.mp3", std::ios::binary);
+        f << "full-hash dummy";
+    }
     auto scanFull = run({"library", "scan", "--path", music.generic_string(), "--full-hash"});
     REQUIRE(scanFull.exitCode == 0);
     REQUIRE(contains(scanFull.out, "1 track added"));
@@ -394,7 +397,10 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(contains(libRm.out, "Removed from library full.mp3"));
     auto histNeg = run({"history", "list", "--limit", "-5"});
     REQUIRE(histNeg.exitCode == 0);
-    { std::ofstream f(music / "song2.mp3", std::ios::binary); f << "second dummy"; }
+    {
+        std::ofstream f(music / "song2.mp3", std::ios::binary);
+        f << "second dummy";
+    }
     auto addDir = run({"queue", "add", music.generic_string()});
     REQUIRE(addDir.exitCode == 0);
     REQUIRE(contains(addDir.out, "Added full.mp3"));

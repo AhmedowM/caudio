@@ -5,10 +5,9 @@
  * @details Moved verbatim out of the CLI shell (Phase 0).
  */
 
+#include <algorithm>
 #include <caudio/app/paths.hpp>
 #include <caudio/db/scan.hpp>
-
-#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <string>
@@ -23,9 +22,7 @@ namespace {
 // Case-insensitive wildcard match (* and ? only) for queue-add globs.
 bool wildcardMatch(std::string_view pat, std::string_view name) {
     std::size_t px = 0, nx = 0, star = std::string_view::npos, ss = 0;
-    auto lower = [](char c) {
-        return (char)std::tolower((unsigned char)c);
-    };
+    auto lower = [](char c) { return (char)std::tolower((unsigned char)c); };
     while (nx < name.size()) {
         if (px < pat.size() && (pat[px] == '?' || lower(pat[px]) == lower(name[nx]))) {
             ++px;
@@ -87,13 +84,12 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
         std::vector<std::string> hits;
         if (recursive) {
             for (auto it = std::filesystem::recursive_directory_iterator(
-                       p, std::filesystem::directory_options::skip_permission_denied, ec);
+                     p, std::filesystem::directory_options::skip_permission_denied, ec);
                  it != std::filesystem::recursive_directory_iterator(); ++it) {
                 if (ec)
                     break;
                 std::error_code e2;
-                if (it->is_regular_file(e2) && !e2 &&
-                    caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e2) && !e2 && caudio::db::detail::hasAudioExt(it->path())) {
                     auto abs = std::filesystem::absolute(it->path(), e2);
                     hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
                 }
@@ -104,8 +100,7 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
                 if (ec)
                     break;
                 std::error_code e2;
-                if (it->is_regular_file(e2) && !e2 &&
-                    caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e2) && !e2 && caudio::db::detail::hasAudioExt(it->path())) {
                     auto abs = std::filesystem::absolute(it->path(), e2);
                     hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
                 }

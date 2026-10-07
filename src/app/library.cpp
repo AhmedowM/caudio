@@ -161,8 +161,7 @@ int App::libraryList(const std::string& query, int limit, int offset, const std:
                      const std::string& album, const std::string& genre, bool asJson) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryList{
         query.empty() ? std::optional<std::string>{} : std::optional<std::string>{query}, limit,
-        offset,
-        artist.empty() ? std::optional<std::string>{} : std::optional<std::string>{artist},
+        offset, artist.empty() ? std::optional<std::string>{} : std::optional<std::string>{artist},
         album.empty() ? std::optional<std::string>{} : std::optional<std::string>{album},
         genre.empty() ? std::optional<std::string>{} : std::optional<std::string>{genre}}};
     return sendViaClient(cmd, asJson);

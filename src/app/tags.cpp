@@ -24,21 +24,19 @@
 
 namespace caudio::app {
 
-int App::tagEdit(std::int64_t id, const std::string& field, const std::string& value,
-                 bool asJson) {
+int App::tagEdit(std::int64_t id, const std::string& field, const std::string& value, bool asJson) {
     caudio::ipc::Command cmd{caudio::ipc::TagEdit{id, field, value}};
     return confirm(sendRaw(cmd), asJson, std::format("Updated {} for track {}", field, id));
 }
 
 int App::tagGet(std::int64_t id, const std::string& field, bool asJson) {
     static const std::array<std::string_view, 8> tagFields{
-        "title", "artist", "album", "album_artist",
-        "genre", "year", "track_number", "disc_number"};
-    if (!field.empty() &&
-        std::find(tagFields.begin(), tagFields.end(), field) == tagFields.end()) {
-        caudio::println(std::cerr, "tag get: unknown field '{}' (expected one of "
-                                   "title|artist|album|album_artist|genre|year|"
-                                   "track_number|disc_number)",
+        "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
+    if (!field.empty() && std::find(tagFields.begin(), tagFields.end(), field) == tagFields.end()) {
+        caudio::println(std::cerr,
+                        "tag get: unknown field '{}' (expected one of "
+                        "title|artist|album|album_artist|genre|year|"
+                        "track_number|disc_number)",
                         field);
         return 1;
     }

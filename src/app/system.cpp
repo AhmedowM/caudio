@@ -38,8 +38,8 @@ int App::deviceSet(const std::string& id, bool asJson) {
 
 int App::deviceTest(std::optional<std::string> id, bool asJson) {
     caudio::ipc::Command cmd{caudio::ipc::DeviceTest{id}};
-    std::string line = id.has_value() ? std::format("Device available: {}", *id)
-                                      : "Default device available";
+    std::string line =
+        id.has_value() ? std::format("Device available: {}", *id) : "Default device available";
     return confirm(sendRaw(cmd), asJson, line);
 }
 

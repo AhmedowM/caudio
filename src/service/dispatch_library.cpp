@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <array>
-#include <caudio/db/types.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/player/decoder.hpp>
@@ -98,8 +98,7 @@ Service::handle(const caudio::ipc::LibraryScan& cmd) {
     // untouched files.
     std::size_t n = 0;
     for (auto t : caudio::db::scan(root, mode)) {
-        if (auto ex = db_->findByPath(t.path);
-            ex && ex->size == t.size && ex->mtime == t.mtime)
+        if (auto ex = db_->findByPath(t.path); ex && ex->size == t.size && ex->mtime == t.mtime)
             continue;
         auto r = db_->insertTrack(t);
         if (r)

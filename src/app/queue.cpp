@@ -9,6 +9,7 @@
  * handlers; glob expansion uses the shared paths utilities.
  */
 
+#include <algorithm>
 #include <app/detail.hpp>
 #include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
@@ -21,7 +22,6 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
-#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <expected>
@@ -306,8 +306,8 @@ int App::queueRemove(const std::string& id, const std::string& pos,
             caudio::app::expandAddToken(tok, recursive, files, unmatched);
         for (auto& u : unmatched) {
             if (caudio::app::isNumeric(u)) {
-                caudio::println(std::cerr, "queue remove: '{}' is not a file (use --id/--pos for ids)",
-                                u);
+                caudio::println(std::cerr,
+                                "queue remove: '{}' is not a file (use --id/--pos for ids)", u);
                 hardFail = true;
             } else if (caudio::app::hasGlobChars(u)) {
                 caudio::println(std::cerr, "No files matched: {}", u);
@@ -452,8 +452,9 @@ int App::queueRepeat(const std::string& mode, bool asJson) {
     RM finalMode = *m;
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
         finalMode = st->repeat;
-    caudio::println("Repeat: {}",
-                    finalMode == RM::All ? "all" : finalMode == RM::One ? "one" : "off");
+    caudio::println("Repeat: {}", finalMode == RM::All   ? "all"
+                                  : finalMode == RM::One ? "one"
+                                                         : "off");
     return 0;
 }
 
