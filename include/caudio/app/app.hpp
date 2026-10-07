@@ -324,7 +324,6 @@ class App {
 
     /** @brief Deletes a playlist. @ingroup caudio_app */
     int playlistDelete(std::int64_t pid, bool asJson);
-
     /** @brief Renames a playlist. @ingroup caudio_app */
     int playlistRename(std::int64_t pid, const std::string& name, bool asJson);
 
@@ -340,6 +339,48 @@ class App {
      * @param name Playlist name, or nullopt to derive from the file.
      */
     int playlistImport(const std::string& path, std::optional<std::string> name, bool asJson);
+
+    /**
+     * @brief Scans a path into the library.
+     * @ingroup caudio_app
+     * @param path Scan root, or nullopt for the configured library path.
+     * @param fullHash Fingerprint full content instead of sampling.
+     */
+    int libraryScan(std::optional<std::string> path, bool fullHash, bool asJson);
+
+    /**
+     * @brief Searches the library (filenames included).
+     * @ingroup caudio_app
+     */
+    int librarySearch(const std::string& query, int limit, bool asJson);
+
+    /**
+     * @brief Shows library stats, optionally with queue/playlist breakdowns.
+     * @ingroup caudio_app
+     * @param mostPlayed Top-N threshold (>= 0 enables detailed mode).
+     * @param queues Queue selectors ("all" or numeric ids).
+     */
+    int libraryStats(int mostPlayed, const std::vector<std::string>& queues,
+                     const std::vector<std::int64_t>& playlists, bool asJson);
+
+    /**
+     * @brief Lists library tracks with optional filters.
+     * @ingroup caudio_app
+     * @details Empty strings mean no filter; translated to nullopts here so
+     * frontends pass plain values.
+     */
+    int libraryList(const std::string& query, int limit, int offset, const std::string& artist,
+                    const std::string& album, const std::string& genre, bool asJson);
+
+    /** @brief Adds a file or directory to the library. @ingroup caudio_app */
+    int libraryAdd(const std::string& path, bool recursive, bool asJson);
+
+    /**
+     * @brief Removes a track from the library (id or path).
+     * @ingroup caudio_app
+     * @details Resolves a human label first so the confirmation names it.
+     */
+    int libraryRemove(const std::string& query, bool asJson);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
