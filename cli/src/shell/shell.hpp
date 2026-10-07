@@ -47,8 +47,6 @@ class Shell {
     int run(int argc, char** argv);
 
   private:
-    int handlePreview(const std::string& file);
-
     caudio::config::Config config_;
     caudio::app::App app_;
     std::unique_ptr<CLI::App> cli_;

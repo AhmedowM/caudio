@@ -440,6 +440,13 @@ class App {
      */
     int configReset(std::optional<std::string> key, bool asJson);
 
+    /**
+     * @brief Plays a file ephemerally without touching the daemon/queue.
+     * @ingroup caudio_app
+     * @details Blocks until playback finishes. Used for quick audition.
+     */
+    int previewFile(const std::string& file);
+
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
     std::string argv0_;             ///< Executable path for POSIX re-spawn.

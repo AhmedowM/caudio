@@ -202,39 +202,6 @@ Shell::Shell(caudio::config::Config cfg)
 
 Shell::~Shell() = default;
 
-int Shell::handlePreview(const std::string& file) {
-    std::filesystem::path p{file};
-    std::error_code ec;
-    if (!std::filesystem::exists(p, ec)) {
-        caudio::println(std::cerr, "preview: file not found {}", file);
-        return 1;
-    }
-    auto playerRes = caudio::player::Player::create();
-    if (!playerRes) {
-        caudio::println(std::cerr, "preview: player create failed ({}): {}",
-                        caudio::utils::toString(playerRes.error().code), playerRes.error().message);
-        return 1;
-    }
-    auto& player = *playerRes.value();
-    auto openRes = player.open(file);
-    if (!openRes) {
-        caudio::println(std::cerr, "preview: open failed ({}): {}",
-                        caudio::utils::toString(openRes.error().code), openRes.error().message);
-        return 1;
-    }
-    auto playRes = player.play();
-    if (!playRes) {
-        caudio::println(std::cerr, "preview: play failed ({}): {}",
-                        caudio::utils::toString(playRes.error().code), playRes.error().message);
-        return 1;
-    }
-    caudio::println("preview playing {}", file);
-    while (player.state() == caudio::player::State::Playing) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    caudio::println("preview done");
-    return 0;
-}
 int Shell::run(int argc, char** argv) {
     if (argc > 0 && argv && argv[0])
         app_.setArgv0(argv[0]);
@@ -722,6 +689,9 @@ int Shell::run(int argc, char** argv) {
         return app_.seek(target, isRelative, seekJson);
     }
     if (statusCmd->parsed()) {
+        // NOTE: the watch loop stays in the shell on purpose: carriage-return
+        // timestamps and ANSI output are terminal rendering, not reusable
+        // behavior. Phase 1 will replace it with a status-stream API.
         if (statusWatch) {
             if (statusInterval <= 0) {
                 caudio::println(std::cerr, "status: --interval must be positive (got {})",
@@ -884,7 +854,7 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (previewCmd->parsed())
-        return handlePreview(previewFile);
+        return app_.previewFile(previewFile);
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed())
             return app_.configGet(cfgGetKey, cfgGetJson);
