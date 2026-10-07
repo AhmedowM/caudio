@@ -24,7 +24,7 @@ namespace caudio::version {
  * @return String view of caudio::versionFull.
  */
 inline std::string_view version() noexcept {
-    return caudio::versionFull;
+    return caudio::detail::versionFull;
 }
 
 /**
@@ -33,7 +33,7 @@ inline std::string_view version() noexcept {
  * @return Copy of caudio::versionFull.
  */
 inline std::string versionString() {
-    return std::string(caudio::versionFull);
+    return std::string(caudio::detail::versionFull);
 }
 
 /**
@@ -42,7 +42,7 @@ inline std::string versionString() {
  * @return String view of caudio::shortVersion.
  */
 inline std::string_view shortVersion() noexcept {
-    return caudio::shortVersion;
+    return caudio::detail::shortVersion;
 }
 
 /**
@@ -51,7 +51,7 @@ inline std::string_view shortVersion() noexcept {
  * @return String view of caudio::versionCommit.
  */
 inline std::string_view versionCommit() noexcept {
-    return caudio::versionCommit;
+    return caudio::detail::versionCommit;
 }
 
 /**
@@ -60,7 +60,7 @@ inline std::string_view versionCommit() noexcept {
  * @return versionMajor.
  */
 constexpr int versionMajor() noexcept {
-    return caudio::versionMajor;
+    return caudio::detail::versionMajor;
 }
 
 /**
@@ -68,7 +68,7 @@ constexpr int versionMajor() noexcept {
  * @ingroup caudio_version
  */
 constexpr int versionMinor() noexcept {
-    return caudio::versionMinor;
+    return caudio::detail::versionMinor;
 }
 
 /**
@@ -76,7 +76,7 @@ constexpr int versionMinor() noexcept {
  * @ingroup caudio_version
  */
 constexpr int versionPatch() noexcept {
-    return caudio::versionPatch;
+    return caudio::detail::versionPatch;
 }
 
 } // namespace caudio::version

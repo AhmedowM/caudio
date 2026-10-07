@@ -129,7 +129,7 @@ namespace caudio::service::detail {
 std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
                                                                      caudio::db::Database& db) {
     caudio::ipc::Status s{};
-    s.version = std::string(caudio::versionFull);
+    s.version = std::string(caudio::version::version());
     s.state = eng.state();
     s.pos = eng.position();
     s.dur = eng.duration();

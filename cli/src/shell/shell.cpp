@@ -198,7 +198,7 @@ using detail::parseVolume;
 Shell::Shell(caudio::config::Config cfg)
     : config_(cfg), app_(std::move(cfg)),
       cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
-    cli_->set_version_flag("--version", std::string(caudio::versionFull));
+    cli_->set_version_flag("--version", std::string(caudio::version::version()));
 }
 
 Shell::~Shell() = default;

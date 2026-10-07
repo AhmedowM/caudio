@@ -13,11 +13,11 @@ using ::caudio::version::versionPatch;
 using ::caudio::version::versionString;
 } // namespace caudio::version
 
-export namespace caudio {
-using ::caudio::shortVersion;
-using ::caudio::versionCommit;
-using ::caudio::versionFull;
-using ::caudio::versionMajor;
-using ::caudio::versionMinor;
-using ::caudio::versionPatch;
-} // namespace caudio
+export namespace caudio::detail {
+using ::caudio::detail::shortVersion;
+using ::caudio::detail::versionCommit;
+using ::caudio::detail::versionFull;
+using ::caudio::detail::versionMajor;
+using ::caudio::detail::versionMinor;
+using ::caudio::detail::versionPatch;
+} // namespace caudio::detail

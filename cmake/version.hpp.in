@@ -16,7 +16,7 @@
  * @brief Library version constants.
  * @ingroup caudio
  */
-namespace caudio {
+namespace caudio::detail {
 /**
  * @brief Short version (PROJECT_VERSION).
  * @ingroup caudio
@@ -35,4 +35,4 @@ inline constexpr std::string_view versionCommit = "@CAUDIO_GIT_HASH@";
 inline constexpr int versionMajor = @PROJECT_VERSION_MAJOR@;
 inline constexpr int versionMinor = @PROJECT_VERSION_MINOR@;
 inline constexpr int versionPatch = @PROJECT_VERSION_PATCH@;
-} // namespace caudio
+} // namespace caudio::detail

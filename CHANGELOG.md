@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   partition drops its legacy `player_core` name
 - Move version helpers from `caudio::utils` to their own `caudio::version`
   namespace (standalone `version.hpp`, like `config.hpp`)
+- Hide generated version constants in `caudio::detail`; public API uses
+  `caudio::version::version()` etc.; shell and service status updated
 
 ## [v1.0.0-rc3] - 2026-10-04
 
