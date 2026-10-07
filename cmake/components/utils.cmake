@@ -1,6 +1,6 @@
 # utils.cmake -- caudio::utils (no dependencies; everything links this).
 set(CAUDIO_UTILS_MODULE_SOURCES
-  modules/utils/utils.cppm
+  modules/utils.cppm
   modules/utils/result.cppm
   modules/utils/error.cppm
   modules/utils/log.cppm

@@ -2,9 +2,9 @@
 # NOTE: statement/transaction/queue/schema/detail/fingerprint/fts/stmt_helpers
 # live in src/db/ (NOT installed) and have no module partitions.
 set(CAUDIO_DB_MODULE_SOURCES
-  modules/db/database.cppm
-  modules/db/db_types.cppm
-  modules/db/db_core.cppm
+  modules/database.cppm
+  modules/db/types.cppm
+  modules/db/core.cppm
   modules/db/scan.cppm
   modules/db/search.cppm
   modules/db/json.cppm

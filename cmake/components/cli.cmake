@@ -2,7 +2,7 @@
 # The CLI shell itself (cli/src/shell/*) compiles into the caudio executable only; no cli library.
 
 set(CAUDIO_IPC_MODULE_SOURCES
-  modules/ipc/ipc.cppm
+  modules/ipc.cppm
   modules/ipc/command.cppm
   modules/ipc/result.cppm
   modules/ipc/protocol.cppm
@@ -21,8 +21,8 @@ endif()
 target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
-  modules/service/service.cppm
-  modules/service/service_core.cppm
+  modules/service.cppm
+  modules/service/core.cppm
   modules/service/shm_status.cppm
   modules/service/ipc_channel.cppm
   modules/service/ipc_server.cppm
@@ -62,7 +62,7 @@ if(CAUDIO_BUILD_SHARED)
 endif()
 
 set(CAUDIO_CLIENT_MODULE_SOURCES
-  modules/client/client.cppm
+  modules/client.cppm
   modules/client/ipc_client.cppm
   modules/client/core.cppm
   modules/client/output_formatter.cppm

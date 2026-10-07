@@ -16,6 +16,6 @@ export module caudio.player;
 export import :reader;
 export import :decoder;
 export import :output;
-export import :player_core;
+export import :core;
 
 import caudio.utils;
