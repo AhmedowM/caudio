@@ -1,6 +1,10 @@
 #pragma once
 
 #include <caudio/config.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
+#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -98,6 +102,65 @@ class App {
      * @return Canonical pid path, or a db-adjacent fallback.
      */
     std::filesystem::path pidPathForConfig() const;
+
+    /**
+     * @brief Sends a command and normalizes server-side errors.
+     * @ingroup caudio_app
+     * @param cmd IPC command to send.
+     * @param timeout Per-attempt timeout (default 2 s).
+     * @return Server result, or the transport/server error.
+     * @details Unwraps `Error` results into unexpected, so callers handle
+     * transport and application errors uniformly.
+     */
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    sendRaw(const caudio::ipc::Command& cmd,
+            std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
+
+    /**
+     * @brief Prints an error plus the start hint when relevant.
+     * @ingroup caudio_app
+     * @return Always 1 (CLI exit convention, kept for renderer parity).
+     */
+    int printErr(const caudio::utils::Error& e);
+
+    /**
+     * @brief Prints a result as JSON.
+     * @ingroup caudio_app
+     * @return Always 0.
+     */
+    int printJson(const caudio::ipc::Result& r);
+
+    /**
+     * @brief Sends a command and renders the result (text or JSON).
+     * @ingroup caudio_app
+     */
+    int sendViaClient(const caudio::ipc::Command& cmd, bool asJson);
+
+    /**
+     * @brief Sends a play-like command, autostarting a down daemon.
+     * @ingroup caudio_app
+     * @param cmd IPC command to send.
+     * @param quietAutostart Suppress autostart chatter (JSON callers).
+     */
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    sendPlay(const caudio::ipc::Command& cmd, bool quietAutostart);
+
+    /**
+     * @brief Renders a result as a one-line confirmation (or JSON).
+     * @ingroup caudio_app
+     * @param line Text line for the success path.
+     */
+    int confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res, bool asJson,
+                const std::string& line);
+
+    /**
+     * @brief Renders a transport result as a one-line confirmation.
+     * @ingroup caudio_app
+     * @details Same shape as confirm(); kept separate so transport wording
+     * can evolve without touching generic call sites.
+     */
+    int confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
+                         bool asJson, const std::string& line);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
