@@ -558,6 +558,21 @@ int App::handleStart(bool foreground, bool quiet) {
             caudio::println("daemon already running at {}", config_.socketPath);
         return 0;
     }
+    // Death-watch: a previous daemon may be mid-teardown (pipe already dead
+    // but pid file present / lock still held while threads join). Spawning
+    // into that window dies on the lock, so wait until both the pipe is
+    // unreachable AND the pid file is gone (2 s max) before spawning.
+    {
+        auto pidPath = pidPathForConfig();
+        for (int i = 0; i < 20; ++i) {
+            auto c = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
+            std::error_code ec;
+            bool pidExists = std::filesystem::exists(pidPath, ec);
+            if (!c && !pidExists)
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
     // Ensure db parent dirs exist before trying to start service (foreground)
     {
         std::error_code ec2;
@@ -600,18 +615,31 @@ int App::handleStart(bool foreground, bool quiet) {
             caudio::println(std::cerr, "start failed: couldn't start daemon ({}: {})", err, what);
             return 1;
         }
-        // Poll for pipe readiness: 1500ms total, 100ms interval x--15
-        for (int i = 0; i < 15; ++i) {
-            auto conn2 = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-            if (conn2) {
-                if (!quiet)
-                    caudio::println("daemon started at {}", config_.socketPath);
-                return 0;
+        // Readiness = full StatusReq round-trip (proves the accept loop and the
+        // dispatcher are alive, not just that a pipe object exists -- a bare
+        // connect can succeed against a dying daemon's draining instance).
+        // Budget 5 s: a fresh spawn on a slow/Debug box can exceed the old
+        // 1.5 s connect-only budget.
+        std::string lastDetail;
+        for (int i = 0; i < 50; ++i) {
+            caudio::client::Client probe{config_.dbPath, config_.socketPath};
+            if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
+                                     std::chrono::milliseconds{500})) {
+                if (std::get_if<caudio::ipc::Status>(&*ps)) {
+                    if (!quiet)
+                        caudio::println("daemon started at {}", config_.socketPath);
+                    return 0;
+                }
+                lastDetail = "unexpected reply";
+            } else {
+                lastDetail = ps.error().message;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         caudio::println(std::cerr, "daemon start failed: socket not reachable at {}",
                         config_.socketPath);
+        if (!lastDetail.empty())
+            caudio::println(std::cerr, "last error: {}", lastDetail);
         return 1;
     }
 }
@@ -1131,8 +1159,16 @@ int App::run(int argc, char** argv) {
         if (!res) {
             const auto& e = res.error();
             if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running") {
-                if (handleStart(false, quietAutostart) != 0)
-                    return std::unexpected{e};
+                if (handleStart(false, quietAutostart) != 0) {
+                    // The autostart may have raced a dying daemon (lock held
+                    // at spawn). One more attempt after a short settle delay;
+                    // surface the freshest error, not the original "down".
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    auto retry = sendRaw(cmd);
+                    if (retry)
+                        return retry;
+                    return std::unexpected{retry.error()};
+                }
                 return sendRaw(cmd);
             }
         }

@@ -512,6 +512,49 @@
         "lhs": "${hostSystemName}",
         "rhs": "Darwin"
       }
+    },
+    {
+      "name": "minsize-lto-gcc",
+      "inherits": [
+        "toolchain-gcc",
+        "minsize-lto"
+      ],
+      "displayName": "Smallest binary with GCC: MinSizeRel + LTO + section GC",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "minsize-lto-clang",
+      "inherits": [
+        "toolchain-clang",
+        "minsize-lto"
+      ],
+      "displayName": "Smallest binary with Clang: MinSizeRel + LTO + section GC"
+    },
+    {
+      "name": "minsize-lto-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "minsize-base"
+      ],
+      "displayName": "Smallest binary with MSVC: MinSizeRel + LTO (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_CXX_FLAGS": "/Gy"
+      }
     }
   ],
   "buildPresets": [
@@ -699,6 +742,22 @@
     {
       "name": "minsize-gcc",
       "configurePreset": "minsize-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-lto-gcc",
+      "configurePreset": "minsize-lto-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-lto-clang",
+      "configurePreset": "minsize-lto-clang",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-lto-msvc",
+      "configurePreset": "minsize-lto-msvc",
+      "configuration": "MinSizeRel",
       "jobs": 4
     }
   ],

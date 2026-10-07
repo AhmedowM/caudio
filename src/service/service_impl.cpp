@@ -114,6 +114,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     if (!dbRes) {
         auto err = dbRes.error();
         std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
+        detail::releaseLock(lockFd);
         return std::unexpected{caudio::utils::makeError(err.code, msg)};
     }
     std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
@@ -121,8 +122,10 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // create Engine
     caudio::engine::EngineConfig ecfg{};
     auto engRes = caudio::engine::Engine::create(ecfg);
-    if (!engRes)
+    if (!engRes) {
+        detail::releaseLock(lockFd);
         return std::unexpected{engRes.error()};
+    }
     std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
     if (auto e = eng->attachDatabase(dbShared); !e) {
         detail::releaseLock(lockFd);
@@ -203,6 +206,11 @@ caudio::utils::Expected<void> Service::run(std::stop_token st) {
     while (!st.stop_requested() && !shutdownRequested_.load(std::memory_order_acquire)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+    // Tear down here (not only in the destructor): pid/lock/socket release
+    // must be sequenced before run() returns so a racing starter observes a
+    // truthful state. shutdown() is idempotent; the destructor re-entry is
+    // harmless.
+    this->shutdown();
     return {};
 }
 

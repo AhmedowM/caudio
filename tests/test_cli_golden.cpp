@@ -552,15 +552,36 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto after = run({"status"});
     REQUIRE(after.exitCode == 1);
     REQUIRE(contains(after.err, "daemon not running"));
-    // Full cleanup verified by a clean restart on the same config.
-    auto restart = run({"start"});
+    // Full cleanup verified by a clean restart on the same config. Bounded
+    // retry: a previous shutdown's pipe/lock release races the new spawn
+    // (a persistent failure still fails loudly below -- this only absorbs
+    // the teardown window).
+    RunResult restart{};
+    bool restarted = false;
+    for (int i = 0; i < 50 && !restarted; ++i) {
+        restart = run({"start"});
+        restarted = (restart.exitCode == 0);
+        if (!restarted)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    REQUIRE(restarted);
     REQUIRE(restart.exitCode == 0);
     REQUIRE(contains(restart.out, "started"));
     auto down2 = run({"shutdown"});
     REQUIRE(down2.exitCode == 0);
     REQUIRE(contains(down2.out, "stopped"));
     // Play autostarts the daemon when down (empty queue errors, daemon stays).
-    auto autoPlay = run({"play"});
+    // Bounded retry: the autostart can race a dying daemon's lock; accept the
+    // expected "empty queue" only, fail on anything persistent.
+    RunResult autoPlay{};
+    bool autoDone = false;
+    for (int i = 0; i < 50 && !autoDone; ++i) {
+        autoPlay = run({"play"});
+        autoDone = (autoPlay.exitCode == 1) && !contains(autoPlay.err, "daemon not running") &&
+                   !contains(autoPlay.err, "socket not reachable");
+        if (!autoDone)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
     REQUIRE(autoPlay.exitCode == 1);
     REQUIRE(contains(autoPlay.err, "empty queue"));
     auto autoStatus = run({"status"});

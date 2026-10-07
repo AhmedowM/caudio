@@ -43,8 +43,22 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
                              nullptr);
     if (h == INVALID_HANDLE_VALUE) {
         DWORD err = ::GetLastError();
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::Io, "CreateFileW connect failed: " + std::to_string(err))};
+        if (err == ERROR_PIPE_BUSY) {
+            // A busy pipe means a live listener whose instances are all
+            // momentarily taken (burst load or mid-teardown drain) -- NOT a
+            // dead daemon. Wait briefly and try once more instead of
+            // misreporting "daemon not running".
+            if (::WaitNamedPipeW(w.c_str(), 500)) {
+                h = ::CreateFileW(w.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                                  OPEN_EXISTING, 0, nullptr);
+                err = (h == INVALID_HANDLE_VALUE) ? ::GetLastError() : ERROR_SUCCESS;
+            }
+        }
+        if (h == INVALID_HANDLE_VALUE) {
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::Io,
+                "CreateFileW connect failed: " + std::to_string(err))};
+        }
     }
     DWORD mode = PIPE_READMODE_BYTE;
     ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
