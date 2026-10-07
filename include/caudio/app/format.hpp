@@ -1,5 +1,6 @@
 #pragma once
 
+#include <caudio/db/db_types.hpp>
 #include <caudio/ipc/result.hpp>
 #include <string>
 
@@ -27,5 +28,13 @@ std::string fmtClock(double secs);
  * @return "artist - title", either half, the filename, or "unknown track".
  */
 std::string trackWho(const caudio::ipc::Status& st);
+
+/**
+ * @brief Human label for added tracks: "artist - title: file.ext".
+ * @ingroup caudio_app
+ * @details Artist/title parts omitted when empty, bare filename when both
+ * are, "track <id>" when nothing else exists.
+ */
+std::string addedLabel(const caudio::db::Track& t);
 
 } // namespace caudio::app

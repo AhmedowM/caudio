@@ -5,6 +5,7 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -213,6 +214,70 @@ class App {
      * relative flag arrives pre-detected.
      */
     int seek(double target, bool isRelative, bool asJson);
+
+    /**
+     * @brief Lists queues (id, name, track counts, active/temp markers).
+     * @ingroup caudio_app
+     */
+    int queues(bool asJson);
+
+    /**
+     * @brief Lists tracks in the active queue (added or playback order).
+     * @ingroup caudio_app
+     * @param order "added" for insertion order, anything else for playback.
+     */
+    int queueTracks(const std::string& order, bool asJson);
+
+    /** @brief Switches the active queue. @ingroup caudio_app */
+    int queueSwitch(std::int64_t qid, bool asJson);
+
+    /** @brief Creates a queue container. @ingroup caudio_app */
+    int queueCreate(const std::string& name, bool asJson);
+
+    /** @brief Deletes a queue container (active queue guarded). @ingroup caudio_app */
+    int queueDelete(std::int64_t qid, bool asJson);
+
+    /**
+     * @brief Adds to the queue via playlist, id/search, or paths.
+     * @ingroup caudio_app
+     * @param paths PATH/glob/folder selectors (PATH mode only).
+     * @param id Library id (id mode) or search query (search mode).
+     * @param search Treat id as an FTS query instead of a numeric id.
+     * @param playlist Source playlist id (playlist mode, 0 = off).
+     * @param replace Overwrite the active queue first (playlist mode only).
+     * @param recursive Descend into folders (PATH mode only).
+     * @details Mode validation travels with the handler, verbatim from the
+     * shell; glob expansion uses the shared paths utilities.
+     */
+    int queueAdd(const std::vector<std::string>& paths, const std::string& id, bool search,
+                 std::int64_t playlist, bool replace, bool recursive, bool asJson);
+
+    /**
+     * @brief Removes from the queue by id, position, or paths.
+     * @ingroup caudio_app
+     * @details Selectors are exclusive; PATH mode matches
+     * separator-insensitively against an insertion-order snapshot.
+     */
+    int queueRemove(const std::string& id, const std::string& pos,
+                    const std::vector<std::string>& paths, bool recursive, bool asJson);
+
+    /** @brief Moves a track within the queue. @ingroup caudio_app */
+    int queueMove(std::size_t from, std::size_t to, bool asJson);
+
+    /** @brief Clears the active queue. @ingroup caudio_app */
+    int queueClear(bool asJson);
+
+    /**
+     * @brief Sets shuffle (on/off/empty toggles to resulting state).
+     * @ingroup caudio_app
+     */
+    int queueShuffle(const std::string& mode, bool asJson);
+
+    /**
+     * @brief Sets repeat (off/one/all; empty cycles off->all->one->off).
+     * @ingroup caudio_app
+     */
+    int queueRepeat(const std::string& mode, bool asJson);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).

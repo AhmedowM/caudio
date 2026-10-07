@@ -6,6 +6,7 @@
  */
 
 #include <caudio/app/format.hpp>
+#include <caudio/db/db_types.hpp>
 #include <caudio/ipc/result.hpp>
 #include <filesystem>
 #include <format>
@@ -35,6 +36,22 @@ std::string trackWho(const caudio::ipc::Status& st) {
             return fn;
     }
     return "unknown track";
+}
+
+std::string addedLabel(const caudio::db::Track& t) {
+    std::string fn = std::filesystem::path(t.path).filename().generic_string();
+    std::string who;
+    if (!t.artist.empty() && !t.title.empty())
+        who = t.artist + " - " + t.title;
+    else
+        who = t.artist + t.title;
+    if (!who.empty() && !fn.empty())
+        return who + ": " + fn;
+    if (!fn.empty())
+        return fn;
+    if (!who.empty())
+        return who;
+    return "track " + std::to_string(t.id);
 }
 
 } // namespace caudio::app

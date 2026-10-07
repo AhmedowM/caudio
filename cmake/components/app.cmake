@@ -6,8 +6,11 @@ set(CAUDIO_APP_SOURCES
   src/app/transport.cpp
   src/app/playback.cpp
   src/app/format.cpp
+  src/app/paths.cpp
+  src/app/detail.cpp
+  src/app/queue.cpp
 )
-caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::utils Threads::Threads)
+caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::db caudio::utils Threads::Threads)
 ca_set_warnings(app)
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(app EXTRA_DEPS caudio::client_shared caudio::service_shared caudio::ipc Threads::Threads)
