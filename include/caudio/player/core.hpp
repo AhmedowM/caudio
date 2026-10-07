@@ -1,5 +1,5 @@
 /**
- * @file player_core.hpp
+ * @file core.hpp
  * @brief Core audio player implementation with gapless playback support
  * @ingroup caudio_player
  *

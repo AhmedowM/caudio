@@ -8,7 +8,7 @@
 #include <vector>
 
 /**
- * @file engine_types.hpp
+ * @file types.hpp
  * @brief Core value types for the caudio playback engine.
  * @ingroup caudio_engine
  *

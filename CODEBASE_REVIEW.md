@@ -288,7 +288,7 @@ after 1.0 if SDK size matters.
 - **No commented-out code blocks** of significance in sampled CMake/sources.
 - **`.clang-format` / `.clang-tidy` / `.editorconfig`** exist and are referenced; `CAUDIO_ENABLE_CLANG_TIDY` wires correctly when the binary exists.
 - **Windows declarations:** `service_paths.cpp`, `core.cpp`, `ipc_client.cpp` include real `<windows.h>` first with `clang-format off` guards; hand-rolled declarations removed.
-- **Engine header slimmed twice:** 21 → 12 includes, then the `Engine` class split into `engine/engine_core.hpp` (fwd-decls + decls) leaving a 10-line `engine.hpp` umbrella; impl needs moved to `src/engine/*.cpp`.
+- **Engine header slimmed twice:** 21 → 12 includes, then the `Engine` class split into `engine/core.hpp` (fwd-decls + decls) leaving a 10-line `engine.hpp` umbrella; impl needs moved to `src/engine/*.cpp`.
 - **Decoder collapsed:** single public `Decoder` + private `ffmpeg_impl.hpp`; deleted `IDecoder`, `DecoderRegistry`, `decoder_common.hpp`, `ffmpeg.cppm`, `decoder_interface.cppm`.
 - **Service split:** `service_impl.cpp` (1521 → ~300 lines) → 4 `dispatch_*.cpp` + `service_paths`/`service_status`/`service_audio`; 5 forwarding wrappers deleted.
 - **Utils consolidated:** `clampVolume` + `toHex`/`fromHex` in `utils::`; removed from `db`/`player`.
@@ -297,7 +297,7 @@ after 1.0 if SDK size matters.
 - **Shared variants gated:** `*_shared` + `combined` behind `CAUDIO_BUILD_SHARED=OFF` (default); static + header-only is canonical. Verified OFF (144/144 tests) and ON configure + MinGW-GCC build 66/66 (2026-10-02). MSVC/macOS shared-link status unverified — full audit + cross-platform fix design in §5, which supersedes this note.
 - **Version story hardened:** tag-less configure emits a loud `WARNING` (fallback is NOT a release build); `CAUDIO_REQUIRE_GIT_VERSION=ON` fails fast with a clear message. Stale `e.g. "v0.25.4"` doc strings removed from `version.hpp` / `version.hpp.in` / `ipc/result.hpp` — surrounding words already convey the format, so nothing rots on release.
 - **FetchContent lazy:** `find_package(CLI11/Catch2)` first, fetch only as fallback (nlohmann_json is vendored in `vendor/nlohmann/`, no fetch at all — see `vendor/README.md`); CLI11 + the `caudio` executable skipped entirely with `CAUDIO_BUILD_CLI=OFF` (verified configure + build). nlohmann reaches components as plain PRIVATE `-I` (`CAUDIO_NLOHMANN_PRIVATE_INCLUDE` = `vendor/`); `CAUDIO_CLI11_EXTRA_INCLUDE` covers the exe (empty when system package provides the target).
-- **AI comments:** stale `import`-wording narration in `tests/common.hpp` deleted; per-method `@par Thread safety` blocks verified as concise one-line locking contracts (kept); canonical locking section lives in `engine/engine_core.hpp` file docs (moved out of the `engine.hpp` umbrella 2026-09-28).
+- **AI comments:** stale `import`-wording narration in `tests/common.hpp` deleted; per-method `@par Thread safety` blocks verified as concise one-line locking contracts (kept); canonical locking section lives in `engine/core.hpp` file docs (moved out of the `engine.hpp` umbrella 2026-09-28).
 
 ## Deferred post-1.0 (CLI behavior audit, 2026-10-03)
 

@@ -14,7 +14,7 @@
 #include <vector>
 
 /**
- * @file app.hpp
+ * @file core.hpp
  * @brief Application orchestrator shared by all frontends.
  * @ingroup caudio_app
  * @details `App` owns the behavior moved out of the CLI shell: daemon

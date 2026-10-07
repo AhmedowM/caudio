@@ -18,7 +18,7 @@
 #include <vector>
 
 /**
- * @file engine_core.hpp
+ * @file core.hpp
  * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
  * @ingroup caudio_engine
  * @details Core `Engine` class (`caudio.engine` re-exports it via `engine.hpp`).
@@ -59,7 +59,7 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
-// Full type in db_core.hpp; Engine holds it by shared_ptr only.
+// Full type in db/core.hpp; Engine holds it by shared_ptr only.
 class Database;
 } // namespace caudio::db
 

@@ -10,7 +10,7 @@
  * @brief App-internal reporting helpers (NOT public API).
  * @details Queue-add style "Added" reporting and terminal color detection,
  * shared between app command handlers. Frontends must use the public
- * `caudio/app/*` headers instead. Shell sources may include this during the
+ * `caudio/app/` headers instead. Shell sources may include this during the
  * Phase-0 extraction only, until their groups move over.
  */
 namespace caudio::app::detail {

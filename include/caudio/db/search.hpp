@@ -12,7 +12,7 @@ struct sqlite3;
 struct sqlite3_stmt;
 
 namespace caudio::db {
-// Defined in db_core.hpp (full Database API); reference params need only this.
+// Defined in db/core.hpp (full Database API); reference params need only this.
 class Database;
 
 /**

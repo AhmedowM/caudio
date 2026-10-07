@@ -7,7 +7,7 @@
 #include <vector>
 
 /**
- * @file db_types.hpp
+ * @file types.hpp
  * @brief Core value types for the caudio database layer.
  * @ingroup caudio_db
  * @details Defines plain-data structs used across all db partitions:

@@ -1,5 +1,5 @@
 /**
- * @file service_core.hpp
+ * @file core.hpp
  * @brief Service: owns Engine, Database, Logger, IPC server, and dispatches
  * commands (daemon runtime used by the CLI service host).
  * @ingroup caudio_service

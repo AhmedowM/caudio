@@ -7,7 +7,7 @@
 #include <string_view>
 
 namespace caudio::db {
-// Defined in db_core.hpp (full Database API); reference params need only this.
+// Defined in db/core.hpp (full Database API); reference params need only this.
 class Database;
 } // namespace caudio::db
 #include <cctype>
