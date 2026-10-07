@@ -1,5 +1,5 @@
 # cli.cmake -- caudio::ipc (IPC command/result/protocol + config) + caudio::service + caudio::client
-# The CLI app itself (cli/src/app/*) compiles into the caudio executable only; no cli library.
+# The CLI shell itself (cli/src/shell/*) compiles into the caudio executable only; no cli library.
 
 set(CAUDIO_IPC_MODULE_SOURCES
   modules/ipc/ipc.cppm

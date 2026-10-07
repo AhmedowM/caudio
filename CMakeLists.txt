@@ -270,8 +270,8 @@ add_executable(caudio_cli
   cli/src/main.cpp
 )
 set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
-target_sources(caudio_cli PRIVATE cli/src/app/core.cpp)
-target_include_directories(caudio_cli PRIVATE cli/src/app vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
+target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp)
+target_include_directories(caudio_cli PRIVATE cli/src/shell vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)

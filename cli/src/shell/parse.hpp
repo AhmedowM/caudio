@@ -9,7 +9,7 @@
 #include <string_view>
 #include <system_error>
 
-namespace caudio::app::parse {
+namespace caudio::app::cli::parse {
 
 // Use std::string for error message to keep header standalone (no caudio::utils dependency).
 // App module wraps errors into caudio::utils::Error.
@@ -181,4 +181,4 @@ inline std::chrono::duration<double> durationFromSeconds(double s) {
     return std::chrono::duration<double>{s};
 }
 
-} // namespace caudio::app::parse
+} // namespace caudio::app::cli::parse

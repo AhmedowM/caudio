@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-#include "core.hpp"
+#include "shell.hpp"
 
 #if defined(_WIN32) && defined(_DEBUG)
 #include <crtdbg.h>
@@ -71,6 +71,6 @@ int main(int argc, char** argv) {
         cfg.logLevel = 2;
     }
 
-    caudio::app::App app{std::move(cfg)};
-    return app.run(argc, argv);
+    caudio::app::cli::Shell shell{std::move(cfg)};
+    return shell.run(argc, argv);
 }

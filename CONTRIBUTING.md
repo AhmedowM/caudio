@@ -146,7 +146,7 @@ caudio/
     service/dispatch_*.cpp  # Service::handle() per command group
     service/service_paths.* service/service_status.* service/service_audio.*
                          # (*.cppm mirrors sit beside sources; CAUDIO_ENABLE_MODULES=ON)
-  cli/src/app/           # Executable only: main, App dispatch, parse helpers
+  cli/src/shell/         # Executable only: main, Shell dispatch, parse helpers
   cmake/components/      # Per-component build files (utils/player/db/engine/cli/combined)
   tests/                 # Catch2 tests (tests/common.hpp helpers)
   examples/              # mini_cpp, player_db_demo, engine_demo

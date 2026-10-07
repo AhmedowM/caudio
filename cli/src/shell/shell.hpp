@@ -18,7 +18,7 @@ namespace CLI {
 class App;
 }
 
-namespace caudio::app {
+namespace caudio::app::cli {
 
 namespace detail {
 
@@ -45,10 +45,10 @@ using detail::parseSeek;
 using detail::parseTime;
 using detail::parseVolume;
 
-class App {
+class Shell {
   public:
-    explicit App(caudio::config::Config cfg);
-    ~App();
+    explicit Shell(caudio::config::Config cfg);
+    ~Shell();
     int run(int argc, char** argv);
 
   private:
@@ -63,4 +63,4 @@ class App {
     std::string argv0_;
 };
 
-} // namespace caudio::app
+} // namespace caudio::app::cli

@@ -44,7 +44,7 @@
 #include <stop_token>
 #include <system_error>
 
-#include "core.hpp"
+#include "shell.hpp"
 #include "parse.hpp"
 
 #ifdef _WIN32
@@ -133,33 +133,33 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <variant>
 #include <vector>
 
-namespace caudio::app {
+namespace caudio::app::cli {
 
 namespace detail {
-// Single source: delegate to caudio::app::parse::parseTime (parse.hpp) and adapt error type.
+// Single source: delegate to caudio::app::cli::parse::parseTime (parse.hpp) and adapt error type.
 // parse.hpp returns expected<double,string>; app layer wraps string into utils::Error.
 std::expected<double, caudio::utils::Error> parseTime(std::string_view s) {
-    auto r = caudio::app::parse::parseTime(s);
+    auto r = caudio::app::cli::parse::parseTime(s);
     if (!r)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
     return *r;
 }
-// Single source: delegate to caudio::app::parse::parseSeek and adapt error type.
+// Single source: delegate to caudio::app::cli::parse::parseSeek and adapt error type.
 std::expected<double, caudio::utils::Error> parseSeek(std::string_view s) {
-    auto r = caudio::app::parse::parseSeek(s);
+    auto r = caudio::app::cli::parse::parseSeek(s);
     if (!r)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
     return *r;
 }
-// Single source: delegate to caudio::app::parse::parseVolume and adapt error type.
+// Single source: delegate to caudio::app::cli::parse::parseVolume and adapt error type.
 std::expected<caudio::ipc::VolumeSet, caudio::utils::Error> parseVolume(std::string_view s) {
-    auto r = caudio::app::parse::parseVolume(s);
+    auto r = caudio::app::cli::parse::parseVolume(s);
     if (!r)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, r.error())};
-    caudio::app::parse::ParsedVolume pv = *r;
+    caudio::app::cli::parse::ParsedVolume pv = *r;
     caudio::ipc::VolumeSet vs{};
     vs.level = pv.level;
     vs.mute = pv.mute;
@@ -416,14 +416,14 @@ using detail::parseSeek;
 using detail::parseTime;
 using detail::parseVolume;
 
-App::App(caudio::config::Config cfg)
+Shell::Shell(caudio::config::Config cfg)
     : config_(std::move(cfg)), cli_(std::make_unique<CLI::App>("caudio - terminal player")) {
     cli_->set_version_flag("--version", std::string(caudio::versionFull));
 }
 
-App::~App() = default;
+Shell::~Shell() = default;
 
-std::filesystem::path App::pidPathForConfig() const {
+std::filesystem::path Shell::pidPathForConfig() const {
     // Canonical pid path -- single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
     auto r = caudio::config::pidPathFor(config_.dbPath);
     if (r)
@@ -435,7 +435,7 @@ std::filesystem::path App::pidPathForConfig() const {
     return pp / "caudio.pid";
 }
 
-std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config& cfg) {
+std::expected<void, std::uint32_t> Shell::spawnDaemon(const caudio::config::Config& cfg) {
 #ifdef _WIN32
     wchar_t exeBuf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
@@ -551,7 +551,7 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 #endif
 }
 
-int App::handleStart(bool foreground, bool quiet) {
+int Shell::handleStart(bool foreground, bool quiet) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
         if (!quiet)
@@ -644,7 +644,7 @@ int App::handleStart(bool foreground, bool quiet) {
     }
 }
 
-int App::handleShutdown() {
+int Shell::handleShutdown() {
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto cmd = caudio::ipc::Command{caudio::ipc::Shutdown{}};
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
@@ -680,7 +680,7 @@ int App::handleShutdown() {
     return 0;
 }
 
-int App::handlePreview(const std::string& file) {
+int Shell::handlePreview(const std::string& file) {
     std::filesystem::path p{file};
     std::error_code ec;
     if (!std::filesystem::exists(p, ec)) {
@@ -713,7 +713,7 @@ int App::handlePreview(const std::string& file) {
     caudio::println("preview done");
     return 0;
 }
-int App::run(int argc, char** argv) {
+int Shell::run(int argc, char** argv) {
     if (argc > 0 && argv && argv[0])
         argv0_ = argv[0];
     std::string configPathStr;
@@ -2565,4 +2565,4 @@ int App::run(int argc, char** argv) {
     return 0;
 }
 
-} // namespace caudio::app
+} // namespace caudio::app::cli
