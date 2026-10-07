@@ -868,93 +868,18 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (tagCmd->parsed()) {
-        if (tagEdit->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::TagEdit{tagEditId, tagEditField, tagEditValue}};
-            return app_.confirm(app_.sendRaw(cmd), tagEditJson,
-                           std::format("Updated {} for track {}", tagEditField, tagEditId));
-        }
-        if (tagGet->parsed()) {
-            static const std::array<std::string_view, 8> tagFields{
-                "title", "artist", "album", "album_artist",
-                "genre", "year", "track_number", "disc_number"};
-            if (!tagGetField.empty() &&
-                std::find(tagFields.begin(), tagFields.end(), tagGetField) ==
-                    tagFields.end()) {
-                caudio::println(std::cerr, "tag get: unknown field '{}' (expected one of "
-                                           "title|artist|album|album_artist|genre|year|"
-                                           "track_number|disc_number)",
-                                tagGetField);
-                return 1;
-            }
-            caudio::ipc::Command cmd{caudio::ipc::TagGet{tagGetId}};
-            auto res = app_.sendRaw(cmd);
-            if (!res)
-                return app_.printErr(res.error());
-            if (tagGetField.empty()) {
-                if (tagGetJson)
-                    return app_.printJson(*res);
-                caudio::client::OutputFormatter fmt{false};
-                fmt.print(*res, std::cout);
-                return 0;
-            }
-            auto* st = std::get_if<caudio::ipc::SingleTrack>(&*res);
-            if (!st) {
-                caudio::client::OutputFormatter fmt{tagGetJson};
-                fmt.print(*res, std::cout);
-                return 0;
-            }
-            const auto& t = st->track;
-            bool numeric = false;
-            std::string value;
-            if (tagGetField == "title")
-                value = t.title;
-            else if (tagGetField == "artist")
-                value = t.artist;
-            else if (tagGetField == "album")
-                value = t.album;
-            else if (tagGetField == "album_artist")
-                value = t.album_artist;
-            else if (tagGetField == "genre")
-                value = t.genre;
-            else if (tagGetField == "year") {
-                numeric = true;
-                value = std::to_string(t.year);
-            } else if (tagGetField == "track_number") {
-                numeric = true;
-                value = std::to_string(t.track_num);
-            } else if (tagGetField == "disc_number") {
-                numeric = true;
-                value = std::to_string(t.disc_num);
-            }
-            if (tagGetJson) {
-                caudio::utils::Json j = caudio::utils::Json::object();
-                if (numeric) {
-                    try {
-                        j[tagGetField] = std::stoll(value);
-                    } catch (...) {
-                        j[tagGetField] = value;
-                    }
-                } else {
-                    j[tagGetField] = value;
-                }
-                caudio::println("{}", j.dump());
-                return 0;
-            }
-            caudio::println("{}", value);
-            return 0;
-        }
+        if (tagEdit->parsed())
+            return app_.tagEdit(tagEditId, tagEditField, tagEditValue, tagEditJson);
+        if (tagGet->parsed())
+            return app_.tagGet(tagGetId, tagGetField, tagGetJson);
         std::cout << tagCmd->help() << "\n";
         return 0;
     }
     if (historyCmd->parsed()) {
-        if (historyList->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::HistoryList{historyLimit}};
-            return app_.sendViaClient(cmd, historyJson);
-        }
-        if (historyClear->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::HistoryClear{}};
-            return app_.confirm(app_.sendRaw(cmd), historyClearJson, "History cleared");
-        }
+        if (historyList->parsed())
+            return app_.historyList(historyLimit, historyJson);
+        if (historyClear->parsed())
+            return app_.historyClear(historyClearJson);
         std::cout << historyCmd->help() << "\n";
         return 0;
     }
@@ -1012,22 +937,15 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (deviceCmd->parsed()) {
-        if (devList->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::DeviceList{}};
-            return app_.sendViaClient(cmd, devJson);
-        }
-        if (devSet->parsed()) {
-            caudio::ipc::Command cmd{caudio::ipc::DeviceSet{devSetId}};
-            return app_.confirm(app_.sendRaw(cmd), devSetJson, std::format("Default device: {}", devSetId));
-        }
+        if (devList->parsed())
+            return app_.deviceList(devJson);
+        if (devSet->parsed())
+            return app_.deviceSet(devSetId, devSetJson);
         if (devTest->parsed()) {
             std::optional<std::string> id;
             if (!devTestId.empty())
                 id = devTestId;
-            caudio::ipc::Command cmd{caudio::ipc::DeviceTest{id}};
-            std::string line = id.has_value() ? std::format("Device available: {}", *id)
-                                              : "Default device available";
-            return app_.confirm(app_.sendRaw(cmd), devTestJson, line);
+            return app_.deviceTest(id, devTestJson);
         }
         std::cout << deviceCmd->help() << "\n";
         return 0;

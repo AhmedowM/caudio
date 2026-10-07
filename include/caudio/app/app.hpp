@@ -382,6 +382,39 @@ class App {
      */
     int libraryRemove(const std::string& query, bool asJson);
 
+    /**
+     * @brief Edits one track tag field (database row).
+     * @ingroup caudio_app
+     */
+    int tagEdit(std::int64_t id, const std::string& field, const std::string& value, bool asJson);
+
+    /**
+     * @brief Reads track tags, optionally selecting a single field.
+     * @ingroup caudio_app
+     * @param field Empty for the full record, otherwise one of the known
+     * fields (validated here; unknown names fail fast).
+     */
+    int tagGet(std::int64_t id, const std::string& field, bool asJson);
+
+    /** @brief Lists playback history entries. @ingroup caudio_app */
+    int historyList(int limit, bool asJson);
+
+    /** @brief Clears all playback history. @ingroup caudio_app */
+    int historyClear(bool asJson);
+
+    /** @brief Lists audio output devices. @ingroup caudio_app */
+    int deviceList(bool asJson);
+
+    /** @brief Sets the default audio output device. @ingroup caudio_app */
+    int deviceSet(const std::string& id, bool asJson);
+
+    /**
+     * @brief Checks an audio device is available.
+     * @ingroup caudio_app
+     * @param id Device id, or nullopt for the default device.
+     */
+    int deviceTest(std::optional<std::string> id, bool asJson);
+
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
     std::string argv0_;             ///< Executable path for POSIX re-spawn.
