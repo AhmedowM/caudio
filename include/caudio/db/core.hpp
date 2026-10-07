@@ -38,7 +38,7 @@ struct DbOpts {
 };
 
 /**
- * @brief Closes an owned SQLite handle (defined in db_core.cpp).
+ * @brief Closes an owned SQLite handle (defined in core.cpp).
  * @ingroup caudio_db
  */
 struct SqliteCloser {
@@ -69,7 +69,7 @@ class Database final {
      * @ingroup caudio_db
      * @param opts Options; writeBatchSize forwarded to WriterThread.
      */
-    // Out-of-line (db_core.cpp): constructing writer_ with only a
+    // Out-of-line (core.cpp): constructing writer_ with only a
     // forward-declared SqliteStatement in scope is insufficient for inline.
     explicit Database(const DbOpts& opts);
     /**

@@ -12,7 +12,7 @@ set(CAUDIO_DB_MODULE_SOURCES
 )
 
 set(CAUDIO_DB_SOURCES
-  src/db/db_core.cpp
+  src/db/core.cpp
   src/db/queue.cpp
   src/db/scan.cpp
   src/db/search.cpp

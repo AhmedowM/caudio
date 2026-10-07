@@ -11,7 +11,7 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/reader.cpp
   src/player/output.cpp
   src/player/decoder.cpp
-  src/player/player_core.cpp
+  src/player/core.cpp
   src/player/decoders/ffmpeg.cpp
 )
 caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor)

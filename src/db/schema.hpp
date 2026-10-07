@@ -9,7 +9,7 @@
  * single `sqlite3_exec` batch on `Database::open()`. The queue table
  * enforces `UNIQUE(queue_id, position)` as a safety net for the
  * single-writer invariant (all queue writes are serialized by
- * `Database::dbMutex_`). See queue.hpp and db_core.hpp for lock
+ * `Database::dbMutex_`). See queue.hpp and core.cpp for lock
  * ordering.
  */
 

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Shorten component header names (`<comp>/core.hpp`, `<comp>/types.hpp`);
   public API unchanged, only include paths moved
+- Shorten component source names (`<comp>/core.cpp`); no functional change
 
 ## [v1.0.0-rc3] - 2026-10-04
 
