@@ -1,18 +1,18 @@
 # utils.cmake -- caudio::utils (no dependencies; everything links this).
 set(CAUDIO_UTILS_MODULE_SOURCES
-  modules/utils.cppm
-  modules/utils/result.cppm
-  modules/utils/error.cppm
-  modules/utils/log.cppm
-  modules/utils/json.cppm
-  modules/utils/math.cppm
-  modules/utils/ring.cppm
-  modules/utils/mpsc_queue.cppm
-  modules/utils/print.cppm
-  modules/utils/thread.cppm
-  modules/utils/version.cppm
-  modules/utils/function.cppm
-  modules/utils/generator.cppm
+  modules/caudio/utils.cppm
+  modules/caudio/utils/result.cppm
+  modules/caudio/utils/error.cppm
+  modules/caudio/utils/log.cppm
+  modules/caudio/utils/json.cppm
+  modules/caudio/utils/math.cppm
+  modules/caudio/utils/ring.cppm
+  modules/caudio/utils/mpsc_queue.cppm
+  modules/caudio/utils/print.cppm
+  modules/caudio/utils/thread.cppm
+  modules/caudio/version.cppm
+  modules/caudio/utils/function.cppm
+  modules/caudio/utils/generator.cppm
 )
 
 set(CAUDIO_UTILS_SOURCES

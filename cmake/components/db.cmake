@@ -2,13 +2,13 @@
 # NOTE: statement/transaction/queue/schema/detail/fingerprint/fts/stmt_helpers
 # live in src/db/ (NOT installed) and have no module partitions.
 set(CAUDIO_DB_MODULE_SOURCES
-  modules/database.cppm
-  modules/db/types.cppm
-  modules/db/core.cppm
-  modules/db/scan.cppm
-  modules/db/search.cppm
-  modules/db/json.cppm
-  modules/db/write_thread.cppm
+  modules/caudio/database.cppm
+  modules/caudio/db/types.cppm
+  modules/caudio/db/core.cppm
+  modules/caudio/db/scan.cppm
+  modules/caudio/db/search.cppm
+  modules/caudio/db/json.cppm
+  modules/caudio/db/write_thread.cppm
 )
 
 set(CAUDIO_DB_SOURCES

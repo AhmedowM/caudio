@@ -2,11 +2,11 @@
 # The CLI shell itself (cli/src/shell/*) compiles into the caudio executable only; no cli library.
 
 set(CAUDIO_IPC_MODULE_SOURCES
-  modules/ipc.cppm
-  modules/ipc/command.cppm
-  modules/ipc/result.cppm
-  modules/ipc/protocol.cppm
-  modules/config.cppm
+  modules/caudio/ipc.cppm
+  modules/caudio/ipc/command.cppm
+  modules/caudio/ipc/result.cppm
+  modules/caudio/ipc/protocol.cppm
+  modules/caudio/config.cppm
 )
 set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
@@ -21,11 +21,11 @@ endif()
 target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
 
 set(CAUDIO_SERVICE_MODULE_SOURCES
-  modules/service.cppm
-  modules/service/core.cppm
-  modules/service/shm_status.cppm
-  modules/service/ipc_channel.cppm
-  modules/service/ipc_server.cppm
+  modules/caudio/service.cppm
+  modules/caudio/service/core.cppm
+  modules/caudio/service/shm_status.cppm
+  modules/caudio/service/ipc_channel.cppm
+  modules/caudio/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_channel.cpp
@@ -62,10 +62,10 @@ if(CAUDIO_BUILD_SHARED)
 endif()
 
 set(CAUDIO_CLIENT_MODULE_SOURCES
-  modules/client.cppm
-  modules/client/ipc_client.cppm
-  modules/client/core.cppm
-  modules/client/output_formatter.cppm
+  modules/caudio/client.cppm
+  modules/caudio/client/ipc_client.cppm
+  modules/caudio/client/core.cppm
+  modules/caudio/client/output_formatter.cppm
 )
 set(CAUDIO_CLIENT_SOURCES
   src/client/ipc_client.cpp

@@ -466,6 +466,14 @@ if(CAUDIO_ENABLE_EXAMPLES)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
 endif()
 
+# Modules-only consumer check: same program as mini_cpp, but importing
+# modules instead of including headers. Modules build only.
+if(CAUDIO_ENABLE_EXAMPLES AND CAUDIO_ENABLE_MODULES)
+  add_executable(caudio_mini_mod examples/mini_mod.cpp)
+  target_link_libraries(caudio_mini_mod PRIVATE caudio::player caudio::utils)
+  target_compile_features(caudio_mini_mod PRIVATE cxx_std_23)
+endif()
+
 # Tests -- Catch2 via system package or FetchContent (144 tests: utils/player/db/engine/ipc/cli paths)
 if(CAUDIO_ENABLE_TESTS)
   find_package(Catch2 QUIET)

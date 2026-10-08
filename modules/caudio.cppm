@@ -1,6 +1,5 @@
 // Umbrella mirrors include/caudio.hpp (all libraries).
 module;
-#include <string_view>
 
 /**
  * @file caudio.cppm
@@ -12,6 +11,7 @@ module;
  */
 export module caudio;
 
+export import caudio.version;
 export import caudio.utils;
 export import caudio.player;
 export import caudio.db;

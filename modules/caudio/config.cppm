@@ -1,7 +1,7 @@
 module;
 #include <caudio/config.hpp>
 
-export module caudio.ipc:config;
+export module caudio.config;
 
 export namespace caudio::config {
 using ::caudio::config::Config;

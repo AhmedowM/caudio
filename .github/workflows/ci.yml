@@ -320,9 +320,10 @@ jobs:
           EOF
           cat > /tmp/caudio-smoke/main.cpp << 'EOF'
           #include <caudio/utils.hpp>
+          #include <caudio/version.hpp>
           #include <print>
           int main() {
-            std::println("caudio smoke ok: {}", caudio::shortVersion);
+            std::println("caudio smoke ok: {}", caudio::version::shortVersion());
             return 0;
           }
           EOF
@@ -371,7 +372,7 @@ jobs:
       - name: Verify module sources shipped
         run: |
           test -f /tmp/caudio-install-mod/modules/caudio.cppm && echo "caudio.cppm found" || (echo "caudio.cppm missing" && exit 1)
-          ls /tmp/caudio-install-mod/modules/*/*.cppm | head -n 20
+          ls /tmp/caudio-install-mod/modules/*/*.cppm /tmp/caudio-install-mod/modules/*/*/*.cppm | head -n 20
 
       - name: Smoke compile (find_package + import caudio.utils)
         run: |
@@ -395,9 +396,9 @@ jobs:
           EOF
           cat > /tmp/caudio-mod-smoke/main.cpp << 'EOF'
           #include <print>
-          import caudio.utils;
+          import caudio.version;
           int main() {
-            std::println("caudio module smoke ok: {}", caudio::utils::shortVersion());
+            std::println("caudio module smoke ok: {}", caudio::version::shortVersion());
             return 0;
           }
           EOF

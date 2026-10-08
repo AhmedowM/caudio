@@ -16,7 +16,13 @@ set(CAUDIO_APP_SOURCES
   src/app/config.cpp
   src/app/preview.cpp
 )
-caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::db caudio::player caudio::utils Threads::Threads)
+set(CAUDIO_APP_MODULE_SOURCES
+  modules/caudio/app.cppm
+  modules/caudio/app/core.cppm
+  modules/caudio/app/format.cppm
+  modules/caudio/app/paths.cppm
+)
+caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} MODULE_SOURCES ${CAUDIO_APP_MODULE_SOURCES} DEPS caudio::client caudio::service caudio::ipc caudio::db caudio::player caudio::utils Threads::Threads)
 ca_set_warnings(app)
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(app EXTRA_DEPS caudio::client_shared caudio::service_shared caudio::ipc caudio::player_shared Threads::Threads)

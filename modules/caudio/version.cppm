@@ -1,7 +1,7 @@
 module;
 #include <caudio/version.hpp>
 
-export module caudio.utils:version;
+export module caudio.version;
 
 export namespace caudio::version {
 using ::caudio::version::shortVersion;
