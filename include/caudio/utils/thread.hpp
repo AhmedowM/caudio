@@ -1,8 +1,6 @@
 #pragma once
-#include <cstdint>
-#if defined(_WIN32) || defined(_WIN64)
-// No windows.h here to avoid intrin conflict; Win32 decls go after export module
-#else
+
+#if !defined(_WIN32) && !defined(_WIN64)
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
@@ -10,6 +8,7 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
+#include <cstdint>
 #include <expected>
 #include <string_view>
 #include <thread>
@@ -28,18 +27,13 @@ using DWORD = unsigned long;
 using FARPROC = long long int (*)();
 #ifndef WINAPI
 #define WINAPI __stdcall
-#endif
-#endif
-#endif
-
-#if defined(_WIN32) || defined(_WIN64)
-#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
 extern "C" {
 __declspec(dllimport) HMODULE __stdcall GetModuleHandleA(LPCSTR);
 __declspec(dllimport) FARPROC __stdcall GetProcAddress(HMODULE, LPCSTR);
 __declspec(dllimport) int __stdcall MultiByteToWideChar(UINT, DWORD, LPCCH, int, LPWSTR, int);
 __declspec(dllimport) HANDLE __stdcall GetCurrentThread(void);
 }
+#endif
 #endif
 #endif
 

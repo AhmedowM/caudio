@@ -1,4 +1,11 @@
 #pragma once
+
+/**
+ * @file ring.hpp
+ * @brief SPSC ring buffer with cache-line isolation and SPSC invariants.
+ * @ingroup caudio_utils
+ */
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -6,12 +13,6 @@
 #include <span>
 #include <type_traits>
 #include <vector>
-
-/**
- * @file ring.hpp
- * @brief SPSC ring buffer with cache-line isolation and SPSC invariants.
- * @ingroup caudio_utils
- */
 
 namespace caudio::utils {
 

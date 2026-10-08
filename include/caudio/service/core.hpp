@@ -1,11 +1,11 @@
+#pragma once
+
 /**
  * @file core.hpp
  * @brief Service: owns Engine, Database, Logger, IPC server, and dispatches
  * commands (daemon runtime used by the CLI service host).
  * @ingroup caudio_service
  */
-
-#pragma once
 
 // Ensure cli headers are included first to avoid windows.h conflicts
 #ifndef NOMINMAX
@@ -15,35 +15,21 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <algorithm>
 #include <atomic>
-#include <caudio/config.hpp>
-#include <caudio/db.hpp>
 #include <caudio/db/json.hpp>
-#include <caudio/engine.hpp>
+#include <caudio/engine/core.hpp>
 #include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
 #include <caudio/service/shm_status.hpp>
-#include <caudio/utils.hpp>
-#include <chrono>
-#include <cmath>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
-#include <fstream>
-#include <iostream>
 #include <memory>
-#include <optional>
-#include <span>
+#include <stop_token>
 #include <string>
-#include <string_view>
-#include <thread>
-#include <utility>
-#include <variant>
-#include <vector>
 
 namespace caudio::service {
 

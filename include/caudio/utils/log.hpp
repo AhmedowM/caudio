@@ -1,16 +1,17 @@
 #pragma once
-#include <format>
-#include <functional>
-#include <mutex>
-#include <string>
-#include <string_view>
-#include <utility>
 
 /**
  * @file log.hpp
  * @brief Thread-safe logger with level filtering and format support.
  * @ingroup caudio_utils
  */
+
+#include <format>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace caudio::utils {
 

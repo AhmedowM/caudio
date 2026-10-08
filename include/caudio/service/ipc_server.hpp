@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file ipc_server.hpp
  * @brief Accept-loop IPC server (daemon side).
@@ -9,8 +11,10 @@
  * (and its `min`/`max` macros) on consumers; see `shm_status.hpp` and
  * `utils/thread.hpp` for the same pattern.
  */
-#pragma once
 
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -19,19 +23,15 @@
 #endif
 #include <atomic>
 #include <condition_variable>
-#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
-#include <memory>
 #include <mutex>
-#include <span>
 #include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <utility>
 #include <vector>
 
 #ifndef _WIN32
@@ -79,10 +79,6 @@ __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
 #include <windows.h>
 #endif
 #endif
-
-#include <caudio/ipc.hpp>
-#include <caudio/service/ipc_channel.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::service {
 

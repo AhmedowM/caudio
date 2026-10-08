@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file ipc_channel.hpp
  * @brief Byte-transport abstraction for daemon IPC (socket / named pipe).
@@ -6,7 +8,6 @@
  * `frameMessage`/`deframeMessage` add the length prefix shared with the
  * `caudio.ipc` wire framing.
  */
-#pragma once
 
 #include <caudio/utils/error.hpp>
 #include <cstddef>

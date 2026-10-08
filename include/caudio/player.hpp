@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file player.hpp
  * @brief Umbrella header for the caudio.player module.
@@ -12,11 +14,8 @@
  * - Player with gapless playback, seeking, and state management
  */
 
-#pragma once
-
 #include <caudio/player/core.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>
-#include <caudio/utils.hpp>
-#include <string_view>
+// #include <caudio/utils.hpp>

@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file config.hpp
  * @brief Configuration management: canonical paths, load/save, and raw key/value access.

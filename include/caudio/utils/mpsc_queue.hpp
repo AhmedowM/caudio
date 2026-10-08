@@ -1,4 +1,11 @@
 #pragma once
+
+/**
+ * @file mpsc_queue.hpp
+ * @brief Multi-producer single-consumer bounded queue.
+ * @ingroup caudio_utils
+ */
+
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <condition_variable>
@@ -10,12 +17,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-
-/**
- * @file mpsc_queue.hpp
- * @brief Multi-producer single-consumer bounded queue.
- * @ingroup caudio_utils
- */
 
 namespace caudio::utils {
 

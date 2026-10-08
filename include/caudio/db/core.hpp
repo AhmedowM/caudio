@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * @file core.hpp
+ * @brief Main SQLite database handle with thread-safe CRUD.
+ * @ingroup caudio_db
+ * @details Implements `Database` with a shared_mutex for the SQLite handle,
+ * a mutex for the prepared-statement cache, and a background `WriterThread`
+ * for batching writes. All public methods are thread-safe; see each method
+ * for locking requirements. Move operations are not thread-safe after open.
+ */
+
 #include <array>
 #include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>

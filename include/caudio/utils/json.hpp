@@ -1,14 +1,4 @@
 #pragma once
-#include <caudio/utils/error.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <limits>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <string_view>
-#include <type_traits>
 
 /**
  * @file json.hpp
@@ -25,6 +15,17 @@
  * return `std::expected` for new code. Insertion order of object keys is
  * preserved (ordered backend).
  */
+
+#include <caudio/utils/error.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <limits>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <type_traits>
 
 namespace caudio::utils {
 

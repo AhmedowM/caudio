@@ -1,15 +1,18 @@
+#pragma once
+
 /**
  * @file output_formatter.hpp
  * @brief Output formatting for CLI results: table and JSON output.
  * @ingroup caudio_client
  */
-#pragma once
 
 #include <caudio/ipc/result.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <utility>
 
 namespace caudio::client {
 

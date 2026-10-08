@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file print.hpp
  * @brief Portable `print`/`println` facade over `<print>` / `<format>`.
@@ -16,7 +18,6 @@
  * `std::print`/`std::println` everywhere else. Always call
  * `caudio::print`/`caudio::println`, never `std::` directly.
  */
-#pragma once
 
 #include <cstdio>
 #include <format>

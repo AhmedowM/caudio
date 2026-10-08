@@ -1,5 +1,11 @@
 #pragma once
 
+/**
+ * @file math.hpp
+ * @brief Miscellaneous math utilities.
+ * @ingroup caudio_utils
+ */
+
 #include <algorithm>
 #include <array>
 #include <cmath>

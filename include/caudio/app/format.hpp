@@ -1,12 +1,5 @@
 #pragma once
 
-#include <caudio/db/types.hpp>
-#include <caudio/ipc/result.hpp>
-#include <ostream>
-#include <string>
-#include <string_view>
-#include <vector>
-
 /**
  * @file format.hpp
  * @brief Display formatting shared by all frontends.
@@ -15,6 +8,14 @@
  * and human track labels (no ids, no queue positions -- see listings for
  * those). Moved out of the CLI shell so TUIs render identically.
  */
+
+#include <caudio/db/types.hpp>
+#include <caudio/ipc/result.hpp>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace caudio::app {
 
 /**

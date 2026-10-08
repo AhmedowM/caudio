@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <caudio/db/core.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

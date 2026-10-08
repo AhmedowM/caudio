@@ -15,10 +15,4 @@
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>
-#include <caudio/utils.hpp>
-
-/**
- * @brief Public namespace for all database APIs.
- * @ingroup caudio_db
- */
-namespace caudio::db {}
+// #include <caudio/utils.hpp>

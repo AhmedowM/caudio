@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file result.hpp
  * @brief CLI result types and variants for the caudio IPC protocol.
@@ -23,15 +24,12 @@
  */
 
 #include <caudio/db/types.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/engine/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <optional>
 #include <string>
-#include <string_view>
-#include <utility>
 #include <variant>
 #include <vector>
 

@@ -1,5 +1,16 @@
 #pragma once
 
+/**
+ * @file search.hpp
+ * @brief FTS5 search with LIKE fallback.
+ * @ingroup caudio_db
+ * @details Implements three-stage search:
+ * 1) Exact `MATCH sanitized`.
+ * 2) Prefix `MATCH sanitized*`.
+ * 3) `LIKE %escaped% ESCAPE '\' COLLATE NOCASE` on title/artist/album/album_artist/genre.
+ * All stages are under a single `shared_lock` to avoid unlock gaps.
+ */
+
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <expected>

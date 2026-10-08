@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file utils.hpp
  * @brief Main header for caudio.utils -- includes all utility partitions.

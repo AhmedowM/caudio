@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <caudio/db/core.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>

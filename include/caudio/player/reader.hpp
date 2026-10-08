@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file reader.hpp
  * @brief Input reader abstractions for audio data sources
@@ -22,16 +24,10 @@
  * - NoMem: Allocation failure
  */
 
-#pragma once
-
 #include <caudio/utils/error.hpp>
-#if defined(_WIN32)
-#include <cstdio>
-#else
-#include <cstdio>
-#endif
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <memory>

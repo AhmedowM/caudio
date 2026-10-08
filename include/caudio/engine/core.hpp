@@ -1,22 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <shared_mutex>
-#include <stop_token>
-#include <string>
-#include <string_view>
-#include <thread>
-#include <vector>
-
 /**
  * @file core.hpp
  * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
@@ -48,11 +31,27 @@
  * pushEvent to callbacks under cbMutex_.
  */
 
+#include <atomic>
 #include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/ring.hpp>
+#include <chrono>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
+#include <stop_token>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <vector>
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

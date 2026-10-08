@@ -1,5 +1,15 @@
 #pragma once
 
+/**
+ * @file write_thread.hpp
+ * @brief Background write batching for SQLite.
+ * @ingroup caudio_db
+ * @details Single-consumer background thread that serializes `WriteOp`s
+ * queued via an `MpscQueue<WriteOp>`. Batch size is set at construction
+ * (`writeBatchSize`, default 256) and forwarded to the queue capacity.
+ * The queue is bounded: `push()` returns `Busy` when full.
+ */
+
 #include <atomic>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/function.hpp>
@@ -12,16 +22,6 @@
 #include <stop_token>
 #include <string>
 #include <thread>
-
-/**
- * @file write_thread.hpp
- * @brief Background write batching for SQLite.
- * @ingroup caudio_db
- * @details Single-consumer background thread that serializes `WriteOp`s
- * queued via an `MpscQueue<WriteOp>`. Batch size is set at construction
- * (`writeBatchSize`, default 256) and forwarded to the queue capacity.
- * The queue is bounded: `push()` returns `Busy` when full.
- */
 
 // Forward declarations (sqlite3.h + statement impl stay in src/db/).
 struct sqlite3;

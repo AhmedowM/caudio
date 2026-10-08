@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file generator.hpp
  * @brief Portable coroutine generator.
@@ -10,7 +12,6 @@
  * `std::generator` iteration subset used here. Always use this type
  * instead of `std::generator` directly.
  */
-#pragma once
 
 #include <coroutine>
 #include <exception>

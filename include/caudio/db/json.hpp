@@ -1,5 +1,14 @@
 #pragma once
 
+/**
+ * @file json.hpp
+ * @brief JSON import/export for tracks.
+ * @ingroup caudio_db
+ * @details Implements `trackToJson`, `trackFromJson`, `exportJson` and
+ * `importJson` for JSON serialization of Track rows. Uses ordered JSON
+ * (keys in insertion order) to preserve field order across export/import.
+ */
+
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>

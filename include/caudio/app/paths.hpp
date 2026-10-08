@@ -1,9 +1,5 @@
 #pragma once
 
-#include <string>
-#include <string_view>
-#include <vector>
-
 /**
  * @file paths.hpp
  * @brief File/glob/path utilities shared by all frontends.
@@ -13,6 +9,11 @@
  * matching in dispatch), and numeric-token checks. Frontends expand user
  * tokens with these, then hand file lists to App methods.
  */
+
+#include <string>
+#include <string_view>
+#include <vector>
+
 namespace caudio::app {
 
 /**

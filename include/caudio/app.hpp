@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file app.hpp
  * @brief Umbrella header for the application orchestration library.
@@ -9,6 +10,7 @@
  * @see caudio::app::fmtClock
  * @see caudio::app::expandAddToken
  */
+
 #include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>

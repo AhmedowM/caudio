@@ -1,15 +1,16 @@
 #pragma once
-#include <caudio/utils/result.hpp>
-#include <expected>
-#include <format>
-#include <string>
-#include <string_view>
 
 /**
  * @file error.hpp
  * @brief Error type, Expected alias and helpers.
  * @ingroup caudio_utils
  */
+
+#include <caudio/utils/result.hpp>
+#include <expected>
+#include <format>
+#include <string>
+#include <string_view>
 
 namespace caudio::utils {
 

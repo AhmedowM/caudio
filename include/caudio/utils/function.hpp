@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file function.hpp
  * @brief Portable move-only type-erased callable.
@@ -9,8 +11,9 @@
  * used here (default/empty construct, move-only, call, bool check).
  * Always use this type instead of `std::move_only_function` directly.
  */
-#pragma once
 
+#include <concepts>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <type_traits>

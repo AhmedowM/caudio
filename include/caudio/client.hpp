@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file client.hpp
  * @brief Umbrella header for the daemon client SDK.
@@ -8,6 +9,7 @@
  * @see caudio::client::IpcClient
  * @see caudio::client::OutputFormatter
  */
+
 #include <caudio/client/core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>

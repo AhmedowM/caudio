@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file output.hpp
  * @brief Audio output management using miniaudio
@@ -26,8 +28,6 @@
  * - InvalidArg: Invalid configuration (sample rate, channels, null ring)
  * - NoMem: Allocation failure
  */
-
-#pragma once
 
 #include <atomic>
 #include <caudio/utils/error.hpp>

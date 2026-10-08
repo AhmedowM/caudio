@@ -1,25 +1,10 @@
+#pragma once
+
 /**
  * @file ipc_client.hpp
  * @brief IPC client for connecting to caudio service via Unix socket or Windows named pipe.
  * @ingroup caudio_client
  */
-#pragma once
-
-#include <caudio/utils/error.hpp>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <atomic>
-#include <cstddef>
-#include <cstdint>
-#include <filesystem>
-#include <span>
-#include <string>
-#include <string_view>
-#include <vector>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -29,9 +14,24 @@
 #include <cerrno>
 #include <cstring>
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 
+#include <atomic>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace caudio::client {
 

@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file core.hpp
  * @brief Core audio player implementation with gapless playback support
@@ -35,8 +37,6 @@
  * - SwrContext resamples to float32 interleaved for AudioOutput
  * - Seeking uses stream time_base for accurate container positioning
  */
-
-#pragma once
 
 #include <atomic>
 #include <caudio/utils/error.hpp>

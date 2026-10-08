@@ -1,15 +1,10 @@
+#pragma once
+
 /**
  * @file core.hpp
  * @brief Client for the caudio daemon (used by the CLI and third-party frontends).
  * @ingroup caudio_client
  */
-#pragma once
-
-#include <caudio/utils/error.hpp>
-#include <chrono>
-#include <filesystem>
-#include <string>
-#include <string_view>
 
 #ifndef _WIN32
 #include <poll.h>
@@ -18,6 +13,11 @@
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
+#include <chrono>
+#include <filesystem>
+#include <string>
+#include <string_view>
 
 namespace caudio::client {
 

@@ -1,18 +1,5 @@
 #pragma once
 
-#include <caudio/config.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
-#include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <vector>
-
 /**
  * @file core.hpp
  * @brief Application orchestrator shared by all frontends.
@@ -31,6 +18,20 @@
  * Thread safety: thread-safe for concurrent calls; daemon interactions go
  * through the IPC client, which serializes per connection.
  */
+
+#include <caudio/config.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
+
 namespace caudio::app {
 
 /**

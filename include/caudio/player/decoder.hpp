@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file decoder.hpp
  * @brief Single audio decoder (FFmpeg backend) with format probing.
@@ -24,8 +26,6 @@
  * arrive from the control thread; implementations synchronize internally.
  * sampleRate(), channels() and totalFrames() are thread-safe (const noexcept).
  */
-
-#pragma once
 
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>

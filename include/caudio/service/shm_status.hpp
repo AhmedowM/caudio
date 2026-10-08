@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * @file shm_status.hpp
  * @brief Seqlock shared-memory playback snapshot (daemon writes, clients poll).
@@ -8,19 +10,16 @@
  * copy. Windows pattern as in `ipc_server.hpp`: local API declarations
  * unless `windows.h` is already included.
  */
-#pragma once
 
 #include <atomic>
-#include <bit>
+#include <caudio/engine/core.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <expected>
-#include <filesystem>
-#include <memory>
 #include <string>
 #include <string_view>
-#include <thread>
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -55,9 +54,6 @@ __declspec(dllimport) DWORD __stdcall GetLastError();
 #include <windows.h>
 #endif
 #endif
-
-#include <caudio/engine.hpp>
-#include <caudio/utils.hpp>
 
 namespace caudio::service {
 

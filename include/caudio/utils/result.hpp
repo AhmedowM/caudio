@@ -1,12 +1,13 @@
 #pragma once
-#include <format>
-#include <string_view>
 
 /**
  * @file result.hpp
  * @brief Status codes and string conversion for caudio utilities.
  * @ingroup caudio_utils
  */
+
+#include <format>
+#include <string_view>
 
 namespace caudio::utils {
 

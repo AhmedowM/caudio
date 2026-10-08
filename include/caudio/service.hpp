@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file service.hpp
  * @brief Umbrella header for the daemon service runtime.
@@ -8,6 +9,7 @@
  * @see caudio::service::IpcServer
  * @see caudio::service::IpcChannel
  */
+
 #include <caudio/service/core.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>

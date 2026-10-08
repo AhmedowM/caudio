@@ -1,11 +1,4 @@
 #pragma once
-#include <caudio/utils/result.hpp>
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <string_view>
-#include <vector>
 
 /**
  * @file types.hpp
@@ -46,6 +39,14 @@
  * `BEGIN IMMEDIATE` transaction that bumps `tracks.play_count` and
  * inserts into `history`.
  */
+
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace caudio::engine {
 

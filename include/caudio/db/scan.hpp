@@ -1,22 +1,31 @@
 #pragma once
 
+/**
+ * @file scan.hpp
+ * @brief Filesystem scan helpers for audio tracks.
+ * @ingroup caudio_db
+ * @details Implements `scanDirectory` and `scanLibrary` for recursive
+ * filesystem traversal, fingerprinting and upsert into the database.
+ * Shared with the service layer (playlist/scan imports).
+ */
+
 #include <algorithm>
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/generator.hpp>
-#include <string_view>
-
-namespace caudio::db {
-// Defined in db/core.hpp (full Database API); reference params need only this.
-class Database;
-} // namespace caudio::db
 #include <cctype>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace caudio::db {
+// Defined in db/core.hpp (full Database API); reference params need only this.
+class Database;
+} // namespace caudio::db
 
 // Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
 struct sqlite3;

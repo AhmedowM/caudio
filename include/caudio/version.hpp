@@ -1,6 +1,4 @@
 #pragma once
-#include <string>
-#include <string_view>
 
 /**
  * @file version.hpp
@@ -13,8 +11,9 @@
  * version_config.hpp for version constants.
  */
 
-// Include CMake-generated version constants
 #include <caudio/version_config.hpp>
+#include <string>
+#include <string_view>
 
 namespace caudio::version {
 

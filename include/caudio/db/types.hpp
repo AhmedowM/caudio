@@ -1,10 +1,4 @@
 #pragma once
-#include <array>
-#include <cstddef>
-#include <cstdint>
-#include <optional>
-#include <string>
-#include <vector>
 
 /**
  * @file types.hpp
@@ -16,6 +10,13 @@
  * All types are trivially copyable aggregates with default-initialised
  * members; no invariants beyond those documented per-field.
  */
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace caudio::db {
 

@@ -1,4 +1,5 @@
 #pragma once
+
 /**
  * @file command.hpp
  * @brief CLI command types and variants for the caudio IPC protocol.
@@ -21,13 +22,14 @@
  * @see caudio::ipc::Result for response types
  */
 
-#include <caudio/engine.hpp>
-#include <concepts>
+#include <caudio/engine/types.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <string_view>
+#include <type_traits>
 #include <variant>
+#include <vector>
 
 namespace caudio::ipc {
 
