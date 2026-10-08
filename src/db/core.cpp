@@ -4,12 +4,10 @@
 #include <caudio/db/core.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/math.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <db/fingerprint.hpp>
 #include <db/fts.hpp>
 #include <db/queue.hpp>
 #include <db/schema.hpp>

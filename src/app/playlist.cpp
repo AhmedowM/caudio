@@ -7,7 +7,6 @@
  * loading, saving, deletion, renaming, file export and import.
  */
 
-#include <app/detail.hpp>
 #include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
@@ -17,14 +16,18 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <variant>
 #include <vector>
 

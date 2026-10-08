@@ -12,11 +12,11 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/print.hpp>
 #include <cstdint>
 #include <expected>
+#include <format>
 #include <iostream>
 #include <string>
 #include <string_view>

@@ -31,7 +31,6 @@
 #include <thread>
 #include <utility>
 #include <variant>
-#include <vector>
 
 #include "config_detail.hpp"
 #include "service_paths.hpp"

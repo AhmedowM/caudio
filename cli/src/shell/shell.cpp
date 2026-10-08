@@ -1,6 +1,5 @@
 #include <cstdio>
 #ifdef _WIN32
-#include <io.h>
 #else
 #include <unistd.h>
 #endif
@@ -19,29 +18,17 @@
 #include <windows.h>
 // Granular API headers used directly: kept after windows.h.
 // clang-format on
-#include <errhandlingapi.h>
-#include <handleapi.h>
-#include <libloaderapi.h>
 #include <minwindef.h>
-#include <processthreadsapi.h>
 #endif
 
 #include <CLI/CLI.hpp>
-#include <algorithm>
+#include <caudio/app/format.hpp>
+#include <caudio/app/paths.hpp>
 #include <caudio/client/core.hpp>
-#include <caudio/db/json.hpp>
-#include <caudio/db/scan.hpp>
-#include <caudio/db/types.hpp>
-#include <caudio/engine/types.hpp>
-#include <caudio/player/core.hpp>
-#include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/json.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>
 #include <memory>
-#include <set>
-#include <stop_token>
 #include <system_error>
 
 #include "parse.hpp"
@@ -49,7 +36,6 @@
 
 // Transitional: app-internal reporting helpers for not-yet-moved groups
 // (playlist tracks). Frontends must use the public caudio/app/* headers.
-#include <app/detail.hpp>
 
 #ifdef _WIN32
 #if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
@@ -113,7 +99,6 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <mach-o/dyld.h>
 #endif
 #endif
-#include <caudio/client/ipc_client.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
@@ -121,13 +106,11 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/print.hpp>
 #include <chrono>
-#include <cmath>
 #include <cstdint>
 #include <ctime>
 #include <expected>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>

@@ -1,6 +1,7 @@
 #include <caudio/config.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <expected>
 #include <filesystem>

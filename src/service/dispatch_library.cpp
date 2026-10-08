@@ -9,7 +9,6 @@
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
-#include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>
 #include <cctype>
 #include <chrono>

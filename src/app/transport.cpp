@@ -15,10 +15,13 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
+#include <caudio/utils/result.hpp>
 #include <chrono>
 #include <expected>
+#include <iostream>
 #include <string>
 #include <thread>
+#include <utility>
 #include <variant>
 
 namespace caudio::app {

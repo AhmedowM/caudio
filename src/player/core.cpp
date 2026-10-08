@@ -16,6 +16,10 @@
 #include <mutex>
 #include <span>
 #include <stop_token>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace caudio::player {
 

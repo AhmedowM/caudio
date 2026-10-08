@@ -1,9 +1,16 @@
 #include <blake3.h>
 
-#include <caudio/utils.hpp>
+#include <array>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <db/fingerprint.hpp>
+#include <expected>
+#include <filesystem>
 #include <fstream>
-#include <thread>
+#include <ios>
+#include <system_error>
 
 namespace caudio::db::internal {
 

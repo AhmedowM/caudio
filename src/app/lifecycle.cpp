@@ -8,6 +8,9 @@
  * Rendering still happens here; Phase 1 moves it to callers.
  */
 
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <iostream>
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX

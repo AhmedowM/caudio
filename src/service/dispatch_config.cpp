@@ -10,6 +10,8 @@
 #include <expected>
 #include <filesystem>
 #include <fstream>
+#include <ios>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <string_view>

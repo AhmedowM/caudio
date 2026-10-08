@@ -16,8 +16,9 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
-#include <chrono>
+#include <caudio/utils/result.hpp>
 #include <expected>
+#include <iostream>
 #include <string>
 #include <variant>
 #include <vector>

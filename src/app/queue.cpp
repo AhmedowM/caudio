@@ -20,12 +20,13 @@
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
-#include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
+#include <iostream>
 #include <optional>
 #include <set>
 #include <string>

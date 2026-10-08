@@ -8,6 +8,7 @@
 #include <db/queue.hpp>
 #include <db/statement.hpp>
 #include <expected>
+#include <optional>
 #include <string_view>
 #include <utility>
 #include <vector>

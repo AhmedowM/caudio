@@ -17,8 +17,8 @@
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
-#include <caudio/utils.hpp>
 #include <cstring>
+#include <utility>
 
 namespace caudio::client {
 

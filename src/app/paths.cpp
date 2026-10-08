@@ -9,6 +9,7 @@
 #include <caudio/app/paths.hpp>
 #include <caudio/db/scan.hpp>
 #include <cctype>
+#include <cstddef>
 #include <filesystem>
 #include <string>
 #include <string_view>

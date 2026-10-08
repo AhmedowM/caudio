@@ -4,15 +4,12 @@
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/player/decoder.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cctype>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <db/fingerprint.hpp>
 #include <expected>
 #include <filesystem>
 #include <memory>
@@ -23,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-#include "service_audio.hpp"
 #include "track_resolve.hpp"
 
 namespace caudio::service {

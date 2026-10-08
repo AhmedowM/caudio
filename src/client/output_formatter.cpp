@@ -1,18 +1,19 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/engine.hpp>
 #include <caudio/ipc/protocol.hpp>
-#include <caudio/utils.hpp>
+#include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
 #include <cctype>
-#include <chrono>
 #include <ctime>
 #include <filesystem>
 #include <format>
 #include <iostream>
 #include <span>
 #include <string>
-#include <vector>
+#include <string_view>
+#include <type_traits>
+#include <variant>
 
 namespace caudio::client {
 

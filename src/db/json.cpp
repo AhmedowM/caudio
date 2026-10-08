@@ -2,12 +2,26 @@
 
 #include <caudio/db/core.hpp>
 #include <caudio/db/json.hpp>
-#include <caudio/utils.hpp>
-#include <db/detail.hpp>
+#include <caudio/db/types.hpp>
+#include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
+#include <caudio/utils/math.hpp>
+#include <caudio/utils/result.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <db/fingerprint.hpp>
 #include <db/statement.hpp>
 #include <db/transaction.hpp>
+#include <exception>
+#include <expected>
+#include <filesystem>
 #include <fstream>
-#include <sstream>
+#include <ios>
+#include <iterator>
+#include <mutex>
+#include <span>
+#include <string>
+#include <utility>
 
 namespace caudio::db {
 
