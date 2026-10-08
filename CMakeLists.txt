@@ -204,7 +204,7 @@ target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
-target_include_directories(blake3 PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
+target_include_directories(blake3 SYSTEM PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
 # suppress GCC warnings in vendored C
 if(NOT MSVC)
@@ -217,7 +217,7 @@ endif()
 # (vendor/nlohmann/, see vendor/README.md): it is PRIVATE (backend for
 # src/utils/json.cpp only) -- its headers never enter installed headers, so
 # no JSON_Install and no find_dependency downstream. Components get it as
-# plain PRIVATE -I (CAUDIO_NLOHMANN_PRIVATE_INCLUDE): even a PRIVATE target
+# PRIVATE SYSTEM -I (CAUDIO_NLOHMANN_PRIVATE_INCLUDE): even a PRIVATE target
 # link would force it into install(EXPORT).
 include(FetchContent)
 # Vendored single-header backend, version locked in vendor/README.md.
@@ -272,7 +272,8 @@ add_executable(caudio_cli
 )
 set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp)
-target_include_directories(caudio_cli PRIVATE cli/src/shell vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
+target_include_directories(caudio_cli PRIVATE cli/src/shell)
+target_include_directories(caudio_cli SYSTEM PRIVATE vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
 target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)

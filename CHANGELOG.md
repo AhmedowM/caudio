@@ -7,10 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.45.0] - 2026-10-08
+
 ### Changed
-- Shorten component header names (`<comp>/core.hpp`, `<comp>/types.hpp`);
-  public API unchanged, only include paths moved
-- Shorten component source names (`<comp>/core.cpp`); no functional change
 - Flatten module umbrellas to `modules/` root and shorten partition file
   names (`<comp>/core.cppm`, `<comp>/types.cppm`); the `caudio.player:core`
   partition drops its legacy `player_core` name
@@ -18,6 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   namespace (standalone `version.hpp`, like `config.hpp`)
 - Hide generated version constants in `caudio::detail`; public API uses
   `caudio::version::version()` etc.; shell and service status updated
+- Apply include-what-you-use to sources and headers (direct includes;
+  pure re-export umbrellas untouched)
+- Third-party include dirs (`vendor/`, fetched CLI11) are now `-isystem`;
+  own dirs stay plain `-I`
+- Release workflow rework: `release.yml` matrix, CI dispatch, Windows
+  Clang preference, README sync
+
+### Added
+- `scripts/format_all.py` and `scripts/tidy_all.py` (format check/run and
+  clang-tidy runner with header analysis mode)
+
+## [v0.44.0] - 2026-10-08
+
+### Changed
+- Daemon performance: fewer allocations, wakeups and status overhead
+- Harden daemon lifecycle and minsize presets
+- Extract CLI behavior into the `caudio::app` library (`App` orchestrator
+  with transport, playback, queue, playlist, library, tags, system, config
+  and preview policies; thin CLI shell)
+- Shorten component header names (`<comp>/core.hpp`, `<comp>/types.hpp`);
+  public API unchanged, only include paths moved
+- Shorten component source names (`<comp>/core.cpp`); no functional change
 
 ## [v1.0.0-rc3] - 2026-10-04
 

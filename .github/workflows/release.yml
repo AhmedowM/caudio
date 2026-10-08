@@ -20,20 +20,19 @@ jobs:
         # Compiler lives in the preset (same scheme as ci.yml); `compiler`
         # below is display + artifact naming only. macOS is LLVM Clang --
         # GCC builds miniaudio with the dummy backend (no audio).
+        # Windows releases build with LLVM Clang (MSVC stays CI-only).
+        # All legs ship release-lto-* (full optimization + LTO).
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             compiler: gcc-16
-            preset: release-gcc
+            preset: release-lto-gcc
           - os: macos-latest
             compiler: clang
-            preset: release-clang
+            preset: release-lto-clang
           - os: windows-latest
-            compiler: windows-gcc
-            preset: release-gcc
-          - os: windows-latest
-            compiler: msvc
-            preset: release-msvc
+            compiler: windows-clang
+            preset: release-lto-clang
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,27 +64,17 @@ jobs:
           LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
           test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<expected>, <print>): $LLVM_MAJOR" && exit 1)
 
-      - name: Setup GCC (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
-        id: msys2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
-
-      - name: Add MinGW to PATH (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
-        run: echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Verify GCC 16 (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
+      - name: Setup LLVM Clang (Windows)
+        if: runner.os == 'Windows'
         run: |
-          command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
-          command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
-          gcc --version || exit 1
-          g++ --version || exit 1
+          # Windows releases build with LLVM Clang (MSVC ABI target).
+          # Prefer a preinstalled LLVM; install via choco only if missing.
+          if ! command -v clang++ >/dev/null 2>&1 && [ ! -x "/c/Program Files/LLVM/bin/clang++.exe" ]; then
+            choco install llvm -y --no-progress
+          fi
+          export PATH="/c/Program Files/LLVM/bin:$PATH"
+          clang++ --version
+          clang --version
         shell: bash
 
       - name: Install dependencies (Ubuntu)
@@ -125,20 +114,12 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Package
-        if: matrix.compiler != 'msvc'
         run: |
           # `cmake --build --target package` FIRST: it runs cpack with CWD in
           # the build tree so packages land in the build dir. A bare
           # `cpack --config` from the repo root writes them to the root
           # (CPACK_OUTPUT_DIRECTORY is not honored there -- verified).
           cmake --build --preset ${{ matrix.preset }} --target package || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP") || echo "CPack failed"
-        shell: bash
-
-      - name: Package (MSVC config)
-        if: matrix.compiler == 'msvc'
-        run: |
-          # Multi-config generator: -C selects which built config to package.
-          (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP" -C Release) || echo "CPack failed"
         shell: bash
 
       - name: List packages

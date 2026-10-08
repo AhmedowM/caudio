@@ -7,7 +7,17 @@
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
   include("${CMAKE_CURRENT_LIST_DIR}/clang.cmake")
 elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
-  if(CMAKE_GENERATOR MATCHES "Visual Studio" OR DEFINED ENV{VCINSTALLDIR})
+  # Windows releases prefer LLVM Clang when it is on PATH (MSVC ABI target,
+  # verified by clang.cmake); MSVC stays for explicit *-msvc presets and CI.
+  find_program(_caudio_win_clangxx NAMES clang++)
+  if(_caudio_win_clangxx)
+    if(NOT _caudio_auto_msg_shown)
+      message(STATUS "auto toolchain: clang++ from PATH "
+        "(Windows releases prefer Clang; use a *-msvc preset or a vcvars shell for MSVC)")
+      set(_caudio_auto_msg_shown TRUE)
+    endif()
+    include("${CMAKE_CURRENT_LIST_DIR}/clang.cmake")
+  elseif(CMAKE_GENERATOR MATCHES "Visual Studio" OR DEFINED ENV{VCINSTALLDIR})
     include("${CMAKE_CURRENT_LIST_DIR}/msvc.cmake")
   else()
     if(NOT _caudio_auto_msg_shown)

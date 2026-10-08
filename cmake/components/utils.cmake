@@ -21,11 +21,11 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/log.cpp
   src/utils/thread.cpp
 )
-caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} MODULE_SOURCES ${CAUDIO_UTILS_MODULE_SOURCES} DEPS Threads::Threads INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/include)
+caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} MODULE_SOURCES ${CAUDIO_UTILS_MODULE_SOURCES} DEPS Threads::Threads)
 # nlohmann is the private backend of src/utils/json.cpp (opaque Json facade):
 # plain PRIVATE -I, never a target link (a link would force it into
 # install(EXPORT) -- see CMakeLists CAUDIO_NLOHMANN_PRIVATE_INCLUDE).
-target_include_directories(utils PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
+target_include_directories(utils SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
 target_include_directories(utils PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(utils EXTRA_DEPS Threads::Threads)

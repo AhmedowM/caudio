@@ -42,7 +42,8 @@ ctest --preset dev
 |---|---|---|
 | Linux | `dev` (default) or `dev-gcc` | GCC 14+ (default), `dev-clang` also works |
 | macOS | `dev-clang` | brew LLVM Clang only — AppleClang and GCC fail configure (C++23 gaps / dummy audio backend) |
-| Windows | `dev-msvc` | MSVC via the Visual Studio 2026 generator (no vcvars needed) |
+| Windows | `dev` (default) | LLVM Clang from `PATH` when installed (MSVC ABI target); falls back to MSVC / MinGW GCC |
+| Windows | `dev-msvc` | MSVC via the Visual Studio 2026 generator (no vcvars needed) — CI stays on MSVC |
 | Windows | `dev-gcc` | MinGW GCC 14+ (ships larger binaries) |
 
 Other ready-made presets: `ci` (headless tests, no audio), `ci-sanitizers` (ASan+UBSan, Linux only), `release` / `release-lto` (optimized, tag required), `minsize` (smallest binary), `shared` (shared libs + `libcaudio`), `modules` (C++23 modules, no CLI), `minimal` (no CLI), `docs`, `all`. Compiler variants append `-gcc` / `-clang` / `-msvc` (`ci-clang`, `release-msvc`, …). The `custom` preset builds into `$CAUDIO_BUILD_DIR` with the compiler from `PATH`.
@@ -81,7 +82,8 @@ Everything is a preset; individual options exist for scripting and CI:
 
 Requirements:
 
-- **Compilers** -- Linux: GCC 14+ (default) or Clang 17+; macOS: brew LLVM Clang (`brew install llvm`); Windows: MSVC 2022+ via `dev-msvc`-style presets, or MinGW GCC 14+
+- **Compilers** -- Linux: GCC 14+ (default) or Clang 17+; macOS: brew LLVM Clang (`brew install llvm`);
+Windows: LLVM Clang preferred (MSVC ABI target, also what releases build with), MSVC 2022+ via `dev-msvc`-style presets (CI), or MinGW GCC 14+
 - **CMake ≥ 3.28**, **Ninja** (required for C++23 modules, recommended everywhere)
 - **FFmpeg** -- system install preferred (Ubuntu: `libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`; macOS: `brew install ffmpeg`; Windows: `choco install ffmpeg`), else auto-fetched
 - **Auto-fetched, no action needed** -- Catch2 3.16.0 (tests only), CLI11 2.7.2 (CLI only)
@@ -231,9 +233,9 @@ API docs: `cmake --preset docs && cmake --build --preset docs` → `build/docs/d
 Packaging:
 
 ```sh
-cmake --preset release-clang   # or release-gcc / release-msvc (tag required)
-cmake --build --preset release-clang
-cmake --install build/release-clang --prefix /usr/local
+cmake --preset release-lto-clang   # or release-lto-gcc (tag required); releases ship from release-lto-*
+cmake --build --preset release-lto-clang
+cmake --install build/release-lto-clang --prefix /usr/local
 # man page: /usr/local/share/man/man1/caudio.1
 # modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/modules/*.cppm (same level as include/)
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake

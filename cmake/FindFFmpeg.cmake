@@ -109,6 +109,8 @@ if(FFmpeg_FOUND)
   endif()
 
   if(NOT TARGET FFmpeg::avcodec)
+    # NOTE: keep plain INTERFACE_INCLUDE_DIRECTORIES -- IMPORTED targets
+    # arrive as -isystem automatically; explicit SYSTEM here drops the dirs.
     add_library(FFmpeg::avcodec UNKNOWN IMPORTED)
     set_target_properties(FFmpeg::avcodec PROPERTIES
       IMPORTED_LOCATION "${FFmpeg_AVCODEC_LIBRARY}"
