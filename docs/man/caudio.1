@@ -1,4 +1,4 @@
-.TH CAUDIO 1 "" "caudio X.Y.Z" "User Commands"
+.TH CAUDIO 1 "" "caudio" "User Commands"
 .SH NAME
 caudio \- C++23 headless music player daemon and CLI
 .SH SYNOPSIS
@@ -47,8 +47,10 @@ is a C++23 headless music player. It consists of a background daemon
 local IPC channel (Unix Domain Socket on POSIX, Named Pipe on Windows)
 using a JSON protocol with a 4\-byte big\-endian length prefix.
 Audio decoding uses FFmpeg (libavformat/avcodec/avutil/swresample).
-The library is split into modules: \fBcaudio::utils\fR, \fBcaudio::player\fR,
-\fBcaudio::db\fR, \fBcaudio::engine\fR, plus \fBcaudio::cli\fR/\fBservice\fR/\fBclient\fR.
+The library is split into components: \fBcaudio::utils\fR, \fBcaudio::player\fR,
+\fBcaudio::db\fR, \fBcaudio::engine\fR, \fBcaudio::ipc\fR, \fBcaudio::service\fR,
+\fBcaudio::client\fR, \fBcaudio::config\fR, \fBcaudio::app\fR (plus
+\fBcaudio::version\fR).
 .PP
 Shared\-memory status (\fBAtomicShmStatus\fR) is published at 10 fps for
 low\-latency TUI polling without IPC round\-trips.
@@ -66,7 +68,7 @@ Daemon log level: \fBtrace\fR|\fBdebug\fR|\fBinfo\fR|\fBwarn\fR|\fBerror\fR.
 Audio output device ID. Overrides config.
 .TP
 .BR \-\-version
-Show version (\fBcaudio::versionFull\fR, e.g. \fBvX.Y.Z\fR) and exit.
+Show version (\fBcaudio::version::version()\fR) and exit.
 .TP
 .BR \-h ", " \-\-help
 Print help and exit.

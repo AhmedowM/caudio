@@ -52,7 +52,7 @@ class IpcClient {
      * @param socketPathOverride Optional explicit socket path (e.g., from --socket or config).
      * @return IpcClient on success, Error on connection failure.
      *
-     * If socketPathOverride is empty, uses cli::socketPathFor(dbPath) to derive
+     * If socketPathOverride is empty, uses config::socketPathFor(dbPath) to derive
      * the canonical socket path (honors XDG/LOCALAPPDATA + hash of dbPath).
      */
     static caudio::utils::Expected<IpcClient> connect(const std::filesystem::path& dbPath,

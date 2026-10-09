@@ -35,7 +35,7 @@ std::filesystem::path lockPathForSocket(const std::filesystem::path& dbPath,
 
 /**
  * @brief Get socket path for a database path.
- * Delegates to cli::socketPathFor; falls back to platform-specific default.
+ * Delegates to config::socketPathFor; falls back to platform-specific default.
  * Windows: Named pipe \\.\pipe\caudio-<hash>
  * POSIX: $XDG_RUNTIME_DIR/caudio/caudio-<hash>.sock (created if needed)
  * @param dbPath Database path.

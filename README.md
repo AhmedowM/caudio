@@ -149,7 +149,7 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio config import <path>` | Validate and import config file |
 | `caudio config reset [key]` | Reset key or all to defaults |
 
-Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::versionFull`, e.g. `vX.Y.Z`), `--help` / `-h`. Exit codes: `0` success, `1` runtime/validation error, `105` bad option value, `106` missing argument, `109` unknown command (see `EXIT STATUS` in `docs/man/caudio.1`).
+Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::version::version()`), `--help` / `-h`. Exit codes: `0` success, `1` runtime/validation error, `105` bad option value, `106` missing argument, `109` unknown command (see `EXIT STATUS` in `docs/man/caudio.1`).
 
 ### As a library
 
@@ -241,7 +241,7 @@ cmake --install build/release-lto-clang --prefix /usr/local
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
-`cpack --config build/<preset>/CPackConfig.cmake` produces `caudio-X.Y.Z-<system>.tar.gz` / `.zip`.
+`cpack --config build/<preset>/CPackConfig.cmake` produces `caudio-<ver>-<os>-<arch>[-dev].tar.gz` / `.zip` (one format per OS: ZIP on Windows, TGZ elsewhere).
 
 ## License
 
