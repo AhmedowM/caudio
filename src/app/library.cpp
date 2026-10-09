@@ -2,7 +2,7 @@
  * @file library.cpp
  * @brief Library command handlers (scan/search/stats/list/add/remove).
  * @ingroup caudio_app
- * @details Moved verbatim out of the CLI shell (Phase 0).
+ * @details Phase 1: returns outcome data; the frontend renders.
  */
 
 #include <app/detail.hpp>
@@ -11,80 +11,67 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/print.hpp>
 #include <cctype>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <format>
-#include <iostream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
 
 namespace caudio::app {
 
-int App::libraryScan(std::optional<std::string> path, bool fullHash, bool asJson) {
+AppResult App::libraryScan(std::optional<std::string> path, bool fullHash) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryScan{path, fullHash}};
-    return sendViaClient(cmd, asJson);
+    return confirm(sendRaw(cmd));
 }
 
-int App::librarySearch(const std::string& query, int limit, bool asJson) {
+AppResult App::librarySearch(const std::string& query, int limit) {
     caudio::ipc::Command cmd{caudio::ipc::LibrarySearch{query, limit}};
-    auto res = sendRaw(cmd);
-    if (!res)
-        return printErr(res.error());
-    if (asJson)
-        return printJson(*res);
-    caudio::client::OutputFormatter fmt{false, detail::useColor()};
-    fmt.setHighlightNeedle(query);
-    fmt.print(*res, std::cout);
-    return 0;
+    return confirm(sendRaw(cmd));
 }
 
-int App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
-                      const std::vector<std::int64_t>& playlists, bool asJson) {
+BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
+                              const std::vector<std::int64_t>& playlists) {
+    if (mostPlayed < -1)
+        return BatchReport::fail("library stats: --most-played needs N >= 0");
+    BatchReport rep;
+    std::optional<caudio::ipc::Result> table;
     bool detailed = mostPlayed >= 0;
-    if (asJson && (!queues.empty() || !playlists.empty())) {
-        caudio::println(std::cerr, "library stats: --json takes no --queue or --playlist");
-        return 1;
-    }
-    if (mostPlayed < -1) {
-        caudio::println(std::cerr, "library stats: --most-played needs N >= 0");
-        return 1;
-    }
     if (detailed) {
         caudio::ipc::Command cmd{caudio::ipc::LibraryStatsDetailed{mostPlayed}};
         auto res = sendRaw(cmd);
         if (!res)
-            return printErr(res.error());
-        if (asJson)
-            return printJson(*res);
-        caudio::client::OutputFormatter fmt{false};
-        fmt.print(*res, std::cout);
+            return std::unexpected{res.error()};
+        table = std::move(*res);
     } else {
         caudio::ipc::Command cmd{caudio::ipc::LibraryStats{}};
         auto res = sendRaw(cmd);
         if (!res)
-            return printErr(res.error());
-        if (asJson)
-            return printJson(*res);
+            return std::unexpected{res.error()};
+        table = std::move(*res);
+    }
+    rep.json = std::move(table);
+    {
         caudio::client::OutputFormatter fmt{false};
-        fmt.print(*res, std::cout);
+        std::ostringstream os;
+        fmt.print(*rep.json, os);
+        detail::appendBlock(rep.out, os.str());
     }
     if (!queues.empty() || !playlists.empty())
-        caudio::println("");
+        rep.out += '\n';
     if (!queues.empty()) {
         caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
         auto res = sendRaw(cmd);
         if (!res)
-            return printErr(res.error());
+            return std::unexpected{res.error()};
         auto* qs = std::get_if<caudio::ipc::Queues>(&*res);
         if (!qs) {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
-            return 0;
+            detail::renderInto(rep.out, *res);
+            return rep;
         }
         bool all = false;
         for (auto& q : queues) {
@@ -94,29 +81,28 @@ int App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
             }
         }
         if (all) {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
+            detail::renderInto(rep.out, *res);
         } else {
             for (auto& q : queues) {
                 long long id = 0;
                 try {
                     id = std::stoll(q);
                 } catch (...) {
-                    caudio::println(std::cerr, "library stats: bad queue selector '{}'", q);
-                    return 1;
+                    return BatchReport::fail(
+                        std::format("library stats: bad queue selector '{}'", q));
                 }
                 bool found = false;
                 for (auto& e : qs->entries) {
                     if (e.id == id) {
-                        caudio::println("Queue {} '{}': {} tracks", e.id, e.name, e.tracks);
+                        if (!rep.out.empty())
+                            rep.out += '\n';
+                        rep.out += std::format("Queue {} '{}': {} tracks", e.id, e.name, e.tracks);
                         found = true;
                         break;
                     }
                 }
-                if (!found) {
-                    caudio::println(std::cerr, "library stats: no such queue: {}", id);
-                    return 1;
-                }
+                if (!found)
+                    return BatchReport::fail(std::format("library stats: no such queue: {}", id));
             }
         }
     }
@@ -124,11 +110,10 @@ int App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
         caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{pid}};
         auto res = sendRaw(cmd);
         if (!res)
-            return printErr(res.error());
+            return std::unexpected{res.error()};
         auto* pd = std::get_if<caudio::ipc::PlaylistData>(&*res);
         if (!pd) {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*res, std::cout);
+            detail::renderInto(rep.out, *res);
             continue;
         }
         std::string name;
@@ -146,35 +131,36 @@ int App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
                 }
             }
         }
-        if (name.empty()) {
-            caudio::println(std::cerr, "library stats: no such playlist: {}", pid);
-            return 1;
-        }
+        if (name.empty())
+            return BatchReport::fail(std::format("library stats: no such playlist: {}", pid));
+        if (!rep.out.empty())
+            rep.out += '\n';
         if (pd->tracks.size() == 1)
-            caudio::println("Playlist '{}': 1 track", name);
+            rep.out += std::format("Playlist '{}': 1 track", name);
         else
-            caudio::println("Playlist '{}': {} tracks", name, pd->tracks.size());
+            rep.out += std::format("Playlist '{}': {} tracks", name, pd->tracks.size());
     }
-    return 0;
+    return rep;
 }
 
-int App::libraryList(const std::string& query, int limit, int offset, const std::string& artist,
-                     const std::string& album, const std::string& genre, bool asJson) {
+AppResult App::libraryList(const std::string& query, int limit, int offset,
+                           const std::string& artist, const std::string& album,
+                           const std::string& genre) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryList{
         query.empty() ? std::optional<std::string>{} : std::optional<std::string>{query}, limit,
         offset, artist.empty() ? std::optional<std::string>{} : std::optional<std::string>{artist},
         album.empty() ? std::optional<std::string>{} : std::optional<std::string>{album},
         genre.empty() ? std::optional<std::string>{} : std::optional<std::string>{genre}}};
-    return sendViaClient(cmd, asJson);
+    return confirm(sendRaw(cmd));
 }
 
-int App::libraryAdd(const std::string& path, bool recursive, bool asJson) {
+AppResult App::libraryAdd(const std::string& path, bool recursive) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryAdd{path, recursive}};
-    return confirm(sendRaw(cmd), asJson, std::format("Added {} to library", path));
+    return confirm(sendRaw(cmd), std::format("Added {} to library", path));
 }
 
-int App::libraryRemove(const std::string& query, bool asJson) {
-    // Resolve a label first so the confirmation names the track.
+AppResult App::libraryRemove(const std::string& query) {
+    // Resolve a label first so the confirmation names it.
     std::string label;
     bool numeric = !query.empty();
     for (char c : query) {
@@ -206,14 +192,10 @@ int App::libraryRemove(const std::string& query, bool asJson) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryRemove{query}};
     auto res = sendRaw(cmd);
     if (!res)
-        return printErr(res.error());
-    if (asJson)
-        return printJson(*res);
-    if (!label.empty())
-        caudio::println("Removed from library {}", label);
-    else
-        caudio::println("Removed {} from library", query);
-    return 0;
+        return std::unexpected{res.error()};
+    std::string line = !label.empty() ? std::format("Removed from library {}", label)
+                                      : std::format("Removed {} from library", query);
+    return Outcome{std::move(*res), std::move(line), false, false};
 }
 
 } // namespace caudio::app

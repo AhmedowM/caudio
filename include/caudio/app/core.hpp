@@ -58,6 +58,24 @@ struct Outcome {
 /** @brief Handler return: outcome data, or the error to render. */
 using AppResult = std::expected<Outcome, caudio::utils::Error>;
 
+/**
+ * @brief Multi-step batch outcome: stdout/stderr blobs plus JSON payload.
+ * @ingroup caudio_app
+ * @details Batch commands (adds, removes, stats) accumulate output text
+ * instead of printing; the frontend flushes each stream. err prints to
+ * stderr in both modes, json renders under --json, out prints in text
+ * mode, exitCode is the process exit code.
+ */
+struct BatchReport {
+    std::optional<ipc::Result> json;
+    std::string out;
+    std::string err;
+    int exitCode = 0;
+    static std::expected<BatchReport, caudio::utils::Error> fail(std::string message);
+};
+/** @brief Batch handler return. */
+using BatchResult = std::expected<BatchReport, caudio::utils::Error>;
+
 /** @brief Known tag fields accepted by tagValue. @ingroup caudio_app */
 inline constexpr std::array<std::string_view, 8> kTagFields{
     "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
@@ -385,13 +403,13 @@ class App {
      * @param path Scan root, or nullopt for the configured library path.
      * @param fullHash Fingerprint full content instead of sampling.
      */
-    int libraryScan(std::optional<std::string> path, bool fullHash, bool asJson);
+    AppResult libraryScan(std::optional<std::string> path, bool fullHash);
 
     /**
      * @brief Searches the library (filenames included).
      * @ingroup caudio_app
      */
-    int librarySearch(const std::string& query, int limit, bool asJson);
+    AppResult librarySearch(const std::string& query, int limit);
 
     /**
      * @brief Shows library stats, optionally with queue/playlist breakdowns.
@@ -399,8 +417,8 @@ class App {
      * @param mostPlayed Top-N threshold (>= 0 enables detailed mode).
      * @param queues Queue selectors ("all" or numeric ids).
      */
-    int libraryStats(int mostPlayed, const std::vector<std::string>& queues,
-                     const std::vector<std::int64_t>& playlists, bool asJson);
+    BatchResult libraryStats(int mostPlayed, const std::vector<std::string>& queues,
+                             const std::vector<std::int64_t>& playlists);
 
     /**
      * @brief Lists library tracks with optional filters.
@@ -408,18 +426,19 @@ class App {
      * @details Empty strings mean no filter; translated to nullopts here so
      * frontends pass plain values.
      */
-    int libraryList(const std::string& query, int limit, int offset, const std::string& artist,
-                    const std::string& album, const std::string& genre, bool asJson);
+    AppResult libraryList(const std::string& query, int limit, int offset,
+                          const std::string& artist, const std::string& album,
+                          const std::string& genre);
 
     /** @brief Adds a file or directory to the library. @ingroup caudio_app */
-    int libraryAdd(const std::string& path, bool recursive, bool asJson);
+    AppResult libraryAdd(const std::string& path, bool recursive);
 
     /**
      * @brief Removes a track from the library (id or path).
      * @ingroup caudio_app
      * @details Resolves a human label first so the confirmation names it.
      */
-    int libraryRemove(const std::string& query, bool asJson);
+    AppResult libraryRemove(const std::string& query);
 
     /**
      * @brief Edits one track tag field (database row).

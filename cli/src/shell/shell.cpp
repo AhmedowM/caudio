@@ -1,5 +1,6 @@
 #include <cstdio>
 #ifdef _WIN32
+#include <io.h>
 #else
 #include <unistd.h>
 #endif
@@ -111,6 +112,7 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>
 #include <expected>
 #include <filesystem>
@@ -192,6 +194,17 @@ int renderJson(const caudio::ipc::Result& r) {
     return 0;
 }
 
+// Terminal color detection for renderers (NO_COLOR honored).
+bool useColor() {
+    if (std::getenv("NO_COLOR") != nullptr)
+        return false;
+#ifdef _WIN32
+    return ::_isatty(::_fileno(stdout)) != 0;
+#else
+    return ::isatty(STDOUT_FILENO) != 0;
+#endif
+}
+
 // Renders a Phase-1 outcome: errors (with hint), JSON results, human
 // lines, bare results, or silent success, in that order.
 int render(caudio::app::AppResult res, bool asJson) {
@@ -219,6 +232,24 @@ int render(caudio::app::AppResult res, bool asJson) {
         fmt.print(*outcome.result, std::cout);
     }
     return 0;
+}
+
+// Flushes a batch report: stderr blob, JSON payload under --json,
+// stdout blob in text mode, then the recorded exit code.
+int renderBatch(caudio::app::BatchResult res, bool asJson) {
+    if (!res)
+        return renderError(res.error());
+    auto& rep = *res;
+    if (!rep.err.empty())
+        caudio::println(std::cerr, "{}", rep.err);
+    if (asJson) {
+        if (rep.json)
+            renderJson(*rep.json);
+        return rep.exitCode;
+    }
+    if (!rep.out.empty())
+        caudio::println(std::cout, "{}", rep.out);
+    return rep.exitCode;
 }
 
 } // namespace detail
@@ -851,20 +882,38 @@ int Shell::run(int argc, char** argv) {
             std::optional<std::string> p;
             if (!libScanPath.empty())
                 p = libScanPath;
-            return app_.libraryScan(p, libScanFullHash, libScanJson);
+            return detail::render(app_.libraryScan(p, libScanFullHash), libScanJson);
         }
-        if (libSearch->parsed())
-            return app_.librarySearch(libSearchQuery, libSearchLimit, libSearchJson);
-        if (libStats->parsed())
-            return app_.libraryStats(libStatsMostPlayed, libStatsQueues, libStatsPlaylists,
-                                     libStatsJson);
+        if (libSearch->parsed()) {
+            auto sr = app_.librarySearch(libSearchQuery, libSearchLimit);
+            if (!sr)
+                return detail::renderError(sr.error());
+            if (!sr->result)
+                return 0;
+            if (libSearchJson)
+                return detail::renderJson(*sr->result);
+            caudio::client::OutputFormatter fmt{false, detail::useColor()};
+            fmt.setHighlightNeedle(libSearchQuery);
+            fmt.print(*sr->result, std::cout);
+            return 0;
+        }
+        if (libStats->parsed()) {
+            if (libStatsJson && (!libStatsQueues.empty() || !libStatsPlaylists.empty())) {
+                caudio::println(std::cerr, "library stats: --json takes no --queue or --playlist");
+                return 1;
+            }
+            return detail::renderBatch(
+                app_.libraryStats(libStatsMostPlayed, libStatsQueues, libStatsPlaylists),
+                libStatsJson);
+        }
         if (libList->parsed())
-            return app_.libraryList(libListQuery, libListLimit, libListOffset, libListArtist,
-                                    libListAlbum, libListGenre, libListJson);
+            return detail::render(app_.libraryList(libListQuery, libListLimit, libListOffset,
+                                                   libListArtist, libListAlbum, libListGenre),
+                                  libListJson);
         if (libAdd->parsed())
-            return app_.libraryAdd(libAddPath, libAddRecursive, libAddJson);
+            return detail::render(app_.libraryAdd(libAddPath, libAddRecursive), libAddJson);
         if (libRemove->parsed())
-            return app_.libraryRemove(libRemoveQuery, libRemoveJson);
+            return detail::render(app_.libraryRemove(libRemoveQuery), libRemoveJson);
         std::cout << libCmd->help() << "\n";
         return 0;
     }

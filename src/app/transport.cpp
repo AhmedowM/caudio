@@ -105,6 +105,10 @@ AppResult Outcome::fail(std::string message) {
     return Outcome{std::nullopt, std::move(message), true, true};
 }
 
+BatchResult BatchReport::fail(std::string message) {
+    return BatchReport{std::nullopt, "", std::move(message), 1};
+}
+
 AppResult App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
                        std::optional<std::string> line) {
     auto owned = std::move(res);
