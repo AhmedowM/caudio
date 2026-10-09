@@ -479,11 +479,13 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
   endif()
 endif()
 
-# C++23 module sources for BMI rebuild (only when modules enabled).
-# Both rules converge on <prefix>/modules/ (same level as include/).
-if(CAUDIO_ENABLE_MODULES)
-  install(DIRECTORY modules/ DESTINATION modules COMPONENT dev FILES_MATCHING PATTERN "*.cppm")
-endif()
+# C++23 module sources for BMI rebuild (shipped always, built on demand).
+# Installed at <prefix>/modules/ (same level as include/). These are pure
+# sources: downstream users compile them against the installed headers.
+# BMIs are never shipped (compiler/flag-specific); building them stays
+# opt-in via CAUDIO_ENABLE_MODULES. (Gating this on the option is what kept
+# module sources out of the release archives.)
+install(DIRECTORY modules/ DESTINATION modules COMPONENT dev FILES_MATCHING PATTERN "*.cppm")
 
 # Man page -- roff source tracked at docs/man/caudio.1
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1")

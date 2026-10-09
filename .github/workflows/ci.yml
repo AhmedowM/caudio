@@ -301,6 +301,8 @@ jobs:
           test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
           echo "=== no module sources in header-mode install ==="
           test ! -d /tmp/caudio-install/include/caudio/src && echo "no src/*.cppm (expected, modules OFF)" || (echo "unexpected src/*.cppm shipped" && exit 1)
+          echo "=== module sources shipped (dev component, build stays opt-in) ==="
+          test -f /tmp/caudio-install/modules/caudio.cppm && echo "modules/caudio.cppm found" || (echo "modules/caudio.cppm missing" && exit 1)
           test -f /tmp/caudio-install/lib/cmake/caudio/caudioConfig.cmake && echo "caudioConfig.cmake found" || echo "caudioConfig.cmake missing"
           test -f /tmp/caudio-install/lib/cmake/caudio/FindFFmpeg.cmake && echo "FindFFmpeg.cmake found" || (echo "FindFFmpeg.cmake missing" && exit 1)
           test -f /tmp/caudio-install/include/caudio/version_config.hpp && echo "version_config.hpp found" || (echo "version_config.hpp missing" && exit 1)
