@@ -2,28 +2,23 @@
  * @file playlist.cpp
  * @brief Playlist command handlers.
  * @ingroup caudio_app
- * @details Moved verbatim out of the CLI shell (Phase 0): listing, track
- * contents, creation, adding (ids and paths with library resolution),
- * loading, saving, deletion, renaming, file export and import.
+ * @details Phase 1: returns outcome data; the frontend renders. Listing,
+ * track contents, creation, adding (ids and paths with library
+ * resolution), loading, saving, deletion, renaming, file export/import.
  */
 
+#include <app/detail.hpp>
 #include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/core.hpp>
-#include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
-#include <caudio/utils/print.hpp>
-#include <caudio/utils/result.hpp>
-#include <chrono>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -33,49 +28,40 @@
 
 namespace caudio::app {
 
-int App::playlistList(bool asJson) {
+AppResult App::playlistList() {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistList{}};
-    return sendViaClient(cmd, asJson);
+    return confirm(sendRaw(cmd));
 }
 
-int App::playlistTracks(std::int64_t pid, bool asJson) {
+AppResult App::playlistTracks(std::int64_t pid) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{pid}};
-    return sendViaClient(cmd, asJson);
+    return confirm(sendRaw(cmd));
 }
 
-int App::playlistCreate(const std::string& name, bool asJson) {
+AppResult App::playlistCreate(const std::string& name) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistCreate{name}};
     auto res = sendRaw(cmd);
     if (!res)
-        return printErr(res.error());
-    if (asJson)
-        return printJson(*res);
+        return std::unexpected{res.error()};
     if (auto* pc = std::get_if<caudio::ipc::PlaylistCreated>(&*res)) {
-        caudio::println("Created playlist {} '{}'", pc->id, pc->name);
-        return 0;
+        return Outcome{std::move(*res), std::format("Created playlist {} '{}'", pc->id, pc->name),
+                       false, false};
     }
-    caudio::client::OutputFormatter fmt{false};
-    fmt.print(*res, std::cout);
-    return 0;
+    return Outcome{std::move(*res), std::nullopt, false, false};
 }
 
-int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
-                     const std::vector<std::string>& paths, bool recursive, bool asJson) {
-    if (ids.empty() && paths.empty()) {
-        caudio::println(std::cerr, "playlist add: need --id ID or PATH");
-        return 1;
-    }
+BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
+                             const std::vector<std::string>& paths, bool recursive) {
+    if (ids.empty() && paths.empty())
+        return BatchReport::fail("playlist add: need --id ID or PATH");
     std::vector<int64_t> resolved;
     for (auto& s : ids) {
-        if (!caudio::app::isNumeric(s)) {
-            caudio::println(std::cerr, "playlist add: --id needs numeric ids");
-            return 1;
-        }
+        if (!caudio::app::isNumeric(s))
+            return BatchReport::fail("playlist add: --id needs numeric ids");
         try {
             resolved.push_back(std::stoll(s));
         } catch (...) {
-            caudio::println(std::cerr, "playlist add: id out of range: {}", s);
-            return 1;
+            return BatchReport::fail(std::format("playlist add: id out of range: {}", s));
         }
     }
     // PATHs: expand, ensure library rows, resolve exact ids.
@@ -83,19 +69,21 @@ int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
     std::vector<std::string> unmatched;
     for (auto& tok : paths)
         caudio::app::expandAddToken(tok, recursive, files, unmatched);
+    BatchReport rep;
     bool hardFail = false;
     for (auto& u : unmatched) {
         if (caudio::app::isNumeric(u)) {
-            caudio::println(std::cerr, "playlist add: '{}' is not a file (use --id for ids)", u);
+            detail::emitLine(rep.err,
+                             std::format("playlist add: '{}' is not a file (use --id for ids)", u));
             hardFail = true;
         } else if (caudio::app::hasGlobChars(u)) {
-            caudio::println(std::cerr, "No files matched: {}", u);
+            detail::emitLine(rep.err, std::format("No files matched: {}", u));
         } else {
             std::error_code ec;
             if (std::filesystem::is_directory(u, ec) && !ec)
-                caudio::println(std::cerr, "No files matched: {}", u);
+                detail::emitLine(rep.err, std::format("No files matched: {}", u));
             else {
-                caudio::println(std::cerr, "playlist add: no such file: {}", u);
+                detail::emitLine(rep.err, std::format("playlist add: no such file: {}", u));
                 hardFail = true;
             }
         }
@@ -104,7 +92,7 @@ int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
         caudio::ipc::Command acmd{caudio::ipc::LibraryAdd{f, false}};
         auto ares = sendRaw(acmd);
         if (!ares) {
-            printErr(ares.error());
+            detail::renderErrorInto(rep.err, ares.error());
             hardFail = true;
             continue;
         }
@@ -112,14 +100,13 @@ int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
         caudio::ipc::Command scmd{caudio::ipc::LibrarySearch{fn, 50}};
         auto sres = sendRaw(scmd);
         if (!sres) {
-            printErr(sres.error());
+            detail::renderErrorInto(rep.err, sres.error());
             hardFail = true;
             continue;
         }
         auto* sr = std::get_if<caudio::ipc::SearchResults>(&*sres);
         if (!sr) {
-            caudio::client::OutputFormatter fmt{false};
-            fmt.print(*sres, std::cout);
+            detail::renderInto(rep.out, *sres);
             hardFail = true;
             continue;
         }
@@ -132,7 +119,7 @@ int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
             }
         }
         if (!found) {
-            caudio::println(std::cerr, "playlist add: not in library: {}", f);
+            detail::emitLine(rep.err, std::format("playlist add: not in library: {}", f));
             hardFail = true;
         }
     }
@@ -144,116 +131,98 @@ int App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
         if (!res) {
             const auto& e = res.error();
             if (e.code == caudio::utils::StatusCode::AlreadyExists) {
-                caudio::println(std::cerr, "already on playlist: track {}", tid);
+                detail::emitLine(rep.err, std::format("already on playlist: track {}", tid));
                 continue;
             }
-            printErr(e);
+            detail::renderErrorInto(rep.err, e);
             hardFail = true;
             continue;
         }
-        if (asJson) {
-            caudio::ipc::Command gcmd{caudio::ipc::TagGet{tid}};
-            if (auto gres = sendRaw(gcmd)) {
-                if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*gres))
-                    collected.tracks.push_back(st->track);
+        caudio::ipc::Command gcmd{caudio::ipc::TagGet{tid}};
+        std::string label;
+        if (auto gres = sendRaw(gcmd)) {
+            if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*gres)) {
+                collected.tracks.push_back(st->track);
+                label = caudio::app::addedLabel(st->track);
             }
-        } else {
-            std::string label;
-            caudio::ipc::Command gcmd{caudio::ipc::TagGet{tid}};
-            if (auto gres = sendRaw(gcmd)) {
-                if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*gres))
-                    label = caudio::app::addedLabel(st->track);
-            }
-            if (label.empty())
-                label = "track " + std::to_string(tid);
-            caudio::println("Added {} to playlist {}", label, pid);
         }
+        if (label.empty())
+            label = "track " + std::to_string(tid);
+        detail::emitLine(rep.out, std::format("Added {} to playlist {}", label, pid));
         ++added;
     }
-    if (asJson)
-        return printJson(caudio::ipc::Result{std::move(collected)});
-    if (added == 1)
-        caudio::println("1 track added");
-    else
-        caudio::println("{} tracks added", added);
-    if (added == 0 && hardFail)
-        return 1;
-    return 0;
+    rep.json = caudio::ipc::Result{std::move(collected)};
+    detail::countLineText(added, rep.out);
+    rep.exitCode = (added == 0 && hardFail) ? 1 : 0;
+    return rep;
 }
 
-int App::playlistLoad(std::int64_t pid, bool play, bool replace, bool asJson) {
+AppResult App::playlistLoad(std::int64_t pid, bool play, bool replace) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistLoad{pid, play, replace}};
     auto res = sendRaw(cmd);
     if (!res)
-        return printErr(res.error());
-    if (asJson)
-        return printJson(*res);
+        return std::unexpected{res.error()};
     if (auto* pl = std::get_if<caudio::ipc::PlaylistLoaded>(&*res)) {
-        if (replace)
-            caudio::println("Replaced queue {} with playlist {}", pl->queue_id, pid);
-        else
-            caudio::println("Loaded playlist {} into queue {}", pid, pl->queue_id);
+        std::string line =
+            replace ? std::format("Replaced queue {} with playlist {}", pl->queue_id, pid)
+                    : std::format("Loaded playlist {} into queue {}", pid, pl->queue_id);
         if (play)
-            caudio::println("Playing {}", caudio::app::trackWho(pl->status));
-        return 0;
+            line += std::format("\nPlaying {}", caudio::app::trackWho(pl->status));
+        return Outcome{std::move(*res), std::move(line), false, false};
     }
-    caudio::client::OutputFormatter fmt{false};
-    fmt.print(*res, std::cout);
-    return 0;
+    return Outcome{std::move(*res), std::nullopt, false, false};
 }
 
-int App::playlistSave(const std::string& name, std::optional<std::int64_t> qid, bool asJson) {
+AppResult App::playlistSave(const std::string& name, std::optional<std::int64_t> qid) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistSave{name, qid}};
     std::string line = std::format("Saved playlist '{}'", name);
-    return confirm(sendRaw(cmd), asJson, line);
+    return confirm(sendRaw(cmd), std::move(line));
 }
 
-int App::playlistDelete(std::int64_t pid, bool asJson) {
+AppResult App::playlistDelete(std::int64_t pid) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistDelete{pid}};
-    return confirm(sendRaw(cmd), asJson, std::format("Deleted playlist {}", pid));
+    return confirm(sendRaw(cmd), std::format("Deleted playlist {}", pid));
 }
 
-int App::playlistRename(std::int64_t pid, const std::string& name, bool asJson) {
+AppResult App::playlistRename(std::int64_t pid, const std::string& name) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistRename{pid, name}};
-    return confirm(sendRaw(cmd), asJson, std::format("Renamed playlist {} to '{}'", pid, name));
+    return confirm(sendRaw(cmd), std::format("Renamed playlist {} to '{}'", pid, name));
 }
 
-int App::playlistExport(std::int64_t pid, const std::string& path, const std::string& format) {
+BatchResult App::playlistExport(std::int64_t pid, const std::string& path,
+                                const std::string& format) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistExport{pid, path, format}};
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto timeout = std::chrono::milliseconds{5000};
     auto cliRes = client.send(cmd, timeout);
-    if (!cliRes) {
-        caudio::println(std::cerr, "export: {}", cliRes.error().message);
-        return 1;
-    }
+    if (!cliRes)
+        return BatchReport::fail(std::format("export: {}", cliRes.error().message));
     if (std::holds_alternative<caudio::utils::Error>(*cliRes)) {
-        caudio::println(std::cerr, "export: {}", std::get<caudio::utils::Error>(*cliRes).message);
-        return 1;
+        return BatchReport::fail(
+            std::format("export: {}", std::get<caudio::utils::Error>(*cliRes).message));
     }
+    BatchReport rep;
     if (std::holds_alternative<caudio::ipc::PlaylistData>(*cliRes)) {
         auto& pd = std::get<caudio::ipc::PlaylistData>(*cliRes);
         std::ofstream ofs(path);
-        if (!ofs) {
-            caudio::println(std::cerr, "export: failed to open output file '{}'", path);
-            return 1;
-        }
+        if (!ofs)
+            return BatchReport::fail(std::format("export: failed to open output file '{}'", path));
         if (pd.format == "m3u" || pd.format == "pls") {
             caudio::app::writePlaylistText(ofs, pd.tracks, pd.format);
         } else if (pd.format == "json") {
             caudio::app::writePlaylistJson(ofs, pd.tracks);
         }
         ofs.close();
-        caudio::println("exported {} tracks to {}", pd.tracks.size(), path);
-        return 0;
+        rep.out = std::format("exported {} tracks to {}", pd.tracks.size(), path);
+        rep.exitCode = 0;
+        return rep;
     }
-    caudio::println(std::cerr, "export: unexpected response from daemon");
-    return 1;
+    return BatchReport::fail("export: unexpected response from daemon");
 }
 
-int App::playlistImport(const std::string& path, std::optional<std::string> name, bool asJson) {
+AppResult App::playlistImport(const std::string& path, std::optional<std::string> name) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistImport{path, name}};
-    return sendViaClient(cmd, asJson);
+    return confirm(sendRaw(cmd));
 }
 
 } // namespace caudio::app

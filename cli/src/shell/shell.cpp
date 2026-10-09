@@ -23,6 +23,7 @@
 #endif
 
 #include <CLI/CLI.hpp>
+#include <app/detail.hpp>
 #include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
@@ -180,11 +181,9 @@ std::string statusLine(const caudio::ipc::Status& st) {
 }
 
 int renderError(const caudio::utils::Error& e) {
-    caudio::ipc::Result errRes{e};
-    caudio::client::OutputFormatter fmt{false};
-    fmt.print(errRes, std::cerr);
-    if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running")
-        caudio::println(std::cerr, "hint: run `caudio start` to start the daemon");
+    std::string text;
+    caudio::app::detail::renderErrorInto(text, e);
+    caudio::println(std::cerr, "{}", text);
     return 1;
 }
 
@@ -243,8 +242,10 @@ int renderBatch(caudio::app::BatchResult res, bool asJson) {
     if (!rep.err.empty())
         caudio::println(std::cerr, "{}", rep.err);
     if (asJson) {
-        if (rep.json)
+        if (rep.json) {
             renderJson(*rep.json);
+            return 0;
+        }
         return rep.exitCode;
     }
     if (!rep.out.empty())
@@ -847,32 +848,35 @@ int Shell::run(int argc, char** argv) {
     }
     if (plCmd->parsed()) {
         if (plList->parsed())
-            return app_.playlistList(plJson);
+            return detail::render(app_.playlistList(), plJson);
         if (plTracks->parsed())
-            return app_.playlistTracks(plTracksPid, plTracksJson);
+            return detail::render(app_.playlistTracks(plTracksPid), plTracksJson);
         if (plCreate->parsed())
-            return app_.playlistCreate(plCreateName, plCreateJson);
+            return detail::render(app_.playlistCreate(plCreateName), plCreateJson);
         if (plAdd->parsed())
-            return app_.playlistAdd(plAddPid, plAddIds, plAddPaths, plAddRecursive, plAddJson);
+            return detail::renderBatch(
+                app_.playlistAdd(plAddPid, plAddIds, plAddPaths, plAddRecursive), plAddJson);
         if (plLoad->parsed())
-            return app_.playlistLoad(plLoadPid, plLoadPlay, plLoadReplace, plLoadJson);
+            return detail::render(app_.playlistLoad(plLoadPid, plLoadPlay, plLoadReplace),
+                                  plLoadJson);
         if (plSave->parsed()) {
             std::optional<std::int64_t> qid;
             if (plSave->get_option("--queue")->count() > 0)
                 qid = plSaveQid;
-            return app_.playlistSave(plSaveName, qid, plSaveJson);
+            return detail::render(app_.playlistSave(plSaveName, qid), plSaveJson);
         }
         if (plDelete->parsed())
-            return app_.playlistDelete(plDeletePid, plDeleteJson);
+            return detail::render(app_.playlistDelete(plDeletePid), plDeleteJson);
         if (plRename->parsed())
-            return app_.playlistRename(plRenamePid, plRenameName, plRenameJson);
+            return detail::render(app_.playlistRename(plRenamePid, plRenameName), plRenameJson);
         if (plExport->parsed())
-            return app_.playlistExport(plExportPid, plExportPath, plExportFormat);
+            return detail::renderBatch(
+                app_.playlistExport(plExportPid, plExportPath, plExportFormat), false);
         if (plImport->parsed()) {
             std::optional<std::string> name;
             if (!plImportName.empty())
                 name = plImportName;
-            return app_.playlistImport(plImportPath, name, plImportJson);
+            return detail::render(app_.playlistImport(plImportPath, name), plImportJson);
         }
         std::cout << plCmd->help() << "\n";
         return 0;

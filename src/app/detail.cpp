@@ -8,6 +8,7 @@
 #include <caudio/app/format.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/print.hpp>
 #include <cstdint>
 #include <cstdlib>
@@ -121,6 +122,16 @@ void countLineText(int added, std::string& out) {
         emitLine(out, "1 track added");
     else
         emitLine(out, std::format("{} tracks added", added));
+}
+
+void renderErrorInto(std::string& err, const caudio::utils::Error& e) {
+    caudio::ipc::Result errRes{e};
+    caudio::client::OutputFormatter fmt{false};
+    std::ostringstream os;
+    fmt.print(errRes, os);
+    appendBlock(err, os.str());
+    if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running")
+        emitLine(err, "hint: run `caudio start` to start the daemon");
 }
 
 } // namespace caudio::app::detail

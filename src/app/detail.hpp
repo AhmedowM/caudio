@@ -65,4 +65,11 @@ int printAddedText(const caudio::ipc::Result& res, std::set<int64_t>& seen, std:
  */
 void countLineText(int added, std::string& out);
 
+/**
+ * @brief Renders an error plus the start hint into a blob.
+ * @details Single implementation shared by batch loops and the shell
+ * error path, so both render byte-identical text.
+ */
+void renderErrorInto(std::string& err, const caudio::utils::Error& e);
+
 } // namespace caudio::app::detail
