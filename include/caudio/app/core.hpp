@@ -473,26 +473,26 @@ class App {
      * @brief Reads a config value from the local file (no daemon needed).
      * @ingroup caudio_app
      */
-    int configGet(const std::string& key, bool asJson);
+    AppResult configGet(const std::string& key);
 
     /** @brief Sets a config value (daemon-side). @ingroup caudio_app */
-    int configSet(const std::string& key, const std::string& value);
+    AppResult configSet(const std::string& key, const std::string& value);
 
     /** @brief Lists config entries. @ingroup caudio_app */
-    int configList(bool asJson);
+    AppResult configList();
 
     /** @brief Exports config to a file. @ingroup caudio_app */
-    int configExport(const std::string& path, bool asJson);
+    AppResult configExport(const std::string& path);
 
     /** @brief Imports config from a file (validated first). @ingroup caudio_app */
-    int configImport(const std::string& path, bool asJson);
+    AppResult configImport(const std::string& path);
 
     /**
      * @brief Resets config to defaults (one key or all).
      * @ingroup caudio_app
      * @param key Key to reset, or nullopt for everything.
      */
-    int configReset(std::optional<std::string> key, bool asJson);
+    AppResult configReset(std::optional<std::string> key);
 
     /**
      * @brief Plays a file ephemerally without touching the daemon/queue.

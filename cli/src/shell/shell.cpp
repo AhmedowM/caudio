@@ -899,15 +899,15 @@ int Shell::run(int argc, char** argv) {
         return app_.previewFile(previewFile);
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed())
-            return app_.configGet(cfgGetKey, cfgGetJson);
+            return detail::render(app_.configGet(cfgGetKey), cfgGetJson);
         if (cfgSet->parsed())
-            return app_.configSet(cfgSetKey, cfgSetVal);
+            return detail::render(app_.configSet(cfgSetKey, cfgSetVal), false);
         if (cfgList->parsed())
-            return app_.configList(cfgListJson);
+            return detail::render(app_.configList(), cfgListJson);
         if (cfgExport->parsed())
-            return app_.configExport(cfgExportPath, cfgExportJson);
+            return detail::render(app_.configExport(cfgExportPath), cfgExportJson);
         if (cfgImport->parsed())
-            return app_.configImport(cfgImportPath, cfgImportJson);
+            return detail::render(app_.configImport(cfgImportPath), cfgImportJson);
         if (cfgReset->parsed()) {
             std::optional<std::string> k;
             if (cfgReset->count("key") > 0 && !cfgResetKey.empty())
@@ -917,7 +917,7 @@ int Shell::run(int argc, char** argv) {
                 caudio::println(std::cerr, "config reset: empty key (omit --key to reset all)");
                 return 1;
             }
-            return app_.configReset(k, cfgResetJson);
+            return detail::render(app_.configReset(k), cfgResetJson);
         }
         std::cout << cfgCmd->help() << "\n";
         return 0;
