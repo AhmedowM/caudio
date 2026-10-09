@@ -124,6 +124,7 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # header-only is the default; opt in only if you need shared libs
 # (CODEBASE_REVIEW.md KISS-1).
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
+option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" OFF)
 # NOTE: ccache is environment configuration, not a project option; pass
 # -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
 
@@ -410,6 +411,71 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
     else()
       message(WARNING "libwinpthread-1.dll not found next to ${CMAKE_CXX_COMPILER} -- packages will need it on PATH")
     endif()
+  endif()
+endif()
+
+# macOS distributability (UNVERIFIED -- no macOS host as of 2026-10-09; keep
+# CAUDIO_BUNDLE_FFMPEG_MACOS=OFF until validated on a Mac or the macOS
+# release leg). Like Windows, the exe links FFmpeg dynamically -- but brew
+# dylibs carry absolute install names, so a bare archive fails on machines
+# without brew ffmpeg. When enabled, versioned dylibs ship in lib/ and an
+# install-time script rewires ids + references to @rpath and re-signs
+# ad-hoc (install_name_tool invalidates signatures; without re-sign the
+# kernel refuses the binaries on Apple Silicon).
+if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
+  get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
+  set(_ff_dylibs "")
+  foreach(_lib avcodec avformat avutil swresample)
+    file(GLOB _cand "${_ff_libdir}/lib${_lib}.*.dylib")
+    foreach(_f IN LISTS _cand)
+      # Skip dev symlinks (libavcodec.dylib); bundle versioned files only.
+      if(NOT IS_SYMLINK "${_f}")
+        list(APPEND _ff_dylibs "${_f}")
+      endif()
+    endforeach()
+  endforeach()
+  list(REMOVE_DUPLICATES _ff_dylibs)
+  if(NOT _ff_dylibs)
+    message(WARNING "CAUDIO_BUNDLE_FFMPEG_MACOS requested but no versioned FFmpeg dylibs near ${FFmpeg_AVCODEC_LIBRARY}")
+  else()
+    install(FILES ${_ff_dylibs} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+    # Exe-side search path; dylib ids + cross-refs are rewired below.
+    set(CMAKE_INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+    set(_ff_dylib_names "")
+    foreach(_f IN LISTS _ff_dylibs)
+      get_filename_component(_n "${_f}" NAME)
+      list(APPEND _ff_dylib_names "${_n}")
+    endforeach()
+    install(CODE "
+      set(_exe \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:caudio_cli>\")
+      set(_libdir \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\")
+      set(_bins \"\${_exe}\")
+      foreach(_n ${_ff_dylib_names})
+        list(APPEND _bins \"\${_libdir}/\${_n}\")
+        execute_process(COMMAND install_name_tool -id \"@rpath/\${_n}\" \"\${_libdir}/\${_n}\" RESULT_VARIABLE _rc_id OUTPUT_QUIET ERROR_QUIET)
+        if(NOT _rc_id EQUAL 0)
+          message(FATAL_ERROR \"FFmpeg bundle: install_name_tool -id failed for \${_n}\")
+        endif()
+      endforeach()
+      foreach(_b IN LISTS _bins)
+        execute_process(COMMAND otool -L \"\${_b}\" OUTPUT_VARIABLE _refs OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        foreach(_n ${_ff_dylib_names})
+          string(REGEX MATCH \"[^ \\t\\r\\n]*/\${_n}( |$)\" _hit \"\${_refs}\")
+          if(_hit)
+            string(REGEX REPLACE \"^[^ \\t\\r\\n]*/\" \"\" _old \"\${_hit}\")
+            string(STRIP \"\${_old}\" _old)
+            execute_process(COMMAND install_name_tool -change \"\${_old}\" \"@rpath/\${_n}\" \"\${_b}\" RESULT_VARIABLE _rc_ch OUTPUT_QUIET ERROR_QUIET)
+            if(NOT _rc_ch EQUAL 0)
+              message(FATAL_ERROR \"FFmpeg bundle: install_name_tool -change failed: \${_old} in \${_b}\")
+            endif()
+          endif()
+        endforeach()
+        execute_process(COMMAND codesign --force -s - \"\${_b}\" RESULT_VARIABLE _rc_cs OUTPUT_QUIET ERROR_QUIET)
+        if(NOT _rc_cs EQUAL 0)
+          message(FATAL_ERROR \"FFmpeg bundle: ad-hoc codesign failed for \${_b}\")
+        endif()
+      endforeach()
+    " COMPONENT runtime)
   endif()
 endif()
 

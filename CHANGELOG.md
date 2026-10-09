@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.46.1] - 2026-10-10
+
+### Changed
+- Release archives split into runtime (`caudio-<ver>-<os>-<arch>`) and
+  `-dev` SDK twins, one format per OS (ZIP on Windows, TGZ elsewhere);
+  release binaries are stripped and filenames carry the architecture
+- Release page ships archives + `SHA256SUMS` only (`VERSION` and
+  `CHANGELOG.md` attachments dropped as redundant)
+
+### Added
+- `scripts/soak_daemon.py`: foreground-supervised daemon loop soak gate
+  (300-iteration audio deck plus a degraded no-audio deck)
+- Opt-in `CAUDIO_BUNDLE_FFMPEG_MACOS` for standalone mac archives (brew
+  dylib bundling with @rpath fixup; off by default, pending validation
+  on a Mac)
+
 ## [v0.46.0] - 2026-10-09
 
 ### Changed
