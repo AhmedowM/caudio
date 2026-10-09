@@ -203,6 +203,8 @@ int render(caudio::app::AppResult res, bool asJson) {
             caudio::println(std::cerr, "{}", *outcome.line);
         return 1;
     }
+    if (outcome.quiet && !asJson)
+        return 0;
     if (asJson && outcome.result)
         return renderJson(*outcome.result);
     if (outcome.line) {
@@ -637,7 +639,7 @@ int Shell::run(int argc, char** argv) {
     app_.setConfig(config_);
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {
-        return app_.startDaemon(true);
+        return detail::render(app_.startDaemon(true), false);
     }
     // Direct play: `caudio PATH... [--save]` with no subcommand. Files are
     // fingerprinted into the library; the queue itself is temporary unless
@@ -678,28 +680,28 @@ int Shell::run(int argc, char** argv) {
         }
         if (files.empty())
             return hardFail ? 1 : 0;
-        return app_.playFiles(files, posSave);
+        return detail::render(app_.playFiles(files, posSave), false);
     }
     if (startCmd->parsed())
-        return app_.startDaemon(fg || globalFg);
+        return detail::render(app_.startDaemon(fg || globalFg), false);
     if (shutdownCmd->parsed())
-        return app_.shutdownDaemon();
+        return detail::render(app_.shutdownDaemon(), false);
     // Transport commands print one-line confirmations (no ids, no queue
     // positions -- see `info` / `queue list` for those). JSON dumps raw.
     if (playCmd->parsed())
-        return app_.doPlay(playJson);
+        return detail::render(app_.doPlay(), playJson);
     if (pauseCmd->parsed())
-        return app_.pause(pauseJson);
+        return detail::render(app_.pause(), pauseJson);
     if (resumeCmd->parsed())
-        return app_.resume(resumeJson);
+        return detail::render(app_.resume(), resumeJson);
     if (restartCmd->parsed())
-        return app_.restart(restartJson);
+        return detail::render(app_.restart(), restartJson);
     if (stopCmd->parsed())
-        return app_.stop(stopJson);
+        return detail::render(app_.stop(), stopJson);
     if (nextCmd->parsed())
-        return app_.next(nextJson);
+        return detail::render(app_.next(), nextJson);
     if (prevCmd->parsed())
-        return app_.prev(prevJson);
+        return detail::render(app_.prev(), prevJson);
     if (seekCmd->parsed()) {
         auto parsed = detail::parseSeek(seekStr);
         if (!parsed) {
@@ -715,7 +717,7 @@ int Shell::run(int argc, char** argv) {
         while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
             sv.remove_prefix(1);
         bool isRelative = !sv.empty() && (sv.front() == '+' || sv.front() == '-');
-        return app_.seek(target, isRelative, seekJson);
+        return detail::render(app_.seek(target, isRelative), seekJson);
     }
     if (statusCmd->parsed()) {
         // NOTE: the watch loop stays in the shell on purpose: carriage-return

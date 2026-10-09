@@ -64,14 +64,13 @@ int App::sendViaClient(const caudio::ipc::Command& cmd, bool asJson) {
 }
 
 // Play-like sends autostart the daemon when it is down (quick launch).
-// quietAutostart keeps --json output clean.
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-App::sendPlay(const caudio::ipc::Command& cmd, bool quietAutostart) {
+App::sendPlay(const caudio::ipc::Command& cmd) {
     auto res = sendRaw(cmd);
     if (!res) {
         const auto& e = res.error();
         if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running") {
-            if (startDaemon(false, quietAutostart) != 0) {
+            if (!startDaemon(false)) {
                 // The autostart may have raced a dying daemon (lock held
                 // at spawn). One more attempt after a short settle delay;
                 // surface the freshest error, not the original "down".
@@ -90,16 +89,6 @@ App::sendPlay(const caudio::ipc::Command& cmd, bool quietAutostart) {
 // Custom confirmation: JSON dumps the raw result, text prints `line`.
 int App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res, bool asJson,
                  const std::string& line) {
-    if (!res)
-        return printErr(res.error());
-    if (asJson)
-        return printJson(*res);
-    caudio::println(std::cout, "{}", line);
-    return 0;
-}
-
-int App::confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
-                          bool asJson, const std::string& line) {
     if (!res)
         return printErr(res.error());
     if (asJson)

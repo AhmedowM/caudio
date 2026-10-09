@@ -10,7 +10,6 @@
 
 #include <caudio/utils/result.hpp>
 #include <cstddef>
-#include <iostream>
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -44,11 +43,11 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <stop_token>
 #include <string>
 #include <system_error>
@@ -199,12 +198,12 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 #endif
 }
 
-int App::startDaemon(bool foreground, bool quiet) {
+AppResult App::startDaemon(bool foreground) {
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
-        if (!quiet)
-            caudio::println("daemon already running at {}", config_.socketPath);
-        return 0;
+        return Outcome{std::nullopt,
+                       std::format("daemon already running at {}", config_.socketPath), false,
+                       false};
     }
     // Death-watch: a previous daemon may be mid-teardown (pipe already dead
     // but pid file present / lock still held while threads join). Spawning
@@ -236,20 +235,18 @@ int App::startDaemon(bool foreground, bool quiet) {
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) {
-            caudio::println(std::cerr, "start failed: {} (db: {})", svc.error().message,
-                            config_.dbPath.generic_string());
-            return 1;
+            return Outcome::fail(std::format("start failed: {} (db: {})", svc.error().message,
+                                             config_.dbPath.generic_string()));
         }
-        caudio::println("starting daemon foreground at {} db={}", config_.socketPath,
-                        config_.dbPath.generic_string());
+        auto starting = std::format("starting daemon foreground at {} db={}", config_.socketPath,
+                                    config_.dbPath.generic_string());
         std::stop_source ss;
         auto res = svc.value()->run(ss.get_token());
         if (!res) {
-            caudio::println(std::cerr, "daemon error: {} (dbPath={})", res.error().message,
-                            config_.dbPath.generic_string());
-            return 1;
+            return Outcome::fail(std::format("daemon error: {} (dbPath={})", res.error().message,
+                                             config_.dbPath.generic_string()));
         }
-        return 0;
+        return Outcome{std::nullopt, std::move(starting), false, false};
     } else {
         auto spawnRes = spawnDaemon(config_);
         if (!spawnRes) {
@@ -260,8 +257,8 @@ int App::startDaemon(bool foreground, bool quiet) {
             } catch (...) {
                 what = "unknown error";
             }
-            caudio::println(std::cerr, "start failed: couldn't start daemon ({}: {})", err, what);
-            return 1;
+            return Outcome::fail(
+                std::format("start failed: couldn't start daemon ({}: {})", err, what));
         }
         // Readiness = full StatusReq round-trip (proves the accept loop and the
         // dispatcher are alive, not just that a pipe object exists -- a bare
@@ -274,9 +271,9 @@ int App::startDaemon(bool foreground, bool quiet) {
             if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
                                      std::chrono::milliseconds{500})) {
                 if (std::get_if<caudio::ipc::Status>(&*ps)) {
-                    if (!quiet)
-                        caudio::println("daemon started at {}", config_.socketPath);
-                    return 0;
+                    return Outcome{std::nullopt,
+                                   std::format("daemon started at {}", config_.socketPath), false,
+                                   false};
                 }
                 lastDetail = "unexpected reply";
             } else {
@@ -284,23 +281,22 @@ int App::startDaemon(bool foreground, bool quiet) {
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        caudio::println(std::cerr, "daemon start failed: socket not reachable at {}",
-                        config_.socketPath);
+        std::string msg =
+            std::format("daemon start failed: socket not reachable at {}", config_.socketPath);
         if (!lastDetail.empty())
-            caudio::println(std::cerr, "last error: {}", lastDetail);
-        return 1;
+            msg += std::format("\nlast error: {}", lastDetail);
+        return Outcome::fail(std::move(msg));
     }
 }
 
-int App::shutdownDaemon() {
+AppResult App::shutdownDaemon() {
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto cmd = caudio::ipc::Command{caudio::ipc::Shutdown{}};
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
     if (!res) {
         // if daemon not running, report
         if (res.error().code == caudio::utils::StatusCode::State) {
-            caudio::println(std::cerr, "shutdown: daemon not running");
-            return 1;
+            return Outcome::fail("shutdown: daemon not running");
         }
         // even if send failed, attempt to poll pid file
     }
@@ -321,11 +317,10 @@ int App::shutdownDaemon() {
     }
     auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
     if (conn) {
-        caudio::println(std::cerr, "shutdown: daemon still running at {}", config_.socketPath);
-        return 1;
+        return Outcome::fail(
+            std::format("shutdown: daemon still running at {}", config_.socketPath));
     }
-    caudio::println("daemon stopped");
-    return 0;
+    return Outcome{std::nullopt, "daemon stopped", false, false};
 }
 
 } // namespace caudio::app

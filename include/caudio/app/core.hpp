@@ -19,11 +19,11 @@
  * through the IPC client, which serializes per connection.
  */
 
+#include <array>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
-#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -43,13 +43,15 @@ namespace caudio::app {
  * render via OutputFormatter (bare/JSON), print `line`, or stay silent:
  * result plus line is a confirmation, result alone bare-renders, line
  * alone with toStderr is a warning (exit still 0), failed lines go to
- * stderr with exit 1, neither is silent success.
+ * stderr with exit 1, quiet skips human rendering of a carried result,
+ * neither is silent success.
  */
 struct Outcome {
     std::optional<caudio::ipc::Result> result;
     std::optional<std::string> line;
     bool toStderr = false;
     bool failed = false;
+    bool quiet = false;
     static std::expected<Outcome, caudio::utils::Error> warn(std::string message);
     static std::expected<Outcome, caudio::utils::Error> fail(std::string message);
 };
@@ -112,20 +114,20 @@ class App {
      * @brief Starts the daemon (foreground service or background spawn).
      * @ingroup caudio_app
      * @param foreground Run the service in-process and block (child path).
-     * @param quiet Suppress informational output (JSON/autostart callers).
-     * @return 0 when the daemon answers a status round-trip, 1 otherwise.
+     * @return Outcome data; success chatter is a line frontends skip in
+     * JSON mode, failures are failed lines.
      * @details Background path waits out a previous daemon's teardown,
      * spawns once, then requires a full StatusReq round-trip (not just a
      * connect) within budget before reporting success.
      */
-    int startDaemon(bool foreground, bool quiet = false);
+    AppResult startDaemon(bool foreground);
 
     /**
      * @brief Stops the daemon and waits for its teardown to complete.
      * @ingroup caudio_app
-     * @return 0 when the daemon is unreachable and its pid file is gone.
+     * @return Outcome data; "daemon stopped" line on success.
      */
-    int shutdownDaemon();
+    AppResult shutdownDaemon();
 
     /**
      * @brief Spawns a detached daemon child for the given config.
@@ -182,10 +184,9 @@ class App {
      * @brief Sends a play-like command, autostarting a down daemon.
      * @ingroup caudio_app
      * @param cmd IPC command to send.
-     * @param quietAutostart Suppress autostart chatter (JSON callers).
      */
     std::expected<caudio::ipc::Result, caudio::utils::Error>
-    sendPlay(const caudio::ipc::Command& cmd, bool quietAutostart);
+    sendPlay(const caudio::ipc::Command& cmd);
 
     /**
      * @brief Renders a result as a one-line confirmation (or JSON).
@@ -206,15 +207,6 @@ class App {
                       std::optional<std::string> line = std::nullopt);
 
     /**
-     * @brief Renders a transport result as a one-line confirmation.
-     * @ingroup caudio_app
-     * @details Same shape as confirm(); kept separate so transport wording
-     * can evolve without touching generic call sites.
-     */
-    int confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
-                         bool asJson, const std::string& line);
-
-    /**
      * @brief Human track label for the last transport result.
      * @ingroup caudio_app
      * @return Track label, or "unknown track" for non-status results.
@@ -224,11 +216,10 @@ class App {
     /**
      * @brief Shared play flow (used by play, and by resume when stopped).
      * @ingroup caudio_app
-     * @param asJson Render raw JSON instead of the one-line confirmation.
      * @details Probes paused state first so the wording (resumed vs fresh)
      * matches; autostarts a down daemon via sendPlay().
      */
-    int doPlay(bool asJson);
+    AppResult doPlay();
 
     /**
      * @brief Plays files immediately in a new queue.
@@ -236,34 +227,33 @@ class App {
      * @param files Pre-expanded file list (glob expansion stays in frontends).
      * @param save Keep the queue instead of purging it on shutdown.
      */
-    int playFiles(const std::vector<std::string>& files, bool save);
+    AppResult playFiles(const std::vector<std::string>& files, bool save);
 
     /** @brief Pause playback (warns instead of failing when idle). @ingroup caudio_app */
-    int pause(bool asJson);
+    AppResult pause();
     /**
      * @brief Resume playback (forgiving: warns when playing, plays from
      * cursor when stopped).
      * @ingroup caudio_app
      */
-    int resume(bool asJson);
+    AppResult resume();
     /** @brief Restart the current track. @ingroup caudio_app */
-    int restart(bool asJson);
+    AppResult restart();
     /** @brief Stop playback. @ingroup caudio_app */
-    int stop(bool asJson);
+    AppResult stop();
     /** @brief Advance to the next track. @ingroup caudio_app */
-    int next(bool asJson);
+    AppResult next();
     /** @brief Move to the previous track (warns at queue start). @ingroup caudio_app */
-    int prev(bool asJson);
+    AppResult prev();
     /**
      * @brief Seek to an absolute position, or by delta when relative.
      * @ingroup caudio_app
      * @param target Seconds (absolute) or delta (relative to now).
      * @param isRelative Resolve target against the current position first.
-     * @param asJson Render raw JSON instead of staying silent.
-     * @details Argument grammar (mm:ss, +/-) is parsed by frontends; the
-     * relative flag arrives pre-detected.
+     * @details Silent on success; argument grammar (mm:ss, +/-) is parsed
+     * by frontends, the relative flag arrives pre-detected.
      */
-    int seek(double target, bool isRelative, bool asJson);
+    AppResult seek(double target, bool isRelative);
 
     /**
      * @brief Lists queues (id, name, track counts, active/temp markers).
