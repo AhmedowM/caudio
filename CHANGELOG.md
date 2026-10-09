@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.46.0] - 2026-10-09
+
+### Changed
+- Mirror `include/` in the module layout (`modules/caudio/<comp>.cppm`
+  with `<comp>/*.cppm` partitions); standalone `caudio.config`, new
+  `caudio.app` (`:core`, `:format`, `:paths`); umbrellas slimmed to pure
+  re-exports
+- Phase 1 of the app split: handlers return `Outcome`/`BatchResult` data
+  and the shell renders (`render`/`renderBatch`/`renderError`); `detail.*`
+  is lib-internal string builders now, shell owns color detection
+
+### Fixed
+- Resume/restart/next/prev/create lines reading moved-from results
+  (reads hoisted above the `Outcome` construction; `cli playback
+  one-liners` golden is green again)
+
 ## [v0.45.0] - 2026-10-08
 
 ### Changed

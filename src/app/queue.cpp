@@ -65,10 +65,17 @@ AppResult App::queueCreate(const std::string& name) {
     if (!res)
         return std::unexpected{res.error()};
     if (auto* qc = std::get_if<caudio::ipc::QueueCreated>(&*res)) {
-        return Outcome{std::move(*res), std::format("Created queue {} '{}'", qc->id, qc->name),
-                       false, false};
+        // Hoisted: copy before Outcome moves *res (moved-from strings read
+        // empty on some toolchains; see App::resume).
+        std::int64_t id = qc->id;
+        std::string name = qc->name;
+        return Outcome{.result = std::move(*res),
+                       .line = std::format("Created queue {} '{}'", id, name),
+                       .toStderr = false,
+                       .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::queueDelete(std::int64_t qid) {
@@ -125,7 +132,8 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
         int added = 0;
         caudio::ipc::QueueTracks collected{};
         for (auto& t : pd->tracks) {
-            caudio::ipc::Command cmd{caudio::ipc::QueueAdd{std::to_string(t.id), false}};
+            caudio::ipc::Command cmd{
+                caudio::ipc::QueueAdd{.query = std::to_string(t.id), .search = false}};
             auto res = sendRaw(cmd);
             if (!res) {
                 detail::renderErrorInto(rep.err, res.error());
@@ -143,7 +151,8 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
         return rep;
     }
     if (hasId || search) {
-        caudio::ipc::Command cmd{caudio::ipc::QueueAdd{hasId ? id : paths[0], search}};
+        caudio::ipc::Command cmd{
+            caudio::ipc::QueueAdd{.query = hasId ? id : paths[0], .search = search}};
         auto res = sendRaw(cmd);
         if (!res)
             return std::unexpected{res.error()};
@@ -180,7 +189,7 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
     int added = 0;
     caudio::ipc::QueueTracks collected{};
     for (auto& f : files) {
-        caudio::ipc::Command cmd{caudio::ipc::QueueAdd{f, false}};
+        caudio::ipc::Command cmd{caudio::ipc::QueueAdd{.query = f, .search = false}};
         auto res = sendRaw(cmd);
         if (!res) {
             detail::renderErrorInto(rep.err, res.error());
@@ -224,7 +233,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
             return std::unexpected{ps.error()};
         if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*ps)) {
             for (std::size_t i = 0; i < qt->tracks.size(); ++i)
-                all.push_back(RemTarget{i, qt->tracks[i]});
+                all.push_back(RemTarget{.pos = i, .track = qt->tracks[i]});
         } else {
             BatchReport rep;
             detail::renderInto(rep.out, *ps);
@@ -247,22 +256,33 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
     if (hasPos) {
         long long p = 0;
         if (!parseNum(pos, p))
-            return BatchReport{std::nullopt, std::move(rep.out), std::move(rep.err), 1};
-        if (p < 0 || (std::size_t)p >= all.size())
-            return BatchReport{std::nullopt, "",
-                               std::format("queue remove: position out of range: {}", p), 1};
-        targets.push_back(all[(std::size_t)p]);
+            return BatchReport{.json = std::nullopt,
+                               .out = std::move(rep.out),
+                               .err = std::move(rep.err),
+                               .exitCode = 1};
+        if (p < 0 || static_cast<std::size_t>(p) >= all.size())
+            return BatchReport{.json = std::nullopt,
+                               .out = "",
+                               .err = std::format("queue remove: position out of range: {}", p),
+                               .exitCode = 1};
+        targets.push_back(all[static_cast<std::size_t>(p)]);
     } else if (hasId) {
         long long idv = 0;
         if (!parseNum(id, idv))
-            return BatchReport{std::nullopt, std::move(rep.out), std::move(rep.err), 1};
+            return BatchReport{.json = std::nullopt,
+                               .out = std::move(rep.out),
+                               .err = std::move(rep.err),
+                               .exitCode = 1};
         for (auto& t : all) {
             if (t.track.id == idv)
                 targets.push_back(t);
         }
         if (targets.empty())
-            return BatchReport{std::nullopt, "",
-                               std::format("queue remove: track {} is not in the queue", idv), 1};
+            return BatchReport{.json = std::nullopt,
+                               .out = "",
+                               .err =
+                                   std::format("queue remove: track {} is not in the queue", idv),
+                               .exitCode = 1};
     } else {
         std::vector<std::string> files;
         std::vector<std::string> unmatched;
@@ -327,15 +347,17 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
 }
 
 AppResult App::queueMove(std::size_t from, std::size_t to) {
-    caudio::ipc::Command cmd{caudio::ipc::QueueMove{from, to}};
+    caudio::ipc::Command cmd{caudio::ipc::QueueMove{.from = from, .to = to}};
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     std::size_t n = 0;
     if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*res))
         n = qt->tracks.size();
-    return Outcome{std::move(*res), std::format("Moved to position {}. Queue: {} tracks", to, n),
-                   false, false};
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Moved to position {}. Queue: {} tracks", to, n),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 AppResult App::queueClear() {
@@ -363,9 +385,14 @@ AppResult App::queueShuffle(const std::string& mode) {
         known = true;
     }
     if (!known)
-        return Outcome{std::move(*res), "Shuffle toggled", false, false};
-    return Outcome{std::move(*res), std::format("Shuffle: {}", stateOn ? "on" : "off"), false,
-                   false};
+        return Outcome{.result = std::move(*res),
+                       .line = "Shuffle toggled",
+                       .toStderr = false,
+                       .failed = false};
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Shuffle: {}", stateOn ? "on" : "off"),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 AppResult App::queueRepeat(const std::string& mode) {
@@ -402,11 +429,12 @@ AppResult App::queueRepeat(const std::string& mode) {
     RM finalMode = *m;
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
         finalMode = st->repeat;
-    return Outcome{std::move(*res),
-                   std::format("Repeat: {}", finalMode == RM::All   ? "all"
-                                             : finalMode == RM::One ? "one"
-                                                                    : "off"),
-                   false, false};
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Repeat: {}", finalMode == RM::All   ? "all"
+                                                     : finalMode == RM::One ? "one"
+                                                                            : "off"),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 } // namespace caudio::app

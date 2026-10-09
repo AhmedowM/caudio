@@ -52,9 +52,11 @@ AppResult App::doPlay() {
         std::string line =
             wasPaused ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
                       : std::format("Playing {}", who);
-        return Outcome{std::move(*res), std::move(line), false, false};
+        return Outcome{
+            .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::playFiles(const std::vector<std::string>& files, bool save) {
@@ -66,9 +68,11 @@ AppResult App::playFiles(const std::vector<std::string>& files, bool save) {
         std::string who = caudio::app::trackWho(*st);
         std::string line = save ? std::format("Playing {}", who)
                                 : std::format("Playing {} (temporary queue)", who);
-        return Outcome{std::move(*res), std::move(line), false, false};
+        return Outcome{
+            .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::pause() {
@@ -82,11 +86,13 @@ AppResult App::pause() {
     }
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         std::string who = transportWho(res);
-        return Outcome{std::move(*res),
-                       std::format("Paused {} at {}", who, caudio::app::fmtClock(st->pos)), false,
-                       false};
+        return Outcome{.result = std::move(*res),
+                       .line = std::format("Paused {} at {}", who, caudio::app::fmtClock(st->pos)),
+                       .toStderr = false,
+                       .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::resume() {
@@ -114,12 +120,17 @@ AppResult App::resume() {
         return std::unexpected{e};
     }
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
-        return Outcome{std::move(*res),
-                       std::format("Resuming {} from {}", caudio::app::trackWho(*st),
-                                   caudio::app::fmtClock(st->pos)),
-                       false, false};
+        // Hoisted: the line must be built before Outcome moves *res (the
+        // braced list otherwise reads moved-from strings on some toolchains).
+        std::string who = caudio::app::trackWho(*st);
+        std::string at = caudio::app::fmtClock(st->pos);
+        return Outcome{.result = std::move(*res),
+                       .line = std::format("Resuming {} from {}", who, at),
+                       .toStderr = false,
+                       .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::restart() {
@@ -127,7 +138,12 @@ AppResult App::restart() {
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
-    return Outcome{std::move(*res), std::format("Restarting {}", transportWho(res)), false, false};
+    // Hoisted: read before Outcome moves *res (see resume()).
+    std::string who = transportWho(res);
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Restarting {}", who),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 AppResult App::stop() {
@@ -140,7 +156,12 @@ AppResult App::next() {
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
-    return Outcome{std::move(*res), std::format("Playing {}", transportWho(res)), false, false};
+    // Hoisted: read before Outcome moves *res (see resume()).
+    std::string who = transportWho(res);
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Playing {}", who),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 AppResult App::prev() {
@@ -152,7 +173,12 @@ AppResult App::prev() {
             return Outcome::warn("prev: at queue start");
         return std::unexpected{e};
     }
-    return Outcome{std::move(*res), std::format("Playing {}", transportWho(res)), false, false};
+    // Hoisted: read before Outcome moves *res (see resume()).
+    std::string who = transportWho(res);
+    return Outcome{.result = std::move(*res),
+                   .line = std::format("Playing {}", who),
+                   .toStderr = false,
+                   .failed = false};
 }
 
 AppResult App::seek(double target, bool isRelative) {
@@ -180,7 +206,11 @@ AppResult App::seek(double target, bool isRelative) {
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
-    return Outcome{std::move(*res), std::nullopt, false, false, true};
+    return Outcome{.result = std::move(*res),
+                   .line = std::nullopt,
+                   .toStderr = false,
+                   .failed = false,
+                   .quiet = true};
 }
 
 } // namespace caudio::app

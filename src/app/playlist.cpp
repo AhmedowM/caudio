@@ -44,10 +44,16 @@ AppResult App::playlistCreate(const std::string& name) {
     if (!res)
         return std::unexpected{res.error()};
     if (auto* pc = std::get_if<caudio::ipc::PlaylistCreated>(&*res)) {
-        return Outcome{std::move(*res), std::format("Created playlist {} '{}'", pc->id, pc->name),
-                       false, false};
+        // Hoisted: copy before Outcome moves *res (see App::resume).
+        std::int64_t id = pc->id;
+        std::string name = pc->name;
+        return Outcome{.result = std::move(*res),
+                       .line = std::format("Created playlist {} '{}'", id, name),
+                       .toStderr = false,
+                       .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& ids,
@@ -89,7 +95,7 @@ BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& i
         }
     }
     for (auto& f : files) {
-        caudio::ipc::Command acmd{caudio::ipc::LibraryAdd{f, false}};
+        caudio::ipc::Command acmd{caudio::ipc::LibraryAdd{.path = f, .recursive = false}};
         auto ares = sendRaw(acmd);
         if (!ares) {
             detail::renderErrorInto(rep.err, ares.error());
@@ -97,7 +103,7 @@ BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& i
             continue;
         }
         std::string fn = std::filesystem::path(f).filename().generic_string();
-        caudio::ipc::Command scmd{caudio::ipc::LibrarySearch{fn, 50}};
+        caudio::ipc::Command scmd{caudio::ipc::LibrarySearch{.query = fn, .limit = 50}};
         auto sres = sendRaw(scmd);
         if (!sres) {
             detail::renderErrorInto(rep.err, sres.error());
@@ -126,7 +132,7 @@ BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& i
     int added = 0;
     caudio::ipc::QueueTracks collected{};
     for (auto tid : resolved) {
-        caudio::ipc::Command cmd{caudio::ipc::PlaylistAdd{pid, tid}};
+        caudio::ipc::Command cmd{caudio::ipc::PlaylistAdd{.pid = pid, .track_id = tid}};
         auto res = sendRaw(cmd);
         if (!res) {
             const auto& e = res.error();
@@ -158,7 +164,8 @@ BatchResult App::playlistAdd(std::int64_t pid, const std::vector<std::string>& i
 }
 
 AppResult App::playlistLoad(std::int64_t pid, bool play, bool replace) {
-    caudio::ipc::Command cmd{caudio::ipc::PlaylistLoad{pid, play, replace}};
+    caudio::ipc::Command cmd{
+        caudio::ipc::PlaylistLoad{.pid = pid, .play = play, .replace = replace}};
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
@@ -168,13 +175,15 @@ AppResult App::playlistLoad(std::int64_t pid, bool play, bool replace) {
                     : std::format("Loaded playlist {} into queue {}", pid, pl->queue_id);
         if (play)
             line += std::format("\nPlaying {}", caudio::app::trackWho(pl->status));
-        return Outcome{std::move(*res), std::move(line), false, false};
+        return Outcome{
+            .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }
-    return Outcome{std::move(*res), std::nullopt, false, false};
+    return Outcome{
+        .result = std::move(*res), .line = std::nullopt, .toStderr = false, .failed = false};
 }
 
 AppResult App::playlistSave(const std::string& name, std::optional<std::int64_t> qid) {
-    caudio::ipc::Command cmd{caudio::ipc::PlaylistSave{name, qid}};
+    caudio::ipc::Command cmd{caudio::ipc::PlaylistSave{.name = name, .queue_id = qid}};
     std::string line = std::format("Saved playlist '{}'", name);
     return confirm(sendRaw(cmd), std::move(line));
 }
@@ -185,13 +194,14 @@ AppResult App::playlistDelete(std::int64_t pid) {
 }
 
 AppResult App::playlistRename(std::int64_t pid, const std::string& name) {
-    caudio::ipc::Command cmd{caudio::ipc::PlaylistRename{pid, name}};
+    caudio::ipc::Command cmd{caudio::ipc::PlaylistRename{.pid = pid, .newName = name}};
     return confirm(sendRaw(cmd), std::format("Renamed playlist {} to '{}'", pid, name));
 }
 
 BatchResult App::playlistExport(std::int64_t pid, const std::string& path,
                                 const std::string& format) {
-    caudio::ipc::Command cmd{caudio::ipc::PlaylistExport{pid, path, format}};
+    caudio::ipc::Command cmd{
+        caudio::ipc::PlaylistExport{.pid = pid, .path = path, .format = format}};
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto timeout = std::chrono::milliseconds{5000};
     auto cliRes = client.send(cmd, timeout);
@@ -221,7 +231,7 @@ BatchResult App::playlistExport(std::int64_t pid, const std::string& path,
 }
 
 AppResult App::playlistImport(const std::string& path, std::optional<std::string> name) {
-    caudio::ipc::Command cmd{caudio::ipc::PlaylistImport{path, name}};
+    caudio::ipc::Command cmd{caudio::ipc::PlaylistImport{.path = path, .name = std::move(name)}};
     return confirm(sendRaw(cmd));
 }
 
