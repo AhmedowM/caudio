@@ -23,6 +23,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +31,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace caudio::app {
@@ -51,6 +53,22 @@ struct Outcome {
 };
 /** @brief Handler return: outcome data, or the error to render. */
 using AppResult = std::expected<Outcome, caudio::utils::Error>;
+
+/** @brief Known tag fields accepted by tagValue. @ingroup caudio_app */
+inline constexpr std::array<std::string_view, 8> kTagFields{
+    "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
+
+/** @brief True when field names a known tag field. @ingroup caudio_app */
+bool isTagField(std::string_view field);
+
+/**
+ * @brief One selected tag value, human text plus single-key JSON dump.
+ * @ingroup caudio_app
+ */
+struct TagValue {
+    std::string value;
+    std::string json;
+};
 
 /**
  * @brief Application orchestrator bound to one config (one database).
@@ -415,15 +433,22 @@ class App {
      * @brief Edits one track tag field (database row).
      * @ingroup caudio_app
      */
-    int tagEdit(std::int64_t id, const std::string& field, const std::string& value, bool asJson);
+    AppResult tagEdit(std::int64_t id, const std::string& field, const std::string& value);
 
     /**
-     * @brief Reads track tags, optionally selecting a single field.
+     * @brief Reads the full track tag record.
      * @ingroup caudio_app
-     * @param field Empty for the full record, otherwise one of the known
-     * fields (validated here; unknown names fail fast).
      */
-    int tagGet(std::int64_t id, const std::string& field, bool asJson);
+    AppResult tagGet(std::int64_t id);
+
+    /**
+     * @brief Reads one tag field as human text plus single-key JSON.
+     * @ingroup caudio_app
+     * @param field Must name a known field (see isTagField); frontends
+     * validate before calling, unknown names fail as InvalidArg.
+     */
+    std::expected<TagValue, caudio::utils::Error> tagValue(std::int64_t id,
+                                                           const std::string& field);
 
     /** @brief Lists playback history entries. @ingroup caudio_app */
     AppResult historyList(int limit);

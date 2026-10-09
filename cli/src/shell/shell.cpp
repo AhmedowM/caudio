@@ -863,9 +863,27 @@ int Shell::run(int argc, char** argv) {
     }
     if (tagCmd->parsed()) {
         if (tagEdit->parsed())
-            return app_.tagEdit(tagEditId, tagEditField, tagEditValue, tagEditJson);
-        if (tagGet->parsed())
-            return app_.tagGet(tagGetId, tagGetField, tagGetJson);
+            return detail::render(app_.tagEdit(tagEditId, tagEditField, tagEditValue), tagEditJson);
+        if (tagGet->parsed()) {
+            if (!tagGetField.empty() && !caudio::app::isTagField(tagGetField)) {
+                caudio::println(std::cerr,
+                                "tag get: unknown field '{}' (expected one of "
+                                "title|artist|album|album_artist|genre|year|"
+                                "track_number|disc_number)",
+                                tagGetField);
+                return 1;
+            }
+            if (tagGetField.empty())
+                return detail::render(app_.tagGet(tagGetId), tagGetJson);
+            auto tv = app_.tagValue(tagGetId, tagGetField);
+            if (!tv)
+                return detail::renderError(tv.error());
+            if (tagGetJson)
+                caudio::println("{}", tv->json);
+            else
+                caudio::println("{}", tv->value);
+            return 0;
+        }
         std::cout << tagCmd->help() << "\n";
         return 0;
     }

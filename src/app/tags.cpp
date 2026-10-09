@@ -2,61 +2,52 @@
  * @file tags.cpp
  * @brief Track tag command handlers.
  * @ingroup caudio_app
- * @details Moved verbatim out of the CLI shell (Phase 0): tag editing and
- * tag reads with optional single-field selection.
+ * @details Phase 1: returns outcome data; the frontend renders.
  */
 
 #include <algorithm>
-#include <array>
 #include <caudio/app/core.hpp>
-#include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
-#include <caudio/utils/print.hpp>
 #include <cstdint>
 #include <expected>
 #include <format>
-#include <iostream>
 #include <string>
 #include <string_view>
 #include <variant>
 
 namespace caudio::app {
 
-int App::tagEdit(std::int64_t id, const std::string& field, const std::string& value, bool asJson) {
-    caudio::ipc::Command cmd{caudio::ipc::TagEdit{id, field, value}};
-    return confirm(sendRaw(cmd), asJson, std::format("Updated {} for track {}", field, id));
+bool isTagField(std::string_view field) {
+    return std::find(kTagFields.begin(), kTagFields.end(), field) != kTagFields.end();
 }
 
-int App::tagGet(std::int64_t id, const std::string& field, bool asJson) {
-    static const std::array<std::string_view, 8> tagFields{
-        "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
-    if (!field.empty() && std::find(tagFields.begin(), tagFields.end(), field) == tagFields.end()) {
-        caudio::println(std::cerr,
-                        "tag get: unknown field '{}' (expected one of "
-                        "title|artist|album|album_artist|genre|year|"
-                        "track_number|disc_number)",
-                        field);
-        return 1;
+AppResult App::tagEdit(std::int64_t id, const std::string& field, const std::string& value) {
+    caudio::ipc::Command cmd{caudio::ipc::TagEdit{id, field, value}};
+    return confirm(sendRaw(cmd), std::format("Updated {} for track {}", field, id));
+}
+
+AppResult App::tagGet(std::int64_t id) {
+    caudio::ipc::Command cmd{caudio::ipc::TagGet{id}};
+    return confirm(sendRaw(cmd));
+}
+
+std::expected<TagValue, caudio::utils::Error> App::tagValue(std::int64_t id,
+                                                            const std::string& field) {
+    if (!isTagField(field)) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "unknown tag field '" + field + "'")};
     }
     caudio::ipc::Command cmd{caudio::ipc::TagGet{id}};
     auto res = sendRaw(cmd);
     if (!res)
-        return printErr(res.error());
-    if (field.empty()) {
-        if (asJson)
-            return printJson(*res);
-        caudio::client::OutputFormatter fmt{false};
-        fmt.print(*res, std::cout);
-        return 0;
-    }
+        return std::unexpected{res.error()};
     auto* st = std::get_if<caudio::ipc::SingleTrack>(&*res);
-    if (!st) {
-        caudio::client::OutputFormatter fmt{asJson};
-        fmt.print(*res, std::cout);
-        return 0;
-    }
+    if (!st)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                        "tag get: no track in result")};
     const auto& t = st->track;
     bool numeric = false;
     std::string value;
@@ -80,22 +71,17 @@ int App::tagGet(std::int64_t id, const std::string& field, bool asJson) {
         numeric = true;
         value = std::to_string(t.disc_num);
     }
-    if (asJson) {
-        caudio::utils::Json j = caudio::utils::Json::object();
-        if (numeric) {
-            try {
-                j[field] = std::stoll(value);
-            } catch (...) {
-                j[field] = value;
-            }
-        } else {
+    caudio::utils::Json j = caudio::utils::Json::object();
+    if (numeric) {
+        try {
+            j[field] = std::stoll(value);
+        } catch (...) {
             j[field] = value;
         }
-        caudio::println("{}", j.dump());
-        return 0;
+    } else {
+        j[field] = value;
     }
-    caudio::println("{}", value);
-    return 0;
+    return TagValue{value, j.dump()};
 }
 
 } // namespace caudio::app
