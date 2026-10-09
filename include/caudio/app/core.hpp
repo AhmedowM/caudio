@@ -93,6 +93,15 @@ struct TagValue {
 };
 
 /**
+ * @brief Listed queue tracks plus the id to highlight, for the frontend.
+ * @ingroup caudio_app
+ */
+struct TrackList {
+    ipc::Result result;
+    std::int64_t highlightId = 0;
+};
+
+/**
  * @brief Application orchestrator bound to one config (one database).
  * @ingroup caudio_app
  * @see caudio::config::Config
@@ -277,23 +286,23 @@ class App {
      * @brief Lists queues (id, name, track counts, active/temp markers).
      * @ingroup caudio_app
      */
-    int queues(bool asJson);
+    AppResult queues();
 
     /**
      * @brief Lists tracks in the active queue (added or playback order).
      * @ingroup caudio_app
      * @param order "added" for insertion order, anything else for playback.
      */
-    int queueTracks(const std::string& order, bool asJson);
+    std::expected<TrackList, caudio::utils::Error> queueTracks(const std::string& order);
 
     /** @brief Switches the active queue. @ingroup caudio_app */
-    int queueSwitch(std::int64_t qid, bool asJson);
+    AppResult queueSwitch(std::int64_t qid);
 
     /** @brief Creates a queue container. @ingroup caudio_app */
-    int queueCreate(const std::string& name, bool asJson);
+    AppResult queueCreate(const std::string& name);
 
     /** @brief Deletes a queue container (active queue guarded). @ingroup caudio_app */
-    int queueDelete(std::int64_t qid, bool asJson);
+    AppResult queueDelete(std::int64_t qid);
 
     /**
      * @brief Adds to the queue via playlist, id/search, or paths.
@@ -307,8 +316,8 @@ class App {
      * @details Mode validation travels with the handler, verbatim from the
      * shell; glob expansion uses the shared paths utilities.
      */
-    int queueAdd(const std::vector<std::string>& paths, const std::string& id, bool search,
-                 std::int64_t playlist, bool replace, bool recursive, bool asJson);
+    BatchResult queueAdd(const std::vector<std::string>& paths, const std::string& id, bool search,
+                         std::int64_t playlist, bool replace, bool recursive);
 
     /**
      * @brief Removes from the queue by id, position, or paths.
@@ -316,26 +325,26 @@ class App {
      * @details Selectors are exclusive; PATH mode matches
      * separator-insensitively against an insertion-order snapshot.
      */
-    int queueRemove(const std::string& id, const std::string& pos,
-                    const std::vector<std::string>& paths, bool recursive, bool asJson);
+    BatchResult queueRemove(const std::string& id, const std::string& pos,
+                            const std::vector<std::string>& paths, bool recursive);
 
     /** @brief Moves a track within the queue. @ingroup caudio_app */
-    int queueMove(std::size_t from, std::size_t to, bool asJson);
+    AppResult queueMove(std::size_t from, std::size_t to);
 
     /** @brief Clears the active queue. @ingroup caudio_app */
-    int queueClear(bool asJson);
+    AppResult queueClear();
 
     /**
      * @brief Sets shuffle (on/off/empty toggles to resulting state).
      * @ingroup caudio_app
      */
-    int queueShuffle(const std::string& mode, bool asJson);
+    AppResult queueShuffle(const std::string& mode);
 
     /**
      * @brief Sets repeat (off/one/all; empty cycles off->all->one->off).
      * @ingroup caudio_app
      */
-    int queueRepeat(const std::string& mode, bool asJson);
+    AppResult queueRepeat(const std::string& mode);
 
     /**
      * @brief Lists playlists.

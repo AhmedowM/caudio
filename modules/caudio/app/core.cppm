@@ -12,4 +12,5 @@ using ::caudio::app::isTagField;
 using ::caudio::app::kTagFields;
 using ::caudio::app::Outcome;
 using ::caudio::app::TagValue;
+using ::caudio::app::TrackList;
 } // namespace caudio::app

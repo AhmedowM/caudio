@@ -820,29 +820,40 @@ int Shell::run(int argc, char** argv) {
     }
     if (queueCmd->parsed()) {
         if (qList->parsed() || qQueuesAlias->parsed())
-            return app_.queues(qList->parsed() ? qJson : qQueuesJson);
-        if (qTracks->parsed())
-            return app_.queueTracks(qTracksOrder, qTracksJson);
+            return detail::render(app_.queues(), qList->parsed() ? qJson : qQueuesJson);
+        if (qTracks->parsed()) {
+            auto qr = app_.queueTracks(qTracksOrder);
+            if (!qr)
+                return detail::renderError(qr.error());
+            if (qTracksJson)
+                return detail::renderJson(qr->result);
+            caudio::client::OutputFormatter fmt{false, detail::useColor()};
+            fmt.setHighlightTrackId(qr->highlightId);
+            fmt.print(qr->result, std::cout);
+            return 0;
+        }
         if (qSwitch->parsed())
-            return app_.queueSwitch(qSwitchId, qSwitchJson);
+            return detail::render(app_.queueSwitch(qSwitchId), qSwitchJson);
         if (qCreate->parsed())
-            return app_.queueCreate(qCreateName, qCreateJson);
+            return detail::render(app_.queueCreate(qCreateName), qCreateJson);
         if (qDelete->parsed())
-            return app_.queueDelete(qDeleteQid, qDeleteJson);
+            return detail::render(app_.queueDelete(qDeleteQid), qDeleteJson);
         if (qAdd->parsed())
-            return app_.queueAdd(qAddPaths, qAddId, qAddSearch, qAddPlaylist, qAddReplace,
-                                 qAddRecursive, qAddJson);
+            return detail::renderBatch(app_.queueAdd(qAddPaths, qAddId, qAddSearch, qAddPlaylist,
+                                                     qAddReplace, qAddRecursive),
+                                       qAddJson);
         if (qRemove->parsed())
-            return app_.queueRemove(qRemoveId, qRemovePos, qRemovePaths, qRemoveRecursive,
-                                    qRemoveJson);
+            return detail::renderBatch(
+                app_.queueRemove(qRemoveId, qRemovePos, qRemovePaths, qRemoveRecursive),
+                qRemoveJson);
         if (qMove->parsed())
-            return app_.queueMove(qFrom, qTo, qMoveJson);
+            return detail::render(app_.queueMove(qFrom, qTo), qMoveJson);
         if (qClear->parsed())
-            return app_.queueClear(qClearJson);
+            return detail::render(app_.queueClear(), qClearJson);
         if (qShuffle->parsed())
-            return app_.queueShuffle(qShuffleArg, qShuffleJson);
+            return detail::render(app_.queueShuffle(qShuffleArg), qShuffleJson);
         if (qRepeat->parsed())
-            return app_.queueRepeat(qRepeatArg, qRepeatJson);
+            return detail::render(app_.queueRepeat(qRepeatArg), qRepeatJson);
         std::cout << queueCmd->help() << "\n";
         return 0;
     }
