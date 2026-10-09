@@ -332,9 +332,9 @@ if(CAUDIO_ENABLE_MODULES)
   install(
     TARGETS ${CAUDIO_INSTALL_LIBS}
     EXPORT caudioTargets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
     # Module sources live at <prefix>/modules/ (NOT under include/):
     # they are build inputs for BMI consumers, not C++ headers.
     FILE_SET CXX_MODULES DESTINATION modules
@@ -343,19 +343,19 @@ else()
   install(
     TARGETS ${CAUDIO_INSTALL_LIBS}
     EXPORT caudioTargets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
   )
 endif()
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio COMPONENT dev)
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
 
 # NOTE: vendor headers (sqlite3.h, blake3.h) are deliberately NOT installed --
 # no public header references them (fwd-decls only). Only the static archives
 # below ship (transitive link deps). miniaudio.h was never installed either.
-install(FILES cmake/FindFFmpeg.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
-install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio)
+install(FILES cmake/FindFFmpeg.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio COMPONENT dev)
+install(EXPORT caudioTargets NAMESPACE caudio:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio COMPONENT dev)
 
 include(CMakePackageConfigHelpers)
 configure_package_config_file(
@@ -372,10 +372,11 @@ install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/caudioConfig.cmake"
   "${CMAKE_CURRENT_BINARY_DIR}/caudioConfigVersion.cmake"
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/caudio
+  COMPONENT dev
 )
 
 if(CAUDIO_BUILD_CLI)
-  install(TARGETS caudio_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  install(TARGETS caudio_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime)
 endif()
 
 # Windows distributability: the caudio.exe links FFmpeg + MinGW runtime
@@ -393,7 +394,7 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
     "${_ff_libdir}/../bin/avutil-*.dll"
     "${_ff_libdir}/../bin/*swresample-*.dll")
   if(_ff_dlls)
-    install(FILES ${_ff_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES ${_ff_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime)
   else()
     message(WARNING "FFmpeg DLLs not found near ${FFmpeg_AVCODEC_LIBRARY} -- packages will need them on PATH")
   endif()
@@ -405,7 +406,7 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
     get_filename_component(_mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
     file(GLOB _mingw_rt_dlls "${_mingw_bin}/libwinpthread-1.dll")
     if(_mingw_rt_dlls)
-      install(FILES ${_mingw_rt_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR})
+      install(FILES ${_mingw_rt_dlls} DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime)
     else()
       message(WARNING "libwinpthread-1.dll not found next to ${CMAKE_CXX_COMPILER} -- packages will need it on PATH")
     endif()
@@ -415,33 +416,50 @@ endif()
 # C++23 module sources for BMI rebuild (only when modules enabled).
 # Both rules converge on <prefix>/modules/ (same level as include/).
 if(CAUDIO_ENABLE_MODULES)
-  install(DIRECTORY modules/ DESTINATION modules FILES_MATCHING PATTERN "*.cppm")
+  install(DIRECTORY modules/ DESTINATION modules COMPONENT dev FILES_MATCHING PATTERN "*.cppm")
 endif()
 
 # Man page -- roff source tracked at docs/man/caudio.1
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1")
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1"
-    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1" COMPONENT runtime)
+endif()
+
+# License at the archive top level (CPACK_RESOURCE_FILE_LICENSE is not
+# bundled into plain TGZ/ZIP archives).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+  install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE" DESTINATION . COMPONENT runtime)
 endif()
 
 # Systemd user service
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/caudio.service")
-  install(FILES packaging/caudio.service DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/systemd/user)
+  install(FILES packaging/caudio.service DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/systemd/user COMPONENT runtime)
 endif()
 
 # Packaging (CPack) -- TGZ/ZIP only until the first release; distro
 # generators (DEB/RPM/NSIS/DragNDrop) return when versions stabilize.
 # Output dir pinned to the build tree: otherwise `cpack` writes packages to
 # whatever CWD invoked it (e.g. the source root), and CI globs miss them.
+# Components (runtime vs dev, set on each install() above) produce one
+# archive per component; the release workflow publishes one format per OS.
 set(CPACK_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set(CPACK_GENERATOR "TGZ;ZIP")
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library -- utils, player, db, engine, ipc, client, service")
 set(CPACK_PACKAGE_CONTACT "caudio@example.com")
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" CPACK_SYSTEM_NAME)
-set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}${CAUDIO_VERSION_SUFFIX}-${CPACK_SYSTEM_NAME}")
+# Architecture tag for filenames (normalize generator spellings).
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+  set(CAUDIO_ARCH_TAG "x86_64")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+  set(CAUDIO_ARCH_TAG "arm64")
+else()
+  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" CAUDIO_ARCH_TAG)
+endif()
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}${CAUDIO_VERSION_SUFFIX}-${CPACK_SYSTEM_NAME}-${CAUDIO_ARCH_TAG}")
 set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
   set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")

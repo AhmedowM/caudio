@@ -27,12 +27,15 @@ jobs:
           - os: ubuntu-latest
             compiler: gcc-16
             preset: release-lto-gcc
+            pkg_ext: tar.gz
           - os: macos-latest
             compiler: clang
             preset: release-lto-clang
+            pkg_ext: tar.gz
           - os: windows-latest
             compiler: windows-clang
             preset: release-lto-clang
+            pkg_ext: zip
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -125,7 +128,7 @@ jobs:
       - name: List packages
         run: |
           echo "=== packages in build/${{ matrix.preset }}/ ==="
-          ls -lh build/${{ matrix.preset }}/*.tar.gz build/${{ matrix.preset }}/*.zip
+          ls -lh build/${{ matrix.preset }}/*.${{ matrix.pkg_ext }}
         shell: bash
 
       - name: Upload artifact - packages
@@ -133,10 +136,9 @@ jobs:
         with:
           name: caudio-packages-${{ matrix.os }}-${{ matrix.compiler }}
           path: |
-            build/${{ matrix.preset }}/*.tar.gz
-            build/${{ matrix.preset }}/*.zip
-          # Only TGZ/ZIP are produced (CPACK_GENERATOR); a missing package
-          # must fail loudly -- never ship a raw .exe as a "release" again.
+            build/${{ matrix.preset }}/*.${{ matrix.pkg_ext }}
+          # One format per OS (pkg_ext above). A missing package must fail
+          # loudly -- never ship a raw .exe as a "release" again.
           if-no-files-found: error
 
   release:
@@ -164,6 +166,13 @@ jobs:
           echo "=== CHANGELOG check ==="
           ls -lh CHANGELOG.md || echo "CHANGELOG.md not found"
 
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+        shell: bash
+
       - name: Extract release notes
         env:
           TAG_NAME: ${{ github.ref_name }}
@@ -175,10 +184,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # No VERSION/CHANGELOG.md attachments: the version is in the tag
+          # name, the binary (--version) and the release title; the notes
+          # body is the changelog section. Archives + SHA256SUMS only.
           files: |
             artifacts/**
-            CHANGELOG.md
-            VERSION
           body_path: release-notes.md
           generate_release_notes: false
           fail_on_unmatched_files: false
