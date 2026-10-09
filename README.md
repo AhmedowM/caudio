@@ -105,7 +105,7 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio restart` | Seek to 0 and play |
 | `caudio stop` | Stop playback |
 | `caudio next` / `prev` | Next / previous track (shuffle-aware, repeat-aware; `next` wraps, `prev` warns at start) |
-| `caudio seek <time>` | Seek -- `mm:ss`, seconds, or relative `+N`/`-N` (silent on success) |
+| `caudio seek <time>` | Seek -- `mm:ss`/`hh:mm:ss` (`ss` < 60), seconds, or relative `+N`/`-N` (silent on success) |
 | `caudio status [--json] [--watch] [--interval <ms>]` | Show status; `--watch`/`--follow` polls every `--interval` ms (default 1000), JSON streams one object per line |
 | `caudio volume [0-100\|+N\|-N\|mute\|unmute]` | Get or set volume (`mute`/`0` remembers level, `unmute` restores) |
 | `caudio queue tracks [--order added\|playback] [--json]` | Tracks in active queue (playback order, current marked `>`) |

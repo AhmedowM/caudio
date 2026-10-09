@@ -174,6 +174,12 @@ TEST_CASE("cli seek validates time grammar", "[cli]") {
     auto colons = runCli(withCfg("gold_seek2", {"seek", "1:2:3:4"}));
     REQUIRE(colons.exitCode == 1);
     REQUIRE(contains(colons.err, "too many colons"));
+    auto overflow = runCli(withCfg("gold_seek3", {"seek", "1:70"}));
+    REQUIRE(overflow.exitCode == 1);
+    REQUIRE(contains(overflow.err, "ss < 60"));
+    auto overflowH = runCli(withCfg("gold_seek4", {"seek", "1:2:70"}));
+    REQUIRE(overflowH.exitCode == 1);
+    REQUIRE(contains(overflowH.err, "ss < 60"));
 }
 
 TEST_CASE("cli volume validates range", "[cli]") {

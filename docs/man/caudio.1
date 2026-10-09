@@ -121,8 +121,10 @@ mode. Natural track end behaves the same except with repeat
 Go to previous track. Warns without failing at queue start.
 .TP
 .B seek \fITIME\fR
-Seek to position. \fITIME\fR can be absolute (\fBmm:ss\fR or seconds,
-e.g. \fB1:30\fR or \fB90\fR) or relative (\fB+N\fR/\fB\-N\fR). Relative
+Seek to position. \fITIME\fR can be absolute (\fBmm:ss\fR, \fBhh:mm:ss\fR,
+or seconds, e.g. \fB1:30\fR or \fB90\fR) or relative (\fB+N\fR/\fB\-N\fR).
+Clock components are ranged (\fBss\fR < 60, and \fBmm\fR < 60 inside
+\fBhh:mm:ss\fR); out-of-range input is rejected. Relative
 seeks fetch current position via \fBStatusReq\fR and clamp to 0.
 Prints nothing on success; errors go to stderr.
 .TP

@@ -70,17 +70,22 @@ inline std::expected<double, std::string> parseTime(std::string_view s) {
             remaining.remove_prefix(nxt + 1);
         }
         if (count == 1) {
-            // mm:ss
+            // mm:ss: minutes unbounded (long mixes exceed 59), seconds in
+            // range -- overflow is almost always a typo, fail loudly.
             double mm = parts[0];
             double ss = parts[1];
-            if (ss < 0 || ss >= 60) {
-                // allow ss up to <60 but tolerate
-            }
+            if (ss < 0 || ss >= 60)
+                return std::unexpected<std::string>{"seconds out of range (ss < 60)"};
             total = mm * 60.0 + ss;
         } else if (count == 2) {
+            // hh:mm:ss: same rule per component, hours unbounded.
             double hh = parts[0];
             double mm = parts[1];
             double ss = parts[2];
+            if (mm < 0 || mm >= 60)
+                return std::unexpected<std::string>{"minutes out of range (mm < 60)"};
+            if (ss < 0 || ss >= 60)
+                return std::unexpected<std::string>{"seconds out of range (ss < 60)"};
             total = hh * 3600.0 + mm * 60.0 + ss;
         } else {
             return std::unexpected<std::string>{"too many colons"};
