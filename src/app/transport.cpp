@@ -109,7 +109,11 @@ int App::confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Erro
 }
 
 AppResult Outcome::warn(std::string message) {
-    return Outcome{std::nullopt, std::move(message), true};
+    return Outcome{std::nullopt, std::move(message), true, false};
+}
+
+AppResult Outcome::fail(std::string message) {
+    return Outcome{std::nullopt, std::move(message), true, true};
 }
 
 AppResult App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,

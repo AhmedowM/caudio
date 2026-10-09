@@ -42,14 +42,16 @@ namespace caudio::app {
  * @details handlers return this instead of printing. Frontends
  * render via OutputFormatter (bare/JSON), print `line`, or stay silent:
  * result plus line is a confirmation, result alone bare-renders, line
- * alone with toStderr is a warning (exit still 0), neither is silent
- * success.
+ * alone with toStderr is a warning (exit still 0), failed lines go to
+ * stderr with exit 1, neither is silent success.
  */
 struct Outcome {
     std::optional<caudio::ipc::Result> result;
     std::optional<std::string> line;
     bool toStderr = false;
+    bool failed = false;
     static std::expected<Outcome, caudio::utils::Error> warn(std::string message);
+    static std::expected<Outcome, caudio::utils::Error> fail(std::string message);
 };
 /** @brief Handler return: outcome data, or the error to render. */
 using AppResult = std::expected<Outcome, caudio::utils::Error>;
@@ -499,7 +501,7 @@ class App {
      * @ingroup caudio_app
      * @details Blocks until playback finishes. Used for quick audition.
      */
-    int previewFile(const std::string& file);
+    AppResult previewFile(const std::string& file);
 
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).

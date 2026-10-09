@@ -198,6 +198,11 @@ int render(caudio::app::AppResult res, bool asJson) {
     if (!res)
         return renderError(res.error());
     auto outcome = std::move(*res);
+    if (outcome.failed) {
+        if (outcome.line)
+            caudio::println(std::cerr, "{}", *outcome.line);
+        return 1;
+    }
     if (asJson && outcome.result)
         return renderJson(*outcome.result);
     if (outcome.line) {
@@ -896,7 +901,7 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (previewCmd->parsed())
-        return app_.previewFile(previewFile);
+        return detail::render(app_.previewFile(previewFile), false);
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed())
             return detail::render(app_.configGet(cfgGetKey), cfgGetJson);
