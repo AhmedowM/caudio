@@ -108,4 +108,16 @@ int App::confirmTransport(std::expected<caudio::ipc::Result, caudio::utils::Erro
     return 0;
 }
 
+AppResult Outcome::warn(std::string message) {
+    return Outcome{std::nullopt, std::move(message), true};
+}
+
+AppResult App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
+                       std::optional<std::string> line) {
+    auto owned = std::move(res);
+    if (!owned)
+        return std::unexpected{owned.error()};
+    return Outcome{std::move(*owned), std::move(line), false};
+}
+
 } // namespace caudio::app

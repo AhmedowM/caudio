@@ -22,10 +22,14 @@
 #endif
 
 #include <CLI/CLI.hpp>
+#include <caudio/app/core.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/core.hpp>
+#include <caudio/client/output_formatter.hpp>
+#include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>
 #include <memory>
@@ -171,6 +175,43 @@ std::string statusLine(const caudio::ipc::Status& st) {
         s += " " + who;
     s += " [" + caudio::app::fmtClock(st.pos) + "/" + caudio::app::fmtClock(st.dur) + "]";
     return s;
+}
+
+int renderError(const caudio::utils::Error& e) {
+    caudio::ipc::Result errRes{e};
+    caudio::client::OutputFormatter fmt{false};
+    fmt.print(errRes, std::cerr);
+    if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running")
+        caudio::println(std::cerr, "hint: run `caudio start` to start the daemon");
+    return 1;
+}
+
+int renderJson(const caudio::ipc::Result& r) {
+    caudio::client::OutputFormatter fmt{true};
+    fmt.print(r, std::cout);
+    return 0;
+}
+
+// Renders a Phase-1 outcome: errors (with hint), JSON results, human
+// lines, bare results, or silent success, in that order.
+int render(caudio::app::AppResult res, bool asJson) {
+    if (!res)
+        return renderError(res.error());
+    auto outcome = std::move(*res);
+    if (asJson && outcome.result)
+        return renderJson(*outcome.result);
+    if (outcome.line) {
+        if (outcome.toStderr)
+            caudio::println(std::cerr, "{}", *outcome.line);
+        else
+            caudio::println(std::cout, "{}", *outcome.line);
+        return 0;
+    }
+    if (outcome.result) {
+        caudio::client::OutputFormatter fmt{false};
+        fmt.print(*outcome.result, std::cout);
+    }
+    return 0;
 }
 
 } // namespace detail
@@ -830,9 +871,9 @@ int Shell::run(int argc, char** argv) {
     }
     if (historyCmd->parsed()) {
         if (historyList->parsed())
-            return app_.historyList(historyLimit, historyJson);
+            return detail::render(app_.historyList(historyLimit), historyJson);
         if (historyClear->parsed())
-            return app_.historyClear(historyClearJson);
+            return detail::render(app_.historyClear(), historyClearJson);
         std::cout << historyCmd->help() << "\n";
         return 0;
     }
@@ -865,14 +906,14 @@ int Shell::run(int argc, char** argv) {
     }
     if (deviceCmd->parsed()) {
         if (devList->parsed())
-            return app_.deviceList(devJson);
+            return detail::render(app_.deviceList(), devJson);
         if (devSet->parsed())
-            return app_.deviceSet(devSetId, devSetJson);
+            return detail::render(app_.deviceSet(devSetId), devSetJson);
         if (devTest->parsed()) {
             std::optional<std::string> id;
             if (!devTestId.empty())
                 id = devTestId;
-            return app_.deviceTest(id, devTestJson);
+            return detail::render(app_.deviceTest(id), devTestJson);
         }
         std::cout << deviceCmd->help() << "\n";
         return 0;

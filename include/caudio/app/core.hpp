@@ -35,6 +35,24 @@
 namespace caudio::app {
 
 /**
+ * @brief Command outcome data for frontends to render.
+ * @ingroup caudio_app
+ * @details handlers return this instead of printing. Frontends
+ * render via OutputFormatter (bare/JSON), print `line`, or stay silent:
+ * result plus line is a confirmation, result alone bare-renders, line
+ * alone with toStderr is a warning (exit still 0), neither is silent
+ * success.
+ */
+struct Outcome {
+    std::optional<caudio::ipc::Result> result;
+    std::optional<std::string> line;
+    bool toStderr = false;
+    static std::expected<Outcome, caudio::utils::Error> warn(std::string message);
+};
+/** @brief Handler return: outcome data, or the error to render. */
+using AppResult = std::expected<Outcome, caudio::utils::Error>;
+
+/**
  * @brief Application orchestrator bound to one config (one database).
  * @ingroup caudio_app
  * @see caudio::config::Config
@@ -156,6 +174,16 @@ class App {
      */
     int confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res, bool asJson,
                 const std::string& line);
+
+    /**
+     * @brief Pairs a result with its success line, passing errors through.
+     * @ingroup caudio_app
+     * @param res Daemon outcome to wrap.
+     * @param line Human success line; nullopt means bare-render the result.
+     * @return Outcome data for the frontend; errors surface unchanged.
+     */
+    AppResult confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
+                      std::optional<std::string> line = std::nullopt);
 
     /**
      * @brief Renders a transport result as a one-line confirmation.
@@ -398,23 +426,23 @@ class App {
     int tagGet(std::int64_t id, const std::string& field, bool asJson);
 
     /** @brief Lists playback history entries. @ingroup caudio_app */
-    int historyList(int limit, bool asJson);
+    AppResult historyList(int limit);
 
     /** @brief Clears all playback history. @ingroup caudio_app */
-    int historyClear(bool asJson);
+    AppResult historyClear();
 
     /** @brief Lists audio output devices. @ingroup caudio_app */
-    int deviceList(bool asJson);
+    AppResult deviceList();
 
     /** @brief Sets the default audio output device. @ingroup caudio_app */
-    int deviceSet(const std::string& id, bool asJson);
+    AppResult deviceSet(const std::string& id);
 
     /**
      * @brief Checks an audio device is available.
      * @ingroup caudio_app
      * @param id Device id, or nullopt for the default device.
      */
-    int deviceTest(std::optional<std::string> id, bool asJson);
+    AppResult deviceTest(std::optional<std::string> id);
 
     /**
      * @brief Reads a config value from the local file (no daemon needed).
