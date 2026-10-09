@@ -9,32 +9,14 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/print.hpp>
 #include <cstdint>
-#include <cstdlib>
 #include <format>
-#include <iostream>
 #include <set>
 #include <sstream>
 #include <string>
 #include <variant>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
 
 namespace caudio::app::detail {
-
-bool useColor() {
-    if (std::getenv("NO_COLOR") != nullptr)
-        return false;
-#ifdef _WIN32
-    return ::_isatty(::_fileno(stdout)) != 0;
-#else
-    return ::isatty(STDOUT_FILENO) != 0;
-#endif
-}
 
 void emitLine(std::string& blob, const std::string& line) {
     if (!blob.empty())
@@ -68,27 +50,6 @@ void renderInto(std::string& blob, const caudio::ipc::Result& res) {
     appendBlock(blob, os.str());
 }
 
-int printAdded(const caudio::ipc::Result& res, std::set<int64_t>& seen) {
-    auto* qt = std::get_if<caudio::ipc::QueueTracks>(&res);
-    if (!qt) {
-        caudio::client::OutputFormatter fmt{false};
-        fmt.print(res, std::cout);
-        return 0;
-    }
-    int added = 0;
-    for (auto& t : qt->tracks) {
-        std::string label = caudio::app::addedLabel(t);
-        if (seen.contains(t.id)) {
-            caudio::println(std::cerr, "already in queue: {}", label);
-        } else {
-            caudio::println("Added {}", label);
-            seen.insert(t.id);
-            ++added;
-        }
-    }
-    return added;
-}
-
 int printAddedText(const caudio::ipc::Result& res, std::set<int64_t>& seen, std::string& out,
                    std::string& err) {
     auto* qt = std::get_if<caudio::ipc::QueueTracks>(&res);
@@ -108,13 +69,6 @@ int printAddedText(const caudio::ipc::Result& res, std::set<int64_t>& seen, std:
         }
     }
     return added;
-}
-
-void countLine(int added) {
-    if (added == 1)
-        caudio::println("1 track added");
-    else
-        caudio::println("{} tracks added", added);
 }
 
 void countLineText(int added, std::string& out) {

@@ -188,40 +188,12 @@ class App {
             std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
 
     /**
-     * @brief Prints an error plus the start hint when relevant.
-     * @ingroup caudio_app
-     * @return Always 1 (CLI exit convention, kept for renderer parity).
-     */
-    int printErr(const caudio::utils::Error& e);
-
-    /**
-     * @brief Prints a result as JSON.
-     * @ingroup caudio_app
-     * @return Always 0.
-     */
-    int printJson(const caudio::ipc::Result& r);
-
-    /**
-     * @brief Sends a command and renders the result (text or JSON).
-     * @ingroup caudio_app
-     */
-    int sendViaClient(const caudio::ipc::Command& cmd, bool asJson);
-
-    /**
      * @brief Sends a play-like command, autostarting a down daemon.
      * @ingroup caudio_app
      * @param cmd IPC command to send.
      */
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     sendPlay(const caudio::ipc::Command& cmd);
-
-    /**
-     * @brief Renders a result as a one-line confirmation (or JSON).
-     * @ingroup caudio_app
-     * @param line Text line for the success path.
-     */
-    int confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res, bool asJson,
-                const std::string& line);
 
     /**
      * @brief Pairs a result with its success line, passing errors through.

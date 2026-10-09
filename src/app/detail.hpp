@@ -7,35 +7,11 @@
 
 /**
  * @file detail.hpp
- * @brief App-internal reporting helpers (NOT public API).
- * @details Queue-add style "Added" reporting and terminal color detection,
- * shared between app command handlers. Frontends must use the public
- * `caudio/app/` headers instead. Phase 1: builders return text instead of
- * printing; useColor moves to frontends as they convert.
+ * @brief App-internal shared reporting builders (NOT public API).
+ * @details Text builders for batch reports; frontends own final rendering
+ * and must use the public `caudio/app/` headers.
  */
 namespace caudio::app::detail {
-
-/**
- * @brief Detects color-capable interactive terminals honoring NO_COLOR.
- * @return True when ANSI color may be emitted.
- * @details Transitional: frontends take their own copy as they convert
- * (the shell already has one); deleted once no lib user remains.
- */
-bool useColor();
-
-/**
- * @brief Prints Added lines for a QueueTracks result, warning on ids
- * already seen (pre-existing queue members).
- * @return The newly added count.
- * @details Transitional: queue.cpp moves to printAddedText; deleted after.
- */
-int printAdded(const caudio::ipc::Result& res, std::set<int64_t>& seen);
-
-/**
- * @brief Prints the "N track(s) added" total line.
- * @details Transitional: queue.cpp moves to countLineText; deleted after.
- */
-void countLine(int added);
 
 /**
  * @brief Appends one line to a blob (newline-joined, no trailing newline).
