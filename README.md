@@ -149,7 +149,7 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio config import <path>` | Validate and import config file |
 | `caudio config reset [key]` | Reset key or all to defaults |
 
-Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::version::version()`), `--help` / `-h`. Exit codes: `0` success, `1` runtime/validation error, `105` bad option value, `106` missing argument, `109` unknown command (see `EXIT STATUS` in `docs/man/caudio.1`).
+Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::version::version()`), `--help` / `-h`. Exit codes: `0` success, `1` any error (see `EXIT STATUS` in `docs/man/caudio.1`).
 
 ### As a library
 

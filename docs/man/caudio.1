@@ -405,16 +405,9 @@ SHM status block (\fBAtomicShmStatus\fR) for 10 fps TUI polling.
 Success (including \fBstart\fR when the daemon is already running).
 .TP
 .B 1
-Runtime, daemon-side, or validation error.
-.TP
-.B 105
-CLI11 option-value validation failure (e.g. bad \fB\-\-format\fR).
-.TP
-.B 106
-Missing required argument.
-.TP
-.B 109
-Unknown command or argument.
+Any error: unknown command, missing or invalid argument, validation
+failure, daemon-side or runtime error. Details go to stderr. (Finer
+usage codes are a post-1.0 option, not implemented.)
 .SH SEE ALSO
 .BR cmake (1),
 .BR ninja (1),

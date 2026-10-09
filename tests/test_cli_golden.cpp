@@ -151,13 +151,13 @@ TEST_CASE("cli version prints", "[cli]") {
 
 TEST_CASE("cli rejects unknown command", "[cli]") {
     auto r = runCli({"frobnicate"});
-    REQUIRE(r.exitCode != 0);
+    REQUIRE(r.exitCode == 1);
     REQUIRE(contains(r.out + r.err, "frobnicate"));
 }
 
 TEST_CASE("cli rejects missing required arg", "[cli]") {
     auto r = runCli({"queue", "add"});
-    REQUIRE(r.exitCode != 0);
+    REQUIRE(r.exitCode == 1);
 }
 
 TEST_CASE("cli validates log level", "[cli]") {
