@@ -462,6 +462,23 @@
       }
     },
     {
+      "name": "ci-trimmed",
+      "inherits": [
+        "toolchain-gcc",
+        "ci-base"
+      ],
+      "displayName": "Trimmed FFmpeg CI: decode-only whitelist build, no audio device",
+      "cacheVariables": {
+        "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+      },
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
       "name": "modules-gcc",
       "inherits": [
         "toolchain-gcc",
@@ -725,6 +742,11 @@
       "jobs": 4
     },
     {
+      "name": "ci-trimmed",
+      "configurePreset": "ci-trimmed",
+      "jobs": 4
+    },
+    {
       "name": "modules-gcc",
       "configurePreset": "modules-gcc",
       "jobs": 4
@@ -857,6 +879,16 @@
     {
       "name": "ci-gcc",
       "configurePreset": "ci-gcc",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-trimmed",
+      "configurePreset": "ci-trimmed",
       "output": {
         "outputOnFailure": true
       },

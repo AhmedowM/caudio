@@ -14,16 +14,16 @@
 # full-static stays rejected.
 #
 # Consumption (Windows first):
-#   1. CI builds once per OS, caches the install prefix (key: hash of this
-#      file + CAUDIO_FFMPEG_TRIM_VERSION), then configures caudio with
-#      -DFFmpeg_ROOT=<prefix> -DCAUDIO_USE_TRIMMED_FFMPEG=ON.
-#   2. Local iteration: -DCAUDIO_USE_TRIMMED_FFMPEG=ON declares the
-#      `ffmpeg_trimmed` ExternalProject target; build it, then re-configure
-#      (same two-step pattern as the SetupFFmpeg source fallback).
-# If the trimmed tree is absent/unbuilt, configure stops with instructions;
-# the pipeline falls back to the default provider (system/Gyan) so a trim
-# outage never reds the build -- implement the fallback at CI level by
-# retrying configure without the flag.
+#   1. CI restores the cached install prefix into CAUDIO_FFMPEG_TRIM_PREFIX
+#      (key: hash of this file, which embeds CAUDIO_FFMPEG_TRIM_VERSION),
+#      then configures with --preset ci-trimmed. Cache hit: find_package
+#      consumes the prefix directly. Cache miss: one-shot configure-time
+#      source build fills it (~10 min, then cached).
+#   2. Local iteration: -DCAUDIO_USE_TRIMMED_FFMPEG=ON with
+#      -DCAUDIO_FFMPEG_TRIM_PREFIX=<path> (default: <build>/ffmpeg-trimmed).
+# A trim outage never reds the pipeline: any build failure stops with a note
+# to retry with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF (default provider), and the CI
+# job implements that retry.
 #
 # Supported builders: Linux GCC, macOS brew-LLVM, Windows MinGW (msys2).
 # MSVC is unsupported (upstream FFmpeg has no native MSVC build); MSVC keeps
@@ -35,7 +35,7 @@ set(CAUDIO_FFMPEG_TRIM_VERSION "8.1.2" CACHE STRING "pinned FFmpeg version for t
 set(CAUDIO_FFMPEG_TRIM_URL "https://ffmpeg.org/releases/ffmpeg-${CAUDIO_FFMPEG_TRIM_VERSION}.tar.xz"
     CACHE STRING "source tarball for trimmed FFmpeg builds")
 
-# Where the trimmed tree installs when built via `ffmpeg_trimmed`.
+# Where the trimmed tree installs (one-shot build target or cache restore).
 set(CAUDIO_FFMPEG_TRIM_PREFIX "${CMAKE_BINARY_DIR}/ffmpeg-trimmed"
     CACHE PATH "install prefix for the trimmed FFmpeg build")
 
@@ -112,10 +112,12 @@ set(CAUDIO_FFMPEG_TRIM_FLAGS
   --enable-bsf=dump_extra
   CACHE STRING "configure flags for the trimmed decode-only FFmpeg build")
 
-# Honors a prebuilt trimmed tree via FFmpeg_ROOT; otherwise declares the
-# `ffmpeg_trimmed` source build and stops with rebuild instructions. System
-# paths are never consulted in trimmed mode: without FFmpeg_ROOT the build
-# would silently use a full FFmpeg and the whitelist would guard nothing.
+# Honors a prebuilt trimmed tree via FFmpeg_ROOT; otherwise performs a
+# one-shot configure-time source build into CAUDIO_FFMPEG_TRIM_PREFIX (needs
+# a POSIX shell + make + nasm + zlib; first build takes ~10 min, CI caches the
+# prefix). System paths are never consulted in trimmed mode: without
+# FFmpeg_ROOT the build would silently use a full FFmpeg and the whitelist
+# would guard nothing.
 function(caudio_setup_trimmed_ffmpeg)
   if(MSVC)
     message(FATAL_ERROR "CAUDIO_USE_TRIMMED_FFMPEG is unsupported with MSVC "
@@ -128,22 +130,74 @@ function(caudio_setup_trimmed_ffmpeg)
       set(FFmpeg_FOUND TRUE PARENT_SCOPE)
       return()
     endif()
-    message(STATUS "FFmpeg_ROOT is set but holds no complete trimmed tree -- declaring trimmed source build")
+    message(STATUS "FFmpeg_ROOT holds no complete trimmed tree -- building into it")
+    if(FFmpeg_ROOT)
+      set(_trim_prefix "${FFmpeg_ROOT}")
+    else()
+      set(_trim_prefix "$ENV{FFmpeg_ROOT}")
+    endif()
+  else()
+    set(_trim_prefix "${CAUDIO_FFMPEG_TRIM_PREFIX}")
   endif()
-  include(ExternalProject)
-  message(STATUS "Configuring trimmed FFmpeg ${CAUDIO_FFMPEG_TRIM_VERSION} "
-    "(decode-only whitelist; needs nasm + zlib + a POSIX shell)")
-  ExternalProject_Add(ffmpeg_trimmed
-    URL ${CAUDIO_FFMPEG_TRIM_URL}
-    PREFIX "${CMAKE_BINARY_DIR}/_ffmpeg_trimmed"
-    CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=${CAUDIO_FFMPEG_TRIM_PREFIX} ${CAUDIO_FFMPEG_TRIM_FLAGS}
-    BUILD_COMMAND make -j4
-    INSTALL_COMMAND make install
-    BUILD_IN_SOURCE FALSE
+  if(WIN32)
+    find_program(_trim_bash bash REQUIRED)
+    find_program(_trim_make make REQUIRED)
+    set(_trim_sh ${_trim_bash})
+    set(_trim_make ${_trim_make})
+  else()
+    find_program(_trim_make make REQUIRED)
+    set(_trim_make ${_trim_make})
+  endif()
+  include(FetchContent)
+  FetchContent_Declare(ffmpeg_trimmed_src URL ${CAUDIO_FFMPEG_TRIM_URL})
+  FetchContent_MakeAvailable(ffmpeg_trimmed_src)
+  set(_trim_src "${ffmpeg_trimmed_src_SOURCE_DIR}")
+  set(_trim_build "${CMAKE_BINARY_DIR}/_ffmpeg_trimmed_build")
+  file(MAKE_DIRECTORY "${_trim_build}" "${_trim_prefix}")
+  separate_arguments(_trim_flags UNIX_COMMAND "${CAUDIO_FFMPEG_TRIM_FLAGS}")
+  if(WIN32)
+    set(_trim_configure ${_trim_sh} "${_trim_src}/configure")
+  else()
+    set(_trim_configure "${_trim_src}/configure")
+  endif()
+  message(STATUS "Building trimmed FFmpeg ${CAUDIO_FFMPEG_TRIM_VERSION} into ${_trim_prefix} "
+    "(decode-only whitelist; one-shot configure-time build)")
+  execute_process(
+    COMMAND ${_trim_configure} --prefix=${_trim_prefix} ${_trim_flags}
+    WORKING_DIRECTORY "${_trim_build}"
+    RESULT_VARIABLE _trim_rc
+    OUTPUT_VARIABLE _trim_out
+    ERROR_VARIABLE _trim_out
   )
-  set(FFmpeg_ROOT "${CAUDIO_FFMPEG_TRIM_PREFIX}" CACHE PATH "FFmpeg root from trimmed build" FORCE)
-  message(FATAL_ERROR "Trimmed FFmpeg not built yet. Build it with: "
-    "cmake --build ${CMAKE_BINARY_DIR} --target ffmpeg_trimmed "
-    "then re-run cmake (or restore a cached trimmed prefix via -DFFmpeg_ROOT=<prefix>). "
-    "To fall back to the default provider, re-configure with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+  if(_trim_rc)
+    string(SUBSTRING "${_trim_out}" 0 3000 _trim_tail)
+    message(FATAL_ERROR "Trimmed FFmpeg configure failed:\n${_trim_tail}\n"
+      "To fall back to the default provider, re-configure with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+  endif()
+  execute_process(
+    COMMAND ${_trim_make} -j4
+    WORKING_DIRECTORY "${_trim_build}"
+    RESULT_VARIABLE _trim_rc
+  )
+  if(_trim_rc)
+    message(FATAL_ERROR "Trimmed FFmpeg build failed. "
+      "To fall back to the default provider, re-configure with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+  endif()
+  execute_process(
+    COMMAND ${_trim_make} install
+    WORKING_DIRECTORY "${_trim_build}"
+    RESULT_VARIABLE _trim_rc
+  )
+  if(_trim_rc)
+    message(FATAL_ERROR "Trimmed FFmpeg install failed. "
+      "To fall back to the default provider, re-configure with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+  endif()
+  set(FFmpeg_ROOT "${_trim_prefix}" CACHE PATH "FFmpeg root from trimmed build" FORCE)
+  find_package(FFmpeg QUIET)
+  if(NOT FFmpeg_FOUND)
+    message(FATAL_ERROR "Trimmed FFmpeg built but not found under ${_trim_prefix}. "
+      "To fall back to the default provider, re-configure with -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+  endif()
+  message(STATUS "Trimmed FFmpeg built: ${FFmpeg_AVCODEC_LIBRARY}")
+  set(FFmpeg_FOUND TRUE PARENT_SCOPE)
 endfunction()

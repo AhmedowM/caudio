@@ -203,6 +203,86 @@ jobs:
           path: build/${{ matrix.preset }}/docs/html
           if-no-files-found: warn
 
+  ffmpeg-trimmed:
+    name: ffmpeg-trimmed (windows-latest / MinGW, decode-only whitelist)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSYS2 (UCRT64 + trim build tools)
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-zlib
+            make
+            pkgconf
+            nasm
+
+      - name: Restore trimmed FFmpeg prefix
+        id: trimcache
+        uses: actions/cache@v4
+        with:
+          # Key tracks the whitelist: any flag/version change rebuilds.
+          path: ffmpeg-trimmed
+          key: ffmpeg-trimmed-windows-${{ hashFiles('cmake/FFmpegTrimmed.cmake') }}
+
+      - name: Configure (trimmed, fallback to default provider)
+        id: pick
+        run: |
+          if cmake --preset ci-trimmed; then
+            echo "preset=ci-trimmed" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
+            cmake --preset ci-gcc
+            echo "preset=ci-gcc" >> "$GITHUB_OUTPUT"
+          fi
+        shell: msys2 {0}
+
+      - name: Expose DLLs
+        run: |
+          # Trimmed DLLs live in the cached prefix; default-provider DLLs
+          # follow the existing lookup (FetchContent _deps or system ffmpeg).
+          # Absolute Windows-style dirs only (loader-readable).
+          preset="${{ steps.pick.outputs.preset }}"
+          dll=""
+          if [ "$preset" = "ci-trimmed" ]; then
+            dll=$(find "$CAUDIO_TRIMMED_ROOT/bin" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          if [ -z "$dll" ]; then
+            dll=$(find "build/$preset/_deps" -name 'avcodec-*.dll' | head -n 1)
+          fi
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+          cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+          echo "PATH additions:"; tail -n 2 "$GITHUB_PATH"
+        shell: msys2 {0}
+
+      - name: Build
+        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+        shell: msys2 {0}
+
+      - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
+        run: ctest --preset ${{ steps.pick.outputs.preset }}
+        shell: msys2 {0}
+
   sanitizers:
     name: sanitizers (ubuntu-24.04 / gcc-16)
     runs-on: ubuntu-latest
