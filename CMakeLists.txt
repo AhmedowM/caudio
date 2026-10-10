@@ -214,6 +214,19 @@ target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 target_include_directories(sqlite3 SYSTEM PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
+# Trimmed amalgamation (CODEBASE_REVIEW.md §3 leftovers): only the API surface
+# in use (prepare/bind/step/column/finalize, exec, open_v2, WAL + foreign_keys
+# + FTS5). OMIT_LOAD_EXTENSION is also hardening. None of the omitted areas
+# (JSON1 SQL, authorizer, progress callbacks, get_table, loadable extensions,
+# deprecated spellings) is referenced anywhere in src/tests/examples/cli.
+target_compile_definitions(sqlite3 PUBLIC
+  SQLITE_OMIT_LOAD_EXTENSION=1
+  SQLITE_OMIT_DEPRECATED=1
+  SQLITE_OMIT_AUTHORIZER=1
+  SQLITE_OMIT_PROGRESS_CALLBACK=1
+  SQLITE_OMIT_GET_TABLE=1
+  SQLITE_OMIT_JSON=1
+)
 
 # Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
