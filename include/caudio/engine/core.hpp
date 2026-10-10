@@ -24,9 +24,10 @@
  *   and persistCursorLocked update the blob/cursor transactionally.
  * - History: doHistoryMark uses shouldMarkPlayed(historyThresholdPct/Secs)
  *   with atomic CAS on markedPlayed_ and a BEGIN IMMEDIATE transaction.
- * Locking: queueMutex_ (mutex, try_lock) for QueueState; decodeMtx_
- * (mutex) for decoder_/ring_ vs seek/decodeLoop; queue/state DB writes
- * go through Database::mutex() (shared_mutex) + withTransaction.
+ * Locking: queueMutex_ (timed mutex) for QueueState -- try_lock on fast
+ * and monitor paths, bounded wait for transport commands (play/next/prev);
+ * decodeMtx_ (mutex) for decoder_/ring_ vs seek/decodeLoop; queue/state DB
+ * writes go through Database::mutex() (shared_mutex) + withTransaction.
  * Events: MpscQueue<EngineEvent,64> with drop-on-full, dispatched via
  * pushEvent to callbacks under cbMutex_.
  */
@@ -75,9 +76,10 @@ namespace caudio::engine {
  * @brief Main playback engine -- queue, decoding, gapless, history and persistence.
  * @ingroup caudio_engine
  * @details See file-level docs for state machine, threading and persistence.
- * Public mutators that touch QueueState use `tryLockQueue()` (non-blocking);
- * callers get `StatusCode::Busy` if the queue is contended. Decode/ring
- * access is serialized by `decodeMtx_`. State (`playbackState_`,
+ * Public mutators that touch QueueState use `tryLockQueue()` (non-blocking,
+ * `Busy` on contention); transport commands (play/next/prev) instead wait up
+ * to 500 ms via `tryLockQueueFor()` so a colliding skip executes instead of
+ * failing. Decode/ring access is serialized by `decodeMtx_`. State (`playbackState_`,
  * `hasCurrent_`, `volume_`, `markedPlayed_`, `gaplessArmed_`,
  * `lastProgressMs_`) is atomic.
  *
@@ -87,8 +89,9 @@ namespace caudio::engine {
  * `NoMem` (perm too large).
  *
  * Thread safety: thread-safe for concurrent play/pause/next/prev/seek
- * under the documented locks; `queueMutex_` is try_lock so callers
- * must handle Busy.
+ * under the documented locks; `queueMutex_` is try_lock on fast paths and
+ * bounded-wait on transport commands, so callers must still handle Busy
+ * (budget exceeded).
  * @see PlaybackState
  * @see QueueState
  * @see EngineConfig
@@ -162,7 +165,7 @@ class Engine final {
      * @param queueId Active queue id (0 defaults to 1).
      * @return Success or Error State/Busy/NotFound/Internal.
      * @retval StatusCode::State if no db.
-     * @retval StatusCode::Busy if queueMutex_ try_lock fails.
+     * @retval StatusCode::Busy if the queue stays contended past the wait budget.
      * @retval StatusCode::NotFound if queue empty, or track file not
      * playable without allowSimulatedPlayback.
      * @retval StatusCode::Device if the audio device cannot be created
@@ -172,11 +175,12 @@ class Engine final {
      *   start AudioOutput.
      * - Playing -> Playing: restart current track (seek 0 under decodeMtx_,
      *   ring reset).
-     * - Stopped -> Playing: queueNextLocked under queueMutex_, then
-     *   doPlayTrack.
+     * - Stopped -> Playing: queueNextLocked under queueMutex_ (bounded
+     *   500 ms wait), then doPlayTrack.
      * Gapless: doPlayTrack prerolls and pushes TrackStarted event.
      * @par Thread safety
-     * Thread-safe; uses tryLockQueue() and decodeMtx_ for decoder.
+     * Thread-safe; Stopped path waits boundedly on queueMutex_, decoder
+     * under decodeMtx_.
      * @see pause
      * @see resume
      * @see stop
@@ -395,11 +399,10 @@ class Engine final {
      * @brief Advances to the next track per RepeatMode/shuffle.
      * @ingroup caudio_engine
      * @return Success or Error State/Busy/NotFound/Device.
-     * @details Fast-path: if !shuffle && repeat==One && hasCurrent, seeks
-     * decoder to 0 under decodeMtx_ and resets ring without touching the
-     * queue. Otherwise locks queueMutex_ try_lock, calls queueNextLocked
-     * (which handles shuffle perm, wrap/reshuffle and RepeatMode::One),
-     * then doPlayTrack.
+     * @details Delegates to advanceLocked with a 500 ms queue-lock budget,
+     * so a colliding skip waits instead of failing Busy. Fast-path: if
+     * !shuffle && repeat==One && hasCurrent, seeks decoder to 0 under
+     * decodeMtx_ and resets ring without touching the queue.
      * @par Thread safety
      * Thread-safe; fast-path locks decodeMtx_, otherwise queueMutex_.
      * @see queueNextLocked
@@ -424,7 +427,7 @@ class Engine final {
      * @brief Moves to the previous track.
      * @ingroup caudio_engine
      * @return Success or Error State/Busy/NotFound/Device ("at start"/"no perm").
-     * @details Locks queueMutex_ try_lock then queuePrevLocked + doPlayTrack.
+     * @details Bounded 500 ms wait on queueMutex_, then queuePrevLocked + doPlayTrack.
      * Shuffle path steps cursor back by 2 and clamps; non-shuffle mirrors.
      * @par Thread safety
      * Thread-safe; try_lock on queueMutex_.
@@ -514,6 +517,15 @@ class Engine final {
      * @return true if lock acquired; false means Busy.
      */
     bool tryLockQueue() noexcept;
+    /**
+     * @brief Tries to acquire queueMutex_ for up to the given budget.
+     * @ingroup caudio_engine
+     * @details Transport commands (play/next/prev) use this so a skip
+     * colliding with a track transition waits instead of failing Busy.
+     * Monitor paths keep tryLockQueue() (fail-fast; the next tick retries).
+     * @return true if lock acquired within budget; false means Busy.
+     */
+    bool tryLockQueueFor(std::chrono::milliseconds wait) noexcept;
     /** @brief Releases queueMutex_. @ingroup caudio_engine */
     void unlockQueue() noexcept;
 
@@ -697,12 +709,15 @@ class Engine final {
      * @ingroup caudio_engine
      * @param stopAtEnd When true with repeat Off, halts at queue end instead
      * of wrapping (cursor stays parked past the end).
+     * @param lockWaitMs Queue-lock wait budget in ms (0 = try once). Monitor
+     * autoNext passes 0 (fail-fast; the next tick retries); user next()
+     * passes 500 so colliding skips execute.
      * @par Thread safety
-     * Thread-safe; try_lock on queueMutex_.
+     * Thread-safe; queueMutex_ try_lock or bounded wait per budget.
      * @see next
      * @see autoNext
      */
-    ExpectedVoid advanceLocked(bool stopAtEnd);
+    ExpectedVoid advanceLocked(bool stopAtEnd, int lockWaitMs = 0);
 
     /**
      * @brief Moves queue cursor to previous track per shuffle/repeat mode (queueMutex_ held).
@@ -921,7 +936,7 @@ class Engine final {
     // gaplessArmed_: 0->1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
-    mutable std::mutex queueMutex_;
+    mutable std::timed_mutex queueMutex_;
 };
 
 } // namespace caudio::engine

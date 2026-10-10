@@ -39,6 +39,13 @@
 
 namespace caudio::engine {
 
+// Transport-command wait budget: device setup under the queue lock routinely
+// takes tens of ms (device open + preroll), so a colliding skip waits
+// instead of failing Busy. Monitor paths keep try_lock (fail-fast).
+namespace {
+constexpr std::chrono::milliseconds kQueueLockWait{500};
+}
+
 Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
     auto e = std::unique_ptr<Engine>(new Engine(cfg));
     auto err = e->init();
@@ -143,7 +150,7 @@ Engine::ExpectedVoid Engine::play(int64_t queueId) {
         return {};
     }
     // Stopped -> start new track via cursor (not dequeue)
-    if (!tryLockQueue())
+    if (!tryLockQueueFor(kQueueLockWait))
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
     queue_.queue_id = queueId;
@@ -402,7 +409,7 @@ Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
 }
 
 int64_t Engine::activeQueueId() const noexcept {
-    std::lock_guard<std::mutex> lk(queueMutex_);
+    std::lock_guard<std::timed_mutex> lk(queueMutex_);
     return queue_.queue_id ? queue_.queue_id : state_.activeQueueId ? state_.activeQueueId : 1;
 }
 
@@ -448,14 +455,14 @@ Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
 }
 
 Engine::ExpectedVoid Engine::next() {
-    return advanceLocked(false);
+    return advanceLocked(false, (int)kQueueLockWait.count());
 }
 
 Engine::ExpectedVoid Engine::autoNext() {
     return advanceLocked(true);
 }
 
-Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd) {
+Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd, int lockWaitMs) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
@@ -487,7 +494,11 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd) {
         decodeCv_.notify_all();
         return {};
     }
-    if (!tryLockQueue())
+    // Monitor autoNext passes 0 (fail-fast; the next tick retries), user
+    // next() passes the wait budget so colliding skips execute.
+    bool locked = lockWaitMs > 0 ? tryLockQueueFor(std::chrono::milliseconds(lockWaitMs))
+                                  : tryLockQueue();
+    if (!locked)
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
     if (stopAtEnd && queue_.repeat == RepeatMode::Off) {
         // Natural track end: halt instead of wrapping. The cursor stays parked
@@ -528,7 +539,7 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd) {
 Engine::ExpectedVoid Engine::prev() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
-    if (!tryLockQueue())
+    if (!tryLockQueueFor(kQueueLockWait))
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
     caudio::db::Track t;
     auto r = queuePrevLocked(t);
@@ -625,6 +636,10 @@ bool Engine::hasDb() const noexcept {
 
 bool Engine::tryLockQueue() noexcept {
     return queueMutex_.try_lock();
+}
+
+bool Engine::tryLockQueueFor(std::chrono::milliseconds wait) noexcept {
+    return queueMutex_.try_lock_for(wait);
 }
 
 void Engine::unlockQueue() noexcept {
