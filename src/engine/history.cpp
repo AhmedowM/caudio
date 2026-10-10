@@ -22,6 +22,11 @@ uint64_t nowMs() noexcept {
     return (uint64_t)duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }
 
+uint64_t wallMs() noexcept {
+    using namespace std::chrono;
+    return (uint64_t)duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
 bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept {
     if (marked)
         return false;

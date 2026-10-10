@@ -477,7 +477,7 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd) {
         playbackState_.store(PlaybackState::Playing, std::memory_order_release);
         markedPlayed_.store(false, std::memory_order_release);
         gaplessArmed_.store(false, std::memory_order_release);
-        startedMs_ = (int64_t)detail::nowMs();
+        startedMs_ = (int64_t)detail::wallMs();
         EngineEvent ev;
         ev.type = EngineEventType::TrackStarted;
         ev.track_id = currentTrack_.id;
@@ -1221,7 +1221,7 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
     hasCurrent_.store(true, std::memory_order_release);
     markedPlayed_.store(false, std::memory_order_release);
     gaplessArmed_.store(false, std::memory_order_release);
-    startedMs_ = (int64_t)detail::nowMs();
+    startedMs_ = (int64_t)detail::wallMs();
     state_.currentTrackId = t.id;
     state_.cursorPos = (int64_t)queue_.cursor;
     playbackState_.store(PlaybackState::Playing, std::memory_order_release);
@@ -1370,9 +1370,10 @@ void Engine::doHistoryMark() {
             ok = false;
         else {
             raw = guard.get();
-            int64_t nowSec = (int64_t)(detail::nowMs() / 1000);
+            // Wall-clock milliseconds (display divides by 1000 for dates).
+            int64_t wallNow = (int64_t)detail::wallMs();
             sqlite3_bind_int64(raw, 1, playCount + 1);
-            sqlite3_bind_int64(raw, 2, nowSec);
+            sqlite3_bind_int64(raw, 2, wallNow);
             sqlite3_bind_int64(raw, 3, currentTrack_.id);
             rc = sqlite3_step(raw);
             if (rc != SQLITE_DONE)
@@ -1404,7 +1405,7 @@ void Engine::doHistoryMark() {
             }
             sqlite3_bind_int64(raw, 1, currentTrack_.id);
             sqlite3_bind_int64(raw, 2, startedMs_);
-            sqlite3_bind_int64(raw, 3, (int64_t)detail::nowMs());
+            sqlite3_bind_int64(raw, 3, (int64_t)detail::wallMs());
             sqlite3_bind_int64(raw, 4, posMs);
             sqlite3_bind_double(raw, 5, compPct);
             sqlite3_bind_int64(raw, 6, queue_.queue_id ? queue_.queue_id : 1);

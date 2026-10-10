@@ -26,10 +26,19 @@ namespace caudio::engine::detail {
 
 /**
  * @brief Returns steady-clock time in milliseconds.
- * @details Used for `startedMs_` and history timestamps; monotonic
- * so not affected by system clock changes.
+ * @details Monotonic intervals only (progress cadence, position math).
+ * Must NEVER back stored timestamps: the display and protocol read
+ * them as wall-clock milliseconds since the Unix epoch.
  */
 uint64_t nowMs() noexcept;
+
+/**
+ * @brief Returns wall-clock time in milliseconds since the Unix epoch.
+ * @details Use for every persisted timestamp (`started_at`,
+ * `completed_at`, `last_played`). Jumps with the system clock, which is
+ * correct for absolute dates and harmless for ordering.
+ */
+uint64_t wallMs() noexcept;
 
 /**
  * @brief Tests whether playback should count as "played" for history.
