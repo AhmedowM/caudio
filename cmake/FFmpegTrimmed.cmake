@@ -48,7 +48,7 @@ set(CAUDIO_FFMPEG_TRIM_FLAGS
   --disable-all
   --disable-autodetect
   --enable-avcodec --enable-avformat --enable-avutil --enable-swresample
-  --disable-avfilter --disable-avdevice --disable-swscale --disable-postproc
+  --disable-avfilter --disable-avdevice --disable-swscale
   --disable-programs --disable-doc --disable-debug
   --disable-network
   --disable-hwaccels
@@ -123,6 +123,15 @@ function(caudio_setup_trimmed_ffmpeg)
     message(FATAL_ERROR "CAUDIO_USE_TRIMMED_FFMPEG is unsupported with MSVC "
       "(upstream FFmpeg has no native MSVC build) -- use MinGW or the default provider")
   endif()
+  # Drop stale hits: find_library/include results persist in cache across
+  # reconfigures, so a previous system/Gyan hit would shadow the trimmed
+  # tree even after FFmpeg_ROOT moves.
+  foreach(_ff_var IN ITEMS FFmpeg_AVCODEC_INCLUDE_DIR FFmpeg_AVCODEC_LIBRARY
+      FFmpeg_AVFORMAT_LIBRARY FFmpeg_AVUTIL_LIBRARY FFmpeg_SWRESAMPLE_LIBRARY)
+    unset(${_ff_var} CACHE)
+  endforeach()
+  unset(FFmpeg_FOUND)
+  unset(FFmpeg_FOUND CACHE)
   if(FFmpeg_ROOT OR DEFINED ENV{FFmpeg_ROOT})
     find_package(FFmpeg QUIET)
     if(FFmpeg_FOUND)
@@ -154,7 +163,9 @@ function(caudio_setup_trimmed_ffmpeg)
   set(_trim_src "${ffmpeg_trimmed_src_SOURCE_DIR}")
   set(_trim_build "${CMAKE_BINARY_DIR}/_ffmpeg_trimmed_build")
   file(MAKE_DIRECTORY "${_trim_build}" "${_trim_prefix}")
-  separate_arguments(_trim_flags UNIX_COMMAND "${CAUDIO_FFMPEG_TRIM_FLAGS}")
+  # NOTE: CAUDIO_FFMPEG_TRIM_FLAGS is already a CMake list (one flag per
+  # item). Do NOT run it through separate_arguments: the items contain no
+  # spaces, so re-parsing only risks rejoining them into one shell word.
   if(WIN32)
     set(_trim_configure ${_trim_sh} "${_trim_src}/configure")
   else()
@@ -163,7 +174,7 @@ function(caudio_setup_trimmed_ffmpeg)
   message(STATUS "Building trimmed FFmpeg ${CAUDIO_FFMPEG_TRIM_VERSION} into ${_trim_prefix} "
     "(decode-only whitelist; one-shot configure-time build)")
   execute_process(
-    COMMAND ${_trim_configure} --prefix=${_trim_prefix} ${_trim_flags}
+    COMMAND ${_trim_configure} --prefix=${_trim_prefix} ${CAUDIO_FFMPEG_TRIM_FLAGS}
     WORKING_DIRECTORY "${_trim_build}"
     RESULT_VARIABLE _trim_rc
     OUTPUT_VARIABLE _trim_out

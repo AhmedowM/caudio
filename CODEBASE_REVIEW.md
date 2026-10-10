@@ -74,6 +74,17 @@ version), Windows first (replaces the ~500 MB Gyan fetch; builds consume via
 the pipeline); (3) all-OS trimmed post-1.0. Shared libs throughout (no new
 LGPL burden). Full-static stays rejected (see prior discussion).
 
+Verified 2026-10-10 (Windows MinGW, FFmpeg 8.1.2 source, `dev-clang` build):
+whitelist configures + builds (fixes: no `separate_arguments` re-parse, no
+`--disable-postproc` in 8.x, stale `FFmpeg_*` cache entries unset on
+reconfigure), linked DLLs avcodec 1.98 + avformat 0.69 + avutil 1.0 +
+swresample 0.17 MB vs full Gyan 92.94 + 19.25 + 3.0 + 0.46 MB, ctest 165/165
+against the trimmed tree, runtime ZIP 3.6 MB. Name corrections vs the table
+above: decoders `mpc7`/`mpc8`/`amrnb`/`amrwb`/`dca`, no standalone `opus`
+demuxer (`ogg` covers `.opus`), `mov`/`matroska` cover mp4/m4a + mka/webm —
+all recorded in `cmake/FFmpegTrimmed.cmake`. CI `ffmpeg-trimmed` job still
+pending its first green run.
+
 ### Non-FFmpeg trim leftovers (pending, audited 2026-09-27 against actual API use — not yet applied)
 
 - **sqlite3** (27 APIs used; WAL + `foreign_keys=ON` + FTS5 required; zero
