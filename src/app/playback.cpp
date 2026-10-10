@@ -14,9 +14,11 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <chrono>
 #include <expected>
 #include <format>
 #include <string>
+#include <thread>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -154,8 +156,18 @@ AppResult App::stop() {
 AppResult App::next() {
     caudio::ipc::Command cmd{caudio::ipc::Next{}};
     auto res = sendRaw(cmd);
-    if (!res)
-        return std::unexpected{res.error()};
+    if (!res && res.error().code == caudio::utils::StatusCode::Busy) {
+        // Transient queue-lock contention (racing gapless advance or a
+        // sibling command): retry once after a beat before surfacing it.
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        res = sendRaw(cmd);
+    }
+    if (!res) {
+        const auto& e = res.error();
+        if (e.code == caudio::utils::StatusCode::Busy)
+            return Outcome::fail("next: engine busy, retry");
+        return std::unexpected{e};
+    }
     // Hoisted: read before Outcome moves *res (see resume()).
     std::string who = transportWho(res);
     return Outcome{.result = std::move(*res),
@@ -167,8 +179,15 @@ AppResult App::next() {
 AppResult App::prev() {
     caudio::ipc::Command cmd{caudio::ipc::Prev{}};
     auto res = sendRaw(cmd);
+    if (!res && res.error().code == caudio::utils::StatusCode::Busy) {
+        // Same transient contention as next(): retry once (see above).
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        res = sendRaw(cmd);
+    }
     if (!res) {
         const auto& e = res.error();
+        if (e.code == caudio::utils::StatusCode::Busy)
+            return Outcome::fail("prev: engine busy, retry");
         if (e.code == caudio::utils::StatusCode::NotFound && e.message == "at start")
             return Outcome::warn("prev: at queue start");
         return std::unexpected{e};

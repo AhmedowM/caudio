@@ -317,10 +317,6 @@ after 1.0 if SDK size matters.
   allowlist, never free format strings.
 - **Cover-art extraction:** `tag get` has no cover support; needs a binary blob over IPC
   (base64 field) plus `--out FILE`. Deferred post-1.0.
-- **Rapid-`next` transient `Busy`:** the non-blocking queue lock surfaces raw
-  `Error: Busy busy` under rapid calls (observed twice during the audit). Fix client-side
-  with retry-once after ~50ms, else map to a hint (`engine busy, retry`) instead of leaking
-  internals.
 
 ---
 
