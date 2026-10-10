@@ -222,24 +222,51 @@ jobs:
         with:
           msystem: UCRT64
           update: true
+          # Full trim toolchain lives here: Configure runs under msys2
+          # (module's FFmpeg build needs the UCRT64 env), Build/Test run
+          # under default shells with ucrt64/bin + usr/bin on PATH.
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-binutils
             mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
             make
             pkgconf
             nasm
+            git
 
-      - name: Restore trimmed FFmpeg prefix
+      - name: Add trim tools to PATH
+        run: |
+          "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
+          "${{ steps.msys2.outputs.msys2-location }}/usr/bin" >> $GITHUB_PATH
+        shell: pwsh
+
+      - name: Restore trimmed archive
         id: trimcache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           # Key tracks the whitelist: any flag/version change rebuilds.
-          path: ffmpeg-trimmed
+          path: ffmpeg-trimmed.tar.gz
           key: ffmpeg-trimmed-windows-${{ hashFiles('cmake/FFmpegTrimmed.cmake') }}
+
+      - name: Extract trimmed archive (cache hit)
+        if: steps.trimcache.outputs.cache-hit == 'true'
+        run: |
+          # cygpath: github.workspace is D:\... (backslashes), which
+          # Git-Bash tools mangle (tar: D\:\a\\...). Normalize once.
+          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          mkdir -p "$troot"
+          tar -xzf ffmpeg-trimmed.tar.gz -C "$troot"
+          ls "$troot/bin"
+        shell: bash
 
       - name: Configure (trimmed, fallback to default provider)
         id: pick
+        # msys2 shell: the module's FFmpeg build needs the full UCRT64 env,
+        # and bare `g++` here is the proven ucrt64 gcc 16.2 (the runner's
+        # C:\mingw64 15.2 chokes on the fattest TUs). Build/Test stay on
+        # default shells so DLL staging (below) governs loader resolution.
         run: |
           if cmake --preset ci-trimmed; then
             echo "preset=ci-trimmed" >> "$GITHUB_OUTPUT"
@@ -250,38 +277,58 @@ jobs:
           fi
         shell: msys2 {0}
 
-      - name: Expose DLLs
+      - name: Stage DLLs beside test executables
         run: |
-          # Trimmed DLLs live in the cached prefix; default-provider DLLs
-          # follow the existing lookup (FetchContent _deps or system ffmpeg).
-          # Absolute Windows-style dirs only (loader-readable).
+          # The loader searches the exe directory before System32/PATH, so
+          # staging the exact DLLs here makes build-time Catch2 discovery +
+          # ctest hermetic: immune to older same-named MinGW runtimes
+          # elsewhere on the image (0xc0000139). Runs pre-build because
+          # discovery executes test binaries during the build itself.
+          # NOTE: the runtime dir is derived from the msys2 location, never
+          # `command -v g++`: in Git-Bash steps that resolves to the
+          # runner's C:\mingw64 gcc 15.2. No zlib1: objdump shows the
+          # trimmed avcodec imports only UCRT/system + sibling DLLs.
           preset="${{ steps.pick.outputs.preset }}"
-          dll=""
+          dest="build/$preset"
+          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
           if [ "$preset" = "ci-trimmed" ]; then
-            dll=$(find "$CAUDIO_TRIMMED_ROOT/bin" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+            src="$troot/bin"
+          else
+            src="build/$preset/_deps/ffmpeg_prebuilt-src/bin"
           fi
-          if [ -z "$dll" ]; then
-            dll=$(find "build/$preset/_deps" -name 'avcodec-*.dll' | head -n 1)
-          fi
-          if [ -z "$dll" ]; then
-            fdir="$(dirname "$(command -v ffmpeg)")"
-            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
-          fi
-          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
-          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
-          cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
-          echo "PATH additions:"; tail -n 2 "$GITHUB_PATH"
-        shell: msys2 {0}
+          for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
+            test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
+            cp "$src/$d" "$dest/"
+          done
+          uroot="$(cygpath "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin")"
+          for d in libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll; do
+            test -f "$uroot/$d" || (echo "missing $uroot/$d" && exit 1)
+            cp "$uroot/$d" "$dest/"
+          done
+          ls "$dest/"*.dll
+        shell: bash
+
+      - name: Package trimmed prefix (cache miss)
+        if: steps.trimcache.outputs.cache-hit != 'true' && steps.pick.outputs.preset == 'ci-trimmed'
+        run: |
+          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          tar -czf ffmpeg-trimmed.tar.gz -C "$troot" .
+        shell: bash
+
+      - name: Save trimmed archive
+        if: steps.trimcache.outputs.cache-hit != 'true' && steps.pick.outputs.preset == 'ci-trimmed'
+        uses: actions/cache/save@v4
+        with:
+          path: ffmpeg-trimmed.tar.gz
+          key: ffmpeg-trimmed-windows-${{ hashFiles('cmake/FFmpegTrimmed.cmake') }}
 
       - name: Build
         run: cmake --build --preset ${{ steps.pick.outputs.preset }}
-        shell: msys2 {0}
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
         run: ctest --preset ${{ steps.pick.outputs.preset }}
-        shell: msys2 {0}
 
   sanitizers:
     name: sanitizers (ubuntu-24.04 / gcc-16)

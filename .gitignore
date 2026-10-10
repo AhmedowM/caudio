@@ -3,6 +3,10 @@ build/
 build*/
 out/
 cmake-build-*/
+ffmpeg-trimmed/
+ffmpeg-trimmed.tar.gz
+out/
+cmake-build-*/
 Testing/
 compile_commands.json
 CMakeFiles/
