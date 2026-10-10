@@ -23,7 +23,7 @@ Fifty-one of the original 53 findings were addressed across twelve batches (head
 
 | ID | Severity | Location | Finding | Suggested fix |
 |---|---|---|---|---|
-| KISS-4 | Minor | `src/client/output_formatter.cpp:48-~260` | `OutputFormatter::print` is a long `if constexpr (is_same_v<T, …>)` chain over ~10 `Result` alternatives. | Use `std::visit(overloaded{…})` or a table of formatters; one case per small function. **Deferred by user decision:** formatting logic is behavior-sensitive; needs output-golden tests first (§4.1). |
+| KISS-4 | Minor | `src/client/output_formatter.cpp:48-~260` | `OutputFormatter::print` is a long `if constexpr (is_same_v<T, …>)` chain over ~10 `Result` alternatives. | Use `std::visit(overloaded{…})` or a table of formatters; one case per small function. **Deferred by user decision** (still post-1.0): output goldens exist since 2026-10-10, so the §4.1 precondition is met whenever it gets scheduled. |
 
 ---
 
@@ -100,12 +100,8 @@ for rc2: CLI polish. rc3: freeze.
 ### 4.1 CLI polish (surface: `main.cpp`, `app/core.{hpp,cpp}`, `app/parse.hpp`)
 
 - Help-text audit: consistent verbs/units across subcommands (time args accept `s`/`mm:ss`/`hh:mm:ss`; volume `0-100`/`+n`/`-n`/`mute`).
-- `parse.hpp` edges: `mm:ss` with `ss>=60` currently tolerated (parse.hpp:75-77) — decide strict vs lenient + document; `hh:mm:ss` range checks; empty-sign rejects.
-- Exit-code contract: document (0 ok / 2 usage / 1 runtime?) and assert in tests; unify user-error output (one path — `main.cpp:19` `std::cerr` scatter is the start, audit `core.cpp`).
-- `--version`/`--help` + per-command golden tests (new `tests/cli_golden.cpp`) — also unblocks deferred KISS-4.
 - Daemon UX: `start`/`--foreground`, stale socket/pid handling, `pidPathForConfig` edge cases.
 - JSON output consistency: `writePlaylistJson` vs `toJsonString` paths must agree field-for-field with the IPC wire format.
-- Docs sync: man page + README command list/examples regenerated from `--help`, not hand-maintained.
 - `client/output_formatter.hpp` home undecided: only our CLI uses `OutputFormatter` — default keep in the SDK, or move to `cli/` (decide at freeze).
 
 ### 5.2 Release mechanics
@@ -304,6 +300,10 @@ after 1.0 if SDK size matters.
 - **Playback-policy config options:** behaviors like whether `queue clear` stops playback,
   whether natural queue end stops or loops, and similar policy choices should become
   config-file options. Deferred: 1.0 keeps current behavior (`clear` leaves playback running)
+- **Playback-mark rule (behavior as of 2026-10-10):** a track counts as
+  played at 60% of position or 90 s of position; seeks count toward
+  position, so skipping to the end marks the track played. Cumulative
+  listened-time (scrobble-style) refinement deferred post-1.0.
 - **Daemon exit under 1s-loop load (cause unknown):** single mid-audit occurrence with short
   looping fixtures and active audio output; all commands returned `daemon not running` until
   restart. Rerun loop soak to reproduce before closing; do not ship 1.0 on an unwitnessed crash.

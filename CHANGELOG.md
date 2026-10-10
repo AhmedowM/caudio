@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0-rc4] - 2026-10-10
+
+### Changed
+- Release archives split into runtime and `-dev` SDK twins (arch in
+  filenames, one format per OS, stripped binaries, `SHA256SUMS`);
+  module sources ship in `dev`
+- Daemon hardening: self-retiring connection threads, atomic
+  listen-handle takeover, owner-only endpoint, client pool detach
+- CLI polish: exit-code contract locked at 0/1, strict seek ranges,
+  man/README synced with `--help`
+
+### Added
+- `scripts/soak_daemon.py`: foreground-supervised daemon loop soak gate
+
+### Fixed
+- History timestamps used the monotonic clock (every date 1970-01-01);
+  wall-clock `wallMs()` now backs `started_at`/`completed_at`/`last_played`
+
 ## [v0.46.1] - 2026-10-10
 
 ### Changed
