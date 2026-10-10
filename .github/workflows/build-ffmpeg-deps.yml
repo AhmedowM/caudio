@@ -55,7 +55,8 @@ jobs:
           awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
           sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
           sed '1d;$d' |
-          sed '/^#/d' |
+          sed '/^[[:space:]]*#/d' |
+          sed 's/[[:space:]]*#.*$//' |
           tr -s ' \n' ' ' |
           sed 's/  */ /g' |
           sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
@@ -121,7 +122,8 @@ jobs:
           awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
           sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
           sed '1d;$d' |
-          sed '/^#/d' |
+          sed '/^[[:space:]]*#/d' |
+          sed 's/[[:space:]]*#.*$//' |
           tr -s ' \n' ' ' |
           sed 's/  */ /g' |
           sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
@@ -178,7 +180,8 @@ jobs:
           awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
           sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
           sed '1d;$d' |
-          sed '/^#/d' |
+          sed '/^[[:space:]]*#/d' |
+          sed 's/[[:space:]]*#.*$//' |
           tr -s ' \n' ' ' |
           sed 's/  */ /g' |
           sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
@@ -240,6 +243,7 @@ jobs:
               --repo "${{ env.DEPS_REPO }}" \
               --title "Trimmed FFmpeg ${{ env.FFMPEG_VERSION }} (rebuild ${{ github.event.inputs.rebuild_counter || '1' }})" \
               --notes "Decode-only whitelist, built from cmake/FFmpegTrimmed.cmake flags."
+          fi
 
       - name: Upload Windows asset
         if: always() && hashFiles('artifacts/ffmpeg-trimmed-*-windows-x86_64.tar.gz') != ''
