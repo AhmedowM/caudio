@@ -1,6 +1,5 @@
 name: Build & Upload Trimmed FFmpeg (deps-private)
 
-# Manual dispatch with version override; monthly schedule rebuilds latest pins.
 on:
   workflow_dispatch:
     inputs:
@@ -13,10 +12,10 @@ on:
         required: true
         default: "1"
   schedule:
-    - cron: "0 6 1 * *"  # monthly, 06:00 UTC
+    - cron: "0 6 1 * *"
 
 permissions:
-  contents: read  # gh release upload needs write via PAT
+  contents: read
 
 jobs:
   build-windows:
@@ -24,18 +23,16 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     env:
-      CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '8.1.2' }}
       REBUILD: ${{ github.event.inputs.rebuild_counter || '1' }}
       RELEASE_TAG: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-${{ github.event.inputs.rebuild_counter || '1' }}"
+      ARTIFACT_NAME: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-windows-x86_64.tar.gz"
     steps:
-      - name: Checkout caudio (for cmake/FFmpegTrimmed.cmake)
+      - name: Checkout (for flags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: AhmedowM/caudio
-          token: ${{ secrets.DEPS_PAT }}
 
       - name: Setup MSYS2 (UCRT64 + trim build tools)
         id: msys2
@@ -47,131 +44,229 @@ jobs:
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-binutils
             mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
             make
             pkgconf
             nasm
             git
 
-      - name: Build trimmed FFmpeg via cmake module
+      - name: Extract FFmpeg trim flags from cmake
+        id: flags
+        run: |
+          awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
+          sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
+          sed '1d;$d' |
+          sed '/^#/d' |
+          tr -s ' \n' ' ' |
+          sed 's/  */ /g' |
+          sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
+        shell: bash
+
+      - name: Build trimmed FFmpeg (standalone)
         run: |
           troot="$(cygpath "$GITHUB_WORKSPACE/ffmpeg-trimmed")"
-          cmake -S . -B build/trim -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/gcc.cmake \
-            -DCAUDIO_USE_TRIMMED_FFMPEG=ON \
-            -DCAUDIO_ENABLE_TESTS=OFF \
-            -DCAUDIO_BUILD_CLI=OFF \
-            -DCMAKE_INSTALL_PREFIX="$troot"
-          cmake --build build/trim --target ffmpeg_trimmed
+          mkdir -p "$troot"
+          mkdir -p "$GITHUB_WORKSPACE/_ffmpeg_src"
+          cd "$GITHUB_WORKSPACE/_ffmpeg_src"
+          if [ ! -d "ffmpeg-${{ env.FFMPEG_VERSION }}" ]; then
+            curl -sSL -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz"
+            tar -xf ffmpeg.tar.xz
+          fi
+          mkdir -p build
+          cd build
+          flags=$(cat "${{ runner.temp }}/flags.txt")
+          bash ../ffmpeg-${{ env.FFMPEG_VERSION }}/configure --prefix="$troot" $flags
+          make -j4
+          make install
+          # Ensure bin/ exists (Windows DLLs go here)
+          mkdir -p "$troot/bin"
+          cp -f "$troot/lib/"*.dll "$troot/bin/" 2>/dev/null || true
         shell: msys2 {0}
 
       - name: Package archive
         run: |
           troot="$(cygpath "$GITHUB_WORKSPACE/ffmpeg-trimmed")"
-          tar -czf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot" .
+          tar -czf "${{ env.ARTIFACT_NAME }}" -C "$troot" .
         shell: bash
 
-      - name: Upload to deps-private release
-        env:
-          GH_TOKEN: ${{ secrets.DEPS_PAT }}
-        run: |
-          gh release create "${{ env.RELEASE_TAG }}" \
-            --repo "${{ env.DEPS_REPO }}" \
-            --title "Trimmed FFmpeg ${{ env.FFMPEG_VERSION }} (Windows, rebuild ${{ env.REBUILD }})" \
-            --notes "Decode-only whitelist, built from cmake/FFmpegTrimmed.cmake flags." \
-            ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifact
+          path: ${{ env.ARTIFACT_NAME }}
 
   build-linux:
     name: Linux (GCC)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '8.1.2' }}
       REBUILD: ${{ github.event.inputs.rebuild_counter || '1' }}
       RELEASE_TAG: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-${{ github.event.inputs.rebuild_counter || '1' }}"
+      ARTIFACT_NAME: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-linux-x86_64.tar.gz"
     steps:
-      - name: Checkout caudio
+      - name: Checkout (for flags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: AhmedowM/caudio
-          token: ${{ secrets.DEPS_PAT }}
 
       - name: Install build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build nasm pkg-config zlib1g-dev
 
-      - name: Build trimmed FFmpeg via cmake module
+      - name: Extract FFmpeg trim flags from cmake
+        id: flags
         run: |
-          cmake -S . -B build/trim -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/gcc.cmake \
-            -DCAUDIO_USE_TRIMMED_FFMPEG=ON \
-            -DCAUDIO_ENABLE_TESTS=OFF \
-            -DCAUDIO_BUILD_CLI=OFF \
-            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg-trimmed"
-          cmake --build build/trim --target ffmpeg_trimmed
+          awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
+          sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
+          sed '1d;$d' |
+          sed '/^#/d' |
+          tr -s ' \n' ' ' |
+          sed 's/  */ /g' |
+          sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
+
+      - name: Build trimmed FFmpeg (standalone)
+        run: |
+          mkdir -p _ffmpeg_src
+          cd _ffmpeg_src
+          if [ ! -d "ffmpeg-${{ env.FFMPEG_VERSION }}" ]; then
+            curl -sSL -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz"
+            tar -xf ffmpeg.tar.xz
+          fi
+          mkdir -p build
+          cd build
+          flags=$(cat "${{ runner.temp }}/flags.txt")
+          ../ffmpeg-${{ env.FFMPEG_VERSION }}/configure --prefix="$GITHUB_WORKSPACE/ffmpeg-trimmed" $flags
+          make -j4
+          make install
 
       - name: Package archive
         run: |
-          tar -czf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-linux-x86_64.tar.gz -C "$GITHUB_WORKSPACE/ffmpeg-trimmed" .
+          tar -czf "${{ env.ARTIFACT_NAME }}" -C "$GITHUB_WORKSPACE/ffmpeg-trimmed" .
 
-      - name: Upload to deps-private release
-        env:
-          GH_TOKEN: ${{ secrets.DEPS_PAT }}
-        run: |
-          gh release create "${{ env.RELEASE_TAG }}" \
-            --repo "${{ env.DEPS_REPO }}" \
-            --title "Trimmed FFmpeg ${{ env.FFMPEG_VERSION }} (Linux, rebuild ${{ env.REBUILD }})" \
-            --notes "Decode-only whitelist, built from cmake/FFmpegTrimmed.cmake flags." \
-            ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-linux-x86_64.tar.gz
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifact
+          path: ${{ env.ARTIFACT_NAME }}
 
   build-macos:
     name: macOS (Clang)
     runs-on: macos-latest
     timeout-minutes: 120
     env:
-      CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '8.1.2' }}
       REBUILD: ${{ github.event.inputs.rebuild_counter || '1' }}
       RELEASE_TAG: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-${{ github.event.inputs.rebuild_counter || '1' }}"
+      ARTIFACT_NAME: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-macos-x86_64.tar.gz"
     steps:
-      - name: Checkout caudio
+      - name: Checkout (for flags)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: AhmedowM/caudio
-          token: ${{ secrets.DEPS_PAT }}
 
       - name: Install build deps
         run: |
           brew update
           brew install ninja nasm pkg-config zlib
 
-      - name: Build trimmed FFmpeg via cmake module
+      - name: Extract FFmpeg trim flags from cmake
+        id: flags
         run: |
-          cmake -S . -B build/trim -G Ninja \
-            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/clang.cmake \
-            -DCAUDIO_USE_TRIMMED_FFMPEG=ON \
-            -DCAUDIO_ENABLE_TESTS=OFF \
-            -DCAUDIO_BUILD_CLI=OFF \
-            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/ffmpeg-trimmed"
-          cmake --build build/trim --target ffmpeg_trimmed
+          awk '/set\(FFMPEG_TRIM_FLAGS/,/CACHE STRING/ {print}' cmake/FFmpegTrimmed.cmake |
+          sed -n '/set(FFMPEG_TRIM_FLAGS/,/CACHE STRING/p' |
+          sed '1d;$d' |
+          sed '/^#/d' |
+          tr -s ' \n' ' ' |
+          sed 's/  */ /g' |
+          sed 's/^ *//;s/ *$//' > "${{ runner.temp }}/flags.txt"
+
+      - name: Build trimmed FFmpeg (standalone)
+        run: |
+          mkdir -p _ffmpeg_src
+          cd _ffmpeg_src
+          if [ ! -d "ffmpeg-${{ env.FFMPEG_VERSION }}" ]; then
+            curl -sSL -o ffmpeg.tar.xz "https://ffmpeg.org/releases/ffmpeg-${{ env.FFMPEG_VERSION }}.tar.xz"
+            tar -xf ffmpeg.tar.xz
+          fi
+          mkdir -p build
+          cd build
+          flags=$(cat "${{ runner.temp }}/flags.txt")
+          ../ffmpeg-${{ env.FFMPEG_VERSION }}/configure --prefix="$GITHUB_WORKSPACE/ffmpeg-trimmed" $flags
+          make -j4
+          make install
 
       - name: Package archive
         run: |
-          tar -czf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz -C "$GITHUB_WORKSPACE/ffmpeg-trimmed" .
+          tar -czf "${{ env.ARTIFACT_NAME }}" -C "$GITHUB_WORKSPACE/ffmpeg-trimmed" .
 
-      - name: Upload to deps-private release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifact
+          path: ${{ env.ARTIFACT_NAME }}
+
+  release:
+    name: Create Release & Upload Assets
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DEPS_REPO: "AhmedowM/deps-private"
+      FFMPEG_VERSION: ${{ github.event.inputs.ffmpeg_version || '8.1.2' }}
+      REBUILD: ${{ github.event.inputs.rebuild_counter || '1' }}
+      RELEASE_TAG: "ffmpeg-trimmed-${{ github.event.inputs.ffmpeg_version || '8.1.2' }}-${{ github.event.inputs.rebuild_counter || '1' }}"
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -la ./artifacts/
+
+      - name: Create/Update Release
         env:
           GH_TOKEN: ${{ secrets.DEPS_PAT }}
         run: |
-          gh release create "${{ env.RELEASE_TAG }}" \
+          if gh release view "${{ env.RELEASE_TAG }}" --repo "${{ env.DEPS_REPO }}" >/dev/null 2>&1; then
+            echo "Release exists, uploading assets..."
+          else
+            echo "Creating new release..."
+            gh release create "${{ env.RELEASE_TAG }}" \
+              --repo "${{ env.DEPS_REPO }}" \
+              --title "Trimmed FFmpeg ${{ env.FFMPEG_VERSION }} (rebuild ${{ github.event.inputs.rebuild_counter || '1' }})" \
+              --notes "Decode-only whitelist, built from cmake/FFmpegTrimmed.cmake flags."
+
+      - name: Upload Windows asset
+        if: always() && hashFiles('artifacts/ffmpeg-trimmed-*-windows-x86_64.tar.gz') != ''
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release upload "${{ env.RELEASE_TAG }}" \
             --repo "${{ env.DEPS_REPO }}" \
-            --title "Trimmed FFmpeg ${{ env.FFMPEG_VERSION }} (macOS, rebuild ${{ env.REBUILD }})" \
-            --notes "Decode-only whitelist, built from cmake/FFmpegTrimmed.cmake flags." \
-            ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz
+            --clobber \
+            artifacts/ffmpeg-trimmed-*-windows-x86_64.tar.gz
+
+      - name: Upload Linux asset
+        if: always() && hashFiles('artifacts/ffmpeg-trimmed-*-linux-x86_64.tar.gz') != ''
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release upload "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --clobber \
+            artifacts/ffmpeg-trimmed-*-linux-x86_64.tar.gz
+
+      - name: Upload macOS asset
+        if: always() && hashFiles('artifacts/ffmpeg-trimmed-*-macos-x86_64.tar.gz') != ''
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release upload "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --clobber \
+            artifacts/ffmpeg-trimmed-*-macos-x86_64.tar.gz

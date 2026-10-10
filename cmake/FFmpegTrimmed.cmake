@@ -39,10 +39,11 @@ set(CAUDIO_FFMPEG_TRIM_URL "https://ffmpeg.org/releases/ffmpeg-${CAUDIO_FFMPEG_T
 set(CAUDIO_FFMPEG_TRIM_PREFIX "${CMAKE_BINARY_DIR}/ffmpeg-trimmed"
     CACHE PATH "install prefix for the trimmed FFmpeg build")
 
-# Whitelist: --disable-all base, then re-enable exactly what the engine uses
-# (decoder.cpp/resample path needs avcodec+swresample; extractMetadata/scan
-# needs avformat; everything links avutil).
-set(CAUDIO_FFMPEG_TRIM_FLAGS
+# Decode-only whitelist: --disable-all base, then re-enable exactly what the
+# engine uses (decoder.cpp/resample needs avcodec+swresample; extractMetadata/
+# scan needs avformat; everything links avutil). One source of truth used by
+# the cmake module AND the producer workflow.
+set(FFMPEG_TRIM_FLAGS
   --enable-shared --disable-static
   --enable-pic
   --disable-all
@@ -93,7 +94,7 @@ set(CAUDIO_FFMPEG_TRIM_FLAGS
   --enable-demuxer=wav --enable-demuxer=w64 --enable-demuxer=aiff --enable-demuxer=au
   --enable-demuxer=caf --enable-demuxer=flac --enable-demuxer=mp3 --enable-demuxer=ogg
   --enable-demuxer=mov --enable-demuxer=aac --enable-demuxer=asf
-  --enable-demuxer=ape --enable-demuxer=mpc --enable-demuxer=mpc8 --enable-demuxer=wv
+  --enable-demuxer=ape --enable-demuxer=mpc --enable-decoder=mpc8 --enable-demuxer=wv
   --enable-demuxer=tta --enable-demuxer=amr --enable-demuxer=matroska
   --enable-demuxer=ac3 --enable-demuxer=eac3 --enable-demuxer=dts
   --enable-demuxer=truehd --enable-demuxer=mlp --enable-demuxer=spdif
@@ -110,7 +111,10 @@ set(CAUDIO_FFMPEG_TRIM_FLAGS
   --enable-bsf=aac_adtstoasc --enable-bsf=opus_metadata --enable-bsf=truehd_core
   --enable-bsf=eac3_core --enable-bsf=dca_core --enable-bsf=pcm_rechunk
   --enable-bsf=dump_extra
-  CACHE STRING "configure flags for the trimmed decode-only FFmpeg build")
+  CACHE STRING "configure flags for the trimmed decode-only FFmpeg build"
+)
+
+set(CAUDIO_FFMPEG_TRIM_FLAGS "${FFMPEG_TRIM_FLAGS}")
 
 # Honors a prebuilt trimmed tree via FFmpeg_ROOT; otherwise performs a
 # one-shot configure-time source build into CAUDIO_FFMPEG_TRIM_PREFIX (needs
