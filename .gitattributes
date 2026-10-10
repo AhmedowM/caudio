@@ -19,3 +19,5 @@
 *.ogg binary
 *.wav binary
 *.m4a binary
+*.opus binary
+*.wma binary

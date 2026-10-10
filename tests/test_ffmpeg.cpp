@@ -6,33 +6,60 @@
 #include <cstddef>
 #include <filesystem>
 #include <span>
+#include <string>
 #include <vector>
 using namespace caudio::player;
 using namespace caudio::utils;
 
-TEST_CASE("ffmpeg primary decodes m4a", "[ffmpeg]") {
-    auto r = FileReader::open("tests/fixtures/sample.m4a");
-    if (!r) {
-        SKIP("no fixture sample.m4a");
-    }
-    auto dec = Decoder::open(**r);
-    REQUIRE(dec.has_value());
-    // Should be Decoder when FFmpeg present
-    std::array<float, 1024> out{};
-    REQUIRE((*dec)->decode(out) > 0);
-}
+namespace {
 
-TEST_CASE("ffmpeg decodes real ogg file", "[ffmpeg]") {
-    auto path = std::filesystem::path(TEST_DATA_DIR) / "sample.ogg";
-    if (!std::filesystem::exists(path)) {
-        SKIP("no fixture sample.ogg");
-    }
+void requireDecodes(const std::filesystem::path& path) {
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
     auto dec = Decoder::open(**r);
     REQUIRE(dec.has_value());
+    REQUIRE((*dec)->sampleRate() > 0);
+    REQUIRE((*dec)->channels() > 0);
     std::array<float, 1024> out{};
     REQUIRE((*dec)->decode(out) > 0);
+}
+
+void checkFixture(const char* name) {
+    auto path = std::filesystem::path(TEST_DATA_DIR) / name;
+    if (!std::filesystem::exists(path)) {
+        SKIP("no fixture " + std::string(name));
+    }
+    requireDecodes(path);
+}
+
+} // namespace
+
+TEST_CASE("ffmpeg whitelist decodes mp3", "[ffmpeg]") {
+    checkFixture("sample.mp3");
+}
+
+TEST_CASE("ffmpeg whitelist decodes flac", "[ffmpeg]") {
+    checkFixture("sample.flac");
+}
+
+TEST_CASE("ffmpeg whitelist decodes m4a", "[ffmpeg]") {
+    checkFixture("sample.m4a");
+}
+
+TEST_CASE("ffmpeg whitelist decodes opus", "[ffmpeg]") {
+    checkFixture("sample.opus");
+}
+
+TEST_CASE("ffmpeg whitelist decodes wma", "[ffmpeg]") {
+    checkFixture("sample.wma");
+}
+
+TEST_CASE("ffmpeg whitelist decodes ogg", "[ffmpeg]") {
+    checkFixture("sample.ogg");
+}
+
+TEST_CASE("ffmpeg whitelist decodes wav", "[ffmpeg]") {
+    checkFixture("sample.wav");
 }
 
 TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {

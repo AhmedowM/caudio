@@ -48,13 +48,14 @@ namespace detail {
  * @brief Checks if a path has a supported audio extension.
  * @ingroup caudio_db
  * @param p Path to check.
- * @return true if extension is .mp3/.flac/.ogg/.wav/.m4a (case-insensitive).
+ * @return true if extension is .mp3/.flac/.ogg/.opus/.wav/.m4a/.wma (case-insensitive).
  */
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".wav" || ext == ".m4a";
+    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" || ext == ".wav" ||
+           ext == ".m4a" || ext == ".wma";
 }
 
 } // namespace detail
