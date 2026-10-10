@@ -67,6 +67,7 @@ Everything is a preset; individual options exist for scripting and CI:
 | Option | Default | Effect |
 |---|---|---|
 | `CAUDIO_WITH_FETCH_FFMPEG` | `ON` | Auto-fetch FFmpeg when missing (system → vcpkg/Conan → prebuilt → source) |
+| `CAUDIO_USE_TRIMMED_FFMPEG` | `OFF` | Trimmed decode-only FFmpeg build (`cmake/FFmpegTrimmed.cmake` whitelist; needs `FFmpeg_ROOT` prebuilt or builds `ffmpeg_trimmed`) |
 | `CAUDIO_BUILD_CLI` | `ON` | Build the `caudio` executable (`OFF` skips the CLI11 fetch entirely) |
 | `CAUDIO_BUILD_SHARED` | `OFF` | Shared `*_shared` variants + combined `libcaudio` |
 | `CAUDIO_ENABLE_TESTS` | `OFF` | Catch2 tests (`ctest --preset dev`) |
