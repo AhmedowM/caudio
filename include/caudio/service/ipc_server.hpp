@@ -125,10 +125,22 @@ class IpcServer {
      */
     void shutdown();
 
+    /** @brief Marks the calling connection thread done (self-retire). */
+    void retireClient();
+
   private:
+    // One slot per connection. A connection thread marks its own slot done
+    // on exit (retireClient); the accept loop sweeps done slots, so the
+    // list holds only live threads and shutdown joins a bounded set.
+    // Retire never erases/joins (shutdown may be joining concurrently);
+    // erase/swap only happens with no other thread touching the list.
+    struct ClientSlot {
+        std::jthread thread;
+        bool done{false};
+    };
     std::atomic<bool> running_{false};
     std::jthread acceptThread_;
-    std::vector<std::jthread> clients_;
+    std::vector<ClientSlot> clients_;
     std::mutex clientsMtx_;
     std::mutex cvMtx_;
     std::condition_variable cv_;
