@@ -210,6 +210,12 @@ jobs:
     env:
       CAUDIO_TEST_NOAUDIO: 1
       CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+      # Pinned version from cmake/FFmpegTrimmed.cmake; REBUILD increments
+      # when the producer re-runs for the same FFmpeg version.
+      DEPS_REPO: "AhmedowM/deps-private"
+      FFMPEG_VERSION: "8.1.2"
+      REBUILD: "1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -222,9 +228,6 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          # Full trim toolchain lives here: Configure runs under msys2
-          # (module's FFmpeg build needs the UCRT64 env), Build/Test run
-          # under default shells with ucrt64/bin + usr/bin on PATH.
           install: >-
             mingw-w64-ucrt-x86_64-gcc
             mingw-w64-ucrt-x86_64-binutils
@@ -242,22 +245,22 @@ jobs:
           "${{ steps.msys2.outputs.msys2-location }}/usr/bin" >> $GITHUB_PATH
         shell: pwsh
 
-      - name: Restore trimmed archive
-        id: trimcache
-        uses: actions/cache/restore@v4
-        with:
-          # Key tracks the whitelist: any flag/version change rebuilds.
-          path: ffmpeg-trimmed.tar.gz
-          key: ffmpeg-trimmed-windows-${{ hashFiles('cmake/FFmpegTrimmed.cmake') }}
-
-      - name: Extract trimmed archive (cache hit)
-        if: steps.trimcache.outputs.cache-hit == 'true'
+      - name: Download trimmed archive from deps-private
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
         run: |
-          # cygpath: github.workspace is D:\... (backslashes), which
-          # Git-Bash tools mangle (tar: D\:\a\\...). Normalize once.
+          gh release download "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz" \
+            --dir . \
+            --clobber
+        shell: bash
+
+      - name: Extract trimmed archive
+        run: |
           troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
           mkdir -p "$troot"
-          tar -xzf ffmpeg-trimmed.tar.gz -C "$troot"
+          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot"
           ls "$troot/bin"
         shell: bash
 
@@ -307,20 +310,6 @@ jobs:
           done
           ls "$dest/"*.dll
         shell: bash
-
-      - name: Package trimmed prefix (cache miss)
-        if: steps.trimcache.outputs.cache-hit != 'true' && steps.pick.outputs.preset == 'ci-trimmed'
-        run: |
-          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          tar -czf ffmpeg-trimmed.tar.gz -C "$troot" .
-        shell: bash
-
-      - name: Save trimmed archive
-        if: steps.trimcache.outputs.cache-hit != 'true' && steps.pick.outputs.preset == 'ci-trimmed'
-        uses: actions/cache/save@v4
-        with:
-          path: ffmpeg-trimmed.tar.gz
-          key: ffmpeg-trimmed-windows-${{ hashFiles('cmake/FFmpegTrimmed.cmake') }}
 
       - name: Build
         run: cmake --build --preset ${{ steps.pick.outputs.preset }}
