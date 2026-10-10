@@ -50,9 +50,10 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     running_.store(false);
 
 #ifdef _WIN32
-    if (pipeHandle_ && pipeHandle_ != kInvalidHandle) {
-        ::CloseHandle(pipeHandle_);
-        pipeHandle_ = nullptr;
+    // Atomic take-over: whoever exchanges non-null owns the close.
+    HANDLE prev = pipeHandle_.exchange(nullptr);
+    if (prev && prev != kInvalidHandle) {
+        ::CloseHandle(prev);
     }
     std::string pathStr = socketPath_;
     std::wstring w;
@@ -66,12 +67,12 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "CreateNamedPipeW failed: " + std::to_string(err))};
     }
-    pipeHandle_ = h;
+    pipeHandle_.store(h);
     return {};
 #else
-    if (listenFd_ >= 0) {
-        ::close(listenFd_);
-        listenFd_ = -1;
+    int prevFd = listenFd_.exchange(-1);
+    if (prevFd >= 0) {
+        ::close(prevFd);
     }
     std::error_code ec;
     auto parent = std::filesystem::path(socketPath_).parent_path();
@@ -103,7 +104,7 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "listen failed")};
     }
-    listenFd_ = fd;
+    listenFd_.store(fd);
     return {};
 #endif
 }
@@ -121,11 +122,12 @@ void IpcServer::run(std::stop_token st,
         while (!st.stop_requested() && !stopSource_.get_token().stop_requested() &&
                running_.load()) {
 #ifdef _WIN32
-            if (!pipeHandle_ || pipeHandle_ == kInvalidHandle) {
+            HANDLE listenH = pipeHandle_.load();
+            if (!listenH || listenH == kInvalidHandle) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
             }
-            BOOL connected = ::ConnectNamedPipe(pipeHandle_, nullptr);
+            BOOL connected = ::ConnectNamedPipe(listenH, nullptr);
             if (connected == 0) {
                 DWORD err = ::GetLastError();
                 if (err == 535 /*ERROR_PIPE_CONNECTED*/) {
@@ -136,7 +138,15 @@ void IpcServer::run(std::stop_token st,
                     continue;
                 }
             }
-            HANDLE clientHandle = pipeHandle_;
+            // Take ownership of the connected instance. Shutdown may take it
+            // concurrently -- whoever exchanges non-null owns the handle, so
+            // a close here can never double-close. (Only this loop creates
+            // instances, so a non-null take is always the connected one.)
+            HANDLE clientHandle = pipeHandle_.exchange(nullptr);
+            if (!clientHandle || clientHandle == kInvalidHandle) {
+                // Lost the race with shutdown; loop back to the stop check.
+                continue;
+            }
             {
                 std::string pathStr = socketPath_;
                 std::wstring w;
@@ -147,10 +157,10 @@ void IpcServer::run(std::stop_token st,
                     ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
                                        kPipeUnlimited, 16384, 16384, 0, nullptr);
                 if (next != kInvalidHandle) {
-                    pipeHandle_ = next;
-                } else {
-                    pipeHandle_ = nullptr;
+                    pipeHandle_.store(next);
                 }
+                // else: stay without a listener; the loop re-checks stop
+                // flags and shutdown's post-join drain closes strays.
             }
             {
                 std::lock_guard<std::mutex> lk(clientsMtx_);
@@ -229,15 +239,16 @@ void IpcServer::run(std::stop_token st,
                 std::erase_if(clients_, [](const ClientSlot& s) { return s.done; });
             }
 #else
-            if (listenFd_ < 0) {
+            int listenSnapshot = listenFd_.load();
+            if (listenSnapshot < 0) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
             }
             fd_set rfds;
             FD_ZERO(&rfds);
-            FD_SET(listenFd_, &rfds);
+            FD_SET(listenSnapshot, &rfds);
             timeval tv{0, 100000};
-            int sel = ::select(listenFd_ + 1, &rfds, nullptr, nullptr, &tv);
+            int sel = ::select(listenSnapshot + 1, &rfds, nullptr, nullptr, &tv);
             if (sel < 0) {
                 if (errno == EINTR)
                     continue;
@@ -246,9 +257,9 @@ void IpcServer::run(std::stop_token st,
             }
             if (sel == 0)
                 continue;
-            if (!FD_ISSET(listenFd_, &rfds))
+            if (!FD_ISSET(listenSnapshot, &rfds))
                 continue;
-            int cfd = ::accept(listenFd_, nullptr, nullptr);
+            int cfd = ::accept(listenSnapshot, nullptr, nullptr);
             if (cfd < 0) {
                 if (errno == EINTR)
                     continue;
@@ -377,9 +388,11 @@ void IpcServer::shutdown() {
     stopSource_.request_stop();
     cv_.notify_all();
 #ifdef _WIN32
-    if (pipeHandle_ && pipeHandle_ != kInvalidHandle) {
-        ::CloseHandle(pipeHandle_);
-        pipeHandle_ = nullptr;
+    // Take-over (see listen()): if the accept loop is mid-handshake it owns
+    // its handle; anything left here is ours to close.
+    HANDLE cur = pipeHandle_.exchange(nullptr);
+    if (cur && cur != kInvalidHandle) {
+        ::CloseHandle(cur);
     }
     if (!socketPath_.empty()) {
         std::string pathStr = socketPath_;
@@ -393,9 +406,9 @@ void IpcServer::shutdown() {
             ::CloseHandle(h);
     }
 #else
-    if (listenFd_ >= 0) {
-        ::close(listenFd_);
-        listenFd_ = -1;
+    int listenCur = listenFd_.exchange(-1);
+    if (listenCur >= 0) {
+        ::close(listenCur);
         if (!socketPath_.empty()) {
             std::string s = socketPath_;
             ::unlink(s.c_str());
@@ -406,6 +419,14 @@ void IpcServer::shutdown() {
         acceptThread_.request_stop();
         acceptThread_.join();
     }
+#ifdef _WIN32
+    // Post-join drain: the accept loop may have stored a fresh listen
+    // instance after our pre-join take. Exchange is idempotent.
+    HANDLE leftover = pipeHandle_.exchange(nullptr);
+    if (leftover && leftover != kInvalidHandle) {
+        ::CloseHandle(leftover);
+    }
+#endif
     // NOTE: the accept thread is already joined above, so no new entries
     // appear from here on. Joins run WITHOUT clientsMtx_: a finishing
     // connection only flips its done flag under that lock (retireClient),

@@ -147,9 +147,12 @@ class IpcServer {
     std::string socketPath_;
     std::stop_source stopSource_;
 #ifdef _WIN32
-    HANDLE pipeHandle_{nullptr};
+    // Listen handle, shared between the accept loop (take/replace) and
+    // shutdown/listen (take/close). Atomic take-over (exchange) gives single
+    // ownership on every handoff -- no double-close on the shutdown race.
+    std::atomic<HANDLE> pipeHandle_{nullptr};
 #else
-    int listenFd_{-1};
+    std::atomic<int> listenFd_{-1};
 #endif
 };
 
