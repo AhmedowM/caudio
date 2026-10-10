@@ -27,6 +27,8 @@
 #include <processthreadsapi.h>
 // clang-format on
 #else
+#include <cerrno>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -48,6 +50,7 @@
 #include <expected>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <stop_token>
 #include <string>
 #include <system_error>
@@ -57,6 +60,37 @@
 #include <vector>
 
 namespace caudio::app {
+
+namespace {
+// True if the pid file names a live process. A file left by a killed daemon
+// (crash/taskkill) names a dead pid -- callers clear it instead of waiting.
+// Unreadable/garbage content is treated as live (conservative: same 2 s wait
+// as before, never a wrong fast-path). PID reuse inside the 100 ms poll
+// window is astronomically rare; worst case is the old wait, not corruption.
+bool pidFileAlive(const std::filesystem::path& pidPath) {
+    std::ifstream f(pidPath, std::ios::binary);
+    if (!f)
+        return true;
+    long long pid = 0;
+    f >> pid;
+    if (!f || pid <= 0)
+        return true;
+#ifdef _WIN32
+    HANDLE h = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD)pid);
+    if (h) {
+        ::CloseHandle(h);
+        return true;
+    }
+    // No such process => dead; any other error (access denied) => alive.
+    return ::GetLastError() != ERROR_INVALID_PARAMETER;
+#else
+    if (::kill((pid_t)pid, 0) == 0)
+        return true;
+    // ESRCH = no such process => dead; EPERM and others => alive.
+    return errno != ESRCH;
+#endif
+}
+} // namespace
 
 App::App(caudio::config::Config cfg) : config_(std::move(cfg)) {}
 
@@ -207,16 +241,22 @@ AppResult App::startDaemon(bool foreground) {
     }
     // Death-watch: a previous daemon may be mid-teardown (pipe already dead
     // but pid file present / lock still held while threads join). Spawning
-    // into that window dies on the lock, so wait until both the pipe is
-    // unreachable AND the pid file is gone (2 s max) before spawning.
+    // into that window dies on the lock, so wait until the pipe is
+    // unreachable AND no live daemon owns the pid file (2 s max). A pid
+    // file left by a killed daemon is cleared immediately instead of
+    // burning the full wait.
     {
         auto pidPath = pidPathForConfig();
         for (int i = 0; i < 20; ++i) {
             auto c = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
             std::error_code ec;
             bool pidExists = std::filesystem::exists(pidPath, ec);
-            if (!c && !pidExists)
+            bool live = pidExists && pidFileAlive(pidPath);
+            if (!c && !live) {
+                if (pidExists)
+                    std::filesystem::remove(pidPath, ec);
                 break;
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
