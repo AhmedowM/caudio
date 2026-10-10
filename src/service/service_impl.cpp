@@ -166,7 +166,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     } catch (...) {
     }
 
-    // Create shared memory status block for 10fps status polling
+    // Create shared memory status block for event-driven status snapshots
     // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
     std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
     auto shmRes = caudio::service::createShmStatus(shmName, true);

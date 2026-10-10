@@ -123,6 +123,8 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # to work around duplicate-symbol/ODR issues from merged static twins. Static +
 # header-only is the default; opt in only if you need shared libs
 # (CODEBASE_REVIEW.md KISS-1).
+# 1.0 status: EXPERIMENTAL and OFF by default (SH-1…SH-5 deferred post-1.0, see
+# CODEBASE_REVIEW.md §5) — no 1.0 artifact ships shared libs.
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" OFF)
 # NOTE: ccache is environment configuration, not a project option; pass

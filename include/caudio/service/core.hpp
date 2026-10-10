@@ -74,7 +74,7 @@ class Service final {
      * @return Expected unique_ptr to Service, or Error if initialization fails.
      *
      * Performs single-instance enforcement via flock lock file and PID file checks.
-     * Creates PID file, initializes shared memory status block for status polling (10fps),
+     * Creates PID file, initializes shared memory status block for event-driven status snapshots,
      * and starts IPC server listening on derived or explicit socket path.
      */
     static ExpectedService create(const ServiceConfig& cfg);
@@ -153,7 +153,7 @@ class Service final {
      * @brief Update the shared memory status block with current engine state.
      *
      * Called after playback state changes (play, pause, seek, track change, queue modifications).
-     * Updates track info, queue size, and duration in the SHM block for status polling at 10fps.
+     * Updates track info, queue size, and duration in the SHM block (published on dispatch).
      * No-op if SHM handle is invalid or not created.
      */
     void updateShmStatus();

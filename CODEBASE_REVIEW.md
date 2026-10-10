@@ -1,21 +1,21 @@
 # caudio C++23 Codebase Review
 
-**Date:** 2026-10-02 (UTC) — all addressed entries removed; only open (deferred/undone/decided) items remain. Declined NAME-7 row removed 2026-10-02; shared-library (§5) and archive-bloat (§6) audits added same day.
+**Date:** 2026-10-02 (UTC) — all addressed entries removed; only open (deferred/undone/decided) items remain. Declined NAME-7 row removed 2026-10-02; shared-library (§5) and archive-bloat (§6) audits added same day. 2026-10-10 pass: BIN-4 done (packaging split shipped v0.46.1), §4 rc2/rc3 goals spent (all met), daemon-exit gate closed by soak, stale paths refreshed; 12 findings remain open.
 **Scope:** `CMakeLists.txt`, `cmake/*.cmake`, `cmake/components/*.cmake`, `include/caudio/**/*.hpp` (+ `include/caudio.hpp`), `src/**/*.cpp` (+ `src/**/*.cppm` sampled), `cli/src/**/*`, `tests/common.hpp` + sample of `tests/*.cpp`, `examples/*.cpp`, `README.md`, `CONTRIBUTING.md`, `.github/workflows/ci.yml`, `.gitignore`, `cmake/version.hpp.in`, `cmake/caudioConfig.cmake.in`, `docs/man/caudio.1` + `docs/polyglot-integration.md` (sampled). Headers treated as canonical; modules (`*.cppm`) opt-in via `CAUDIO_ENABLE_MODULES=OFF` default. Large directories sampled via glob/grep + targeted reads, not every file fully read.
 
 ## Executive summary
 
-Fifty-one of the original 53 findings were addressed across twelve batches (header detox, shim deletion, service split, utils consolidation, cmake/docs cleanup, `cli` → `ipc`/`config` namespace rename, module gating, decoder collapse, Windows-declaration fix, engine header slim, shared-lib gating, version/fetch/comment cleanup). Since then the dependency bumps (rc1), the full library de-noise + naming unification, the documentation audit, and the include-hygiene/module-export pass were all executed and committed — those sections were removed in the 2026-09-30 pass. One item remains open by explicit decision (deferred KISS-4) plus two tracked third-party issues; the declined NAME-7 row was removed 2026-10-02. A shared-library audit added 2026-10-02 contributes five findings (§5) — no critical blockers outside the MSVC shared path. An MSVC archive-bloat audit added the same day contributes four findings (§6): SDK-only size overhead, explicitly not an RC item.
+Fifty-one of the original 53 findings were addressed across twelve batches (header detox, shim deletion, service split, utils consolidation, cmake/docs cleanup, `cli` → `ipc`/`config` namespace rename, module gating, decoder collapse, Windows-declaration fix, engine header slim, shared-lib gating, version/fetch/comment cleanup). Since then the dependency bumps (rc1), the full library de-noise + naming unification, the documentation audit, and the include-hygiene/module-export pass were all executed and committed — those sections were removed in the 2026-09-30 pass. The §4 rc2/rc3 goals were all met and that section was removed in the 2026-10-10 pass (only the OutputFormatter-home decision survives, moved to the deferred list). BIN-4 was done in v0.46.1. One item remains open by explicit decision (deferred KISS-4) plus two tracked third-party issues; the declined NAME-7 row was removed 2026-10-02. A shared-library audit added 2026-10-02 contributes five findings (§5) — no critical blockers outside the MSVC shared path. An MSVC archive-bloat audit added the same day contributes three remaining findings (§6, BIN-4 done): SDK-only size overhead, explicitly not a 1.0 item.
 
-**Counts by severity (13 open findings):**
+**Counts by severity (12 open findings):**
 
 | Severity | Count |
 |---|---|
 | Critical | 0 |
 | Major | 2 |
-| Minor | 11 |
+| Minor | 10 |
 | Nit | 0 |
-| **Total** | **13** |
+| **Total** | **12** |
 
 ---
 
@@ -32,7 +32,7 @@ Fifty-one of the original 53 findings were addressed across twelve batches (head
 | ID | Severity | Location | Finding | Status |
 |---|---|---|---|---|
 | EXT-1 | Minor | `src/player/decoders/ffmpeg.cpp` (`Decoder::init`, `extractMetadata`) + `tests/sanitizers/lsan.supp` | System FFmpeg (Ubuntu 24.04 libavutil, 6.x) leaks one 8192-byte probe buffer per `avformat_open_input` via `av_realloc_f`, on success and failure paths. Our lifecycle (alloc/open/close, AVIO setup/teardown, codec/swr alloc+free, packet/frame/layout RAII) is balanced; all affected tests pass functionally; zero UBSan/ASan-OOB reports. Suppressed narrowly (`leak:av_realloc_f` — caudio never calls it, so nothing of ours is masked). | Revisit with a Linux+ASan environment or newer system FFmpeg. |
-| EXT-2 | Minor | `include/caudio/utils/print.hpp`, `src/**/dispatch_*.cpp`, `cli/src/app/core.cpp` | msys2 MinGW GCC 16.x `libstdc++` lacks `std::__open_terminal`/`std::__write_to_terminal`, so every `std::print` stream/`FILE*` overload fails at link. Worked around with the `caudio::print`/`println` facade (format+insert on MinGW, plain forward elsewhere). | Drop the MinGW branch if a future msys2 build ships the symbols. |
+| EXT-2 | Minor | `include/caudio/utils/print.hpp`, `src/**/dispatch_*.cpp`, `cli/src/shell/shell.cpp` + `src/app/*.cpp` | msys2 MinGW GCC 16.x `libstdc++` lacks `std::__open_terminal`/`std::__write_to_terminal`, so every `std::print` stream/`FILE*` overload fails at link. Worked around with the `caudio::print`/`println` facade (format+insert on MinGW, plain forward elsewhere). | Drop the MinGW branch if a future msys2 build ships the symbols. |
 
 ---
 
@@ -91,23 +91,9 @@ LGPL burden). Full-static stays rejected (see prior discussion).
 
 ---
 
-## 4. rc2/rc3 goals — CLI polish + release mechanics (marked 2026-09-28)
+## 4. rc2/rc3 goals — CLI polish + release mechanics (marked 2026-09-28; SPENT 2026-10-10, removed)
 
-Phase: rc1 feature-complete; de-noise executed and committed 2026-09-28
-(CHANGELOG `### Removed` + migration note cover the API break). Remaining
-for rc2: CLI polish. rc3: freeze.
-
-### 4.1 CLI polish (surface: `main.cpp`, `app/core.{hpp,cpp}`, `app/parse.hpp`)
-
-- Help-text audit: consistent verbs/units across subcommands (time args accept `s`/`mm:ss`/`hh:mm:ss`; volume `0-100`/`+n`/`-n`/`mute`).
-- Daemon UX: `start`/`--foreground`, stale socket/pid handling, `pidPathForConfig` edge cases.
-- JSON output consistency: `writePlaylistJson` vs `toJsonString` paths must agree field-for-field with the IPC wire format.
-- `client/output_formatter.hpp` home undecided: only our CLI uses `OutputFormatter` — default keep in the SDK, or move to `cli/` (decide at freeze).
-
-### 5.2 Release mechanics
-
-- rc2 tag covers the de-noise break (CHANGELOG `### Removed` + migration note: `internal::`/`detail` gone from install, `_impl` merged).
-- rc3: freeze — only bugfixes, full matrix + sanitizers + install-smoke green.
+All goals met: help-text audit (man/README regenerated from `--help` in `b772061`), daemon UX (`start`/`--foreground`, stale pid+socket reclaim plus the CLI-side pid-liveness fast path in `74fe46a`), JSON consistency (`writePlaylistJson` serializes via the same `db::trackToJson` as the IPC wire format — consistent by construction), de-noise break covered by CHANGELOG `### Removed` + migration note (`internal::`/`detail` gone from install, `_impl` merged), freeze honored (post-rc3 commits are bugfixes only; full matrix + sanitizers + install-smoke green). The one surviving decision — `OutputFormatter` home (only our CLI uses it; keep in the SDK or move to `cli/`) — moves to the deferred list below.
 
 ---
 
@@ -122,6 +108,12 @@ utils/player/db/engine into `libcaudio`
 with `-Wl,--allow-multiple-definition`, which exists only on GNU ld
 (`CaudioHelpers.cmake:65`, `combined.cmake:15`, `cli.cmake:21` — all guard
 out Darwin; MSVC has no equivalent in-tree).
+
+1.0 decision (2026-10-10): stays OFF + experimental (noted at the
+`CAUDIO_BUILD_SHARED` option in `CMakeLists.txt`) — the §5.1 fix batch is
+deferred post-1.0 (freeze; it needs per-OS verification, and no 1.0 artifact
+ships shared libs). No external users exist, so the renames stay free anytime;
+the old "pre-1.0 + CHANGELOG note" urgency is dropped.
 
 | ID | Severity | Location | Finding | Fix (§5.1) |
 |---|---|---|---|---|
@@ -219,7 +211,7 @@ file size (code+symbols), then family-count the `llvm-nm` output.
 | BIN-1 | Minor | `src/ipc/protocol.cpp:209,717`, `src/client/*.cpp`, `src/service/service_impl.cpp:317` + `include/caudio/ipc/command.hpp` (~20-alternative `Command` variant) | `std::variant` machinery is ~70% of MSVC symbols in IPC/client objects. Already source-local (4 `std::visit` sites, all `.cpp`); the header holds only the variant *definition*, which is the API vocabulary and must stay. Header-stripping cannot move this. | None structural (see RC verdict below). |
 | BIN-2 | Minor | `src/utils/json.cpp` (+ vendored nlohmann) | JSON machine is source-local and private; MSVC emits it ~3.5x fatter than Clang. Compiler tax, no code smell. | None. |
 | BIN-3 | Minor | `include/` (`<format>` in `utils/{result,error,log,print}.hpp`; `<filesystem>` in 8 headers; `<functional>` in engine/scan/service headers; ~34 small template definitions inventoried, none dominant) | Heavy-STL includes cost parse time in every including TU; only *used* templates instantiate, and the inventory shows no movable monster — the heaviest bodies (`print`/`log` variadics, `get<T>`, formatters) cannot leave headers (variadic/explicit-specialization must be visible at call sites). Non-template inline bodies (e.g. `detail::hasAudioExt`) could move to `.cpp` without breaking API, but contribute marginally. | Opportunistic IWYU only; no campaign. |
-| BIN-4 | Minor | `CMakeLists.txt` `install()` (no `COMPONENT`s), CPack TGZ/ZIP ~103 MB | Dev artifacts (`.lib`s) ship inside the runtime archive. The size complaint is really about distribution, not compilation. | Split `COMPONENT`s: runtime (`caudio.exe` + FFmpeg DLLs) vs dev (headers + `.lib`s); ship runtime zips as the release artifact. Optional: `minsize` preset for the exe. |
+| BIN-4 | Minor | `CMakeLists.txt` `install()` (no `COMPONENT`s), CPack TGZ/ZIP ~103 MB | Dev artifacts (`.lib`s) ship inside the runtime archive. The size complaint is really about distribution, not compilation. | **DONE in v0.46.1:** runtime vs dev `COMPONENT`s split, arch in filenames, one format per OS, stripped binaries, archives + `SHA256SUMS` only. |
 | BIN-5 | Minor | `src/client/output_formatter.cpp:46` (KISS-4 chain), `src/service/config` paths | `format` is 43% of `output_formatter.obj` symbols (2,032/4,720): each `if constexpr` branch instantiates the full `<format>` machinery for its own arg list. Same pattern smaller in `config.obj` (874). | Fold into the deferred KISS-4 `std::visit` refactor: each visitor returns `std::string`, single `print("{}", …)` at the sink — collapses N instantiations to ~1. Not an RC item (same freeze as KISS-4). |
 
 ### Should template-stripping go into the next RCs? No.
@@ -228,7 +220,7 @@ file size (code+symbols), then family-count the `llvm-nm` output.
 - **API-breaking?** Safe subset: no. Structural subset: yes (`EngineCallbacks` member types, `Command` shape, formatter surface) — permissible pre-1.0 with CHANGELOG notes, but churn during freeze.
 - **Pros:** smaller SDK artifacts, faster MSVC builds, marginally leaner archives on all compilers.
 - **Cons:** zero effect on shipped binaries (linker already GCs); perf risk (less cross-TU inlining without LTO); review burden; violates rc3 freeze (bugfixes only, §4).
-- **Verdict:** keep the MSVC default (the `.exe` story is unchanged), do BIN-4 packaging split (cheap, solves the actual complaint), defer template hygiene to a post-1.0 measured project using the `llvm-nm` method above — never as an RC item. The one technique worth that project is `extern template` (§6.1).
+- **Verdict:** keep the MSVC default (the `.exe` story is unchanged), BIN-4 packaging split **done in v0.46.1** (it solved the actual complaint), template hygiene stays a post-1.0 measured project using the `llvm-nm` method above — never a 1.0 item. The one technique worth that project is `extern template` (§6.1).
 
 ### 6.1 Stripping `std::variant` via `extern template` (recipe, post-1.0)
 
@@ -276,10 +268,10 @@ after 1.0 if SDK size matters.
 - **Module gating core:** `CaudioHelpers.cmake` gates `FILE_SET CXX_MODULES` on `CAUDIO_ENABLE_MODULES`; `CMAKE_CXX_SCAN_FOR_MODULES` toggles; `*.cppm` install is gated. Verified by full builds in both modes.
 - **Public-header vendor includes:** verified zero `sqlite3.h`/`blake3.h`/`miniaudio.h` includes under `include/`. (Stale note removed 2026-09-28: nlohmann/json is private since 0.36.0 — opaque `Json` facade, no `find_dependency`, nothing installed.)
 - **Namespace rename:** `caudio::cli` fully gone from code (`caudio::ipc` + `caudio::config`); zero `^import` in tests/cli/examples; `RepeatMode::Queue` → `All` incl. JSON wire string.
-- **Install verified both modes:** header-only install ships headers + `FindFFmpeg.cmake`, no `.cppm`; modules-ON install ships 43 `.cppm` files under `<prefix>/modules/` (moved out of `include/` 2026-09-28; was 56 under `include/caudio/modules/`, 44 before the `:paths`/`:status`/`:audio` partitions were deleted 2026-09-30 as wrappers of non-installed `src/service/*` internals, 41 before `:function`/`:generator` were added 2026-10-02). Downstream full-module smoke (all 7 modules imported, live symbol per module) green.
+- **Install verified both modes:** header-only install ships headers + `FindFFmpeg.cmake`, no `.cppm`; modules-ON install ships 46 `.cppm` files under `<prefix>/modules/` (moved out of `include/` 2026-09-28; was 56 under `include/caudio/modules/`, 44 before the `:paths`/`:status`/`:audio` partitions were deleted 2026-09-30 as wrappers of non-installed `src/service/*` internals, 41 before `:function`/`:generator` were added 2026-10-02, 43 before `caudio.app` gained `:core`/`:format`/`:paths`). Downstream full-module smoke (all 7 modules imported, live symbol per module) green.
 - **`version_config.hpp` flow:** `cmake/version.hpp.in → configure_file → BINARY_DIR/include/caudio/version_config.hpp → install(FILES …)` is coherent.
 - **Sanitizer helper:** target-scoped with WIN32/MSVC guards; per-test repetition removed via single `caudio_add_catch_test` helper.
-- **Test skip mechanism:** `CAUDIO_TEST_NOAUDIO` compile def + env fallback + `CAUDIO_SKIP_IF_NOAUDIO()` macro, consistently used; ctest 158/158 green in default config (GCC + Clang + MSVC, 2026-10-02; one pre-existing m4a fixture skip).
+- **Test skip mechanism:** `CAUDIO_TEST_NOAUDIO` compile def + env fallback + `CAUDIO_SKIP_IF_NOAUDIO()` macro, consistently used; ctest 160/160 green in default config (GCC + Clang + MSVC, 2026-10-10; one pre-existing m4a fixture skip).
 - **Umbrella layering docs:** `include/caudio.hpp` layer rule matches `cmake/components/*.cmake` DEPS; no public-header→`src/` private-header include remains.
 - **No commented-out code blocks** of significance in sampled CMake/sources.
 - **`.clang-format` / `.clang-tidy` / `.editorconfig`** exist and are referenced; `CAUDIO_ENABLE_CLANG_TIDY` wires correctly when the binary exists.
@@ -297,6 +289,12 @@ after 1.0 if SDK size matters.
 
 ## Deferred post-1.0 (CLI behavior audit, 2026-10-03)
 
+- **OutputFormatter home (DECIDED 2026-10-10: keep in the SDK):** the "only our CLI
+  uses it" premise was wrong — the app library itself uses it (`src/app/detail.cpp`,
+  `src/app/library.cpp`), it is exported from the `caudio.client` module, and the
+  header is installed + referenced from `client.hpp`. Moving it to `cli/` would be
+  churn + an install-surface break for zero gain. Closed; revisit post-1.0 only if
+  a real second frontend forces the question.
 - **Playback-policy config options:** behaviors like whether `queue clear` stops playback,
   whether natural queue end stops or loops, and similar policy choices should become
   config-file options. Deferred: 1.0 keeps current behavior (`clear` leaves playback running)
@@ -304,9 +302,11 @@ after 1.0 if SDK size matters.
   played at 60% of position or 90 s of position; seeks count toward
   position, so skipping to the end marks the track played. Cumulative
   listened-time (scrobble-style) refinement deferred post-1.0.
-- **Daemon exit under 1s-loop load (cause unknown):** single mid-audit occurrence with short
-  looping fixtures and active audio output; all commands returned `daemon not running` until
-  restart. Rerun loop soak to reproduce before closing; do not ship 1.0 on an unwitnessed crash.
+- **Daemon exit under 1s-loop load (CLOSED 2026-10-10):** single mid-audit occurrence with short
+  looping fixtures and active audio output; that instance's root cause stays unknown, but
+  `scripts/soak_daemon.py` reproduces the incident class (0.3/0.5/1.0 s fixtures on repeat-all
+  with transport hammering) and passes 300/300 on both decks — the pre-1.0 gate is satisfied as
+  far as a single unreproduced occurrence can be. Reopen with the soak temp dir + abort log if it ever recurs.
 - **Tag file sync (`tag edit` is DB-only):** edits update the DB row; audio files on disk stay
   untouched (noted in man). Correct fix is file-first-then-rescan, which needs per-format
   tag-write support (evaluate TagLib writer or equivalent). Do not silently diverge DB/file.

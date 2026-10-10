@@ -52,8 +52,8 @@ The library is split into components: \fBcaudio::utils\fR, \fBcaudio::player\fR,
 \fBcaudio::client\fR, \fBcaudio::config\fR, \fBcaudio::app\fR (plus
 \fBcaudio::version\fR).
 .PP
-Shared\-memory status (\fBAtomicShmStatus\fR) is published at 10 fps for
-low\-latency TUI polling without IPC round\-trips.
+Shared\-memory status (\fBAtomicShmStatus\fR) is published on dispatch for
+low\-latency polling without IPC round\-trips.
 .SH OPTIONS
 .TP
 .BR \-\-config " \fIFILE\fR"
@@ -400,7 +400,7 @@ Path derived from DB path via \fBcaudio::config::pidPathFor\fR.
 .I
 /dev/shm/caudio-<hash> (POSIX) or
 named shared memory (Windows)
-SHM status block (\fBAtomicShmStatus\fR) for 10 fps TUI polling.
+SHM status block (\fBAtomicShmStatus\fR), published on dispatch.
 .SH EXIT STATUS
 .TP
 .B 0

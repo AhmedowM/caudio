@@ -4,8 +4,10 @@
  * @file shm_status.hpp
  * @brief Seqlock shared-memory playback snapshot (daemon writes, clients poll).
  * @ingroup caudio_service
- * @details Lets `Client::snapshotStatus()` read position/state at 10 fps
- * without an IPC round-trip. Writers publish through `AtomicShmStatus`
+ * @details Lets `Client::snapshotStatus()` read the latest event-driven
+ * position/state snapshot without an IPC round-trip. The daemon publishes
+ * on dispatch only (no periodic writer), so position can go stale between
+ * commands — use the IPC status path when freshness matters. Writers publish
  * (lock-free atomics + seqlock sequence); readers get a plain `ShmStatus`
  * copy. Windows pattern as in `ipc_server.hpp`: local API declarations
  * unless `windows.h` is already included.

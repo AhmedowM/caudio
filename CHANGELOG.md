@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0] - 2026-10-10
+
+### Fixed
+- Transient `engine busy` on rapid `next`/`prev`: the CLI retries once, and
+  transport commands wait up to 500 ms on the queue lock before giving up
+- Slow start after a killed daemon: a stale pid file is liveness-checked and
+  skipped instead of death-watched (clean start either way)
+
+### Changed
+- Shared libraries stay `OFF` and experimental for 1.0 (no shipped artifact
+  uses them; the `SH-1…SH-5` fix batch is deferred post-1.0)
+- SHM status documented as event-driven (published on dispatch, no 10 Hz
+  writer); `OutputFormatter` stays in the SDK
+
 ## [v1.0.0-rc4] - 2026-10-10
 
 ### Changed

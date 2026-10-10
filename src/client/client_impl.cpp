@@ -123,7 +123,7 @@ caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Com
     }
 }
 
-// Snapshot status via shared memory (10fps status polling) or fallback to IPC
+// Snapshot status via shared memory (event-driven snapshot) or fallback to IPC
 caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
     // Try to connect to shared memory status block
     // Derive shm name via canonical hex8 (consistent with service)
