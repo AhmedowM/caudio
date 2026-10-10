@@ -21,6 +21,7 @@
 
 #ifndef _WIN32
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -29,6 +30,46 @@
 #endif
 
 #include <caudio/config.hpp>
+
+#ifdef _WIN32
+namespace {
+// Owner-only pipe DACL, so another local user cannot connect to our daemon
+// (shutdown/queue control, library/history reads) without any protocol
+// change: owner + built-in admins + system get full access, everyone else
+// nothing. SDDL is constant; conversion cannot fail short of OOM, and then
+// we fall back to default attributes (availability wins, documented).
+constexpr wchar_t kPipeSddl[] = L"D:(A;;GA;;;OW)(A;;GA;;;BA)(A;;GA;;;SY)";
+// Layout-compatible with SECURITY_ATTRIBUTES (length, descriptor, inherit).
+struct PipeSecurityAttributes {
+    DWORD nLength{0};
+    LPVOID descriptor{nullptr};
+    BOOL inherit{0};
+};
+class PipeDacl {
+  public:
+    PipeDacl() {
+        sa_.nLength = sizeof(sa_);
+        LPVOID sd = nullptr;
+        DWORD len = 0;
+        if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                kPipeSddl, caudio::service::kSddlRevision1, &sd, &len) &&
+            sd) {
+            sa_.descriptor = sd;
+        }
+    }
+    ~PipeDacl() {
+        if (sa_.descriptor)
+            ::LocalFree(sa_.descriptor);
+    }
+    PipeDacl(const PipeDacl&) = delete;
+    PipeDacl& operator=(const PipeDacl&) = delete;
+    LPVOID attributes() { return sa_.descriptor ? &sa_ : nullptr; }
+
+  private:
+    PipeSecurityAttributes sa_;
+};
+} // namespace
+#endif
 
 namespace caudio::service {
 
@@ -60,8 +101,9 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     w.reserve(pathStr.size());
     for (char c : pathStr)
         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+    PipeDacl dacl;
     HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                  kPipeUnlimited, 16384, 16384, 0, nullptr);
+                                  kPipeUnlimited, 16384, 16384, 0, dacl.attributes());
     if (h == kInvalidHandle) {
         DWORD err = ::GetLastError();
         return std::unexpected{caudio::utils::makeError(
@@ -78,6 +120,14 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     auto parent = std::filesystem::path(socketPath_).parent_path();
     if (!parent.empty()) {
         std::filesystem::create_directories(parent, ec);
+    }
+    if (!parent.empty() && !ec) {
+        // Owner-only daemon dir: Linux ignores socket-file modes for access
+        // control, so the containing directory is the real gate (notably the
+        // /tmp fallback; XDG_RUNTIME_DIR is 0700 already). Best-effort.
+        std::error_code ec2;
+        std::filesystem::permissions(parent, std::filesystem::perms::owner_all,
+                                     std::filesystem::perm_options::replace, ec2);
     }
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -99,6 +149,9 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "bind failed")};
     }
+    // Owner-only socket file, best-effort: honored on Darwin/BSD, ignored
+    // (harmlessly) on Linux, where the directory gate above applies.
+    (void)::fchmod(fd, S_IRWXU);
     if (::listen(fd, 16) != 0) {
         ::close(fd);
         return std::unexpected{
@@ -153,9 +206,10 @@ void IpcServer::run(std::stop_token st,
                 w.reserve(pathStr.size());
                 for (char c : pathStr)
                     w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-                HANDLE next =
-                    ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                       kPipeUnlimited, 16384, 16384, 0, nullptr);
+                PipeDacl nextDacl;
+                HANDLE next = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex,
+                                                       kPipeTypeByte | kPipeWait, kPipeUnlimited,
+                                                       16384, 16384, 0, nextDacl.attributes());
                 if (next != kInvalidHandle) {
                     pipeHandle_.store(next);
                 }

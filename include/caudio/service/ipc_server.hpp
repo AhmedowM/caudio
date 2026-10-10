@@ -59,6 +59,7 @@ inline constexpr DWORD kPipeTypeByte = 0x00000000UL;
 inline constexpr DWORD kPipeWait = 0x00000000UL;
 inline constexpr DWORD kPipeUnlimited = 255UL;
 inline const HANDLE kInvalidHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+inline constexpr DWORD kSddlRevision1 = 1UL;
 } // namespace caudio::service
 extern "C" {
 __declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD,
@@ -74,6 +75,11 @@ __declspec(dllimport) BOOL __stdcall DisconnectNamedPipe(HANDLE);
 __declspec(dllimport) BOOL __stdcall FlushFileBuffers(HANDLE);
 __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
 __declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
+__declspec(dllimport) BOOL __stdcall ConvertStringSecurityDescriptorToSecurityDescriptorW(LPCWSTR,
+                                                                                           DWORD,
+                                                                                           LPVOID*,
+                                                                                           LPDWORD);
+__declspec(dllimport) LPVOID __stdcall LocalFree(LPVOID);
 }
 #else
 #include <windows.h>
