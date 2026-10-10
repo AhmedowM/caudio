@@ -110,9 +110,11 @@ caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Com
                      bg.end());
             // Enforce bounded size (audit B6: limit to 8 background workers)
             if (bg.size() >= 8) {
-                // Drop oldest without blocking join: release handle to avoid blocking destructor
-                // on a still-running thread; leak is bounded to at most 8 threads total.
-                (void)bg.front().release();
+                // Drop oldest without blocking join: detach (the worker was
+                // stop-requested above) instead of release(), so no thread
+                // object leaks; the thread itself runs out on its own.
+                // All entries here are joinable (reaped above, mutex held).
+                bg.front()->detach();
                 bg.erase(bg.begin());
             }
             bg.push_back(std::move(worker));
