@@ -462,12 +462,12 @@
       }
     },
     {
-      "name": "ci-trimmed",
+      "name": "ci-trimmed-gcc",
       "inherits": [
         "toolchain-gcc",
         "ci-base"
       ],
-      "displayName": "Trimmed FFmpeg CI: decode-only whitelist build, no audio device",
+      "displayName": "Trimmed FFmpeg CI with GCC: decode-only whitelist build, no audio device",
       "cacheVariables": {
         "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
         "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
@@ -476,6 +476,40 @@
         "type": "notEquals",
         "lhs": "${hostSystemName}",
         "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "ci-trimmed-clang",
+      "inherits": [
+        "toolchain-clang",
+        "ci-base"
+      ],
+      "displayName": "Trimmed FFmpeg CI with Clang: decode-only whitelist build, no audio device",
+      "cacheVariables": {
+        "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+      }
+    },
+    {
+      "name": "ci-trimmed-msvc",
+      "inherits": [
+        "toolchain-msvc",
+        "ci-base"
+      ],
+      "displayName": "Trimmed FFmpeg CI with MSVC: decode-only whitelist build, no audio device (VS 2026 generator)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "warnings": {
+        "unusedCli": false
+      },
+      "cacheVariables": {
+        "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
@@ -742,8 +776,19 @@
       "jobs": 4
     },
     {
-      "name": "ci-trimmed",
-      "configurePreset": "ci-trimmed",
+      "name": "ci-trimmed-gcc",
+      "configurePreset": "ci-trimmed-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "ci-trimmed-clang",
+      "configurePreset": "ci-trimmed-clang",
+      "jobs": 4
+    },
+    {
+      "name": "ci-trimmed-msvc",
+      "configurePreset": "ci-trimmed-msvc",
+      "configuration": "Debug",
       "jobs": 4
     },
     {
@@ -887,8 +932,29 @@
       }
     },
     {
-      "name": "ci-trimmed",
-      "configurePreset": "ci-trimmed",
+      "name": "ci-trimmed-gcc",
+      "configurePreset": "ci-trimmed-gcc",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-trimmed-clang",
+      "configurePreset": "ci-trimmed-clang",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-trimmed-msvc",
+      "configurePreset": "ci-trimmed-msvc",
+      "configuration": "Debug",
       "output": {
         "outputOnFailure": true
       },

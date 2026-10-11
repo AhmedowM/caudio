@@ -271,8 +271,8 @@ jobs:
         # C:\mingw64 15.2 chokes on the fattest TUs). Build/Test stay on
         # default shells so DLL staging (below) governs loader resolution.
         run: |
-          if cmake --preset ci-trimmed; then
-            echo "preset=ci-trimmed" >> "$GITHUB_OUTPUT"
+          if cmake --preset ci-trimmed-gcc; then
+            echo "preset=ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
             cmake --preset ci-gcc
@@ -294,7 +294,7 @@ jobs:
           preset="${{ steps.pick.outputs.preset }}"
           dest="build/$preset"
           troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          if [ "$preset" = "ci-trimmed" ]; then
+          if [ "$preset" = "ci-trimmed-gcc" ]; then
             src="$troot/bin"
           else
             src="build/$preset/_deps/ffmpeg_prebuilt-src/bin"
@@ -310,6 +310,214 @@ jobs:
           done
           ls "$dest/"*.dll
         shell: bash
+
+      - name: Build
+        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+
+      - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
+        run: ctest --preset ${{ steps.pick.outputs.preset }}
+
+  ffmpeg-trimmed-msvc:
+    name: ffmpeg-trimmed (windows-latest / MSVC, decode-only whitelist)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+      DEPS_REPO: "AhmedowM/deps-private"
+      FFMPEG_VERSION: "8.1.2"
+      REBUILD: "1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download trimmed archive from deps-private
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release download "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz" \
+            --dir . \
+            --clobber
+        shell: bash
+
+      - name: Extract trimmed archive
+        run: |
+          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          mkdir -p "$troot"
+          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot"
+          ls "$troot/bin"
+        shell: bash
+
+      - name: Configure (trimmed, fallback to default provider)
+        id: pick
+        # MSVC links the prebuilt tree (COFF import libs); it never builds
+        # one (module FATALS without a complete FFmpeg_ROOT). Same fallback
+        # contract as the other trim jobs.
+        run: |
+          if cmake --preset ci-trimmed-msvc; then
+            echo "preset=ci-trimmed-msvc" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
+            cmake --preset ci-msvc
+            echo "preset=ci-msvc" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Stage DLLs beside test executables
+        run: |
+          # Same hermeticity rationale as the MinGW job; MSVC needs no
+          # extra runtime DLLs (UCRT/vcruntime are system components).
+          preset="${{ steps.pick.outputs.preset }}"
+          dest="build/$preset"
+          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          if [ "$preset" = "ci-trimmed-msvc" ]; then
+            src="$troot/bin"
+          else
+            src="build/$preset/_deps/ffmpeg_prebuilt-src/bin"
+          fi
+          for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
+            test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
+            cp "$src/$d" "$dest/"
+          done
+          ls "$dest/"*.dll
+        shell: bash
+
+      - name: Build
+        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+
+      - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
+        run: ctest --preset ${{ steps.pick.outputs.preset }}
+
+  ffmpeg-trimmed-linux:
+    name: ffmpeg-trimmed (ubuntu-24.04 / gcc-16, decode-only whitelist)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+      DEPS_REPO: "AhmedowM/deps-private"
+      FFMPEG_VERSION: "8.1.2"
+      REBUILD: "1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          gcc-16 --version; g++-16 --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build nasm pkg-config zlib1g-dev make curl
+          cmake --version
+          ninja --version
+
+      - name: Download trimmed archive from deps-private
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release download "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-linux-x86_64.tar.gz" \
+            --dir . \
+            --clobber
+
+      - name: Extract trimmed archive
+        run: |
+          mkdir -p "$CAUDIO_TRIMMED_ROOT"
+          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-linux-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+          ls "$CAUDIO_TRIMMED_ROOT/lib"
+
+      - name: Configure (trimmed, fallback to default provider)
+        id: pick
+        run: |
+          if cmake --preset ci-trimmed-gcc; then
+            echo "preset=ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
+            cmake --preset ci-gcc
+            echo "preset=ci-gcc" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+
+      - name: Test
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
+        run: ctest --preset ${{ steps.pick.outputs.preset }}
+
+  ffmpeg-trimmed-macos:
+    name: ffmpeg-trimmed (macos-latest / LLVM Clang, decode-only whitelist)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+      DEPS_REPO: "AhmedowM/deps-private"
+      FFMPEG_VERSION: "8.1.2"
+      REBUILD: "1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup LLVM Clang
+        run: |
+          brew update || echo "brew update failed, continuing with snapshot"
+          brew install llvm || brew upgrade llvm
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+          "$LLVM_PREFIX/bin/clang" --version
+          brew install ninja nasm pkg-config || brew upgrade ninja nasm pkg-config || true
+          cmake --version
+          ninja --version
+
+      - name: Download trimmed archive from deps-private
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          gh release download "${{ env.RELEASE_TAG }}" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz" \
+            --dir . \
+            --clobber
+
+      - name: Extract trimmed archive
+        run: |
+          mkdir -p "$CAUDIO_TRIMMED_ROOT"
+          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+          ls "$CAUDIO_TRIMMED_ROOT/lib"
+
+      - name: Configure (trimmed, fallback to default provider)
+        id: pick
+        run: |
+          if cmake --preset ci-trimmed-clang; then
+            echo "preset=ci-trimmed-clang" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
+            cmake --preset ci-clang
+            echo "preset=ci-clang" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build
         run: cmake --build --preset ${{ steps.pick.outputs.preset }}

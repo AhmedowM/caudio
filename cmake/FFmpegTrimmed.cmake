@@ -16,7 +16,7 @@
 # Consumption (Windows first):
 #   1. CI restores the cached install prefix into CAUDIO_FFMPEG_TRIM_PREFIX
 #      (key: hash of this file, which embeds CAUDIO_FFMPEG_TRIM_VERSION),
-#      then configures with --preset ci-trimmed. Cache hit: find_package
+#      then configures with --preset ci-trimmed-gcc. Cache hit: find_package
 #      consumes the prefix directly. Cache miss: one-shot configure-time
 #      source build fills it (~10 min, then cached).
 #   2. Local iteration: -DCAUDIO_USE_TRIMMED_FFMPEG=ON with
@@ -26,8 +26,8 @@
 # job implements that retry.
 #
 # Supported builders: Linux GCC, macOS brew-LLVM, Windows MinGW (msys2).
-# MSVC is unsupported (upstream FFmpeg has no native MSVC build); MSVC keeps
-# the default provider.
+# MSVC cannot compile FFmpeg (no native upstream MSVC build) but links a
+# prebuilt trimmed tree via FFmpeg_ROOT (COFF import libs in bin/).
 
 # Pinned source matching the audited inventory. Override with
 # -DCAUDIO_FFMPEG_TRIM_VERSION=x.y.z if the audit moves.
@@ -123,10 +123,6 @@ set(CAUDIO_FFMPEG_TRIM_FLAGS "${FFMPEG_TRIM_FLAGS}")
 # FFmpeg_ROOT the build would silently use a full FFmpeg and the whitelist
 # would guard nothing.
 function(caudio_setup_trimmed_ffmpeg)
-  if(MSVC)
-    message(FATAL_ERROR "CAUDIO_USE_TRIMMED_FFMPEG is unsupported with MSVC "
-      "(upstream FFmpeg has no native MSVC build) -- use MinGW or the default provider")
-  endif()
   # Drop stale hits: find_library/include results persist in cache across
   # reconfigures, so a previous system/Gyan hit would shadow the trimmed
   # tree even after FFmpeg_ROOT moves.
@@ -139,6 +135,8 @@ function(caudio_setup_trimmed_ffmpeg)
   if(FFmpeg_ROOT OR DEFINED ENV{FFmpeg_ROOT})
     find_package(FFmpeg QUIET)
     if(FFmpeg_FOUND)
+      # MSVC links a prebuilt trimmed tree fine (COFF import libs in bin/);
+      # it just cannot compile one (no native upstream MSVC build).
       message(STATUS "Trimmed FFmpeg found: ${FFmpeg_AVCODEC_LIBRARY}")
       set(FFmpeg_FOUND TRUE PARENT_SCOPE)
       return()
@@ -151,6 +149,11 @@ function(caudio_setup_trimmed_ffmpeg)
     endif()
   else()
     set(_trim_prefix "${CAUDIO_FFMPEG_TRIM_PREFIX}")
+  endif()
+  if(MSVC)
+    message(FATAL_ERROR "CAUDIO_USE_TRIMMED_FFMPEG needs a prebuilt trimmed tree "
+      "under FFmpeg_ROOT with MSVC (upstream FFmpeg has no native MSVC build) -- "
+      "use MinGW or the default provider")
   endif()
   if(WIN32)
     find_program(_trim_bash bash REQUIRED)
