@@ -396,7 +396,8 @@
       "displayName": "Release + LTO with Clang, trimmed decode-only FFmpeg",
       "cacheVariables": {
         "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
-        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}",
+        "CAUDIO_BUNDLE_FFMPEG_MACOS": "ON"
       }
     },
     {

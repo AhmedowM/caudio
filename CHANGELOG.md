@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-10-11
+
+### Added
+- Decode-whitelist fixtures (`sample.mp3/.flac/.m4a/.opus/.wma`) with
+  decode guard tests, plus `scripts/generate_fixtures.py` to regenerate them
+- `cmake/FFmpegTrimmed.cmake`: decode-only FFmpeg whitelist (pinned 8.1.2,
+  shared libs), consumed via `CAUDIO_USE_TRIMMED_FFMPEG` / `FFmpeg_ROOT`
+  with fallback to the default provider; `ci-trimmed-{gcc,clang,msvc}` and
+  `release-lto-trimmed-{gcc,clang}` presets
+- Per-OS trim CI jobs (MinGW, MSVC, Linux, macOS) fed by
+  `build-ffmpeg-deps.yml` release assets
+
+### Changed
+- Release archives ship trimmed FFmpeg (linked set ~116 MB → ~4 MB)
+- Vendored SQLite/miniaudio trimmed (`SQLITE_OMIT_*`, `MA_NO_*`); scanner
+  recognizes `.opus`/`.wma`
+
 ## [v1.0.0] - 2026-10-10
 
 ### Fixed

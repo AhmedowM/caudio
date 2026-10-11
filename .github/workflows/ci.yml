@@ -258,7 +258,11 @@ jobs:
 
       - name: Extract trimmed archive
         run: |
-          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          if command -v cygpath >/dev/null 2>&1; then
+            troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          else
+            troot="$CAUDIO_TRIMMED_ROOT"
+          fi
           mkdir -p "$troot"
           tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot"
           ls "$troot/bin"
@@ -349,7 +353,11 @@ jobs:
 
       - name: Extract trimmed archive
         run: |
-          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          if command -v cygpath >/dev/null 2>&1; then
+            troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
+          else
+            troot="$CAUDIO_TRIMMED_ROOT"
+          fi
           mkdir -p "$troot"
           tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot"
           ls "$troot/bin"
