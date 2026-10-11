@@ -156,8 +156,17 @@ function(caudio_setup_trimmed_ffmpeg)
       "use MinGW or the default provider")
   endif()
   if(WIN32)
-    find_program(_trim_bash bash REQUIRED)
-    find_program(_trim_make make REQUIRED)
+    # No prebuilt tree: source build needs a POSIX env. Check explicitly so
+    # the failure names the fix (a bare find_program REQUIRED error does not).
+    find_program(_trim_bash bash)
+    find_program(_trim_make make)
+    if(NOT _trim_bash OR NOT _trim_make)
+      message(FATAL_ERROR "CAUDIO_USE_TRIMMED_FFMPEG without a prebuilt trimmed tree "
+        "must compile FFmpeg from source, which needs bash+make on PATH (MSYS2) plus "
+        "nasm/zlib. Either set FFmpeg_ROOT (or CAUDIO_TRIMMED_ROOT) to a complete "
+        "trimmed prefix -- e.g. the deps-private asset -- or install the tools. "
+        "To fall back to the default provider: -DCAUDIO_USE_TRIMMED_FFMPEG=OFF")
+    endif()
     set(_trim_sh ${_trim_bash})
     set(_trim_make ${_trim_make})
   else()
