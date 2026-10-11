@@ -36,69 +36,9 @@ Fifty-one of the original 53 findings were addressed across twelve batches (head
 
 ---
 
-## 3. FFmpeg trimming plan (post-1.0 packaging track, approved)
+## 3. FFmpeg trimming plan (CLOSED 2026-10-11, removed)
 
-Inventory below is from our exact build (Gyan 8.1.2 full: 215 audio + 274 video
-decoders, 131 demuxers, 131 muxers, 40 protocols, 50 bsfs, 578 filters).
-Decode-only product: tag editing writes SQLite rows, never audio files, so no
-muxers/encoders are needed. Supported formats = whatever demuxers stay enabled
-(scanner probes via FFmpeg, no hardcoded extension list).
-
-| Category | Full size | Verdict |
-|---|---|---|
-| avcodec/avformat/avutil/swresample | 4 libs | **Keep** — the entire backend |
-| avfilter (578 filters, 111 audio), avdevice, swscale | 3 libs + tools | **Drop** — resample via libswresample directly; I/O is miniaudio's job. *Future: server-side EQ/transcode pipelines only* |
-| Programs (ffmpeg/ffplay/ffprobe) | 3 binaries | **Drop** — libs only |
-| Video decoders (274), subtitle (22) | — | **Drop all.** Not a video player; cover art needs mjpeg/png only, if ever |
-| Audio decoders (215) | — | **Keep ~40**: pcm_* family, adpcm_ms, adpcm_ima_wav, flac, mp3float, vorbis, opus, aac, aac_latm, alac, ape, musepack7/8, wavpack, tta, tak, shorten, wmalossless, wmapro, wmav1/2, ac3, eac3, dts, truehd, mlp, dsd_lsbf/msbf(+planar), amr_nb/wb, speex, gsm. Drop ~170: game audio, telephony, retro, dead formats |
-| Encoders (81 audio + 104 video) | — | **Drop all.** *Future: transcode/file-tag-write product decisions only* |
-| Demuxers (131) | — | **Keep ~28**: wav, w64, aiff, au, caf, flac, mp3, ogg, opus, mov/mp4/m4a, aac, asf, ape, mpc, mpc8, wv, tta, amr, matroska-audio, ac3, eac3, dts, truehd, mlp, spdif, voc, ircam, sox, gsm, sbc. Drop ~100 video/subtitle/game/telecom/streaming containers |
-| Muxers (131) | — | **Drop all** (same future as encoders) |
-| Parsers | — | Keep aac, aac_latm, ac3, dca, flac, mpegaudio, opus, vorbis, tak |
-| Protocols (40) | — | Keep `file` + `pipe`; `--disable-network` kills http/hls/rtmp/tls/srt/ftp/ssh + the gnutls/openssl dependency subtree. *Future: internet radio = re-enable http/https/hls + TLS* |
-| Bitstream filters (50) | — | Keep aac_adtstoasc (raw .aac!), opus_metadata, truehd_core, eac3_core, dca_core, pcm_rechunk, dump_extra; drop ~16 video/metadata ones |
-| HWaccels (cuda/vaapi/dxva2/vulkan…) | — | **Drop all** (software decode; drops SDK chains). *Future: only on decode-CPU complaints* |
-| External libs (~40: x264, bluray, srt, ssh, fonts…) | — | Keep `zlib` (mov needs it); drop the rest |
-| Docs/programs/debug | — | `--disable-doc --disable-programs --disable-debug` |
-
-Safety property: explicit `--enable-*` whitelist fails `configure` loudly on
-missing deps — never silently drops a format. Expected payoff: ~30-60 MB of
-DLLs → ~8-15 MB, smaller attack surface, one FFmpeg everywhere instead of
-system/brew/Gyan variance. License unchanged (already shipping FFmpeg).
-
-Phasing: (1) fixtures for mp3/flac/m4a/opus/wma + decode cases so CI guards
-the whitelist (valuable regardless); (2) `cmake/FFmpegTrimmed.cmake` flag set
-+ dedicated per-OS `ffmpeg` CI job with `actions/cache` (key: flags hash +
-version), Windows first (replaces the ~500 MB Gyan fetch; builds consume via
-`FFmpeg_ROOT` with fallback to current behavior so trimming outages never red
-the pipeline); (3) all-OS trimmed post-1.0. Shared libs throughout (no new
-LGPL burden). Full-static stays rejected (see prior discussion).
-
-Verified 2026-10-10 (Windows MinGW, FFmpeg 8.1.2 source, `dev-clang` build):
-whitelist configures + builds (fixes: no `separate_arguments` re-parse, no
-`--disable-postproc` in 8.x, stale `FFmpeg_*` cache entries unset on
-reconfigure), linked DLLs avcodec 1.98 + avformat 0.69 + avutil 1.0 +
-swresample 0.17 MB vs full Gyan 92.94 + 19.25 + 3.0 + 0.46 MB, ctest 165/165
-against the trimmed tree, runtime ZIP 3.6 MB. Name corrections vs the table
-above: decoders `mpc7`/`mpc8`/`amrnb`/`amrwb`/`dca`, no standalone `opus`
-demuxer (`ogg` covers `.opus`), `mov`/`matroska` cover mp4/m4a + mka/webm —
-all recorded in `cmake/FFmpegTrimmed.cmake`. CI `ffmpeg-trimmed` job still
-pending its first green run.
-
-### Non-FFmpeg trim leftovers (pending, audited 2026-09-27 against actual API use — not yet applied)
-
-- **sqlite3** (27 APIs used; WAL + `foreign_keys=ON` + FTS5 required; zero
-  JSON1 SQL uses, no `create_function`/blob-I/O/backup/authorizer/extensions):
-  `SQLITE_OMIT_LOAD_EXTENSION` (also hardening), `SQLITE_OMIT_DEPRECATED`,
-  `SQLITE_OMIT_AUTHORIZER`, `SQLITE_OMIT_PROGRESS_CALLBACK`,
-  `SQLITE_OMIT_GET_TABLE`, `SQLITE_OMIT_JSON` (~5-15% off; FTS5 dominates).
-  Optional second wave: `OMIT_UTF16/SHARED_CACHE/DECLTYPE/TRACE/COMPLETE`.
-- **miniaudio** (18 APIs, device playback + enumeration only; zero
-  decoder/encoder/engine/node/graph/waveform calls): `MA_NO_DECODING`,
-  `MA_NO_ENCODING`, `MA_NO_GENERATION`, `MA_NO_RESOURCE_MANAGER`,
-  `MA_NO_NODE_GRAPH`, `MA_NO_ENGINE`, `MA_NO_WAV/FLAC/MP3`. Keep all backends
-  (portability) and device I/O. Expect ~40-60% smaller object.
-- nlohmann/CLI11/Catch2: header/test-only, nothing to trim.
+Executed in full: whitelist fixtures for mp3/flac/m4a/opus/wma (+ogg/wav) with decode cases in `tests/test_ffmpeg.cpp` (`generate_fixtures.py` regenerates them); `cmake/FFmpegTrimmed.cmake` flag set consumed via `FFmpeg_ROOT` with default-provider fallback; per-OS trim CI jobs (`ffmpeg-trimmed`, `-linux`, `-macos`, `-msvc`, all green) fed by `build-ffmpeg-deps.yml` release assets on `deps-private`; non-FFmpeg leftovers applied (6× `SQLITE_OMIT_*`, 9× `MA_NO_*`). Measured result: linked DLLs avcodec 1.98 + avformat 0.69 + avutil 1.0 + swresample 0.17 MB vs full Gyan 92.94 + 19.25 + 3.0 + 0.46 MB; ctest 165/165 against the trimmed tree; runtime ZIP 3.6 MB. Name corrections vs the original table (`mpc7`/`mpc8`/`amrnb`/`amrwb`/`dca`, no standalone `opus` demuxer, `mov`/`matroska` cover mp4/m4a + mka/webm) live in the module. Tag file sync stays on the dedicated-tag-library decision (never FFmpeg muxers); internet radio (http/hls+TLS) and HWaccel remain future re-enables. Full inventory + phasing in git history.
 
 ---
 
