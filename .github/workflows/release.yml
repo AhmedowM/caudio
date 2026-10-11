@@ -141,8 +141,11 @@ jobs:
       - name: Extract trimmed FFmpeg
         if: steps.trimdl.outputs.trim_root != ''
         run: |
-          mkdir -p "${{ steps.trimdl.outputs.trim_root }}"
-          tar -xzf "${{ matrix.trim_asset }}" -C "${{ steps.trimdl.outputs.trim_root }}"
+          # cygpath: github.workspace is D:\... (backslashes), which
+          # Git-Bash tools mangle (tar: D\:\a\\...). Normalize once.
+          troot="$(cygpath "${{ steps.trimdl.outputs.trim_root }}")"
+          mkdir -p "$troot"
+          tar -xzf "${{ matrix.trim_asset }}" -C "$troot"
         shell: bash
 
       - name: Configure (release preset)
