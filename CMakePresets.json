@@ -378,6 +378,28 @@
       "displayName": "Release + link-time optimization with Clang"
     },
     {
+      "name": "release-lto-trimmed-gcc",
+      "inherits": [
+        "release-lto-gcc"
+      ],
+      "displayName": "Release + LTO with GCC, trimmed decode-only FFmpeg",
+      "cacheVariables": {
+        "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+      }
+    },
+    {
+      "name": "release-lto-trimmed-clang",
+      "inherits": [
+        "release-lto-clang"
+      ],
+      "displayName": "Release + LTO with Clang, trimmed decode-only FFmpeg",
+      "cacheVariables": {
+        "CAUDIO_USE_TRIMMED_FFMPEG": "ON",
+        "FFmpeg_ROOT": "$penv{CAUDIO_TRIMMED_ROOT}"
+      }
+    },
+    {
       "name": "release-lto-msvc",
       "inherits": [
         "toolchain-msvc",
@@ -804,6 +826,16 @@
     {
       "name": "release-lto-gcc",
       "configurePreset": "release-lto-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-trimmed-gcc",
+      "configurePreset": "release-lto-trimmed-gcc",
+      "jobs": 4
+    },
+    {
+      "name": "release-lto-trimmed-clang",
+      "configurePreset": "release-lto-trimmed-clang",
       "jobs": 4
     },
     {

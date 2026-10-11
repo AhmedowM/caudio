@@ -27,14 +27,20 @@ jobs:
           - os: ubuntu-latest
             compiler: gcc-16
             preset: release-lto-gcc
+            trim_preset: release-lto-trimmed-gcc
+            trim_asset: ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz
             pkg_ext: tar.gz
           - os: macos-latest
             compiler: clang
             preset: release-lto-clang
+            trim_preset: release-lto-trimmed-clang
+            trim_asset: ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz
             pkg_ext: tar.gz
           - os: windows-latest
             compiler: windows-clang
             preset: release-lto-clang
+            trim_preset: release-lto-trimmed-clang
+            trim_asset: ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz
             pkg_ext: zip
     steps:
       - name: Checkout
@@ -110,11 +116,50 @@ jobs:
 
       # Release packaging only -- testing lives in ci.yml. The release preset
       # requires a git tag (tag-triggered workflow checks out fetch-depth 0).
+      # Trimmed FFmpeg ships in every archive: the per-OS asset is downloaded
+      # from deps-private and consumed via CAUDIO_TRIMMED_ROOT. Any failure
+      # falls back to the default provider (full FFmpeg) -- a trim outage
+      # must never block a release.
+      - name: Download trimmed FFmpeg
+        id: trimdl
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+          CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+        run: |
+          if gh release download "ffmpeg-trimmed-8.1.2-1" \
+            --repo "AhmedowM/deps-private" \
+            --pattern "${{ matrix.trim_asset }}" \
+            --dir . \
+            --clobber; then
+            echo "trim_root=${{ github.workspace }}/ffmpeg-trimmed" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- release ships default provider"
+            echo "trim_root=" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Extract trimmed FFmpeg
+        if: steps.trimdl.outputs.trim_root != ''
+        run: |
+          mkdir -p "${{ steps.trimdl.outputs.trim_root }}"
+          tar -xzf "${{ matrix.trim_asset }}" -C "${{ steps.trimdl.outputs.trim_root }}"
+        shell: bash
+
       - name: Configure (release preset)
-        run: cmake --preset ${{ matrix.preset }}
+        id: cfg
+        env:
+          CAUDIO_TRIMMED_ROOT: ${{ steps.trimdl.outputs.trim_root }}
+        run: |
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ] && cmake --preset ${{ matrix.trim_preset }}; then
+            echo "preset=${{ matrix.trim_preset }}" >> "$GITHUB_OUTPUT"
+          else
+            cmake --preset ${{ matrix.preset }}
+            echo "preset=${{ matrix.preset }}" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
 
       - name: Build
-        run: cmake --build --preset ${{ matrix.preset }}
+        run: cmake --build --preset ${{ steps.cfg.outputs.preset }}
 
       - name: Package
         run: |
@@ -122,13 +167,13 @@ jobs:
           # the build tree so packages land in the build dir. A bare
           # `cpack --config` from the repo root writes them to the root
           # (CPACK_OUTPUT_DIRECTORY is not honored there -- verified).
-          cmake --build --preset ${{ matrix.preset }} --target package || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP") || echo "CPack failed"
+          cmake --build --preset ${{ steps.cfg.outputs.preset }} --target package || (cd build/${{ steps.cfg.outputs.preset }} && cpack -G "TGZ;ZIP") || echo "CPack failed"
         shell: bash
 
       - name: List packages
         run: |
-          echo "=== packages in build/${{ matrix.preset }}/ ==="
-          ls -lh build/${{ matrix.preset }}/*.${{ matrix.pkg_ext }}
+          echo "=== packages in build/${{ steps.cfg.outputs.preset }}/ ==="
+          ls -lh build/${{ steps.cfg.outputs.preset }}/*.${{ matrix.pkg_ext }}
         shell: bash
 
       - name: Upload artifact - packages
@@ -136,7 +181,7 @@ jobs:
         with:
           name: caudio-packages-${{ matrix.os }}-${{ matrix.compiler }}
           path: |
-            build/${{ matrix.preset }}/*.${{ matrix.pkg_ext }}
+            build/${{ steps.cfg.outputs.preset }}/*.${{ matrix.pkg_ext }}
           # One format per OS (pkg_ext above). A missing package must fail
           # loudly -- never ship a raw .exe as a "release" again.
           if-no-files-found: error
