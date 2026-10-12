@@ -48,14 +48,18 @@ namespace detail {
  * @brief Checks if a path has a supported audio extension.
  * @ingroup caudio_db
  * @param p Path to check.
- * @return true if extension is .mp3/.flac/.ogg/.opus/.wav/.m4a/.wma (case-insensitive).
+ * @return true if extension is a supported audio extension
+ * (decode + tag-write sets: .mp3/.flac/.ogg/.opus/.oga/.wav/.m4a/.mp4/.wma/
+ * .asf/.aiff/.aif/.ape/.mpc/.wv, case-insensitive).
  */
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" || ext == ".wav" ||
-           ext == ".m4a" || ext == ".wma";
+    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" ||
+           ext == ".oga" || ext == ".wav" || ext == ".m4a" || ext == ".mp4" ||
+           ext == ".wma" || ext == ".asf" || ext == ".aiff" || ext == ".aif" ||
+           ext == ".ape" || ext == ".mpc" || ext == ".wv";
 }
 
 } // namespace detail

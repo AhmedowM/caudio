@@ -233,6 +233,41 @@ class Engine final {
     ExpectedVoid seek(double seconds);
 
     /**
+     * @brief Suspends the loaded track and releases its file handles.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy.
+     * @retval StatusCode::State if no track is loaded.
+     * @retval StatusCode::Busy if the queue stays contended past the wait budget.
+     * @details Closes reader/decoder (releasing the audio file) without
+     * touching queue cursor, current track, or history mark. The file is
+     * free for out-of-band modification (tag write) until
+     * resumeAfterTagWrite(). State becomes Paused; output stopped.
+     * @par Thread safety
+     * Thread-safe; holds the queue lock across teardown (queue to
+     * decodeMtx_ order, matching the rest of the engine).
+     * @see resumeAfterTagWrite
+     */
+    ExpectedVoid suspendCurrentTrack();
+
+    /**
+     * @brief Reopens the suspended track at a captured position.
+     * @ingroup caudio_engine
+     * @param t Track row to open (usually re-registered after a tag write).
+     * @param pos Seconds to resume from (clamped to duration).
+     * @param wasPaused Restore Paused instead of Playing when true.
+     * @return Success or Error Busy/NotFound/Device/Internal.
+     * @details No-op success when the current track id no longer matches
+     * (the user moved on while suspended; the tag/db update already
+     * landed). Otherwise replays via doPlayTrack, restores position with
+     * seek, preserves the history mark (a tag edit is not a new listen),
+     * and restores the prior paused/playing state.
+     * @par Thread safety
+     * Thread-safe; holds the queue lock across reopen (same order as above).
+     * @see suspendCurrentTrack
+     */
+    ExpectedVoid resumeAfterTagWrite(const caudio::db::Track& t, double pos, bool wasPaused);
+
+    /**
      * @brief Sets playback volume and persists it.
      * @ingroup caudio_engine
      * @param g Volume in [0,1] (clamped; NaN/inf -> 0).

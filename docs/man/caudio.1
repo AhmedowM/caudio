@@ -268,7 +268,7 @@ track; files on disk are untouched.
 .TP
 .B tag edit \fIID\fR \fIFIELD\fR \fIVALUE\fR
 Edit track tag. \fIFIELD\fR: \fBtitle\fR|\fBartist\fR|\fBalbum\fR|\fBalbum_artist\fR|\fBgenre\fR|\fByear\fR|\fBtrack_number\fR|\fBdisc_number\fR.
-Database only: audio files on disk are untouched.
+File first: the audio file is retagged in place, then the database row is re-registered under the same id. Editing the loaded track suspends and resumes playback around the write. Formats outside the writable set (mp3/flac/m4a/mp4/ogg/opus/wma/asf/wav/aiff/ape/mpc/wv) are rejected.
 .TP
 .B tag get \fIID\fR [\fIFIELD\fR] [\-\-json]
 Get track tags for track \fIID\fR, or one field with \fIFIELD\fR.

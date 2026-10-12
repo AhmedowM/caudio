@@ -269,6 +269,46 @@ if(CAUDIO_BUILD_CLI)
 endif()
 
 # DRY helpers + component split (include preserves single-BMI build)
+# TagLib is private to the service tag-write path (file tag editing): prefer
+# a system package first, fetch pinned source as fallback -- same lazy
+# pattern as CLI11/Catch2. Headers never enter installed headers.
+find_package(TagLib 2 QUIET)
+if(NOT TagLib_FOUND)
+  FetchContent_Declare(
+    TagLib
+    GIT_REPOSITORY https://github.com/taglib/taglib.git
+    GIT_TAG v2.3.2
+    GIT_SHALLOW TRUE
+  )
+  set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(TagLib)
+  message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
+  if(NOT MSVC)
+    # Vendored-style silence: TagLib's own headers trip -Wall -Wextra
+    # (e.g. -Wmicrosoft-unqualified-friend); same -w treatment as blake3.
+    # MSVC builds keep their (quiet) defaults.
+    target_compile_options(tag PRIVATE -w)
+  endif()
+  # TagLib's `tag` target exports install includes only; consumers use flat
+  # per-subdir includes (`#include <apetag.h>`). Derive every header dir
+  # from the pinned source for the fetched case (system packages export
+  # their own includes).
+  file(GLOB_RECURSE _taglib_hdrs "${taglib_SOURCE_DIR}/taglib/*.h")
+  set(CAUDIO_TAGLIB_BUILD_INCLUDES "${taglib_SOURCE_DIR}" "${taglib_BINARY_DIR}")
+  foreach(_h IN LISTS _taglib_hdrs)
+    get_filename_component(_d "${_h}" DIRECTORY)
+    list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
+  endforeach()
+  list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
+else()
+  message(STATUS "TagLib found (system): file tag writing enabled")
+endif()
+if(NOT TARGET TagLib::tag AND TARGET tag)
+  add_library(TagLib::tag ALIAS tag)
+endif()
 include(cmake/CaudioHelpers.cmake)
 include(cmake/components/utils.cmake)
 include(cmake/components/player.cmake)
@@ -654,6 +694,7 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_engine_gapless tests/test_engine_gapless.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3)
 
   caudio_add_catch_test(test_db_scan tests/test_db_scan.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_tag_write tests/test_tag_write.cpp LIBS caudio::service caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_TEST_DATA)
   caudio_add_catch_test(test_db_search tests/test_db_search.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
   caudio_add_catch_test(test_db_json tests/test_db_json.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
 

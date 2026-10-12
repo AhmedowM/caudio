@@ -62,6 +62,10 @@ TEST_CASE("ffmpeg whitelist decodes wav", "[ffmpeg]") {
     checkFixture("sample.wav");
 }
 
+TEST_CASE("ffmpeg whitelist decodes tta", "[ffmpeg]") {
+    checkFixture("sample.tta");
+}
+
 TEST_CASE("ffmpeg probe returns true for any data when available", "[ffmpeg]") {
     // FFmpeg probe is permissive (returns true for any data >= 4 bytes)
     std::vector<std::byte> probeData(32, std::byte{0});

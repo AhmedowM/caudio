@@ -611,6 +611,68 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     fs::remove_all(dir, ec);
 }
 
+TEST_CASE("cli tag edit writes file", "[cli]") {
+    namespace fs = std::filesystem;
+    fs::path dir = tempDirPath("gold_tagfile");
+    fs::path cfg = dir / "config.json";
+    {
+        std::ofstream f(cfg, std::ios::binary);
+        f << "{\"dbPath\": \"" << dir.generic_string() << "/library.db\"}";
+    }
+    std::string cfgS = cfg.generic_string();
+    auto run = [&](std::vector<std::string> a) {
+        a.insert(a.begin(), {"--config", cfgS});
+        return runCli(a);
+    };
+    struct DaemonGuard {
+        decltype(run)* runFn;
+        ~DaemonGuard() {
+            try {
+                (*runFn)({"shutdown"});
+            } catch (...) {
+            }
+        }
+    } guard{&run};
+#ifdef TEST_DATA_DIR
+    fs::path src = fs::path(std::string(TEST_DATA_DIR)) / "sample.mp3";
+#else
+    fs::path src;
+#endif
+    if (src.empty() || !fs::exists(src)) {
+        SKIP("no fixture sample.mp3");
+    }
+    fs::path music = dir / "music";
+    std::error_code ec;
+    fs::create_directories(music, ec);
+    fs::copy_file(src, music / "song.mp3", fs::copy_options::overwrite_existing, ec);
+    REQUIRE(!ec);
+    auto start = run({"start"});
+    REQUIRE(start.exitCode == 0);
+    bool up = false;
+    for (int i = 0; i < 150 && !up; ++i) {
+        auto s = run({"status"});
+        up = (s.exitCode == 0);
+        if (!up)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    REQUIRE(up);
+    // Single-file ensure (no scan needed); fresh database, so id 1.
+    auto add = run({"library", "add", (music / "song.mp3").generic_string()});
+    REQUIRE(add.exitCode == 0);
+    auto edit = run({"tag", "edit", "1", "title", "Golden Title"});
+    REQUIRE(edit.exitCode == 0);
+    auto get = run({"tag", "get", "1"});
+    REQUIRE(get.exitCode == 0);
+    REQUIRE(contains(get.out, "Golden Title"));
+    // Re-adding hits path dedup (same id): the row survived the rewrite.
+    auto addAgain = run({"library", "add", (music / "song.mp3").generic_string()});
+    REQUIRE(addAgain.exitCode == 0);
+    auto get2 = run({"tag", "get", "1", "title"});
+    REQUIRE(get2.exitCode == 0);
+    REQUIRE(contains(get2.out, "Golden Title"));
+    fs::remove_all(dir, ec);
+}
+
 TEST_CASE("cli playback one-liners", "[cli]") {
     CAUDIO_SKIP_IF_NOAUDIO();
     namespace fs = std::filesystem;

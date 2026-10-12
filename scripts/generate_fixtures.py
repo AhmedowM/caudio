@@ -25,6 +25,9 @@ TARGETS = [
     ("sample.m4a", ["-c:a", "aac", "-b:a", "64k"]),
     ("sample.opus", ["-c:a", "libopus", "-b:a", "32k"]),
     ("sample.wma", ["-c:a", "wmav2", "-b:a", "64k"]),
+    ("sample.aiff", ["-c:a", "pcm_s16be"]),
+    ("sample.tta", ["-c:a", "tta"]),
+    ("sample.wv", ["-c:a", "wavpack"]),
 ]
 
 

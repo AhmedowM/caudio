@@ -135,7 +135,7 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio library list [--query <q>] [--artist <a>] [--album <a>] [--genre <g>] [--limit N] [--offset N] [--json]` | Filtered listing |
 | `caudio library add <path> [--recursive]` | Add file/dir to library |
 | `caudio library remove <id-or-path>` | Remove track from library (files untouched) |
-| `caudio tag edit <id> <field> <value>` | Edit tag in database (`title`,`artist`,`album`,`album_artist`,`genre`,`year`,`track_number`,`disc_number`; files untouched) |
+| `caudio tag edit <id> <field> <value>` | Retag file in place, then re-register its database row (`title`,`artist`,`album`,`album_artist`,`genre`,`year`,`track_number`,`disc_number`; loaded track is suspended and resumed) |
 | `caudio tag get <id> [field] [--json]` | Get track tags (or one field) |
 | `caudio info [--json]` | Current track info (metadata + play count) |
 | `caudio history list [--limit N] [--json]` | Playback history |

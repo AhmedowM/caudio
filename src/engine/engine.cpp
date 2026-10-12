@@ -258,6 +258,74 @@ Engine::ExpectedVoid Engine::seek(double seconds) {
     return {};
 }
 
+Engine::ExpectedVoid Engine::suspendCurrentTrack() {
+    if (!hasCurrent_.load(std::memory_order_acquire)) {
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State,
+                                                        "no track"));
+    }
+    if (!tryLockQueueFor(kQueueLockWait)) {
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+    }
+    // Mirror stop() teardown but keep cursor, current track, and history
+    // mark: the file handles must go so TagLib can rewrite the file, while
+    // everything needed to resume stays in place. decodeMtx_ serializes with
+    // an in-flight decode chunk (stop() relies on state flags alone; the
+    // mutex is strictly safer and follows the queue-to-decodeMtx_ order).
+    std::unique_lock<std::mutex> lk(decodeMtx_);
+    playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+    if (output_)
+        output_->stop();
+    if (ring_)
+        ring_->reset();
+    decoder_.reset();
+    reader_.reset();
+    lk.unlock();
+    unlockQueue();
+    decodeCv_.notify_all();
+    monCv_.notify_all();
+    return {};
+}
+
+Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
+                                                 bool wasPaused) {
+    if (!tryLockQueueFor(kQueueLockWait)) {
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+    }
+    // The user may have moved on while suspended (next/prev/play from
+    // another client): the tag/db update already landed, so there is
+    // nothing to reopen. Success, not an error.
+    if (!hasCurrent_.load(std::memory_order_acquire) || state_.currentTrackId != t.id) {
+        unlockQueue();
+        return {};
+    }
+    bool marked = markedPlayed_.load(std::memory_order_acquire);
+    caudio::db::Track reopen = t;
+    auto r = doPlayTrack(reopen);
+    markedPlayed_.store(marked, std::memory_order_release);
+    if (!r) {
+        unlockQueue();
+        return std::unexpected(r.error());
+    }
+    // doPlayTrack starts at 0/Playing; restore position (seek clamps to
+    // duration and ends Playing), then restore the prior paused state.
+    auto sr = seek(pos);
+    if (!sr) {
+        unlockQueue();
+        return std::unexpected(sr.error());
+    }
+    if (wasPaused) {
+        auto pr = pause();
+        if (!pr) {
+            unlockQueue();
+            return std::unexpected(pr.error());
+        }
+    }
+    unlockQueue();
+    return {};
+}
+
 Engine::ExpectedVoid Engine::setVolume(float g) {
     g = caudio::utils::clampVolume(g);
     state_.volume = g;

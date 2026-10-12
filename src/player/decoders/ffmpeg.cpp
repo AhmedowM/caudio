@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <expected>
+#include <initializer_list>
 #include <memory>
 #include <span>
 #include <string>
@@ -43,37 +44,55 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
 
     TrackMetadata meta;
 
-    auto getDict = [](AVDictionary* dict, const char* key) -> std::string {
-        AVDictionaryEntry* entry = av_dict_get(dict, key, nullptr, 0);
-        return entry && entry->value ? std::string(entry->value) : std::string{};
+    int audioStreamIdx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    AVDictionary* streamMeta =
+        (audioStreamIdx >= 0) ? fmt->streams[audioStreamIdx]->metadata : nullptr;
+
+    // Format metadata first (current behavior), then the audio stream's own
+    // dict: Ogg-container tags live at stream level, invisible otherwise.
+    // Aliases cover FFmpeg's per-format exports (ALBUMARTIST, DISCNUMBER,
+    // WM/Year); first non-empty hit wins.
+    auto getTag = [](AVDictionary* fmtMeta, AVDictionary* strMeta,
+                     std::initializer_list<const char*> keys) -> std::string {
+        for (auto* dict : {fmtMeta, strMeta}) {
+            if (!dict)
+                continue;
+            for (const char* key : keys) {
+                AVDictionaryEntry* entry = av_dict_get(dict, key, nullptr, 0);
+                if (entry && entry->value && *entry->value)
+                    return std::string(entry->value);
+            }
+        }
+        return {};
     };
 
-    meta.title = getDict(fmt->metadata, "title");
-    meta.artist = getDict(fmt->metadata, "artist");
-    meta.album = getDict(fmt->metadata, "album");
-    meta.album_artist = getDict(fmt->metadata, "album_artist");
-    meta.genre = getDict(fmt->metadata, "genre");
+    meta.title = getTag(fmt->metadata, streamMeta, {"title"});
+    meta.artist = getTag(fmt->metadata, streamMeta, {"artist"});
+    meta.album = getTag(fmt->metadata, streamMeta, {"album"});
+    meta.album_artist = getTag(fmt->metadata, streamMeta, {"album_artist", "albumartist", "album artist"});
+    meta.genre = getTag(fmt->metadata, streamMeta, {"genre"});
 
-    if (auto dateStr = getDict(fmt->metadata, "date"); !dateStr.empty()) {
+    if (auto dateStr = getTag(fmt->metadata, streamMeta, {"date", "WM/Year", "year"});
+        !dateStr.empty()) {
         try {
             meta.year = std::stoi(dateStr.substr(0, 4));
         } catch (...) {
         }
     }
-    if (auto trackStr = getDict(fmt->metadata, "track"); !trackStr.empty()) {
+    if (auto trackStr = getTag(fmt->metadata, streamMeta, {"track"}); !trackStr.empty()) {
         try {
             meta.track_num = std::stoi(trackStr);
         } catch (...) {
         }
     }
-    if (auto discStr = getDict(fmt->metadata, "disc"); !discStr.empty()) {
+    if (auto discStr = getTag(fmt->metadata, streamMeta, {"disc", "discnumber"});
+        !discStr.empty()) {
         try {
             meta.disc_num = std::stoi(discStr);
         } catch (...) {
         }
     }
 
-    int audioStreamIdx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     if (audioStreamIdx >= 0) {
         AVStream* stream = fmt->streams[audioStreamIdx];
         if (stream->codecpar) {

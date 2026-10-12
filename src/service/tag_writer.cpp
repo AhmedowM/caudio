@@ -1,0 +1,210 @@
+#include "tag_writer.hpp"
+
+#include <apefile.h>
+#include <apetag.h>
+#include <asfattribute.h>
+#include <asffile.h>
+#include <asftag.h>
+#include <fileref.h>
+#include <flacfile.h>
+#include <id3v2tag.h>
+#include <mp4item.h>
+#include <mp4tag.h>
+#include <mpcfile.h>
+#include <mpegfile.h>
+#include <opusfile.h>
+#include <tag.h>
+#include <textidentificationframe.h>
+#include <tstring.h>
+#include <vorbisfile.h>
+#include <wavfile.h>
+#include <wavpackfile.h>
+#include <xiphcomment.h>
+
+#include <algorithm>
+#include <caudio/db/core.hpp>
+#include <caudio/player/decoder.hpp>
+#include <cctype>
+#include <cstdint>
+#include <db/fingerprint.hpp>
+#include <string>
+#include <system_error>
+
+namespace caudio::service::detail {
+namespace {
+
+TagLib::String toTagString(const std::string& s) {
+    return TagLib::String(s, TagLib::String::UTF8);
+}
+
+// ID3v2 text frame: always remove first, re-add only when non-empty so
+// clearing a field drops the frame (re-reads as empty).
+void setId3v2Text(TagLib::ID3v2::Tag* t2, const char* id, const std::string& v) {
+    t2->removeFrames(id);
+    if (v.empty())
+        return;
+    auto* f = new TagLib::ID3v2::TextIdentificationFrame(id, TagLib::String::UTF8);
+    f->setText(toTagString(v));
+    t2->addFrame(f);
+}
+
+void setXiphText(TagLib::Ogg::XiphComment* xc, const char* key, const std::string& v) {
+    // addField with an empty value removes the field; replace=true drops dupes.
+    xc->addField(key, toTagString(v), true);
+}
+
+void setXiphExtras(TagLib::Ogg::XiphComment* xc, const caudio::db::Track& t) {
+    setXiphText(xc, "ALBUMARTIST", t.album_artist);
+    setXiphText(xc, "DISCNUMBER", t.disc_num > 0 ? std::to_string(t.disc_num) : std::string{});
+}
+
+void setId3v2Extras(TagLib::ID3v2::Tag* t2, const caudio::db::Track& t) {
+    setId3v2Text(t2, "TPE2", t.album_artist);
+    if (t.disc_num > 0)
+        setId3v2Text(t2, "TPOS", std::to_string(t.disc_num));
+    else
+        t2->removeFrames("TPOS");
+}
+
+void setApeExtras(TagLib::APE::Tag* ape, const caudio::db::Track& t) {
+    if (t.album_artist.empty())
+        ape->removeItem("Album Artist");
+    else
+        ape->addValue("Album Artist", toTagString(t.album_artist), true);
+    if (t.disc_num > 0)
+        ape->addValue("Disc", toTagString(std::to_string(t.disc_num)), true);
+    else
+        ape->removeItem("Disc");
+}
+
+} // namespace
+
+bool canWriteFileTags(const std::filesystem::path& p) {
+    auto ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return (char)std::tolower(c); });
+    // NOTE: no .tta — TrueAudio files carry a muxer-written APE tag that
+    // FFmpeg prefers over ID3v2, and TagLib's TrueAudio class exposes no APE
+    // API, so a write would be invisible to our own reader. DB-only, like
+    // .tak/.shorten and the telephony formats.
+    return ext == ".mp3" || ext == ".flac" || ext == ".m4a" || ext == ".mp4" || ext == ".ogg" ||
+           ext == ".oga" || ext == ".opus" || ext == ".wma" || ext == ".asf" || ext == ".wav" ||
+           ext == ".aiff" || ext == ".aif" || ext == ".ape" || ext == ".mpc" || ext == ".wv";
+}
+
+caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
+                                            const caudio::db::Track& t) {
+    if (!canWriteFileTags(p)) {
+        return std::unexpected(caudio::utils::makeError(
+            caudio::utils::StatusCode::InvalidArg,
+            "tag write not supported for this format: " + p.extension().string()));
+    }
+    TagLib::FileRef f(p.generic_string().c_str());
+    if (f.isNull() || !f.file() || !f.tag()) {
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                        "taglib cannot open file for tag write"));
+    }
+    auto* tag = f.tag();
+    tag->setTitle(toTagString(t.title));
+    tag->setArtist(toTagString(t.artist));
+    tag->setAlbum(toTagString(t.album));
+    tag->setGenre(toTagString(t.genre));
+    tag->setYear(t.year < 0 ? 0 : static_cast<unsigned int>(t.year));
+    tag->setTrack(t.track_num < 0 ? 0 : static_cast<unsigned int>(t.track_num));
+
+    // Format-specific extras (album artist + disc). Dispatch on the FILE
+    // type with typed accessors: FileRef::tag() returns unions for most
+    // formats (MP3/WAV/FLAC/Ogg/ASF/APE), which dynamic_cast cannot see
+    // through. MP4/ASF/AIFF paths below use the tag cast, verified working.
+    auto* file = f.file();
+    bool id3v2Done = false;
+    if (auto* mpeg = dynamic_cast<TagLib::MPEG::File*>(file)) {
+        if (auto* t2 = mpeg->ID3v2Tag(true)) {
+            setId3v2Extras(t2, t);
+            id3v2Done = true;
+        }
+    } else if (auto* wav = dynamic_cast<TagLib::RIFF::WAV::File*>(file)) {
+        // No create accessor: relies on the generic setters above having
+        // materialized the chunk. Null-safe skip otherwise.
+        if (auto* t2 = wav->ID3v2Tag()) {
+            setId3v2Extras(t2, t);
+            id3v2Done = true;
+        }
+    } else if (auto* flac = dynamic_cast<TagLib::FLAC::File*>(file)) {
+        if (auto* xc = flac->xiphComment(true))
+            setXiphExtras(xc, t);
+    } else if (auto* vf = dynamic_cast<TagLib::Ogg::Vorbis::File*>(file)) {
+        setXiphExtras(vf->tag(), t);
+    } else if (auto* of = dynamic_cast<TagLib::Ogg::Opus::File*>(file)) {
+        setXiphExtras(of->tag(), t);
+    } else if (auto* apef = dynamic_cast<TagLib::APE::File*>(file)) {
+        if (auto* ape = apef->APETag(true))
+            setApeExtras(ape, t);
+    } else if (auto* mpc = dynamic_cast<TagLib::MPC::File*>(file)) {
+        if (auto* ape = mpc->APETag(true))
+            setApeExtras(ape, t);
+    } else if (auto* wv = dynamic_cast<TagLib::WavPack::File*>(file)) {
+        if (auto* ape = wv->APETag(true))
+            setApeExtras(ape, t);
+    }
+    if (!id3v2Done) {
+        if (auto* t2 = dynamic_cast<TagLib::ID3v2::Tag*>(tag)) {
+            setId3v2Extras(t2, t);
+            id3v2Done = true;
+        }
+    }
+    if (auto* m4 = dynamic_cast<TagLib::MP4::Tag*>(tag)) {
+        if (t.album_artist.empty())
+            m4->removeItem("aART");
+        else {
+            TagLib::StringList sl;
+            sl.append(toTagString(t.album_artist));
+            m4->setItem("aART", TagLib::MP4::Item(sl));
+        }
+        if (t.disc_num > 0)
+            m4->setItem("disk", TagLib::MP4::Item(t.disc_num, 0));
+        else
+            m4->removeItem("disk");
+    } else if (auto* asf = dynamic_cast<TagLib::ASF::Tag*>(tag)) {
+        if (t.album_artist.empty())
+            asf->removeItem("WM/AlbumArtist");
+        else
+            asf->setAttribute("WM/AlbumArtist",
+                              TagLib::ASF::Attribute(toTagString(t.album_artist)));
+        if (t.disc_num > 0)
+            asf->setAttribute("WM/PartOfSet",
+                              TagLib::ASF::Attribute(toTagString(std::to_string(t.disc_num))));
+        else
+            asf->removeItem("WM/PartOfSet");
+    }
+    if (!f.save()) {
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io,
+                                                        "taglib failed to save file tags"));
+    }
+    return {};
+}
+
+caudio::utils::Expected<caudio::db::Track> reregisterTrackRow(caudio::db::Database& db,
+                                                              caudio::db::Track t) {
+    auto fpRes = caudio::db::internal::computeFingerprint(t.path);
+    if (!fpRes)
+        return std::unexpected{fpRes.error()};
+    t.fingerprint = *fpRes;
+    std::error_code ec;
+    if (auto sz = std::filesystem::file_size(t.path, ec); !ec)
+        t.size = static_cast<int64_t>(sz);
+    if (auto mt = std::filesystem::last_write_time(t.path, ec); !ec)
+        t.mtime = static_cast<int64_t>(mt.time_since_epoch().count());
+    if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+        if (meta->duration > 0)
+            t.duration = meta->duration;
+        t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+        t.channels = static_cast<uint32_t>(meta->channels);
+        t.bitrate = meta->bitrate;
+    }
+    if (auto upd = db.updateTrack(t); !upd)
+        return std::unexpected{upd.error()};
+    return t;
+}
+
+} // namespace caudio::service::detail

@@ -34,6 +34,7 @@
 
 #include "service_audio.hpp"
 #include "service_status.hpp"
+#include "tag_writer.hpp"
 
 namespace caudio::service {
 
@@ -456,9 +457,45 @@ Service::handle(const caudio::ipc::TagEdit& cmd) {
                                                             "invalid disc_number: " + cmd.value)};
         }
     }
-    auto upd = db_->updateTrack(t);
-    if (!upd)
-        return std::unexpected{upd.error()};
+    // File-first-then-rescan: the audio file is the source of truth, so the
+    // DB row can never diverge from it silently.
+    if (!detail::canWriteFileTags(t.path)) {
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::InvalidArg,
+            "tag write not supported for this format: " + std::filesystem::path(t.path).extension().string())};
+    }
+    // A loaded (playing or paused) track holds the file open through the
+    // decoder: suspend to release the handles, write + re-register, reopen.
+    auto& eng = *engine_;
+    bool loaded = (eng.state() == caudio::engine::PlaybackState::Playing ||
+                   eng.state() == caudio::engine::PlaybackState::Paused) &&
+                  eng.currentTrackId() == t.id;
+    double resumePos = 0.0;
+    bool wasPaused = false;
+    if (loaded) {
+        resumePos = eng.position();
+        wasPaused = (eng.state() == caudio::engine::PlaybackState::Paused);
+        if (auto s = eng.suspendCurrentTrack(); !s)
+            return std::unexpected{s.error()};
+    }
+    auto wr = detail::writeFileTags(t.path, t);
+    if (!wr) {
+        // Reopen either way so playback is never left suspended; the DB row
+        // is untouched and still matches the (unmodified) file.
+        if (loaded)
+            (void)eng.resumeAfterTagWrite(t, resumePos, wasPaused);
+        return std::unexpected{wr.error()};
+    }
+    auto reg = detail::reregisterTrackRow(*db_, t);
+    if (!reg) {
+        if (loaded)
+            (void)eng.resumeAfterTagWrite(t, resumePos, wasPaused);
+        return std::unexpected{reg.error()};
+    }
+    if (loaded) {
+        if (auto r = eng.resumeAfterTagWrite(*reg, resumePos, wasPaused); !r)
+            return std::unexpected{r.error()};
+    }
     return Result{Empty{}};
 }
 

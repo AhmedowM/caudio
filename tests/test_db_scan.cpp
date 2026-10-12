@@ -188,13 +188,20 @@ TEST_CASE("scanDirectory filters by audio extensions case-insensitively", "[db_s
     std::ofstream(dir / "h.OGG", std::ios::binary) << "audio";
     std::ofstream(dir / "j.OPUS", std::ios::binary) << "audio";
     std::ofstream(dir / "k.WMA", std::ios::binary) << "audio";
+    std::ofstream(dir / "m.MP4", std::ios::binary) << "audio";
+    std::ofstream(dir / "n.ASF", std::ios::binary) << "audio";
+    std::ofstream(dir / "o.AIFF", std::ios::binary) << "audio";
+    std::ofstream(dir / "p.APE", std::ios::binary) << "audio";
+    std::ofstream(dir / "q.MPC", std::ios::binary) << "audio";
+    std::ofstream(dir / "r.WV", std::ios::binary) << "audio";
+    std::ofstream(dir / "s.OGA", std::ios::binary) << "audio";
     std::ofstream(dir / "i.txt", std::ios::binary) << "not audio";
     std::ofstream(dir / "l", std::ios::binary) << "no ext";
 
     auto tracks = scanDirectory(dir, ScanMode::Sampled);
     REQUIRE(tracks.has_value());
-    // Only 10 audio files should be found
-    REQUIRE(tracks->size() == 10);
+    // Only 17 audio files should be found
+    REQUIRE(tracks->size() == 17);
 
     std::filesystem::remove_all(dir, ec);
 }
