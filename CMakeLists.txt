@@ -269,46 +269,46 @@ if(CAUDIO_BUILD_CLI)
 endif()
 
 # DRY helpers + component split (include preserves single-BMI build)
-# TagLib is private to the service tag-write path (file tag editing): prefer
-# a system package first, fetch pinned source as fallback -- same lazy
-# pattern as CLI11/Catch2. Headers never enter installed headers.
-find_package(TagLib 2 QUIET)
-if(NOT TagLib_FOUND)
-  FetchContent_Declare(
-    TagLib
-    GIT_REPOSITORY https://github.com/taglib/taglib.git
-    GIT_TAG v2.3.2
-    GIT_SHALLOW TRUE
-  )
+# TagLib is vendored like sqlite3/blake3 (always fetched, never system):
+# private file-tag implementation detail, installed as caudio::tag next to
+# them so install(EXPORT) resolves. Headers never enter installed headers.
+FetchContent_Declare(
+  TagLib
+  GIT_REPOSITORY https://github.com/taglib/taglib.git
+  GIT_TAG v2.3.2
+  GIT_SHALLOW TRUE
+)
   set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
   set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-  set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE CACHE BOOL "" FORCE)
-  FetchContent_MakeAvailable(TagLib)
-  message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
-  if(NOT MSVC)
-    # Vendored-style silence: TagLib's own headers trip -Wall -Wextra
-    # (e.g. -Wmicrosoft-unqualified-friend); same -w treatment as blake3.
-    # MSVC builds keep their (quiet) defaults.
-    target_compile_options(tag PRIVATE -w)
-  endif()
-  # TagLib's `tag` target exports install includes only; consumers use flat
-  # per-subdir includes (`#include <apetag.h>`). Derive every header dir
-  # from the pinned source for the fetched case (system packages export
-  # their own includes).
-  file(GLOB_RECURSE _taglib_hdrs "${taglib_SOURCE_DIR}/taglib/*.h")
-  set(CAUDIO_TAGLIB_BUILD_INCLUDES "${taglib_SOURCE_DIR}" "${taglib_BINARY_DIR}")
-  foreach(_h IN LISTS _taglib_hdrs)
-    get_filename_component(_d "${_h}" DIRECTORY)
-    list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
-  endforeach()
-  list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
-else()
-  message(STATUS "TagLib found (system): file tag writing enabled")
+  set(BUILD_BINDINGS OFF CACHE BOOL "" FORCE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE CACHE BOOL "" FORCE)
+# No zlib: TagLib would otherwise pick up platform SDK headers (macOS),
+# poisoning brew-libc++ resolution under our -nostdinc++ toolchain, and
+# silently vary by host. Compressed ID3v2 frames are rare; builds without
+# them read such frames as absent. Deterministic everywhere.
+set(WITH_ZLIB OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(TagLib)
+message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
+# Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
+# property so install() ships the archive only, without warnings.
+set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
+if(NOT MSVC)
+  # Vendored-style silence: TagLib's own headers trip -Wall -Wextra
+  # (e.g. -Wmicrosoft-unqualified-friend); same -w treatment as blake3.
+  # MSVC builds keep their (quiet) defaults.
+  target_compile_options(tag PRIVATE -w)
 endif()
-if(NOT TARGET TagLib::tag AND TARGET tag)
-  add_library(TagLib::tag ALIAS tag)
-endif()
+# TagLib's `tag` target exports install includes only; consumers use flat
+# per-subdir includes (`#include <apetag.h>`). Derive every header dir
+# from the pinned source.
+file(GLOB_RECURSE _taglib_hdrs "${taglib_SOURCE_DIR}/taglib/*.h")
+set(CAUDIO_TAGLIB_BUILD_INCLUDES "${taglib_SOURCE_DIR}" "${taglib_BINARY_DIR}")
+foreach(_h IN LISTS _taglib_hdrs)
+  get_filename_component(_d "${_h}" DIRECTORY)
+  list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
+endforeach()
+list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
 include(cmake/components/utils.cmake)
 include(cmake/components/player.cmake)
@@ -381,6 +381,7 @@ set(CAUDIO_INSTALL_LIBS
   app
   sqlite3
   blake3
+  tag
 )
 if(CAUDIO_BUILD_SHARED)
   list(APPEND CAUDIO_INSTALL_LIBS
@@ -578,6 +579,11 @@ endif()
 set(CPACK_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+# Only our components ship: third-party FetchContent install rules carry no
+# COMPONENT and would otherwise land in "Unspecified" archives (TagLib
+# headers, .pc/config scripts). Our own tag.lib still ships via the dev
+# component (CAUDIO_INSTALL_LIBS); only their loose files are excluded.
+set(CPACK_COMPONENTS_ALL runtime dev)
 set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")

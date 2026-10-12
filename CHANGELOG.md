@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-10-12
+
+### Added
+- File tag sync: `tag edit` retags audio in place via TagLib 2.3.2
+  (fetched lazily like CLI11/Catch2, linked privately into `service`) and
+  re-registers the row under a stable id with fresh fingerprint; the loaded
+  track suspends around the write and resumes from its position with paused
+  state and history mark preserved; 15-format writable set, the rest rejected
+  with a clear error
+- `Engine::suspendCurrentTrack` / `resumeAfterTagWrite` (atomic close/reopen
+  around out-of-band file modification; no-op if the user moved on)
+- `test_tag_write` round-trip suite (9 formats), file-sync CLI golden,
+  aiff/tta/wv fixtures, `tta` decode guard
+
+### Changed
+- Scanner extension set widened to the writable formats
+  (.mp4/.asf/.aiff/.aif/.ape/.mpc/.wv/.oga)
+- `extractMetadata` falls back to audio-stream metadata and format key
+  aliases (`albumartist`, `discnumber`, `WM/Year`, …)
+- Man/README `tag edit` notes describe file-first behavior
+
+### Fixed
+- Ogg/Opus tags were invisible to scan (stream-level dicts never read)
+- TagLib fetch/build warnings silenced (`BUILD_TESTING` off, CppUnit
+  disabled, `-w` on the vendored-style target)
+
 ## [v1.2.0] - 2026-10-12
 
 ### Added
