@@ -551,8 +551,11 @@ int Shell::run(int argc, char** argv) {
     bool historyClearJson = false;
     historyClear->add_flag("--json", historyClearJson, "JSON output");
     std::string previewFile;
+    bool previewKeepPlaying = false;
     auto* previewCmd = cli_->add_subcommand("preview", "Preview file (ephemeral)");
     previewCmd->add_option("file", previewFile, "File path")->required();
+    previewCmd->add_flag("--keep-playing", previewKeepPlaying,
+                         "Do not pause a playing daemon while previewing");
     previewCmd->group("");
     auto* cfgCmd = cli_->add_subcommand("config", "Config operations");
     std::string cfgGetKey;
@@ -966,8 +969,32 @@ int Shell::run(int argc, char** argv) {
         std::cout << historyCmd->help() << "\n";
         return 0;
     }
-    if (previewCmd->parsed())
-        return detail::render(app_.previewFile(previewFile), false);
+    if (previewCmd->parsed()) {
+        // Transient-focus duck: pause a playing daemon while auditioning,
+        // resume afterwards. Best-effort and silent: daemon-less runs and
+        // mid-preview failures just preview. Only resumes if still paused
+        // (the user may have driven the daemon from elsewhere meanwhile).
+        auto daemonState = [this]() -> std::optional<caudio::engine::PlaybackState> {
+            caudio::client::Client probe{config_.dbPath, config_.socketPath};
+            auto pres = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
+                                   std::chrono::milliseconds{2000});
+            if (!pres)
+                return std::nullopt;
+            if (auto* st = std::get_if<caudio::ipc::Status>(&*pres))
+                return st->state;
+            return std::nullopt;
+        };
+        bool ducked = false;
+        if (!previewKeepPlaying) {
+            auto state = daemonState();
+            if (state == caudio::engine::PlaybackState::Playing)
+                ducked = app_.pause().has_value();
+        }
+        auto rc = detail::render(app_.previewFile(previewFile), false);
+        if (ducked && daemonState() == caudio::engine::PlaybackState::Paused)
+            (void)app_.resume();
+        return rc;
+    }
     if (cfgCmd->parsed()) {
         if (cfgGet->parsed())
             return detail::render(app_.configGet(cfgGetKey), cfgGetJson);
