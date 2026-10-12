@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] - 2026-10-12
+
+### Added
+- `preview --keep-playing`: opt out of pausing a playing daemon while
+  auditioning a file
+
+### Changed
+- `preview` now transient-ducks the daemon (pause while auditioning, resume
+  afterwards if still paused; silent and best-effort, daemon-less runs
+  unchanged)
+- `OutputFormatter::print` dispatches via `std::visit` overloads (one case
+  per function; shared track-detail block); exhaustive visit fails at
+  compile time on new `Result` alternatives instead of printing "Unknown"
+
 ## [v1.1.0] - 2026-10-11
 
 ### Added
