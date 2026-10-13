@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.1] - 2026-10-13
+
+### Fixed
+- Log thread tag trimmed to 6 hex digits (was full 64-bit hash)
+
 ### Added
 - Live log-level control: `config set logLevel` accepts names or 0-4,
   rejects garbage without storing, canonicalizes to int, and applies to
