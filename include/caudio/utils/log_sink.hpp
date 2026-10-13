@@ -1,0 +1,86 @@
+#pragma once
+
+/**
+ * @file log_sink.hpp
+ * @brief Bounded rotating file sink for Logger (daemon log output).
+ * @ingroup caudio_utils
+ * @details `FileLogSink` owns one log file plus a bounded set of rotated
+ * generations (`path`, `path.1`, …). Rotation is size-triggered: when the
+ * next line would exceed `maxBytes`, generations shift down (oldest
+ * dropped) and a fresh current file starts. Total disk use is bounded by
+ * `generations * maxBytes`, which matters because the daemon is long-lived.
+ *
+ * Line format: `[2026-10-13T12:34:56Z] [INFO ] [t:1a2b3c] message` —
+ * UTC timestamp, fixed-width level, hashed thread id. Use through
+ * `Logger`: `Logger(sink->callback(), level)`. The callback is thread-safe
+ * (own mutex; Logger already invokes outside its lock) and never throws:
+ * I/O failures degrade to dropped lines so logging can never crash the
+ * daemon. Open failure returns nullptr — the caller falls back to silence.
+ *
+ * Thread safety: thread-safe; all state under mutex_.
+ */
+
+#include <caudio/utils/log.hpp>
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <memory>
+#include <mutex>
+#include <string>
+
+namespace caudio::utils {
+
+/** @brief Options for FileLogSink::open. @ingroup caudio_utils */
+struct FileSinkOptions {
+    std::size_t maxBytes{1024 * 1024}; ///< Rotate past 1 MiB of current file.
+    int generations{3};                ///< Total files kept (current + rotated).
+    bool teeStderr{false};             ///< Also echo every line to stderr.
+};
+
+/**
+ * @brief Rotating file sink behind a Logger::Callback.
+ * @ingroup caudio_utils
+ * @details Create with open() (shared ownership — the Logger callback holds
+ * a copy, so the sink outlives any ordering concerns). Not copyable.
+ */
+class FileLogSink : public std::enable_shared_from_this<FileLogSink> {
+  public:
+    /**
+     * @brief Opens (or creates) the log file for append.
+     * @param path Log file path; parent must exist (caller creates it).
+     * @param opts Rotation/tee options.
+     * @return Sink, or nullptr when the file cannot be opened.
+     * @details When the existing file already exceeds maxBytes it is
+     * rotated immediately, so a stale oversized log never persists.
+     */
+    static std::shared_ptr<FileLogSink> open(const std::filesystem::path& path,
+                                             const FileSinkOptions& opts = {});
+
+    FileLogSink(const FileLogSink&) = delete;
+    FileLogSink& operator=(const FileLogSink&) = delete;
+
+    /** @brief Logger-compatible callback writing formatted lines. */
+    Logger::Callback callback();
+
+    /** @brief True when the file is open. */
+    bool valid() const noexcept;
+
+    /** @brief Flushes the file (also done per line). */
+    void flush();
+
+  private:
+    FileLogSink() = default;
+    void writeLine(LogLevel lvl, std::string_view msg);
+    void rotate();
+    static std::string formatLine(LogLevel lvl, std::string_view msg);
+    std::filesystem::path indexedPath(int i) const;
+
+    mutable std::mutex mutex_;
+    std::ofstream out_;
+    std::filesystem::path path_;
+    FileSinkOptions opts_;
+    std::size_t currentBytes_{0};
+    bool valid_{false};
+};
+
+} // namespace caudio::utils

@@ -4,6 +4,7 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   modules/caudio/utils/result.cppm
   modules/caudio/utils/error.cppm
   modules/caudio/utils/log.cppm
+  modules/caudio/utils/log_sink.cppm
   modules/caudio/utils/json.cppm
   modules/caudio/utils/math.cppm
   modules/caudio/utils/ring.cppm
@@ -19,6 +20,7 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/error.cpp
   src/utils/json.cpp
   src/utils/log.cpp
+  src/utils/log_sink.cpp
   src/utils/thread.cpp
 )
 caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} MODULE_SOURCES ${CAUDIO_UTILS_MODULE_SOURCES} DEPS Threads::Threads)

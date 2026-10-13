@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Daemon log file: `<db-dir>/caudio.log` with timestamp/level/thread
+  formatting, 1 MB × 3-generation rotation, startup/shutdown lifecycle
+  lines; `--foreground` (`start --foreground`) also echoes to stderr via
+  the new `ServiceConfig::logToStderr`
+
 ### Fixed
 - Log levels unified: `LogLevel` gains `Trace` so the enum matches the CLI
   `--log-level trace|debug|info|warn|error` names 1:1 (trace=0 … error=4);

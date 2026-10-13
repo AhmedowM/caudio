@@ -259,6 +259,25 @@ caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem
     }
 }
 
+caudio::utils::Expected<std::filesystem::path> logPathFor(const std::filesystem::path& dbPath) {
+    try {
+        auto parent = dbPath.parent_path();
+        if (!parent.empty())
+            return parent / "caudio.log";
+        std::error_code ec;
+        auto tmp = std::filesystem::temp_directory_path(ec);
+        if (ec)
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::Io, "logPathFor failed")};
+        return tmp / "caudio.log";
+    } catch (const std::exception& e) {
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, e.what())};
+    } catch (...) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Io, "logPathFor failed")};
+    }
+}
+
 caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
                                                   std::string_view key) {
     std::error_code ec;

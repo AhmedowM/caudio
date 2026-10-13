@@ -401,6 +401,11 @@ Path derived from DB path via \fBcaudio::config::pidPathFor\fR.
 /dev/shm/caudio-<hash> (POSIX) or
 named shared memory (Windows)
 SHM status block (\fBAtomicShmStatus\fR), published on dispatch.
+.TP
+.I
+<db-dir>/caudio.log
+Daemon log file (next to the database). Level via \fB\-\-log\-level\fR or
+config; rotated at 1 MB keeping \fBcaudio.log.1\fR and \fBcaudio.log.2\fR.
 .SH EXIT STATUS
 .TP
 .B 0

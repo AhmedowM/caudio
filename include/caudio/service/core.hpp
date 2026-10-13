@@ -46,6 +46,8 @@ struct ServiceConfig {
     std::filesystem::path configPath{};
     /** @brief Log level (0=trace, 1=debug, 2=info, 3=warn, 4=error). Default: 2 (info). */
     int logLevel{2};
+    /** @brief Echo log lines to stderr (foreground mode). Default: false. */
+    bool logToStderr{false};
 };
 
 } // namespace caudio::service

@@ -272,6 +272,7 @@ AppResult App::startDaemon(bool foreground) {
     scfg.socketPath = config_.socketPath;
     scfg.configPath = config_.configPath;
     scfg.logLevel = config_.logLevel;
+    scfg.logToStderr = foreground;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) {

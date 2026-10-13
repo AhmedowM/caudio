@@ -1,7 +1,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/utils/log.hpp>
+#include <caudio/utils/log_sink.hpp>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 namespace caudio::utils::test {
@@ -155,6 +159,57 @@ bool log_trace_filter() {
     return true;
 }
 
+bool log_sink_rotation() {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    auto dir = fs::temp_directory_path(ec) / "caudio-logtest";
+    if (ec)
+        return false;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir, ec);
+    if (ec)
+        return false;
+    FileSinkOptions opts;
+    opts.maxBytes = 128;
+    opts.generations = 3;
+    auto sink = FileLogSink::open(dir / "caudio.log", opts);
+    if (!sink || !sink->valid())
+        return false;
+    Logger logger(sink->callback());
+    for (int i = 0; i < 40; ++i)
+        logger.info("line number {} padding padding", i);
+    // Bounded: current + 2 generations exist, the 4th never does.
+    if (!fs::exists(dir / "caudio.log", ec))
+        return false;
+    if (!fs::exists(dir / "caudio.log.1", ec))
+        return false;
+    if (!fs::exists(dir / "caudio.log.2", ec))
+        return false;
+    if (fs::exists(dir / "caudio.log.3", ec))
+        return false;
+    // Format: level tag plus the message text.
+    std::ifstream in(dir / "caudio.log");
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    if (content.find("[INFO ]") == std::string::npos)
+        return false;
+    if (content.find("line number") == std::string::npos)
+        return false;
+    fs::remove_all(dir, ec);
+    return true;
+}
+
+bool log_sink_open_failure() {
+    // Directories are not log files: open fails gracefully, no crash.
+    std::error_code ec;
+    auto dir = std::filesystem::temp_directory_path(ec) / "caudio-logtest-dir";
+    if (ec)
+        return false;
+    std::filesystem::create_directories(dir, ec);
+    auto sink = FileLogSink::open(dir);
+    std::filesystem::remove_all(dir, ec);
+    return sink == nullptr;
+}
+
 } // namespace caudio::utils::test
 
 using namespace caudio::utils::test;
@@ -189,4 +244,12 @@ TEST_CASE("Logger parseLogLevel mapping", "[utils][log]") {
 
 TEST_CASE("Logger trace filtered by default", "[utils][log]") {
     REQUIRE(log_trace_filter());
+}
+
+TEST_CASE("FileLogSink rotation stays bounded", "[utils][log]") {
+    REQUIRE(log_sink_rotation());
+}
+
+TEST_CASE("FileLogSink open failure is silent", "[utils][log]") {
+    REQUIRE(log_sink_open_failure());
 }

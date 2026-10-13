@@ -8,6 +8,7 @@
 #include <atomic>
 #include <caudio/db/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/core.hpp>
@@ -15,7 +16,9 @@
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
+#include <caudio/utils/log_sink.hpp>
 #include <caudio/utils/result.hpp>
+#include <caudio/version.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -141,16 +144,24 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{listenRes.error()};
     }
 
+    // Daemon log: rotating file next to the db (see logPathFor). A log that
+    // cannot be opened degrades to silence — logging must never block startup.
+    caudio::utils::Logger::Callback logCb =
+        [](caudio::utils::LogLevel, std::string_view) {};
+    if (auto lp = caudio::config::logPathFor(cfg.dbPath)) {
+        caudio::utils::FileSinkOptions sinkOpts;
+        sinkOpts.teeStderr = cfg.logToStderr;
+        if (auto sink = caudio::utils::FileLogSink::open(*lp, sinkOpts))
+            logCb = sink->callback();
+    }
     auto loggerPtr = std::make_unique<caudio::utils::Logger>(
-        [](caudio::utils::LogLevel lvl, std::string_view msg) {
-            (void)lvl;
-            (void)msg;
-        },
+        std::move(logCb),
         static_cast<caudio::utils::LogLevel>(std::clamp(
             cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
             std::to_underlying(caudio::utils::LogLevel::Error))));
 
     // Create PID file with current PID
+    std::string pidStr;
     try {
         auto parent = pidPath.parent_path();
         if (!parent.empty()) {
@@ -159,11 +170,11 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         std::ofstream pf(pidPath);
         if (pf) {
 #ifdef _WIN32
-            pf << ::_getpid();
+            pidStr = std::to_string(::_getpid());
 #else
-            pf << ::getpid();
+            pidStr = std::to_string(::getpid());
 #endif
-            pf << "\n";
+            pf << pidStr << "\n";
         }
     } catch (...) {
     }
@@ -182,6 +193,8 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     auto svc = std::unique_ptr<Service>(
         new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath,
                     spStr, lockFd, std::move(shmHandle), shmName));
+    svc->logger_->info("daemon started version={} pid={} db={} socket={}",
+                       caudio::version::version(), pidStr, cfg.dbPath.generic_string(), spStr);
     return svc;
 }
 
@@ -208,6 +221,8 @@ caudio::utils::Expected<void> Service::run(std::stop_token st) {
     while (!st.stop_requested() && !shutdownRequested_.load(std::memory_order_acquire)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+    if (logger_)
+        logger_->info("daemon stopping");
     // Tear down here (not only in the destructor): pid/lock/socket release
     // must be sequenced before run() returns so a racing starter observes a
     // truthful state. shutdown() is idempotent; the destructor re-entry is
