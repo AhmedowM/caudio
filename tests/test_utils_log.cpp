@@ -192,6 +192,8 @@ bool log_sink_rotation() {
     std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     if (content.find("[INFO ]") == std::string::npos)
         return false;
+    if (content.find("[t:") == std::string::npos)
+        return false;
     if (content.find("line number") == std::string::npos)
         return false;
     fs::remove_all(dir, ec);

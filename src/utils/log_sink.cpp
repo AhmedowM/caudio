@@ -71,8 +71,10 @@ void FileLogSink::flush() {
 
 std::string FileLogSink::formatLine(LogLevel lvl, std::string_view msg) {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
-    const auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    return std::format("[{:%FT%TZ}] [{}] [t:{:x}] {}\n", now, levelTag(lvl), tid, msg);
+    // Low 24 bits distinguish the daemon's handful of threads; the full
+    // 64-bit hash is visual noise in every line.
+    const auto tid = std::hash<std::thread::id>{}(std::this_thread::get_id()) & 0xffffffu;
+    return std::format("[{:%FT%TZ}] [{}] [t:{:06x}] {}\n", now, levelTag(lvl), tid, msg);
 }
 
 void FileLogSink::writeLine(LogLevel lvl, std::string_view msg) {
