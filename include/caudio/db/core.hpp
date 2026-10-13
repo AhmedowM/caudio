@@ -191,6 +191,15 @@ class Database final {
      */
     sqlite3* handleLocked() const noexcept;
     /**
+     * @brief Returns the non-owning logger from DbOpts (may be null).
+     * @ingroup caudio_db
+     * @details For free functions (scan) that act on the database but take
+     * no logger of their own. Never null-dereference; check before use.
+     */
+    caudio::utils::Logger* logger() const noexcept {
+        return logger_;
+    }
+    /**
      * @brief Flushes the background WriterThread queue.
      * @ingroup caudio_db
      * @return Success or Error with StatusCode::Busy on 200 ms timeout.

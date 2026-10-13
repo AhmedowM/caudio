@@ -158,8 +158,7 @@ Engine::ExpectedVoid Engine::play(int64_t queueId) {
     }
     // Stopped -> start new track via cursor (not dequeue)
     if (!tryLockQueueFor(kQueueLockWait))
-        return std::unexpected(
-            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+        return queueBusy("play", "queue busy");
     queue_.queue_id = queueId;
     caudio::db::Track t;
     auto r = queueNextLocked(t);
@@ -271,8 +270,7 @@ Engine::ExpectedVoid Engine::suspendCurrentTrack() {
                                                         "no track"));
     }
     if (!tryLockQueueFor(kQueueLockWait)) {
-        return std::unexpected(
-            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+        return queueBusy("suspend", "queue busy");
     }
     // Mirror stop() teardown but keep cursor, current track, and history
     // mark: the file handles must go so TagLib can rewrite the file, while
@@ -295,10 +293,9 @@ Engine::ExpectedVoid Engine::suspendCurrentTrack() {
 }
 
 Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
-                                                 bool wasPaused) {
+                                                  bool wasPaused) {
     if (!tryLockQueueFor(kQueueLockWait)) {
-        return std::unexpected(
-            caudio::utils::makeError(caudio::utils::StatusCode::Busy, "queue busy"));
+        return queueBusy("resume", "queue busy");
     }
     // The user may have moved on while suspended (next/prev/play from
     // another client): the tag/db update already landed, so there is
@@ -452,7 +449,7 @@ Engine::ExpectedVoid Engine::setShuffle(bool on) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueue())
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        return queueBusy("setShuffle", "busy");
     auto r = setShuffleLocked(on);
     unlockQueue();
     if (!r)
@@ -470,7 +467,7 @@ Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
     if (!tryLockQueue())
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        return queueBusy("setRepeat", "busy");
     queue_.repeat = m;
     state_.repeatMode = m;
     state_.cursorPos = (int64_t)queue_.cursor;
@@ -494,7 +491,7 @@ Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueue())
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        return queueBusy("switchQueue", "busy");
     // validate queue exists (holds queueMutex_ -> dbMutex_ shared)
     {
         auto q = db_->getQueue(qid);
@@ -573,8 +570,13 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd, int lockWaitMs) {
     // next() passes the wait budget so colliding skips execute.
     bool locked = lockWaitMs > 0 ? tryLockQueueFor(std::chrono::milliseconds(lockWaitMs))
                                   : tryLockQueue();
-    if (!locked)
+    if (!locked) {
+        // Monitor autoNext fail-fast is routine (next tick retries) — stay
+        // silent; only user-wait collisions are diagnostic.
+        if (lockWaitMs > 0)
+            return queueBusy("next", "busy");
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+    }
     if (stopAtEnd && queue_.repeat == RepeatMode::Off) {
         // Natural track end: halt instead of wrapping. The cursor stays parked
         // past the end, so a later play wraps to the head. Manual next() still
@@ -615,7 +617,7 @@ Engine::ExpectedVoid Engine::prev() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueueFor(kQueueLockWait))
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
+        return queueBusy("prev", "busy");
     caudio::db::Track t;
     auto r = queuePrevLocked(t);
     if (!r) {
@@ -719,6 +721,14 @@ bool Engine::tryLockQueueFor(std::chrono::milliseconds wait) noexcept {
 
 void Engine::unlockQueue() noexcept {
     queueMutex_.unlock();
+}
+
+std::unexpected<caudio::utils::Error> Engine::queueBusy(std::string_view op,
+                                                        std::string_view msg) const {
+    if (cfg_.logger)
+        cfg_.logger->debug("queue busy op={}", op);
+    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Busy,
+                                                    std::string(msg))};
 }
 
 double Engine::currentPositionLocked() const noexcept {
@@ -1289,10 +1299,14 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
         if (!cfg_.allowSimulatedPlayback) {
             const std::string msg =
                 lastErr_.empty() ? "track file not playable: " + path : lastErr_;
+            if (cfg_.logger)
+                cfg_.logger->warn("track not playable file={} err={}", path, msg);
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::StatusCode::NotFound, msg)};
         }
         // timer-only fallback to track metadata duration (no audio output)
+        if (cfg_.logger)
+            cfg_.logger->warn("simulated playback (no audio) file={}", path);
         duration_ = t.duration > 0 ? t.duration : 1.0;
         // no ring/output needed for simulated playback
     } else if (!output_) {
@@ -1303,6 +1317,8 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
             reader_.reset();
             ring_.reset();
             const std::string msg = lastErr_.empty() ? "audio device unavailable" : lastErr_;
+            if (cfg_.logger)
+                cfg_.logger->warn("audio device unavailable file={} err={}", path, msg);
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::StatusCode::Device, msg)};
         }
@@ -1329,6 +1345,8 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
     pushEvent(ev);
     decodeCv_.notify_all();
     monCv_.notify_all();
+    if (cfg_.logger)
+        cfg_.logger->debug("playing track={} file={}", t.id, path);
     return {};
 }
 

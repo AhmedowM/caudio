@@ -4,6 +4,7 @@
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
@@ -52,9 +53,14 @@ Player::ExpectedVoid Player::open(std::string_view path) {
     if (!readerResult) {
         lastError_ = readerResult.error().message;
         state_.store(State::Error, std::memory_order_release);
+        if (logger_)
+            logger_->warn("player open failed file={} err={}", path, lastError_);
         return std::unexpected(readerResult.error());
     }
-    return openReader(std::move(readerResult.value()));
+    auto rRes = openReader(std::move(readerResult.value()));
+    if (!rRes && logger_)
+        logger_->warn("player open failed file={} err={}", path, lastError_);
+    return rRes;
 }
 
 Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
@@ -107,6 +113,8 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     if (!outResult) {
         lastError_ = outResult.error().message;
         state_.store(State::Error, std::memory_order_release);
+        if (logger_)
+            logger_->warn("audio output create failed: {}", lastError_);
         return std::unexpected(outResult.error());
     }
 

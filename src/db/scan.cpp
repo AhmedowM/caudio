@@ -8,6 +8,7 @@
 #include <caudio/player/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/generator.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstddef>
@@ -111,7 +112,13 @@ scanLibrary(Database& db, int64_t libraryId,
     if (!std::filesystem::exists(root, ec))
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "path not found")};
+    if (auto* lg = db.logger())
+        lg->info("scan started root={} mode={}", libPath,
+                 mode == ScanMode::Sampled ? "sampled" : "full");
     int64_t scanned = 0;
+    int64_t added = 0;
+    int64_t updated = 0;
+    int64_t failed = 0;
     constexpr size_t kBatchSize = 500;
     size_t batchPending = 0;
     std::unique_lock<std::shared_mutex> batchLock;
@@ -193,7 +200,13 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.library_id = libraryId;
             upd.deleted_at = 0;
             bool hasMeta = false;
-            if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
+            auto meta = caudio::player::extractMetadata(trk.path);
+            if (!meta) {
+                if (auto* lg = db.logger())
+                    lg->debug("scan metadata failed file={} err={}", trk.path,
+                              meta.error().message);
+            }
+            if (meta) {
                 if (!meta->title.empty()) {
                     upd.title = std::move(meta->title);
                     hasMeta = true;
@@ -258,7 +271,10 @@ scanLibrary(Database& db, int64_t libraryId,
                 upd.channels = 0;
                 upd.bitrate = 0;
             }
-            (void)db.updateTrackLocked(upd);
+            if (db.updateTrackLocked(upd))
+                updated++;
+            else
+                failed++;
             if (existingPath && existingPath->id != byFp->id) {
                 if (existingPath->fingerprint == trk.fingerprint)
                     (void)db.deleteTrackLocked(existingPath->id);
@@ -274,7 +290,13 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.library_id = libraryId;
             upd.deleted_at = 0;
             bool hasMeta = false;
-            if (auto meta = caudio::player::extractMetadata(trk.path); meta) {
+            auto meta = caudio::player::extractMetadata(trk.path);
+            if (!meta) {
+                if (auto* lg = db.logger())
+                    lg->debug("scan metadata failed file={} err={}", trk.path,
+                              meta.error().message);
+            }
+            if (meta) {
                 if (!meta->title.empty()) {
                     upd.title = std::move(meta->title);
                     hasMeta = true;
@@ -343,10 +365,16 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.play_count = keepPlay;
             upd.rating = keepRating;
             upd.date_added = keepAdded;
-            (void)db.updateTrackLocked(upd);
+            if (db.updateTrackLocked(upd))
+                updated++;
+            else
+                failed++;
         } else {
             trk.library_id = libraryId;
-            (void)db.insertTrackLocked(trk);
+            if (db.insertTrackLocked(trk))
+                added++;
+            else
+                failed++;
         }
         scanned++;
         batchPending++;
@@ -367,6 +395,9 @@ scanLibrary(Database& db, int64_t libraryId,
             return std::unexpected{c.error()};
         }
     }
+    if (auto* lg = db.logger())
+        lg->info("scan finished root={} scanned={} added={} updated={} failed={}", libPath,
+                 scanned, added, updated, failed);
     auto libs2 = db.libraryList();
     if (libs2) {
         for (auto& l : *libs2)

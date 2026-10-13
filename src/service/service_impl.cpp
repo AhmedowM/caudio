@@ -10,6 +10,7 @@
 #include <caudio/engine/types.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
@@ -190,7 +191,9 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
     auto shmRes = caudio::service::createShmStatus(shmName, true);
     if (!shmRes) {
-        // Non-fatal: log but continue without shm
+        // Non-fatal: continue without shm (clients fall back to IPC status).
+        loggerPtr->warn("shm status unavailable: {} (falling back to IPC status)",
+                        shmRes.error().message);
     }
     std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle;
     if (shmRes)
@@ -351,6 +354,15 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::statusResult()
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::dispatch(const caudio::ipc::Command& cmd) {
+    // Per-command trace at debug: what the daemon was asked to do. Guarded
+    // by enabled() (dump() walks the whole command) and try/catch (a log
+    // line must never break dispatch on adversarial input).
+    if (logger_ && logger_->enabled(caudio::utils::LogLevel::Debug)) {
+        try {
+            logger_->debug("dispatch {}", caudio::ipc::toJson(cmd).dump());
+        } catch (...) {
+        }
+    }
     return std::visit(DispatchVisitor{this}, cmd);
 }
 

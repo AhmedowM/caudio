@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   daemon passes its file logger down so db open, engine create/open,
   decoder open and audio output open emit; new `Logger::enabled()` fast
   check for skipping expensive debug arguments
+- Daemon message catalog: unplayable-track and device failures warn with
+  file + error, track starts log at debug, queue-lock contention logs the
+  operation at debug (monitor autoNext stays silent), every dispatched
+  command logs its JSON at debug, scans report start/finish counts with
+  per-file metadata failures at debug, tag edits log at info, SHM loss
+  warns instead of failing silently
 
 ### Fixed
 - Log levels unified: `LogLevel` gains `Trace` so the enum matches the CLI

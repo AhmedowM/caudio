@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/core.hpp>
 #include <caudio/db/scan.hpp>
+#include <caudio/utils/log.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <cstddef>
@@ -8,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <string>
+#include <string_view>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -303,6 +306,43 @@ TEST_CASE("scanLibrary preserves play_count", "[db_scan]") {
     REQUIRE(t2->rating == 5);
     // title should have been cleared (metadata staleness) but play_count preserved
     REQUIRE(t2->title.empty());
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
+TEST_CASE("scanLibrary reports start/finish summary", "[db_scan]") {
+    auto dir = tempDirPath("scanlib_log");
+    // empty file: fingerprint works, metadata open fails, insert still succeeds
+    {
+        std::ofstream f(dir / "z.mp3", std::ios::binary);
+    }
+    std::vector<std::string> out;
+    Logger logger([&](LogLevel, std::string_view msg) { out.emplace_back(msg); }, LogLevel::Trace);
+    DbOpts opts;
+    opts.logger = &logger;
+    auto dbRes = Database::open(":memory:", opts);
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    auto libIdRes = db->libraryAdd(dir.string(), "testlib");
+    REQUIRE(libIdRes.has_value());
+    auto sr = scanLibrary(*db, *libIdRes);
+    REQUIRE(sr.has_value());
+    bool started = false;
+    bool finished = false;
+    // NOTE: no metadata-failure assertion — FFmpeg opens even garbage
+    // successfully (empty tags), so the "scan metadata failed" debug line
+    // only fires on hard open_input errors; covered by review, not fixtures.
+    for (const auto& m : out) {
+        if (m.find("scan started") != std::string::npos)
+            started = true;
+        if (m.find("scan finished") != std::string::npos) {
+            finished = true;
+            REQUIRE(m.find("scanned=1") != std::string::npos);
+            REQUIRE(m.find("added=1") != std::string::npos);
+        }
+    }
+    REQUIRE(started);
+    REQUIRE(finished);
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
 }

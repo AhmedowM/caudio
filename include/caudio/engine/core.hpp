@@ -563,6 +563,18 @@ class Engine final {
     bool tryLockQueueFor(std::chrono::milliseconds wait) noexcept;
     /** @brief Releases queueMutex_. @ingroup caudio_engine */
     void unlockQueue() noexcept;
+    /**
+     * @brief Builds a Busy error for queue-lock contention, logging at debug.
+     * @ingroup caudio_engine
+     * @param op Operation name for the log line (e.g. "play").
+     * @param msg User-visible message, preserved verbatim (client retry
+     * matching depends on it).
+     * @details Call instead of returning a Busy error directly so contention
+     * becomes visible in the daemon log. Do NOT call on monitor autoNext
+     * fail-fast paths (routine, would spam); user-wait paths only.
+     */
+    std::unexpected<caudio::utils::Error> queueBusy(std::string_view op,
+                                                    std::string_view msg) const;
 
     /**
      * @brief Computes current playback position in seconds.

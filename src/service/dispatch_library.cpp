@@ -10,6 +10,7 @@
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cctype>
 #include <chrono>
@@ -96,15 +97,23 @@ Service::handle(const caudio::ipc::LibraryScan& cmd) {
     // Fallback: simple insert (batched path uses scanLibrary above which is already
     // per-500 transactional). Files already recorded with matching size+mtime
     // are skipped, so rescans (including cross-mode ones) do not duplicate
-    // untouched files.
+    // untouched files. This is the path every first scan takes (no library
+    // row matches yet), so it reports its own summary like scanLibrary does.
+    if (logger_)
+        logger_->info("scan started root={} mode={} (direct)", root.generic_string(),
+                      cmd.full_hash ? "full" : "sampled");
     std::size_t n = 0;
+    std::size_t seen = 0;
     for (auto t : caudio::db::scan(root, mode)) {
+        ++seen;
         if (auto ex = db_->findByPath(t.path); ex && ex->size == t.size && ex->mtime == t.mtime)
             continue;
         auto r = db_->insertTrack(t);
         if (r)
             ++n;
     }
+    if (logger_)
+        logger_->info("scan finished root={} scanned={} added={}", root.generic_string(), seen, n);
     return Result{caudio::ipc::ScanReport{n}};
 }
 
@@ -482,6 +491,9 @@ Service::handle(const caudio::ipc::TagEdit& cmd) {
     if (!wr) {
         // Reopen either way so playback is never left suspended; the DB row
         // is untouched and still matches the (unmodified) file.
+        if (logger_)
+            logger_->warn("tag write failed file={} field={} err={}", t.path, cmd.field,
+                          wr.error().message);
         if (loaded)
             (void)eng.resumeAfterTagWrite(t, resumePos, wasPaused);
         return std::unexpected{wr.error()};
@@ -496,6 +508,9 @@ Service::handle(const caudio::ipc::TagEdit& cmd) {
         if (auto r = eng.resumeAfterTagWrite(*reg, resumePos, wasPaused); !r)
             return std::unexpected{r.error()};
     }
+    if (logger_)
+        logger_->info("tag edit id={} field={} file={} suspended={}", cmd.id, cmd.field, t.path,
+                      loaded);
     return Result{Empty{}};
 }
 
