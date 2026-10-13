@@ -31,6 +31,7 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>
@@ -639,22 +640,14 @@ int Shell::run(int argc, char** argv) {
     if (!deviceStr.empty())
         config_.device = deviceStr;
     if (!logLevelStr.empty()) {
-        if (logLevelStr == "trace")
-            config_.logLevel = 0;
-        else if (logLevelStr == "debug")
-            config_.logLevel = 1;
-        else if (logLevelStr == "info")
-            config_.logLevel = 2;
-        else if (logLevelStr == "warn")
-            config_.logLevel = 3;
-        else if (logLevelStr == "error")
-            config_.logLevel = 4;
-        else {
+        auto lvl = caudio::utils::parseLogLevel(logLevelStr);
+        if (!lvl) {
             caudio::println(std::cerr,
                             "--log-level: invalid '{}' (expected trace|debug|info|warn|error)",
                             logLevelStr);
             return 1;
         }
+        config_.logLevel = std::to_underlying(*lvl);
     }
     if (config_.socketPath.empty() && !config_.dbPath.empty()) {
         auto sp = caudio::config::socketPathFor(config_.dbPath);

@@ -43,22 +43,28 @@ bool log_level_filter() {
 bool log_convenience() {
     std::vector<std::pair<LogLevel, std::string>> out;
     Logger logger(
-        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); });
+        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+        LogLevel::Trace);
+    logger.trace("trc {}", 0);
     logger.debug("dbg {}", 1);
     logger.info("inf {}", 2);
     logger.warn("wrn {}", 3);
     logger.error("err {}", 4);
-    if (out.size() != 4)
+    if (out.size() != 5)
         return false;
-    if (out[0].first != LogLevel::Debug)
+    if (out[0].first != LogLevel::Trace)
         return false;
-    if (out[0].second.compare("dbg 1") != 0)
+    if (out[0].second.compare("trc 0") != 0)
         return false;
-    if (out[1].first != LogLevel::Info)
+    if (out[1].first != LogLevel::Debug)
         return false;
-    if (out[2].first != LogLevel::Warn)
+    if (out[1].second.compare("dbg 1") != 0)
         return false;
-    if (out[3].first != LogLevel::Error)
+    if (out[2].first != LogLevel::Info)
+        return false;
+    if (out[3].first != LogLevel::Warn)
+        return false;
+    if (out[4].first != LogLevel::Error)
         return false;
     return true;
 }
@@ -93,6 +99,8 @@ bool log_null_safe() {
 }
 
 bool log_toString_level() {
+    if (toString(LogLevel::Trace).compare("Trace") != 0)
+        return false;
     if (toString(LogLevel::Debug).compare("Debug") != 0)
         return false;
     if (toString(LogLevel::Info).compare("Info") != 0)
@@ -100,6 +108,49 @@ bool log_toString_level() {
     if (toString(LogLevel::Warn).compare("Warn") != 0)
         return false;
     if (toString(LogLevel::Error).compare("Error") != 0)
+        return false;
+    return true;
+}
+
+bool log_parse_level() {
+    // CLI --log-level names map 1:1 to enumerators (trace=0 ... error=4).
+    const std::pair<std::string_view, LogLevel> cases[] = {
+        {"trace", LogLevel::Trace},
+        {"debug", LogLevel::Debug},
+        {"info", LogLevel::Info},
+        {"warn", LogLevel::Warn},
+        {"error", LogLevel::Error},
+    };
+    for (const auto& [name, lvl] : cases) {
+        auto got = parseLogLevel(name);
+        if (!got || *got != lvl)
+            return false;
+        if (std::to_underlying(*got) != std::to_underlying(lvl))
+            return false;
+    }
+    if (std::to_underlying(LogLevel::Trace) != 0)
+        return false;
+    if (std::to_underlying(LogLevel::Error) != 4)
+        return false;
+    if (parseLogLevel("bogus").has_value())
+        return false;
+    if (parseLogLevel("INFO").has_value())
+        return false;
+    if (parseLogLevel("").has_value())
+        return false;
+    return true;
+}
+
+bool log_trace_filter() {
+    std::vector<std::pair<LogLevel, std::string>> out;
+    Logger logger(
+        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); });
+    // Default minLevel is Debug: trace is filtered, everything else passes.
+    logger.trace("filtered");
+    logger.debug("passes");
+    if (out.size() != 1)
+        return false;
+    if (out[0].first != LogLevel::Debug)
         return false;
     return true;
 }
@@ -130,4 +181,12 @@ TEST_CASE("Logger null callback safe", "[utils][log]") {
 
 TEST_CASE("Logger toString LogLevel", "[utils][log]") {
     REQUIRE(log_toString_level());
+}
+
+TEST_CASE("Logger parseLogLevel mapping", "[utils][log]") {
+    REQUIRE(log_parse_level());
+}
+
+TEST_CASE("Logger trace filtered by default", "[utils][log]") {
+    REQUIRE(log_trace_filter());
 }

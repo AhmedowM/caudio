@@ -9,6 +9,7 @@
 #include <format>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -19,9 +20,10 @@ namespace caudio::utils {
  * @brief Log severity levels ordered low to high.
  * @ingroup caudio_utils
  * @details Filtering is `lvl >= minLevel`. Underlying values are used for
- * comparison via `std::to_underlying`.
+ * comparison via `std::to_underlying`. Values match the CLI `--log-level`
+ * names 1:1 (trace=0 … error=4); see parseLogLevel.
  */
-enum class LogLevel : int { Debug = 0, Info = 1, Warn = 2, Error = 3 };
+enum class LogLevel : int { Trace = 0, Debug = 1, Info = 2, Warn = 3, Error = 4 };
 
 /**
  * @brief Converts a LogLevel to a human-readable string view.
@@ -31,6 +33,8 @@ enum class LogLevel : int { Debug = 0, Info = 1, Warn = 2, Error = 3 };
  */
 constexpr std::string_view toString(LogLevel lvl) noexcept {
     switch (lvl) {
+    case LogLevel::Trace:
+        return "Trace";
     case LogLevel::Debug:
         return "Debug";
     case LogLevel::Info:
@@ -42,6 +46,28 @@ constexpr std::string_view toString(LogLevel lvl) noexcept {
     default:
         return "Unknown";
     }
+}
+
+/**
+ * @brief Parses a CLI `--log-level` name to a LogLevel.
+ * @ingroup caudio_utils
+ * @param name Lowercase level name (`trace|debug|info|warn|error`).
+ * @return The level, or nullopt for unknown names (caller reports usage).
+ * @details Single source of truth for the name mapping — the shell and any
+ * future config/import validation must use this, never a local if-chain.
+ */
+constexpr std::optional<LogLevel> parseLogLevel(std::string_view name) noexcept {
+    if (name == "trace")
+        return LogLevel::Trace;
+    if (name == "debug")
+        return LogLevel::Debug;
+    if (name == "info")
+        return LogLevel::Info;
+    if (name == "warn")
+        return LogLevel::Warn;
+    if (name == "error")
+        return LogLevel::Error;
+    return std::nullopt;
 }
 
 /**
@@ -147,6 +173,17 @@ class Logger {
     }
 
     /**
+     * @brief Emits a formatted Trace message.
+     * @ingroup caudio_utils
+     * @tparam Args Format argument types.
+     * @param fmt Format string.
+     * @param args Format arguments.
+     */
+    template <typename... Args>
+    void trace(std::format_string<Args...> fmt, Args&&... args) {
+        log(LogLevel::Trace, fmt, std::forward<Args>(args)...);
+    }
+    /**
      * @brief Emits a formatted Debug message.
      * @ingroup caudio_utils
      * @tparam Args Format argument types.
@@ -191,6 +228,14 @@ class Logger {
         log(LogLevel::Error, fmt, std::forward<Args>(args)...);
     }
 
+    /**
+     * @brief Emits a Trace message view.
+     * @ingroup caudio_utils
+     * @param msg Message view.
+     */
+    void trace(std::string_view msg) {
+        log(LogLevel::Trace, msg);
+    }
     /**
      * @brief Emits a Debug message view.
      * @ingroup caudio_utils

@@ -146,7 +146,9 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
             (void)lvl;
             (void)msg;
         },
-        static_cast<caudio::utils::LogLevel>(std::clamp(cfg.logLevel, 0, 3)));
+        static_cast<caudio::utils::LogLevel>(std::clamp(
+            cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
+            std::to_underlying(caudio::utils::LogLevel::Error))));
 
     // Create PID file with current PID
     try {

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Log levels unified: `LogLevel` gains `Trace` so the enum matches the CLI
+  `--log-level trace|debug|info|warn|error` names 1:1 (trace=0 … error=4);
+  the shell parses via the shared `parseLogLevel` and the daemon clamps to
+  the full range — `--log-level info` no longer lands on Warn
+
 ## [v1.3.0] - 2026-10-12
 
 ### Added
