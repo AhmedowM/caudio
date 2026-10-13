@@ -36,6 +36,11 @@
 #include <string>
 #include <string_view>
 
+namespace caudio::utils {
+// Full type in utils/log.hpp; Decoder holds it non-owning only.
+class Logger;
+} // namespace caudio::utils
+
 namespace caudio::player {
 
 /**
@@ -91,12 +96,15 @@ class Decoder final {
     /**
      * @brief Probe and open a decoder for the given reader.
      * @param reader Input reader positioned at start of audio data.
+     * @param logger Non-owning logger (may be null = silent). Must outlive
+     * the open call; stored for decode-path messages, never from destructors.
      * @return Expected containing unique_ptr to Decoder on success, Error on failure.
      * @retval StatusCode::Unsupported No decoder recognized the format, or init failed
      * @retval StatusCode::Io FFmpeg initialization failed
      * @retval StatusCode::InvalidArg Reader seek/tell returned invalid values
      */
-    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<Decoder>> open(Reader& reader);
+    [[nodiscard]] static caudio::utils::Expected<std::unique_ptr<Decoder>>
+    open(Reader& reader, caudio::utils::Logger* logger = nullptr);
 
     /** @brief Default-constructs an unopened decoder; use open() factory. */
     Decoder();
@@ -147,6 +155,8 @@ class Decoder final {
     /// Opaque FFmpeg backend; defined in the private implementation.
     struct Impl;
     std::unique_ptr<Impl> impl_;
+    /// Non-owning log sink (null = silent). See open().
+    caudio::utils::Logger* logger_{nullptr};
 
     /**
      * @brief Initialize the backend against an opened reader.

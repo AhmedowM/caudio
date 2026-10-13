@@ -2,6 +2,7 @@
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -21,7 +22,8 @@ bool Decoder::probe(std::span<const std::byte> data) noexcept {
     return data.size() >= 4;
 }
 
-caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader) {
+caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
+                                                                   caudio::utils::Logger* logger) {
     constexpr std::size_t kProbeBytes = 32;
     std::array<std::byte, kProbeBytes> buf{};
     std::size_t n = 0;
@@ -53,13 +55,19 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader) 
         // or AVIO pos and file pos will diverge (causing Header missing/CRC).
         (void)reader.seek(0, SEEK_SET);
         auto dec = std::make_unique<Decoder>();
+        dec->logger_ = logger;
         if (auto ok = dec->init(reader); ok.has_value()) {
+            if (logger)
+                logger->debug("decoder opened rate={} channels={}", dec->sampleRate(),
+                              dec->channels());
             return caudio::utils::Expected<std::unique_ptr<Decoder>>{std::move(dec)};
         } else {
             // failure: restore orig
             auto sr = reader.seek(orig, SEEK_SET);
             if (!sr.has_value())
                 (void)reader.seek(0, SEEK_SET);
+            if (logger)
+                logger->debug("decoder open failed: {}", ok.error().message);
             return std::unexpected{ok.error()};
         }
     }

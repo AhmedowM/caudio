@@ -112,8 +112,28 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         if (!parent.empty())
             std::filesystem::create_directories(parent, ec2);
     }
+    // Daemon log first: rotating file next to the db (see logPathFor), so
+    // db/engine creation below already emit. A log that cannot be opened
+    // degrades to silence — logging must never block startup.
+    caudio::utils::Logger::Callback logCb =
+        [](caudio::utils::LogLevel, std::string_view) {};
+    if (auto lp = caudio::config::logPathFor(cfg.dbPath)) {
+        caudio::utils::FileSinkOptions sinkOpts;
+        sinkOpts.teeStderr = cfg.logToStderr;
+        if (auto sink = caudio::utils::FileLogSink::open(*lp, sinkOpts))
+            logCb = sink->callback();
+    }
+    auto loggerPtr = std::make_unique<caudio::utils::Logger>(
+        std::move(logCb),
+        static_cast<caudio::utils::LogLevel>(std::clamp(
+            cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
+            std::to_underlying(caudio::utils::LogLevel::Error))));
+    caudio::utils::Logger* logger = loggerPtr.get();
+
     // open DB
-    auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string());
+    caudio::db::DbOpts dbOpts;
+    dbOpts.logger = logger;
+    auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string(), dbOpts);
     if (!dbRes) {
         auto err = dbRes.error();
         std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
@@ -124,6 +144,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
 
     // create Engine
     caudio::engine::EngineConfig ecfg{};
+    ecfg.logger = logger;
     auto engRes = caudio::engine::Engine::create(ecfg);
     if (!engRes) {
         detail::releaseLock(lockFd);
@@ -144,21 +165,6 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{listenRes.error()};
     }
 
-    // Daemon log: rotating file next to the db (see logPathFor). A log that
-    // cannot be opened degrades to silence — logging must never block startup.
-    caudio::utils::Logger::Callback logCb =
-        [](caudio::utils::LogLevel, std::string_view) {};
-    if (auto lp = caudio::config::logPathFor(cfg.dbPath)) {
-        caudio::utils::FileSinkOptions sinkOpts;
-        sinkOpts.teeStderr = cfg.logToStderr;
-        if (auto sink = caudio::utils::FileLogSink::open(*lp, sinkOpts))
-            logCb = sink->callback();
-    }
-    auto loggerPtr = std::make_unique<caudio::utils::Logger>(
-        std::move(logCb),
-        static_cast<caudio::utils::LogLevel>(std::clamp(
-            cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
-            std::to_underlying(caudio::utils::LogLevel::Error))));
 
     // Create PID file with current PID
     std::string pidStr;

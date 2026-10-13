@@ -4,6 +4,7 @@
 #include <atomic>
 #include <caudio/player/output.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
@@ -65,6 +66,9 @@ AudioOutput::Expected AudioOutput::create(const Config& cfg) {
         return std::unexpected(caudio::utils::Error{
             caudio::utils::StatusCode::Device, std::string_view("miniaudio device init failed")});
     }
+    if (cfg.logger)
+        cfg.logger->debug("audio output opened rate={} channels={}", cfg.sampleRate,
+                          cfg.channels);
     return out;
 }
 

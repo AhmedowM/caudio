@@ -10,6 +10,7 @@
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
@@ -51,11 +52,15 @@ Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
     auto err = e->init();
     if (err)
         return std::unexpected(*err);
+    if (cfg.logger)
+        cfg.logger->debug("engine created monitor={}", cfg.enableMonitorThread);
     return e;
 }
 
 Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& cfg) {
-    auto dbRes = caudio::db::Database::open(path);
+    caudio::db::DbOpts dbOpts;
+    dbOpts.logger = cfg.logger;
+    auto dbRes = caudio::db::Database::open(path, dbOpts);
     if (!dbRes)
         return std::unexpected(dbRes.error());
     auto e = std::unique_ptr<Engine>(new Engine(cfg));
@@ -65,6 +70,8 @@ Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& c
     (void)e->loadState();
     if (e->output_)
         e->output_->setVolume(e->state_.volume);
+    if (cfg.logger)
+        cfg.logger->info("engine opened database path={}", path);
     return e;
 }
 
@@ -1234,7 +1241,7 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
         auto rRes = caudio::player::FileReader::open(path);
         if (rRes) {
             reader_ = std::move(rRes.value());
-            auto dRes = caudio::player::Decoder::open(*reader_);
+            auto dRes = caudio::player::Decoder::open(*reader_, cfg_.logger);
             if (dRes) {
                 decoder_ = std::move(dRes.value());
                 opened = true;
@@ -1261,6 +1268,7 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
                 cfg.channels = ch;
                 cfg.ring = ring_.get();
                 cfg.volume = volume_.load(std::memory_order_relaxed);
+                cfg.logger = cfg_.logger;
                 auto oRes = caudio::player::AudioOutput::create(cfg);
                 if (oRes) {
                     output_ = std::move(oRes.value());

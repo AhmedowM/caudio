@@ -52,6 +52,11 @@
 #include <string_view>
 #include <thread>
 
+namespace caudio::utils {
+// Full type in utils/log.hpp; Player holds it non-owning only.
+class Logger;
+} // namespace caudio::utils
+
 namespace caudio::player {
 // Decoder/Reader/AudioOutput live in their own public headers; Player holds
 // them by unique_ptr only (ctor/dtor out-of-line), so declarations suffice.
@@ -81,6 +86,9 @@ struct PlayerOpts {
     uint32_t sampleRate = 48000;
     /// Output channel count (default: 2)
     uint32_t channels = 2;
+    /// Non-owning logger (may be null = silent). Must outlive the Player;
+    /// threaded through to decoder/output, never from destructors.
+    caudio::utils::Logger* logger{nullptr};
 };
 
 /**
@@ -411,6 +419,9 @@ class Player {
 
     /// Last error message (for lastError())
     std::string lastError_;
+
+    /// Non-owning log sink from PlayerOpts (null = silent). See PlayerOpts::logger.
+    caudio::utils::Logger* logger_{nullptr};
 };
 
 } // namespace caudio::player

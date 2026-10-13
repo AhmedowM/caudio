@@ -5,13 +5,16 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/utils/log.hpp>
 #include <common.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
+#include <vector>
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::utils;
@@ -127,6 +130,21 @@ TEST_CASE("engine state volume clamped 0-1", "[engine_state]") {
     REQUIRE(eng->volume() == 1.0f);
     REQUIRE(eng->setVolume(-1.0f).has_value());
     REQUIRE(eng->volume() == 0.0f);
+}
+
+TEST_CASE("engine create emits lifecycle log", "[engine_state]") {
+    std::vector<std::pair<LogLevel, std::string>> out;
+    Logger logger([&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+                  LogLevel::Trace);
+    EngineConfig cfg;
+    cfg.allowSimulatedPlayback = true;
+    cfg.enableMonitorThread = false;
+    cfg.logger = &logger;
+    auto eRes = Engine::create(cfg);
+    REQUIRE(eRes.has_value());
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].first == LogLevel::Debug);
+    REQUIRE(out[0].second.find("engine created") != std::string::npos);
 }
 
 TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {

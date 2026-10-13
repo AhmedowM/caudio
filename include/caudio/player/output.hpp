@@ -42,6 +42,11 @@
 /// Opaque miniaudio device handle; full type visible only in output.cpp.
 struct ma_device;
 
+namespace caudio::utils {
+// Full type in utils/log.hpp; AudioOutput holds it non-owning only.
+class Logger;
+} // namespace caudio::utils
+
 namespace caudio::player {
 
 /**
@@ -147,6 +152,8 @@ class AudioOutput {
         caudio::utils::SpscRing<float>* ring = nullptr;
         /// Initial volume 0.0-1.0 (default: 1.0)
         float volume = 1.0f;
+        /// Non-owning logger (may be null = silent). Must outlive the output.
+        caudio::utils::Logger* logger{nullptr};
     };
 
     /** @brief Default-constructs an uninitialized output; use create(). */

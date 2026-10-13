@@ -4,12 +4,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/core.hpp>
 #include <caudio/db/types.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstdint>
 #include <expected>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 using namespace caudio::db;
 using namespace caudio::utils;
 
@@ -246,4 +248,16 @@ TEST_CASE("listTracks after schema init", "[db]") {
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+}
+
+TEST_CASE("Database open emits lifecycle log", "[db]") {
+    using namespace caudio::utils;
+    std::vector<std::string> out;
+    Logger logger([&](LogLevel, std::string_view msg) { out.emplace_back(msg); }, LogLevel::Trace);
+    caudio::db::DbOpts opts;
+    opts.logger = &logger;
+    auto dbRes = caudio::db::Database::open(":memory:", opts);
+    REQUIRE(dbRes.has_value());
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].find("database opened path=") != std::string::npos);
 }

@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cmath>
 #include <cstddef>
@@ -10,6 +11,8 @@
 #include <limits>
 #include <span>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 using namespace caudio::player;
 using namespace caudio::utils;
@@ -21,6 +24,20 @@ TEST_CASE("decode registry probe unsupported", "[decoder]") {
     auto dec = Decoder::open(**r);
     REQUIRE(!dec.has_value());
     REQUIRE(dec.error().code == StatusCode::Unsupported);
+}
+
+TEST_CASE("decoder open emits lifecycle log", "[decoder]") {
+    auto path = std::filesystem::path(std::string(TEST_DATA_DIR) + "/sample.ogg");
+    auto r = FileReader::open(path);
+    REQUIRE(r.has_value());
+    std::vector<std::pair<LogLevel, std::string>> out;
+    Logger logger([&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+                  LogLevel::Trace);
+    auto dec = Decoder::open(**r, &logger);
+    REQUIRE(dec.has_value());
+    REQUIRE(out.size() == 1);
+    REQUIRE(out[0].first == LogLevel::Debug);
+    REQUIRE(out[0].second.find("decoder opened") != std::string::npos);
 }
 
 TEST_CASE("decode registry probe restore offset with real ogg", "[decoder]") {

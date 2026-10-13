@@ -48,6 +48,11 @@
 #include <string_view>
 #include <vector>
 
+namespace caudio::utils {
+// Full type in utils/log.hpp; Engine holds it non-owning only.
+class Logger;
+} // namespace caudio::utils
+
 namespace caudio::engine {
 
 /**
@@ -152,6 +157,9 @@ struct EngineConfig {
                                         ///< with it off, play/next/prev fail instead of
                                         ///< reporting Playing with zero sound.
     EngineCallbacks callbacks{};        ///< Initial callbacks (also via setCallbacks).
+    /// Non-owning logger (may be null = silent). Must outlive the Engine;
+    /// never emitted from destructors. Threaded through to decode paths.
+    caudio::utils::Logger* logger{nullptr};
 };
 
 /**

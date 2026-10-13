@@ -4,6 +4,7 @@
 #include <caudio/db/core.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -31,7 +32,8 @@ void SqliteCloser::operator()(sqlite3* db) const noexcept {
         sqlite3_close(db);
 }
 
-Database::Database(const DbOpts& opts) : writer_(opts.writeBatchSize), db_(nullptr) {}
+Database::Database(const DbOpts& opts)
+    : writer_(opts.writeBatchSize), db_(nullptr), logger_(opts.logger) {}
 
 Database::~Database() {
     writer_.close();
@@ -42,7 +44,8 @@ Database::~Database() {
     db_.reset();
 }
 
-Database::Database(Database&& o) noexcept : writer_(std::move(o.writer_)), db_(std::move(o.db_)) {
+Database::Database(Database&& o) noexcept
+    : writer_(std::move(o.writer_)), db_(std::move(o.db_)), logger_(o.logger_) {
     // cache stays empty for moved-from; moved-to starts empty (statements tied to old handle)
     // if o had cached stmts they are cleared (handle moved)
     // Acquire in documented order: dbMutex_ -> stmtCacheMutex_
@@ -68,6 +71,7 @@ Database& Database::operator=(Database&& o) noexcept {
         db_.reset();
         writer_ = std::move(o.writer_);
         db_ = std::move(o.db_);
+        logger_ = o.logger_;
         o.stmtCache_.clear();
         // also clear any remaining in *this (already cleared) - start fresh for new handle
     }
@@ -134,7 +138,8 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
     rc = sqlite3_exec(raw, std::string(kSchemaDefaultLibrary).c_str(), nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {
         std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
-        // not fatal? but log
+        if (opts.logger)
+            opts.logger->warn("schema default-library pass failed (non-fatal): {}", msg);
         if (err) {
             sqlite3_free(err);
             err = nullptr;
@@ -157,6 +162,8 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
     auto db = std::make_unique<Database>(opts);
     db->db_.reset(raw);
     db->writer_.open(raw);
+    if (db->logger_)
+        db->logger_->info("database opened path={}", dbPath);
     return db;
 }
 

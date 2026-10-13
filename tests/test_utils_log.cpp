@@ -253,3 +253,15 @@ TEST_CASE("FileLogSink rotation stays bounded", "[utils][log]") {
 TEST_CASE("FileLogSink open failure is silent", "[utils][log]") {
     REQUIRE(log_sink_open_failure());
 }
+
+TEST_CASE("Logger enabled fast check", "[utils][log]") {
+    caudio::utils::Logger logger(nullptr, caudio::utils::LogLevel::Warn);
+    // No callback: nothing would be emitted at any level.
+    REQUIRE(!logger.enabled(caudio::utils::LogLevel::Error));
+    logger.setCallback([](caudio::utils::LogLevel, std::string_view) {});
+    REQUIRE(!logger.enabled(caudio::utils::LogLevel::Info));
+    REQUIRE(logger.enabled(caudio::utils::LogLevel::Warn));
+    REQUIRE(logger.enabled(caudio::utils::LogLevel::Error));
+    logger.setLevel(caudio::utils::LogLevel::Trace);
+    REQUIRE(logger.enabled(caudio::utils::LogLevel::Trace));
+}

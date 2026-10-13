@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   formatting, 1 MB × 3-generation rotation, startup/shutdown lifecycle
   lines; `--foreground` (`start --foreground`) also echoes to stderr via
   the new `ServiceConfig::logToStderr`
+- Logger threading: `DbOpts`/`EngineConfig`/`PlayerOpts`/`AudioOutput::Config`
+  and `Decoder::open` take a non-owning `Logger*` (null = silent); the
+  daemon passes its file logger down so db open, engine create/open,
+  decoder open and audio output open emit; new `Logger::enabled()` fast
+  check for skipping expensive debug arguments
 
 ### Fixed
 - Log levels unified: `LogLevel` gains `Trace` so the enum matches the CLI

@@ -71,7 +71,7 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     }
 
     // Open decoder
-    auto decResult = Decoder::open(*reader);
+    auto decResult = Decoder::open(*reader, logger_);
     if (!decResult) {
         lastError_ = decResult.error().message;
         state_.store(State::Error, std::memory_order_release);
@@ -101,6 +101,7 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     cfg.channels = ch;
     cfg.ring = ring_.get();
     cfg.volume = volume_.load(std::memory_order_relaxed);
+    cfg.logger = logger_;
 
     auto outResult = AudioOutput::create(cfg);
     if (!outResult) {
@@ -284,6 +285,7 @@ std::string_view Player::lastError() const noexcept {
 bool Player::init(const PlayerOpts& opts) {
     sampleRate_ = opts.sampleRate ? opts.sampleRate : 48000;
     channels_ = opts.channels ? opts.channels : 2;
+    logger_ = opts.logger;
     volume_.store(1.0f, std::memory_order_relaxed);
     state_.store(State::Stopped, std::memory_order_relaxed);
 

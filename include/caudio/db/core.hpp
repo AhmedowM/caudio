@@ -32,6 +32,11 @@
 struct sqlite3;
 struct sqlite3_stmt;
 
+namespace caudio::utils {
+// Full type in utils/log.hpp; Database holds it non-owning only.
+class Logger;
+} // namespace caudio::utils
+
 namespace caudio::db {
 
 // Statement/transaction internals live in src/db/ (NOT installed);
@@ -45,6 +50,9 @@ class SqliteStatement;
 struct DbOpts {
     std::size_t writeBatchSize =
         256; ///< Queue capacity / batch size for WriterThread (default 256).
+    /// Non-owning logger (may be null = silent). Must outlive the Database;
+    /// never emitted from destructors. Set from opts at open().
+    caudio::utils::Logger* logger{nullptr};
 };
 
 /**
@@ -305,6 +313,8 @@ class Database final {
   private:
     WriterThread writer_;
     std::unique_ptr<sqlite3, SqliteCloser> db_;
+    /// Non-owning log sink from DbOpts (null = silent). See DbOpts::logger.
+    caudio::utils::Logger* logger_{nullptr};
     // Naming clarity: dbMutex_ is dbMutex_ (protects db_ handle and serializes DB ops),
     // cacheMutex_ is stmtCacheMutex_ (protects stmtCache_), queueLock_ concept maps to
     // engineQueueSpin_ in engine but DB uses dbMutex_ for queue table as well.

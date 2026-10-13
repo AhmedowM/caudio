@@ -138,6 +138,21 @@ class Logger {
     }
 
     /**
+     * @brief Fast check whether a level would be emitted.
+     * @ingroup caudio_utils
+     * @param lvl Severity to test.
+     * @return true when a callback is set and `lvl >= minLevel`.
+     * @details Use to skip expensive message-argument computation: the
+     * `log()` overloads filter before formatting, but arguments are still
+     * evaluated at the call site. `if (logger && logger->enabled(Debug))`
+     * avoids that cost on hot paths.
+     */
+    [[nodiscard]] bool enabled(LogLevel lvl) const noexcept {
+        std::lock_guard<std::mutex> lk(mutex_);
+        return callback_ && std::to_underlying(lvl) >= std::to_underlying(minLevel_);
+    }
+
+    /**
      * @brief Emits a pre-formatted message if enabled.
      * @ingroup caudio_utils
      * @param lvl Severity of the message.
