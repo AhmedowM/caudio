@@ -279,6 +279,17 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     REQUIRE(up);
+    // The daemon writes its startup line to the db-adjacent log file.
+    bool logged = false;
+    for (int i = 0; i < 50 && !logged; ++i) {
+        std::ifstream lf(dir / "caudio.log", std::ios::binary);
+        std::string content((std::istreambuf_iterator<char>(lf)),
+                            std::istreambuf_iterator<char>());
+        logged = content.find("daemon started") != std::string::npos;
+        if (!logged)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    REQUIRE(logged);
     auto js = run({"status", "--json"});
     REQUIRE(js.exitCode == 0);
     REQUIRE(contains(js.out, "\"state\""));
