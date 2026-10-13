@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.4.0] - 2026-10-13
+
 ### Added
 - Daemon log file: `<db-dir>/caudio.log` with timestamp/level/thread
   formatting, 1 MB × 3-generation rotation, startup/shutdown lifecycle
