@@ -71,6 +71,24 @@ constexpr std::optional<LogLevel> parseLogLevel(std::string_view name) noexcept 
 }
 
 /**
+ * @brief Parses a log-level value: names or 0–4 integers.
+ * @ingroup caudio_utils
+ * @param value Level name (`trace|debug|info|warn|error`) or integer string.
+ * @return The level, or nullopt for garbage (caller reports usage).
+ * @details Accepts everything parseLogLevel does plus `"0"`…`"4"`, so config
+ * values (`config set logLevel`) accept both forms while the canonical
+ * stored form stays numeric. Single source of truth — the daemon handler
+ * and loadConfig must use this, never ad-hoc parsing.
+ */
+constexpr std::optional<LogLevel> parseLogLevelValue(std::string_view value) noexcept {
+    if (auto l = parseLogLevel(value))
+        return l;
+    if (value.size() == 1 && value[0] >= '0' && value[0] <= '4')
+        return static_cast<LogLevel>(value[0] - '0');
+    return std::nullopt;
+}
+
+/**
  * @brief Thread-safe logger with callback and level filtering.
  * @ingroup caudio_utils
  * @details Lock ordering: a single `mutable std::mutex` protects both

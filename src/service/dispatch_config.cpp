@@ -6,6 +6,7 @@
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <expected>
 #include <filesystem>
@@ -48,9 +49,28 @@ Service::handle(const caudio::ipc::ConfigGet& cmd) {
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::handle(const caudio::ipc::ConfigSet& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-    auto sRes = caudio::config::configSetRaw(p, cmd.key, cmd.value);
+    // logLevel applies live: validate first (garbage is rejected, never
+    // stored), canonicalize names to ints on write, then setLevel.
+    bool isLevel = (cmd.key == "logLevel" || cmd.key == "log_level");
+    caudio::utils::LogLevel newLevel = caudio::utils::LogLevel::Info;
+    std::string storedValue = cmd.value;
+    if (isLevel) {
+        auto lvl = caudio::utils::parseLogLevelValue(cmd.value);
+        if (!lvl)
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::InvalidArg,
+                "invalid logLevel '" + cmd.value +
+                    "' (expected trace|debug|info|warn|error or 0-4)")};
+        newLevel = *lvl;
+        storedValue = std::to_string(std::to_underlying(newLevel));
+    }
+    auto sRes = caudio::config::configSetRaw(p, cmd.key, storedValue);
     if (!sRes)
         return std::unexpected{sRes.error()};
+    if (isLevel && logger_) {
+        logger_->setLevel(newLevel);
+        logger_->info("log level set to {}", caudio::utils::toString(newLevel));
+    }
     return Result{Empty{}};
 }
 
@@ -124,10 +144,14 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
     }
     for (const char* k : {"logLevel", "log_level"}) {
         auto v = parsed->at(k);
-        if (v && !v->isNumber() && !v->isNull())
-            return std::unexpected{
-                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
-                                         std::string("import key '") + k + "' must be a number")};
+        if (!v || v->isNull() || v->isNumber())
+            continue;
+        // Names are tolerated (loadConfig canonicalizes); garbage is not.
+        if (v->isString() && caudio::utils::parseLogLevelValue(v->get<std::string>()))
+            continue;
+        return std::unexpected{caudio::utils::makeError(
+            caudio::utils::StatusCode::InvalidArg,
+            std::string("import key '") + k + "' must be a number or level name")};
     }
     std::filesystem::create_directories(dst.parent_path(), ec);
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);

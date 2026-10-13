@@ -537,6 +537,17 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     REQUIRE(list.exitCode == 0);
     REQUIRE(contains(list.out, "cli_golden_key = hello"));
     REQUIRE(contains(list.out, "cli_golden_num = 42"));
+    // logLevel accepts names (canonicalized) and ints, rejects garbage live.
+    auto lvlName = run({"config", "set", "logLevel", "trace"});
+    REQUIRE(lvlName.exitCode == 0);
+    auto lvlGet = run({"config", "get", "logLevel"});
+    REQUIRE(lvlGet.exitCode == 0);
+    REQUIRE(contains(lvlGet.out, "0"));
+    auto lvlNum = run({"config", "set", "logLevel", "2"});
+    REQUIRE(lvlNum.exitCode == 0);
+    auto lvlBad = run({"config", "set", "logLevel", "loud"});
+    REQUIRE(lvlBad.exitCode == 1);
+    REQUIRE(contains(lvlBad.err, "logLevel"));
     // Empty the queue, then play must fail fast without touching audio.
     auto clear = run({"queue", "clear"});
     REQUIRE(clear.exitCode == 0);

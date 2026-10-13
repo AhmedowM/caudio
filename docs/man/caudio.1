@@ -298,6 +298,8 @@ daemon.
 .B config set \fIKEY\fR \fIVALUE\fR
 Set config value. \fIVALUE\fR is stored as JSON or plain string.
 Prints nothing on success.
+\fBlogLevel\fR also accepts \fBtrace\fR|\fBdebug\fR|\fBinfo\fR|\fBwarn\fR|\fBerror\fR
+(stored numeric) and applies to a running daemon immediately.
 .TP
 .B config list [\-\-json]
 List all config key/value pairs.

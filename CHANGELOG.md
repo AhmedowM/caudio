@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Live log-level control: `config set logLevel` accepts names or 0-4,
+  rejects garbage without storing, canonicalizes to int, and applies to
+  the running daemon immediately; hand-written names tolerated on load
+  and import
+
 ## [v1.4.0] - 2026-10-13
 
 ### Added

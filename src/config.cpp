@@ -1,6 +1,7 @@
 #include <caudio/config.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -122,6 +123,10 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
         }
         if (j.contains("logLevel") && j["logLevel"].isInteger()) {
             cfg.logLevel = j["logLevel"].get<int>();
+        } else if (j.contains("logLevel") && j["logLevel"].isString()) {
+            // Tolerate hand-written names ("info"); canonical form is numeric.
+            if (auto lvl = caudio::utils::parseLogLevelValue(j["logLevel"].get<std::string>()))
+                cfg.logLevel = std::to_underlying(*lvl);
         }
         if (j.contains("socketPath") && j["socketPath"].isString()) {
             std::string s = j["socketPath"].get<std::string>();
@@ -136,6 +141,9 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
         }
         if (j.contains("log_level") && j["log_level"].isInteger()) {
             cfg.logLevel = j["log_level"].get<int>();
+        } else if (j.contains("log_level") && j["log_level"].isString()) {
+            if (auto lvl = caudio::utils::parseLogLevelValue(j["log_level"].get<std::string>()))
+                cfg.logLevel = std::to_underlying(*lvl);
         }
     } catch (const std::exception& e) {
         return std::unexpected{

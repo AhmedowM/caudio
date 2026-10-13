@@ -242,6 +242,19 @@ TEST_CASE("Logger parseLogLevel mapping", "[utils][log]") {
     REQUIRE(log_parse_level());
 }
 
+TEST_CASE("Logger parseLogLevelValue accepts ints", "[utils][log]") {
+    using caudio::utils::LogLevel;
+    using caudio::utils::parseLogLevelValue;
+    REQUIRE(parseLogLevelValue("0") == LogLevel::Trace);
+    REQUIRE(parseLogLevelValue("2") == LogLevel::Info);
+    REQUIRE(parseLogLevelValue("4") == LogLevel::Error);
+    REQUIRE(parseLogLevelValue("info") == LogLevel::Info);
+    REQUIRE(!parseLogLevelValue("5").has_value());
+    REQUIRE(!parseLogLevelValue("loud").has_value());
+    REQUIRE(!parseLogLevelValue("").has_value());
+    REQUIRE(!parseLogLevelValue("INFO").has_value());
+}
+
 TEST_CASE("Logger trace filtered by default", "[utils][log]") {
     REQUIRE(log_trace_filter());
 }
