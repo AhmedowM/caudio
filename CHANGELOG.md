@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Playback heap: the decoder converts through a fixed window so
+  libswresample never buffers input internally — a playing track held
+  ~47 MB in one resampler block and RSS sat at 64-71 MB; residue is now
+  bounded decoder-side (~1 frame, cleared on seek/close) and playback RSS
+  stays flat
 - Probe sizes capped at scan and decode open (1 MB / 0.5 s) instead of
   FFmpeg defaults
 - `stop` releases decoder/output/ring: a stopped daemon no longer retains

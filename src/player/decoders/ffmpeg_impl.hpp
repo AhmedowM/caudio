@@ -88,9 +88,9 @@ struct Decoder::Impl {
         LayoutGuard& operator=(const LayoutGuard&) = delete;
     };
 
-    int convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
-                     std::size_t frames) noexcept;
-    int flushResampler(std::span<float> out, std::size_t totalDecoded, std::size_t frames) noexcept;
+    int convertFrameBuffered(AVFrame* frame);
+    int drainResampler();
+    std::size_t serveSpill(std::span<float> out, std::size_t totalDecoded, std::size_t frames);
 
     static int readCallback(void* opaque, uint8_t* buf, int bufSize);
 
@@ -112,6 +112,16 @@ struct Decoder::Impl {
     // Decoder is NOT thread-safe; decode() is the sole user.
     PacketPtr scratchPkt_{};
     FramePtr scratchFrame_{};
+    // Fixed resample window (P-7): swr_convert buffers any input it cannot
+    // emit in the same call, so feeding it a smaller out window than the
+    // frame size leaks that residue into swr-internal storage on every
+    // frame (~1 KB/frame -> tens of MB over a track). convertBuf_ is always
+    // >= the largest frame window, spill_ holds only our own converted-but-
+    // undelivered residue (bounded by ~one frame); swr-internal stays empty.
+    static constexpr std::size_t kConvertFrames = 4096;
+    std::vector<float> convertBuf_{};
+    std::vector<float> spill_{};
+    std::size_t spillPos_{0};
 };
 
 } // namespace caudio::player

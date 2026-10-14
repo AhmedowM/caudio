@@ -7,6 +7,7 @@
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -130,7 +131,7 @@ uint64_t Decoder::Impl::totalFrames() const noexcept {
 }
 
 std::size_t Decoder::Impl::decode(std::span<float> out) {
-    if (out.empty() || !fmt_ || !dec_ || !swr_)
+    if (out.empty() || !fmt_ || !dec_ || !swr_ || channels_ == 0)
         return 0;
 
     std::size_t frames = out.size() / channels_;
@@ -149,7 +150,13 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
         return 0;
     AVPacket* pkt = scratchPkt_.get();
     AVFrame* frame = scratchFrame_.get();
+    // Decode at most what `out` (plus the bounded spill_) can hold: each
+    // iteration serves spill_ first and converts at most one more frame, so
+    // swr_convert always sees the full kConvertFrames window (P-7).
     while (totalDecoded < frames && !eofReached) {
+        totalDecoded += serveSpill(out, totalDecoded, frames);
+        if (totalDecoded >= frames)
+            break;
         av_packet_unref(pkt);
 
         int ret = av_read_frame(fmt_, pkt);
@@ -157,24 +164,19 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
             // EOF: flush decoder internal buffers
             if (ret == AVERROR_EOF || ret < 0) {
                 (void)avcodec_send_packet(dec_, nullptr);
-                while (totalDecoded < frames) {
+                for (;;) {
                     av_frame_unref(frame);
                     ret = avcodec_receive_frame(dec_, frame);
                     if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                         break;
                     if (ret < 0)
                         break;
-                    int converted = convertFrame(frame, out, totalDecoded, frames);
-                    if (converted > 0)
-                        totalDecoded += static_cast<std::size_t>(converted);
-                    if (converted <= 0)
+                    if (convertFrameBuffered(frame) < 0)
                         break;
                 }
-                if (totalDecoded < frames) {
-                    int flushed = flushResampler(out, totalDecoded, frames);
-                    if (flushed > 0)
-                        totalDecoded += static_cast<std::size_t>(flushed);
-                }
+                if (drainResampler() < 0)
+                    break;
+                totalDecoded += serveSpill(out, totalDecoded, frames);
             }
             eofReached = true;
             break;
@@ -187,29 +189,21 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
         ret = avcodec_send_packet(dec_, pkt);
         if (ret == AVERROR(EAGAIN)) {
             av_frame_unref(frame);
-            if (avcodec_receive_frame(dec_, frame) == 0) {
-                int converted = convertFrame(frame, out, totalDecoded, frames);
-                if (converted > 0)
-                    totalDecoded += static_cast<std::size_t>(converted);
-            }
+            if (avcodec_receive_frame(dec_, frame) == 0)
+                (void)convertFrameBuffered(frame);
             continue;
         }
         if (ret < 0)
             continue;
 
-        while (totalDecoded < frames) {
-            av_frame_unref(frame);
-            ret = avcodec_receive_frame(dec_, frame);
-            if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
-                break;
-            if (ret < 0)
-                break;
-            int converted = convertFrame(frame, out, totalDecoded, frames);
-            if (converted > 0)
-                totalDecoded += static_cast<std::size_t>(converted);
-            if (converted <= 0)
-                break;
-        }
+        av_frame_unref(frame);
+        ret = avcodec_receive_frame(dec_, frame);
+        if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+            continue;
+        if (ret < 0)
+            continue;
+        if (convertFrameBuffered(frame) < 0)
+            break;
     }
 
     pos_ += totalDecoded;
@@ -248,6 +242,10 @@ caudio::utils::Expected<void> Decoder::Impl::seek(double seconds) {
     // flush resampler as well
     if (swr_)
         swr_init(swr_);
+    // Drop converted-but-undelivered residue: positions before the seek
+    // target must never surface after it.
+    spill_.clear();
+    spillPos_ = 0;
     pos_ = static_cast<uint64_t>(seconds * sampleRate_);
     return {};
 }
@@ -256,19 +254,73 @@ Decoder::Impl::~Impl() {
     cleanup();
 }
 
-int Decoder::Impl::convertFrame(AVFrame* frame, std::span<float> out, std::size_t totalDecoded,
-                                std::size_t frames) noexcept {
-    uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-    int outSamples = static_cast<int>(frames - totalDecoded);
-    return swr_convert(swr_, outPtrs, outSamples, const_cast<const uint8_t**>(frame->extended_data),
-                       frame->nb_samples);
+int Decoder::Impl::convertFrameBuffered(AVFrame* frame) {
+    uint32_t ch = channels_;
+    if (ch == 0 || !frame || frame->nb_samples <= 0)
+        return 0;
+    try {
+        if (convertBuf_.size() < kConvertFrames * ch)
+            convertBuf_.resize(kConvertFrames * ch);
+        uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(convertBuf_.data())};
+        int appended = 0;
+        int n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames),
+                            const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
+        if (n < 0)
+            return n;
+        if (n > 0) {
+            spill_.insert(spill_.end(), convertBuf_.data(),
+                          convertBuf_.data() + static_cast<std::size_t>(n) * ch);
+            appended += n;
+        }
+        appended += drainResampler();
+        return appended;
+    } catch (...) {
+        return -1;
+    }
 }
 
-int Decoder::Impl::flushResampler(std::span<float> out, std::size_t totalDecoded,
-                                  std::size_t frames) noexcept {
-    uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(out.data() + totalDecoded * channels_)};
-    int outSamples = static_cast<int>(frames - totalDecoded);
-    return swr_convert(swr_, outPtrs, outSamples, nullptr, 0);
+int Decoder::Impl::drainResampler() {
+    uint32_t ch = channels_;
+    if (ch == 0)
+        return 0;
+    try {
+        if (convertBuf_.size() < kConvertFrames * ch)
+            convertBuf_.resize(kConvertFrames * ch);
+        uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(convertBuf_.data())};
+        // Pull out anything swr held back (oversize frame, filter delay) so
+        // swr-internal storage stays bounded by one frame instead of growing
+        // one residue per decoded frame.
+        int appended = 0;
+        int n = 0;
+        while ((n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames), nullptr, 0)) >
+               0) {
+            spill_.insert(spill_.end(), convertBuf_.data(),
+                          convertBuf_.data() + static_cast<std::size_t>(n) * ch);
+            appended += n;
+        }
+        return n < 0 ? n : appended;
+    } catch (...) {
+        return -1;
+    }
+}
+
+std::size_t Decoder::Impl::serveSpill(std::span<float> out, std::size_t totalDecoded,
+                                      std::size_t frames) {
+    if (spillPos_ >= spill_.size() || channels_ == 0)
+        return 0;
+    std::size_t availFrames = (spill_.size() - spillPos_) / channels_;
+    std::size_t want = frames - totalDecoded;
+    std::size_t n = std::min(availFrames, want);
+    if (n == 0)
+        return 0;
+    std::memcpy(out.data() + totalDecoded * channels_, spill_.data() + spillPos_,
+                n * channels_ * sizeof(float));
+    spillPos_ += n * channels_;
+    if (spillPos_ == spill_.size()) {
+        spill_.clear();
+        spillPos_ = 0;
+    }
+    return n;
 }
 
 int Decoder::Impl::readCallback(void* opaque, uint8_t* buf, int bufSize) {
@@ -459,6 +511,9 @@ bool Decoder::Impl::init() {
 void Decoder::Impl::cleanup() {
     scratchPkt_.reset();
     scratchFrame_.reset();
+    convertBuf_.clear();
+    spill_.clear();
+    spillPos_ = 0;
     if (swr_) {
         swr_free(&swr_);
         swr_ = nullptr;
