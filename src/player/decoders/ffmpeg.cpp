@@ -36,6 +36,12 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "avformat_open_input failed"));
     }
 
+    // Bound probing (P1-1): defaults (5 MB / unbounded-ish analysis) let a
+    // single open buffer megabytes per file. 1 MB / 0.5 s covers headers,
+    // Xing/Info tables and attached pictures for sane files.
+    fmt->probesize = 1048576;
+    fmt->max_analyze_duration = 500000;
+
     if (avformat_find_stream_info(fmt, nullptr) < 0) {
         avformat_close_input(&fmt);
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Io,
@@ -349,6 +355,10 @@ bool Decoder::Impl::init() {
         cleanup();
         return false;
     }
+
+    // Bound probing (P1-1): see extractMetadata above.
+    fmt_->probesize = 1048576;
+    fmt_->max_analyze_duration = 500000;
 
     if (avformat_find_stream_info(fmt_, nullptr) < 0) {
         cleanup();

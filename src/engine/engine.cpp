@@ -205,10 +205,20 @@ Engine::ExpectedVoid Engine::stop() {
     if (s == PlaybackState::Stopped)
         return {};
     playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
-    if (output_)
-        output_->stop();
-    if (ring_)
-        ring_->reset();
+    // Release playback resources (decoder/output/ring hold tens of MB for
+    // large files; measured +47 MB private retained after stop). Replay
+    // re-opens via doPlayTrack. decodeMtx_ serializes with an in-flight
+    // decode chunk (queue lock already released above: queue-to-decodeMtx_).
+    {
+        std::unique_lock<std::mutex> lk(decodeMtx_);
+        if (output_) {
+            output_->stop();
+            output_.reset();
+        }
+        decoder_.reset();
+        reader_.reset();
+        ring_.reset();
+    }
     pausePos_ = 0;
     hasCurrent_.store(false, std::memory_order_release);
     // Rewind the cursor to the stopped track: cursor addresses the NEXT track,
@@ -275,8 +285,7 @@ Engine::ExpectedVoid Engine::suspendCurrentTrack() {
     // Mirror stop() teardown but keep cursor, current track, and history
     // mark: the file handles must go so TagLib can rewrite the file, while
     // everything needed to resume stays in place. decodeMtx_ serializes with
-    // an in-flight decode chunk (stop() relies on state flags alone; the
-    // mutex is strictly safer and follows the queue-to-decodeMtx_ order).
+    // an in-flight decode chunk (like stop(); queue-to-decodeMtx_ order).
     std::unique_lock<std::mutex> lk(decodeMtx_);
     playbackState_.store(PlaybackState::Paused, std::memory_order_release);
     if (output_)

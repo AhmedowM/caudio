@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Probe sizes capped at scan and decode open (1 MB / 0.5 s) instead of
+  FFmpeg defaults
+- `stop` releases decoder/output/ring: a stopped daemon no longer retains
+  tens of MB of playback buffers (replay re-opens transparently)
+
 ## [v1.4.1] - 2026-10-13
 
 ### Fixed
