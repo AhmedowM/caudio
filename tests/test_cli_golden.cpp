@@ -2,7 +2,9 @@
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
+#include <cmath>
 #include <common.hpp>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -283,8 +285,7 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     bool logged = false;
     for (int i = 0; i < 50 && !logged; ++i) {
         std::ifstream lf(dir / "caudio.log", std::ios::binary);
-        std::string content((std::istreambuf_iterator<char>(lf)),
-                            std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(lf)), std::istreambuf_iterator<char>());
         logged = content.find("daemon started") != std::string::npos;
         if (!logged)
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -724,6 +725,16 @@ TEST_CASE("cli playback one-liners", "[cli]") {
         fs::remove_all(dir, ec);
         FAIL(what);
     };
+    // stop is idempotent server-side (already-stopped still succeeds), so a
+    // single retry covers a transient IPC cancel under full-suite load.
+    auto runStop = [&](const char* what) {
+        auto r = run({"stop"});
+        if (r.exitCode != 0)
+            r = run({"stop"});
+        if (r.exitCode != 0)
+            EpicFail(what);
+        return r;
+    };
     if (run({"start"}).exitCode != 0)
         EpicFail("daemon did not start");
     bool up = false;
@@ -741,33 +752,75 @@ TEST_CASE("cli playback one-liners", "[cli]") {
         fs::remove_all(dir, ec);
         SKIP("no audio device for playback one-liners");
     }
-#ifdef TEST_DATA_DIR
-    fs::path wav = fs::path(std::string(TEST_DATA_DIR)) / "sample.wav";
-#else
-    fs::path wav;
-#endif
-    if (wav.empty() || !fs::exists(wav)) {
-        run({"shutdown"});
-        std::error_code ec;
-        fs::remove_all(dir, ec);
-        SKIP("no fixture sample.wav");
-    }
+    // Deterministic fixtures: the sub-second sample files can naturally end
+    // (and gapless-advance) between two CLI spawns under full-suite load, so
+    // every track-identity assertion below would race wall-clock playback.
+    // Synthesize 6 s 16-bit stereo tones instead; container is irrelevant to
+    // this CLI-shape test. (Kept the `ogg` variable name for continuity.)
+    auto writeTone = [&](const char* name, double freq) {
+        fs::path p = dir / name;
+        std::ofstream f(p, std::ios::binary);
+        if (!f)
+            EpicFail("could not write synth fixture");
+        constexpr uint32_t rate = 44100;
+        const uint32_t frames = rate * 6;
+        const uint32_t bytes = frames * 4;
+        auto put32 = [&](uint32_t v) {
+            f.put(static_cast<char>(v & 0xFF));
+            f.put(static_cast<char>((v >> 8) & 0xFF));
+            f.put(static_cast<char>((v >> 16) & 0xFF));
+            f.put(static_cast<char>((v >> 24) & 0xFF));
+        };
+        auto put16 = [&](uint16_t v) {
+            f.put(static_cast<char>(v & 0xFF));
+            f.put(static_cast<char>((v >> 8) & 0xFF));
+        };
+        f.write("RIFF", 4);
+        put32(36 + bytes);
+        f.write("WAVEfmt ", 8);
+        put32(16);
+        put16(1);
+        put16(2);
+        put32(rate);
+        put32(rate * 4);
+        put16(4);
+        put16(16);
+        f.write("data", 4);
+        put32(bytes);
+        for (uint32_t i = 0; i < frames; ++i) {
+            double t = static_cast<double>(i) / static_cast<double>(rate);
+            auto s = static_cast<int16_t>(std::sin(2.0 * 3.141592653589793 * freq * t) * 20000);
+            put16(static_cast<uint16_t>(s));
+            put16(static_cast<uint16_t>(s));
+        }
+        f.close();
+        if (!f)
+            EpicFail("synth fixture write failed");
+        return p;
+    };
+    fs::path wav = writeTone("toneA.wav", 440.0);
+    fs::path ogg = writeTone("toneB.wav", 660.0);
     REQUIRE(run({"library", "add", wav.generic_string()}).exitCode == 0);
     REQUIRE(run({"queue", "add", wav.generic_string()}).exitCode == 0);
-    fs::path ogg = wav.parent_path() / "sample.ogg";
     REQUIRE(fs::exists(ogg));
     REQUIRE(run({"library", "add", ogg.generic_string()}).exitCode == 0);
     REQUIRE(run({"queue", "add", ogg.generic_string()}).exitCode == 0);
+    // Pin the track on repeat-one for the one-liner section: ten CLI spawns
+    // can still outlast the 6 s tone under full-suite load, and every
+    // track-identity assertion below would then race wall-clock playback.
+    // Repeat is switched back off after stopA, so the advance/end sections
+    // below run exactly as before.
+    REQUIRE(run({"queue", "repeat", "one"}).exitCode == 0);
     auto play = run({"play"});
     REQUIRE(play.exitCode == 0);
     REQUIRE(contains(play.out, "Playing "));
-    REQUIRE(contains(play.out, "sample.wav"));
+    REQUIRE(contains(play.out, "toneA.wav"));
     auto pause = run({"pause"});
     REQUIRE(pause.exitCode == 0);
-    REQUIRE(contains(pause.out, "Paused sample.wav at "));
+    REQUIRE(contains(pause.out, "Paused toneA.wav at "));
     auto resume = run({"resume"});
     REQUIRE(resume.exitCode == 0);
-    REQUIRE(contains(resume.out, "Resuming sample.wav from "));
+    REQUIRE(contains(resume.out, "Resuming toneA.wav from "));
     // Seek silence while playing (seek 0 stays at head, so no auto-advance
     // can fire before the assertions below).
     auto seek = run({"seek", "0"});
@@ -775,63 +828,64 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     REQUIRE(seek.out.empty());
     auto pauseA = run({"pause"});
     REQUIRE(pauseA.exitCode == 0);
-    REQUIRE(contains(pauseA.out, "Paused sample.wav at "));
-    auto stop = run({"stop"});
-    REQUIRE(stop.exitCode == 0);
+    REQUIRE(contains(pauseA.out, "Paused toneA.wav at "));
+    auto stop = runStop("stop failed");
     REQUIRE(contains(stop.out, "Stopped"));
     // Play-after-stop replays the stopped track instead of advancing.
     auto again = run({"play"});
     REQUIRE(again.exitCode == 0);
-    REQUIRE(contains(again.out, "Playing sample.wav"));
+    REQUIRE(contains(again.out, "Playing toneA.wav"));
     auto pause2 = run({"pause"});
     REQUIRE(pause2.exitCode == 0);
-    REQUIRE(contains(pause2.out, "Paused sample.wav at "));
+    REQUIRE(contains(pause2.out, "Paused toneA.wav at "));
     auto resume2 = run({"resume"});
     REQUIRE(resume2.exitCode == 0);
-    REQUIRE(contains(resume2.out, "Resuming sample.wav from "));
-    auto stopA = run({"stop"});
-    REQUIRE(stopA.exitCode == 0);
+    REQUIRE(contains(resume2.out, "Resuming toneA.wav from "));
+    auto stopA = runStop("second stop failed");
+    REQUIRE(run({"queue", "repeat", "off"}).exitCode == 0);
     auto nx1 = run({"next"});
     REQUIRE(nx1.exitCode == 0);
-    REQUIRE(contains(nx1.out, "Playing sample.wav"));
+    REQUIRE(contains(nx1.out, "Playing toneA.wav"));
     auto nx = run({"next"});
     REQUIRE(nx.exitCode == 0);
-    REQUIRE(contains(nx.out, "Playing sample.ogg"));
+    REQUIRE(contains(nx.out, "Playing toneB.wav"));
     // Current-track row in queue tracks is prefixed with '>'.
     auto qtm = run({"queue", "tracks"});
     REQUIRE(qtm.exitCode == 0);
     REQUIRE(contains(qtm.out, "Queue (2 tracks):"));
     REQUIRE(markedRows(qtm.out) == 1);
-    auto stop2 = run({"stop"});
-    REQUIRE(stop2.exitCode == 0);
+    auto stop2 = runStop("stop before idle pause failed");
     auto pauseIdle = run({"pause"});
     REQUIRE(pauseIdle.exitCode == 0);
     REQUIRE(contains(pauseIdle.err, "nothing playing"));
     // Resume-after-stop plays the stopped track from its head.
     auto resumeStopped = run({"resume"});
     REQUIRE(resumeStopped.exitCode == 0);
-    REQUIRE(contains(resumeStopped.out, "Playing sample.ogg"));
-    // Natural end with repeat Off stops instead of looping: ogg (last track)
-    // was just started, so wait it out, then status must show Stopped and
-    // play must wrap to the head (wav).
+    REQUIRE(contains(resumeStopped.out, "Playing toneB.wav"));
+    // Natural end with repeat Off stops instead of looping: seek near the
+    // end of the 6 s tone, wait it out, then status must show Stopped and
+    // play must wrap to the head (toneA).
+    auto tail = run({"seek", "5"});
+    REQUIRE(tail.exitCode == 0);
+    REQUIRE(tail.out.empty());
     std::this_thread::sleep_for(std::chrono::seconds(2));
     auto ended = run({"status"});
     REQUIRE(ended.exitCode == 0);
     REQUIRE(contains(ended.out, "State: Stopped"));
     auto rewind = run({"play"});
     REQUIRE(rewind.exitCode == 0);
-    REQUIRE(contains(rewind.out, "Playing sample.wav"));
+    REQUIRE(contains(rewind.out, "Playing toneA.wav"));
     // Direct play opens a temporary queue; --save keeps it permanently.
     auto direct = run({wav.generic_string()});
     REQUIRE(direct.exitCode == 0);
-    REQUIRE(contains(direct.out, "Playing sample.wav (temporary queue)"));
+    REQUIRE(contains(direct.out, "Playing toneA.wav (temporary queue)"));
     auto kept = run({"--save", ogg.generic_string()});
     REQUIRE(kept.exitCode == 0);
-    REQUIRE(contains(kept.out, "Playing sample.ogg"));
+    REQUIRE(contains(kept.out, "Playing toneB.wav"));
     REQUIRE(!contains(kept.out, "temporary"));
     auto qltemp = run({"queue", "list"});
     REQUIRE(qltemp.exitCode == 0);
-    REQUIRE(contains(qltemp.out, "temp: sample.wav"));
+    REQUIRE(contains(qltemp.out, "temp: toneA.wav"));
     REQUIRE(run({"shutdown"}).exitCode == 0);
     std::error_code ec;
     fs::remove_all(dir, ec);
