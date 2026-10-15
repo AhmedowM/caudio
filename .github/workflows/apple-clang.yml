@@ -16,13 +16,28 @@
 # miniaudio note: the dummy-backend trap is GCC-specific; AppleClang builds
 # the CoreAudio backend normally, so audio behavior (if any) is meaningful.
 
+# AppleClang 17 note (2026-10-15, Xcode 26.0.1: full build + 190/190):
+# compiler version is NOT stdlib version. Linux Clang 18 fails on an old
+# system libstdc++; AppleClang ships its SDK libc++ as one unit with
+# Xcode, and Xcode 26's libc++ is a complete C++23 library. Older Xcode
+# generations are probed via the `runs_on` input (older macos runners),
+# not by installing old Xcodes onto macos-latest.
+
 name: Apple Clang (manual)
 
 "on":
   workflow_dispatch:
     inputs:
+      runs_on:
+        description: 'Runner (older images carry older default Xcodes)'
+        required: false
+        default: 'macos-latest'
+        type: choice
+        options:
+          - macos-latest
+          - macos-15
       xcode:
-        description: 'Xcode to use: "latest" or e.g. "16.4" (must be preinstalled)'
+        description: 'Xcode to use: "latest" or e.g. "16.4" (must be preinstalled; job lists /Applications first)'
         required: false
         default: 'latest'
 
@@ -32,8 +47,8 @@ concurrency:
 
 jobs:
   apple-clang:
-    name: AppleClang (macos-latest / Xcode ${{ inputs.xcode }})
-    runs-on: macos-latest
+    name: AppleClang (${{ inputs.runs_on }} / Xcode ${{ inputs.xcode }})
+    runs-on: ${{ inputs.runs_on }}
     continue-on-error: true
     env:
       CAUDIO_TEST_NOAUDIO: 1

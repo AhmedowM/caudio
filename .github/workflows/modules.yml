@@ -2,10 +2,11 @@
 #
 # Same setup as compilers.yml, but every leg configures a modules-*
 # preset (CAUDIO_ENABLE_MODULES=ON, CLI off). Purpose: map the *modules*
-# floor separately from the default-build floor -- named modules need
-# newer compilers than the headers do, so the two matrices are expected
-# to disagree (hypothesis: gcc-13 red here while green in compilers.yml;
-# Clang 18 red in both, for different reasons).
+# floor separately from the default-build floor. Recorded 2026-10-15:
+# gcc-13 red at configure (CMake: no import-graph scanner pre-14) while
+# green in the default matrix -- the split IS the finding (default floor
+# 13, modules floor 14). Clang 18 red for the same stdlib-pairing reason
+# as the default matrix.
 #
 # Tests are OFF in modules presets by default, so this file is a compile
 # matrix unless `run_tests` is set (which adds -DCAUDIO_ENABLE_TESTS=ON
@@ -25,13 +26,13 @@ name: Modules (manual)
   workflow_dispatch:
     inputs:
       gcc_versions:
-        description: 'GCC majors on ubuntu-24.04 (JSON array)'
+        description: 'GCC majors on ubuntu-24.04 (JSON array; 13 excluded: no module scanner pre-14)'
         required: false
-        default: '["13", "14", "15"]'
+        default: '["14", "15"]'
       clang_versions:
-        description: 'LLVM majors on ubuntu-24.04 via apt.llvm.org (JSON array)'
+        description: 'LLVM majors on ubuntu-24.04 via apt.llvm.org (JSON array; 18 excluded: broken stdlib pairing)'
         required: false
-        default: '["18", "19", "20", "21"]'
+        default: '["19", "20", "21"]'
       run_msvc:
         description: 'Run MSVC legs (windows-2022 + windows-latest)'
         type: boolean

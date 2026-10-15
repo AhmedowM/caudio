@@ -10,14 +10,14 @@
 # - Version selection works through PATH, not CC/CXX: our toolchain files
 #   hard-set gcc/g++/clang/clang++ and CMake resolves the bare name from
 #   PATH. Each job therefore plants versioned symlinks where they win.
-# - Floors under test: GCC 13 is the floor-minus-one probe (Ubuntu 24.04's
-#   default compiler -- green here removes the gcc-14 PPA requirement; the
-#   only known sub-14 blocker is `<print>`, covered by the print.hpp
-#   `__has_include` fallback, while named modules stay OFF by default so
-#   they never gate the default presets). Clang 18 is the floor-minus-one
-#   probe (Linux Clang rides the system libstdc++, so the bar is really
-#   libstdc++ >= 14). MSVC legs ride the runner images (windows-2022 =
-#   older VS17 toolset, windows-latest = newest).
+# - Floors under test: GCC 13 is IN (Ubuntu 24.04's default compiler went
+#   green 2026-10-15 with the print.hpp `__has_include` fallback; the only
+#   known sub-14 blocker was `<print>`). Clang 18 is OUT (2026-10-15: its
+#   default libstdc++ pairing has no working `std::expected`, first-TU
+#   failure -- a toolchain/packaging fact, not our code; compiler version
+#   is not stdlib version). Linux Clang rides the system libstdc++, so the
+#   bar is really libstdc++ >= 14. MSVC legs ride the runner images
+#   (windows-2022 = older VS17 toolset, windows-latest = newest).
 # - Legs are informational by default (continue-on-error) with a summary
 #   table in the `report` job. Flip `strict` to promote failures to fatal
 #   when qualifying a version for Tier-1 (ci.yml).
@@ -36,7 +36,7 @@ name: Compilers (manual)
       clang_versions:
         description: 'LLVM majors on ubuntu-24.04 via apt.llvm.org (JSON array)'
         required: false
-        default: '["18", "19", "20", "21"]'
+        default: '["19", "20", "21"]'
       run_msvc:
         description: 'Run MSVC legs (windows-2022 + windows-latest)'
         type: boolean
