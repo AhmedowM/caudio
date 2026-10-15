@@ -22,9 +22,18 @@
 # - Apple legs deliberately do NOT install brew llvm (proves independence);
 #   they reuse the proven apple-clang.yml overrides (xcrun compilers +
 #   CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
-# - minsize* on macOS is expected red: the presets pass -Wl,--gc-sections
-#   (GNU-ld-only; Apple needs -dead_strip). That failure is the finding
-#   that justifies the Apple-conditional dead-strip follow-up.
+# - minsize-lto translates section GC per linker (CAUDIO_LINK_SECTION_GC:
+#   GNU --gc-sections, Apple -dead_strip; MSVC needs none). The flag must
+#   not sit in the presets: Apple ld rejects --gc-sections at compiler
+#   validation, before CMakeLists could repair it.
+# - Known-red: linux gcc / minsize-lto (gcc-16 + IPO + -Os/section-flags
+#   miscompiles startup: --version AND --help abort silently right after
+#   config open, no output; never-throwing paths work; loader/DSO-inits
+#   clean per LD_DEBUG, strace shows raw abort()). Exonerated by experiment:
+#   $ORIGIN RPATH + SONAME bundling (fixed the other 7 linux legs),
+#   --allow-multiple-definition scoping, --gc-sections removal (still red
+#   without it). Next probe: minimal reproducer for a gcc-16 LTO bug
+#   report; candidates -fno-ipa-icf or -O3 on minsize-lto-gcc.
 # - MSVC legs run windows-latest only (VS18-generator presets).
 # - Release presets require a git tag (CAUDIO_REQUIRE_GIT_VERSION=ON), so
 #   checkout uses fetch-depth: 0 -- shallow clones fail configure loudly.
@@ -54,6 +63,11 @@ name: Release bake-off (manual)
       strict:
         required: false
         description: 'Fail the run on any finding (shipping-candidate mode)'
+        type: boolean
+        default: false
+      smoke_debug:
+        required: false
+        description: 'On smoke failure, dump readelf/ldd/LD_DEBUG diagnostics (linux legs)'
         type: boolean
         default: false
 
@@ -295,13 +309,29 @@ jobs:
           find "$RUNNER_TEMP/stage" -type f | sort
           BIN="$RUNNER_TEMP/stage/bin/caudio"
           test -x "$BIN" || (echo "staged binary missing" && exit 1)
-          "$BIN" --version
+          SMOKE_RC=0
+          "$BIN" --version || SMOKE_RC=$?
+          if [ "$SMOKE_RC" -ne 0 ] && [ "${{ inputs.smoke_debug }}" = "true" ]; then
+            echo "=== smoke failed ($SMOKE_RC): loader + init diagnostics ==="
+            readelf -d "$BIN" | grep -E "NEEDED|RUNPATH|RPATH" || true
+            ldd "$BIN" || true
+            LD_DEBUG=libs "$BIN" --version 2>&1 | tail -n 25 || true
+            echo "=== arg-independence: --help and bogus subcommand ==="
+            "$BIN" --help > /tmp/help.txt 2>&1 || HELP_RC=$?; echo "help_rc=${HELP_RC:-0}"
+            head -n 3 /tmp/help.txt || true
+            "$BIN" __no_such_cmd__ > /tmp/bogus.txt 2>&1 || BOGUS_RC=$?; echo "bogus_rc=${BOGUS_RC:-0}"
+            head -n 3 /tmp/bogus.txt || true
+            echo "=== strace tail (last syscalls before death) ==="
+            strace -f -e trace=%process,%network,file,signal -o /tmp/strace.log "$BIN" --version > /dev/null 2>&1 || true
+            tail -n 30 /tmp/strace.log || echo "strace unavailable or empty"
+          fi
           ldd "$BIN" | head -n 15 || true
           echo "bin_bytes=$(stat -c%s "$BIN")"
           size -A "$BIN" 2>/dev/null | sort -k2 -n -r | head -n 8 || true
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
           PKG=$(ls -t build/$PRESET/*.tar.gz 2>/dev/null | head -n 1 || true)
           if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -c%s "$PKG")"; else echo "pkg_bytes=0"; fi
+          exit "$SMOKE_RC"
 
       - name: Upload report
         if: always()
@@ -470,6 +500,8 @@ jobs:
             echo "provider=, plus the staged-tree listing (what ships) and"
             echo "otool/ldd output (what it links). Compare within an OS --"
             echo "cross-OS bytes are not comparable (formats/toolchains)."
-            echo "Known-red: minsize* on macOS (-Wl,--gc-sections is"
-            echo "GNU-ld-only; Apple needs -dead_strip -- follow-up fix)."
+            echo "Section GC is linker-matched (CAUDIO_LINK_SECTION_GC:"
+            echo "GNU --gc-sections, Apple -dead_strip)."
+            echo "Known-red: linux gcc / minsize-lto (gcc-16 LTO startup"
+            echo "miscompile -- silent SIGABRT; see header comment)."
           } >> "$GITHUB_STEP_SUMMARY"

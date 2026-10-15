@@ -207,23 +207,21 @@
     {
       "name": "minsize-lto",
       "inherits": "minsize",
-      "displayName": "Smallest binary: MinSizeRel + LTO + section GC (GCC/Clang)",
+      "displayName": "Smallest binary: MinSizeRel + LTO + section GC (linker-matched in CMakeLists)",
       "cacheVariables": {
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
         "CMAKE_CXX_FLAGS": "-ffunction-sections -fdata-sections",
-        "CMAKE_EXE_LINKER_FLAGS": "-Wl,--gc-sections",
-        "CMAKE_SHARED_LINKER_FLAGS": "-Wl,--gc-sections"
+        "CAUDIO_LINK_SECTION_GC": "ON"
       }
     },
     {
       "name": "minsize-lto-no-cli",
       "inherits": "minsize-no-cli",
-      "displayName": "Smallest binary: MinSizeRel + LTO + section GC, no CLI (GCC/Clang)",
+      "displayName": "Smallest binary: MinSizeRel + LTO + section GC, no CLI (linker-matched in CMakeLists)",
       "cacheVariables": {
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
         "CMAKE_CXX_FLAGS": "-ffunction-sections -fdata-sections",
-        "CMAKE_EXE_LINKER_FLAGS": "-Wl,--gc-sections",
-        "CMAKE_SHARED_LINKER_FLAGS": "-Wl,--gc-sections"
+        "CAUDIO_LINK_SECTION_GC": "ON"
       }
     },
     {

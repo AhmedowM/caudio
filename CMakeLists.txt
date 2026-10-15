@@ -128,6 +128,20 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # CODEBASE_REVIEW.md §5) — no 1.0 artifact ships shared libs.
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" OFF)
+# Section garbage-collection for the minsize-lto presets. The flag is
+# linker-specific and must be chosen after compiler validation: Apple ld
+# rejects -Wl,--gc-sections inside try_compile ("ld: unknown options:
+# --gc-sections"), killing configure before CMakeLists could repair it --
+# so the presets carry only the intent (above) and the translation lives
+# here. MSVC links /OPT:REF by default in optimized configs; nothing to add.
+option(CAUDIO_LINK_SECTION_GC "drop unreferenced code/data sections at link (Apple -dead_strip, otherwise --gc-sections)" OFF)
+if(CAUDIO_LINK_SECTION_GC)
+  if(APPLE)
+    add_link_options(-Wl,-dead_strip)
+  elseif(NOT MSVC)
+    add_link_options(-Wl,--gc-sections)
+  endif()
+endif()
 # NOTE: ccache is environment configuration, not a project option; pass
 # -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
 
@@ -345,8 +359,10 @@ target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::cli
 target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 ca_set_warnings(caudio_cli)
 ca_set_module_warnings(caudio_cli)
-# Needed on MinGW for template instantiation deduplication across executable + static libs
-target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
+# Needed on MinGW for template instantiation deduplication across executable + static libs.
+# Scoped to Windows-GNU only: the Linux-GNU links (release presets across
+# the bake-off matrix) succeed without it.
+target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>:-Wl,--allow-multiple-definition>)
 # Static GNU runtime for the shipped executable: kills GLIBCXX-version failures
 # and missing libstdc++/libgcc DLLs on bare machines (all platforms, validated
 # by CI incl. macOS/GCC). libwinpthread stays shared -- a single instance
@@ -448,8 +464,8 @@ endif()
 
 # Windows distributability: the caudio.exe links FFmpeg + MinGW runtime
 # dynamically, none of which lives on a bare machine's PATH. Bundle both next
-# to the executable so CPack archives run standalone. (Linux/macOS resolve
-# via system loader paths; nothing to bundle there.)
+# to the executable so CPack archives run standalone. (macOS bundles behind
+# CAUDIO_BUNDLE_FFMPEG_MACOS; Linux is bundled unconditionally below.)
 if(WIN32 AND CAUDIO_BUILD_CLI)
   # Bundle FFmpeg runtime DLLs next to the executable. Our FindFFmpeg targets
   # are UNKNOWN IMPORTED (no runtime location), so resolve the DLLs by layout:
@@ -480,6 +496,40 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
   endif()
 endif()
 
+# Linux distributability: trimmed FFmpeg .so files live outside the system
+# loader path, so the staged binary dies with "libavcodec.so.62: cannot open
+# shared object file" (release bake-off 2026-10-15). Mirror the macOS shape:
+# ship the versioned files in lib/ and point the exe at them via an
+# $ORIGIN-relative RPATH (ELF needs no rewiring or re-signing). Two details
+# matter: (a) the SONAME links (libavcodec.so.62) must ship too -- the
+# loader asks for the SONAME by exact name, so only the bare dev link
+# (libavcodec.so) stays out, via the .so.* glob; (b) CMAKE_INSTALL_RPATH is
+# consumed when caudio_cli is created (above), so touching the variable here
+# is too late -- set the target property explicitly, preserving any value
+# the user configured.
+if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
+  get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
+  set(_ff_sos "")
+  foreach(_lib avcodec avformat avutil swresample)
+    file(GLOB _cand "${_ff_libdir}/lib${_lib}.so.*")
+    list(APPEND _ff_sos ${_cand})
+  endforeach()
+  list(REMOVE_DUPLICATES _ff_sos)
+  if(NOT _ff_sos)
+    if(NOT FFmpeg_AVCODEC_LIBRARY MATCHES "\\.a$")
+      message(WARNING "FFmpeg shared libs not found near ${FFmpeg_AVCODEC_LIBRARY} -- packages will need them on the loader path")
+    endif()
+  else()
+    install(FILES ${_ff_sos} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+    get_target_property(_cli_rpath caudio_cli INSTALL_RPATH)
+    if(_cli_rpath STREQUAL "_cli_rpath-NOTFOUND")
+      set(_cli_rpath "")
+    endif()
+    list(APPEND _cli_rpath "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+    set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_cli_rpath}")
+  endif()
+endif()
+
 # macOS distributability (UNVERIFIED -- no macOS host as of 2026-10-09; keep
 # CAUDIO_BUNDLE_FFMPEG_MACOS=OFF until validated on a Mac or the macOS
 # release leg). Like Windows, the exe links FFmpeg dynamically -- but brew
@@ -505,8 +555,16 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
     message(WARNING "CAUDIO_BUNDLE_FFMPEG_MACOS requested but no versioned FFmpeg dylibs near ${FFmpeg_AVCODEC_LIBRARY}")
   else()
     install(FILES ${_ff_dylibs} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-    # Exe-side search path; dylib ids + cross-refs are rewired below.
-    set(CMAKE_INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+    # Exe-side search path; dylib ids + cross-refs are rewired below. Set the
+    # target property explicitly: CMAKE_INSTALL_RPATH is consumed at target
+    # creation (above), so assigning the variable here would be too late
+    # (same ordering as the Linux block).
+    get_target_property(_cli_rpath caudio_cli INSTALL_RPATH)
+    if(_cli_rpath STREQUAL "_cli_rpath-NOTFOUND")
+      set(_cli_rpath "")
+    endif()
+    list(APPEND _cli_rpath "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+    set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_cli_rpath}")
     set(_ff_dylib_names "")
     foreach(_f IN LISTS _ff_dylibs)
       get_filename_component(_n "${_f}" NAME)
