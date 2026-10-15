@@ -1,0 +1,352 @@
+# Modules version matrix (MANUAL observatory, not a gate).
+#
+# Same setup as compilers.yml, but every leg configures a modules-*
+# preset (CAUDIO_ENABLE_MODULES=ON, CLI off). Purpose: map the *modules*
+# floor separately from the default-build floor -- named modules need
+# newer compilers than the headers do, so the two matrices are expected
+# to disagree (hypothesis: gcc-13 red here while green in compilers.yml;
+# Clang 18 red in both, for different reasons).
+#
+# Tests are OFF in modules presets by default, so this file is a compile
+# matrix unless `run_tests` is set (which adds -DCAUDIO_ENABLE_TESTS=ON
+# and runs ctest --test-dir; there are no modules-* test presets).
+# The modules+tests combination itself is unproven -- a red Test step
+# with a green Build step is a finding about the combo, not the compiler.
+#
+# Design notes shared with compilers.yml:
+# - Version selection works through PATH, not CC/CXX (toolchains hard-set
+#   bare names). Legs plant versioned symlinks where they win.
+# - Legs are informational by default (continue-on-error) with a summary
+#   in `report`. Flip `strict` for Tier-1 qualification mode.
+
+name: Modules (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      gcc_versions:
+        description: 'GCC majors on ubuntu-24.04 (JSON array)'
+        required: false
+        default: '["13", "14", "15"]'
+      clang_versions:
+        description: 'LLVM majors on ubuntu-24.04 via apt.llvm.org (JSON array)'
+        required: false
+        default: '["18", "19", "20", "21"]'
+      run_msvc:
+        description: 'Run MSVC legs (windows-2022 + windows-latest)'
+        type: boolean
+        default: true
+      run_winclang:
+        description: 'Run LLVM clang++ on Windows leg (MSVC ABI, modules preset)'
+        type: boolean
+        default: true
+      run_tests:
+        description: 'Also build tests (-DCAUDIO_ENABLE_TESTS=ON) and run ctest --test-dir'
+        type: boolean
+        default: false
+      strict:
+        description: 'Fail the run on any version finding (Tier-1 qualification mode)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gcc:
+    name: modules gcc-${{ matrix.version }} (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(inputs.gcc_versions) }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GCC ${{ matrix.version }}
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-${{ matrix.version }} g++-${{ matrix.version }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.version }} 100 --slave /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.version }} --slave /usr/bin/gcov gcov /usr/bin/gcov-${{ matrix.version }} || true
+          sudo update-alternatives --set gcc /usr/bin/gcc-${{ matrix.version }} || true
+          gcc --version; g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure (modules-gcc)
+        run: |
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
+          cmake --preset modules-gcc $TESTS
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build --preset modules-gcc 2>&1 | tee build-mgcc-${{ matrix.version }}.log
+
+      - name: Test
+        if: inputs.run_tests
+        run: |
+          set -o pipefail
+          ctest --test-dir build/modules-gcc --output-on-failure 2>&1 | tee test-mgcc-${{ matrix.version }}.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modules-gcc-${{ matrix.version }}-logs
+          path: |
+            build-mgcc-${{ matrix.version }}.log
+            test-mgcc-${{ matrix.version }}.log
+          if-no-files-found: warn
+
+  clang:
+    name: modules clang-${{ matrix.version }} (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(inputs.clang_versions) }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM Clang ${{ matrix.version }} (apt.llvm.org)
+        run: |
+          # Same hardened installer as compilers.yml / llvm-linux.yml.
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          echo "codename: $CODENAME"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${{ matrix.version }} main" | sudo tee /etc/apt/sources.list.d/llvm-${{ matrix.version }}.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-${{ matrix.version }}
+          /usr/bin/clang-${{ matrix.version }} --version
+          sudo ln -sf /usr/bin/clang-${{ matrix.version }} /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-${{ matrix.version }} /usr/local/bin/clang++
+          hash -r; clang --version; clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure (modules-clang)
+        run: |
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
+          cmake --preset modules-clang $TESTS
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build --preset modules-clang 2>&1 | tee build-mclang-${{ matrix.version }}.log
+
+      - name: Test
+        if: inputs.run_tests
+        run: |
+          set -o pipefail
+          ctest --test-dir build/modules-clang --output-on-failure 2>&1 | tee test-mclang-${{ matrix.version }}.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modules-clang-${{ matrix.version }}-logs
+          path: |
+            build-mclang-${{ matrix.version }}.log
+            test-mclang-${{ matrix.version }}.log
+          if-no-files-found: warn
+
+  msvc:
+    name: modules msvc (${{ matrix.os }})
+    if: inputs.run_msvc
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-latest]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: MSVC version under test
+        run: |
+          vswhere -latest -property installationVersion || echo "vswhere unavailable"
+          cl 2>&1 | head -n 2 || true
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+          ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
+        shell: bash
+
+      - name: Configure (modules-msvc)
+        # modules-msvc pins the VS 2026 generator like ci-msvc -- same VS17
+        # fallback on windows-2022 (array form: quotes don't re-expand).
+        run: |
+          GEN_ARGS=()
+          if [ "${{ matrix.os }}" = "windows-2022" ]; then GEN_ARGS=(-G "Visual Studio 17 2022"); fi
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
+          cmake --preset modules-msvc "${GEN_ARGS[@]}" $TESTS
+        shell: bash
+
+      - name: Expose DLLs
+        run: |
+          dll=$(find build/modules-msvc/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build --preset modules-msvc 2>&1 | tee build-msvc-${{ matrix.os }}.log
+        shell: bash
+
+      - name: Test
+        if: inputs.run_tests
+        run: |
+          set -o pipefail
+          ctest --test-dir build/modules-msvc -C Debug --output-on-failure 2>&1 | tee test-msvc-${{ matrix.os }}.log
+        shell: bash
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modules-msvc-${{ matrix.os }}-logs
+          path: |
+            build-msvc-${{ matrix.os }}.log
+            test-msvc-${{ matrix.os }}.log
+          if-no-files-found: warn
+
+  winclang:
+    name: modules clang++ on Windows (MSVC ABI)
+    if: inputs.run_winclang
+    runs-on: windows-latest
+    continue-on-error: ${{ inputs.strict == false }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM
+        run: |
+          choco install llvm -y --no-progress || echo "llvm choco install failed"
+          export PATH="/c/Program Files/LLVM/bin:$PATH"
+          echo "/c/Program Files/LLVM/bin" >> $GITHUB_PATH
+          clang++ --version || exit 1
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+        shell: bash
+
+      - name: Configure (modules preset, auto toolchain finds clang++)
+        run: |
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
+          cmake --preset modules $TESTS
+        shell: bash
+
+      - name: Expose DLLs
+        run: |
+          dll=$(find build/modules/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Build
+        run: |
+          set -o pipefail
+          cmake --build --preset modules 2>&1 | tee build-winclang-modules.log
+        shell: bash
+
+      - name: Test
+        if: inputs.run_tests
+        run: |
+          set -o pipefail
+          ctest --test-dir build/modules --output-on-failure 2>&1 | tee test-winclang-modules.log
+        shell: bash
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modules-winclang-logs
+          path: |
+            build-winclang-modules.log
+            test-winclang-modules.log
+          if-no-files-found: warn
+
+  report:
+    name: modules support report
+    needs: [gcc, clang, msvc, winclang]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: |
+          {
+            echo "# Modules version support (manual run)"
+            echo ""
+            echo "| Leg | Result |"
+            echo "| --- | ------ |"
+            echo "| gcc matrix | ${{ needs.gcc.result }} |"
+            echo "| clang matrix | ${{ needs.clang.result }} |"
+            echo "| msvc | ${{ needs.msvc.result }} |"
+            echo "| winclang | ${{ needs.winclang.result }} |"
+            echo ""
+            echo "Per-version logs are in the run artifacts. Expected shape:"
+            echo "gcc-13 red (named modules need 14+) while green in the"
+            echo "default-preset matrix -- that split IS the finding (it"
+            echo "confirms the two floors differ). Anything else red names"
+            echo "the next blocker the same way."
+          } >> "$GITHUB_STEP_SUMMARY"
