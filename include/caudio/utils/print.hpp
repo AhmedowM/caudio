@@ -15,8 +15,10 @@
  * This header routes through `std::format` + classic insertion on MinGW
  * (byte-identical output for our UTF-8/ASCII usage; no console transcoding
  * is performed, matching the daemon/pipe use case) and forwards to
- * `std::print`/`std::println` everywhere else. Always call
- * `caudio::print`/`caudio::println`, never `std::` directly.
+ * `std::print`/`std::println` everywhere else. Toolchains without `<print>`
+ * at all (e.g. GCC 13 libstdc++) take the same format-based route, which
+ * keeps the floor at `<format>`/`<expected>` instead of `<print>`. Always
+ * call `caudio::print`/`caudio::println`, never `std::` directly.
  */
 
 #include <cstdio>
@@ -25,7 +27,7 @@
 #include <string>
 #include <utility>
 
-#if defined(__MINGW32__)
+#if defined(__MINGW32__) || !__has_include(<print>)
 #include <iostream>
 #else
 #include <print>
@@ -33,7 +35,7 @@
 
 namespace caudio {
 
-#ifdef __MINGW32__
+#if defined(__MINGW32__) || !__has_include(<print>)
 
 /// @brief Format to a stream (MinGW: avoids missing terminal helpers).
 template <typename... A>
