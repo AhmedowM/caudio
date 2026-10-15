@@ -7,7 +7,10 @@
 # through; CompilerPolicy.cmake still requires
 # -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. Not a supported configuration --
 # the workflow measures the baseline gap, it does not close it.
-if(CAUDIO_APPLE_CLANG)
+# NOTE: the cache variable does NOT survive try_compile (compiler ABI
+# probes re-run this file in a fresh scope), but the environment does --
+# so the workflow exports CAUDIO_APPLE_CLANG=1 and both forms are honored.
+if(CAUDIO_APPLE_CLANG OR DEFINED ENV{CAUDIO_APPLE_CLANG})
   message(STATUS "AppleClang mode: keeping caller-provided compiler "
     "(unsupported; see apple-clang.yml)")
   return()

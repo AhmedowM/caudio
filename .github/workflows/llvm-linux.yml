@@ -21,13 +21,13 @@ name: LLVM on Linux (manual)
         required: false
         default: '21'
       preset:
-        description: 'Build preset (size-oriented)'
+        description: 'Build preset (must be a *-clang preset: the bare names resolve to GCC via toolchain-auto)'
         required: false
-        default: 'minsize-lto'
+        default: 'minsize-lto-clang'
         type: choice
         options:
-          - minsize-lto
-          - release-lto
+          - minsize-lto-clang
+          - release-lto-clang
           - ci-clang
       use_lld:
         description: 'Link with lld (recommended for size/link speed)'
@@ -102,12 +102,18 @@ jobs:
           cmake --preset ${{ inputs.preset }} $EXTRA
 
       - name: Build
-        run: cmake --build --preset ${{ inputs.preset }} 2>&1 | tee build.log
+        # pipefail: without it tee masks a failed build as success (this
+        # hid the first real finding: system g++-13 has no <print>).
+        run: |
+          set -o pipefail
+          cmake --build --preset ${{ inputs.preset }} 2>&1 | tee build.log
 
       - name: Test
         if: inputs.run_tests
         # --test-dir (not --preset): size presets ship no test preset.
-        run: ctest --test-dir build/${{ inputs.preset }} --output-on-failure 2>&1 | tee test.log
+        run: |
+          set -o pipefail
+          ctest --test-dir build/${{ inputs.preset }} --output-on-failure 2>&1 | tee test.log
 
       - name: Size report
         if: always()

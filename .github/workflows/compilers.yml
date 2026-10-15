@@ -89,10 +89,14 @@ jobs:
         run: cmake --preset ci-gcc
 
       - name: Build
-        run: cmake --build --preset ci-gcc 2>&1 | tee build-gcc-${{ matrix.version }}.log
+        run: |
+          set -o pipefail
+          cmake --build --preset ci-gcc 2>&1 | tee build-gcc-${{ matrix.version }}.log
 
       - name: Test
-        run: ctest --preset ci-gcc --output-on-failure 2>&1 | tee test-gcc-${{ matrix.version }}.log
+        run: |
+          set -o pipefail
+          ctest --preset ci-gcc --output-on-failure 2>&1 | tee test-gcc-${{ matrix.version }}.log
 
       - name: Upload logs
         if: always()
@@ -153,10 +157,14 @@ jobs:
         run: cmake --preset ci-clang
 
       - name: Build
-        run: cmake --build --preset ci-clang 2>&1 | tee build-clang-${{ matrix.version }}.log
+        run: |
+          set -o pipefail
+          cmake --build --preset ci-clang 2>&1 | tee build-clang-${{ matrix.version }}.log
 
       - name: Test
-        run: ctest --preset ci-clang --output-on-failure 2>&1 | tee test-clang-${{ matrix.version }}.log
+        run: |
+          set -o pipefail
+          ctest --preset ci-clang --output-on-failure 2>&1 | tee test-clang-${{ matrix.version }}.log
 
       - name: Upload logs
         if: always()
@@ -203,7 +211,14 @@ jobs:
         shell: bash
 
       - name: Configure (ci-msvc)
-        run: cmake --preset ci-msvc
+        # ci-msvc pins the VS 2026 generator, which windows-2022 (VS17 max)
+        # cannot create -- fall back to VS17 there. The older toolset is
+        # precisely what this leg probes (C++23 gaps welcome: findings).
+        run: |
+          GEN=""
+          if [ "${{ matrix.os }}" = "windows-2022" ]; then GEN='-G "Visual Studio 17 2022"'; fi
+          cmake --preset ci-msvc $GEN
+        shell: bash
 
       - name: Expose DLLs
         run: |
@@ -219,11 +234,15 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ci-msvc 2>&1 | tee build-msvc-${{ matrix.os }}.log
+        run: |
+          set -o pipefail
+          cmake --build --preset ci-msvc 2>&1 | tee build-msvc-${{ matrix.os }}.log
         shell: bash
 
       - name: Test
-        run: ctest --preset ci-msvc --output-on-failure 2>&1 | tee test-msvc-${{ matrix.os }}.log
+        run: |
+          set -o pipefail
+          ctest --preset ci-msvc --output-on-failure 2>&1 | tee test-msvc-${{ matrix.os }}.log
         shell: bash
 
       - name: Upload logs
@@ -283,11 +302,15 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ci 2>&1 | tee build-winclang.log
+        run: |
+          set -o pipefail
+          cmake --build --preset ci 2>&1 | tee build-winclang.log
         shell: bash
 
       - name: Test
-        run: ctest --preset ci --output-on-failure 2>&1 | tee test-winclang.log
+        run: |
+          set -o pipefail
+          ctest --preset ci --output-on-failure 2>&1 | tee test-winclang.log
         shell: bash
 
       - name: Upload logs
