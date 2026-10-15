@@ -1,15 +1,8 @@
 # LLVM on Linux (MANUAL).
 #
-# Two purposes in one file:
-#  1. A robust apt.llvm.org installer (the step that failed before) --
-#     this block is the reference copy; compilers.yml duplicates its core
-#     with a pointer back here.
-#  2. A Clang size-measurement build (minsize-lto / release-lto) to
-#     quantify shipping from LLVM: binary + SDK space cuts vs the GCC
-#     releases (see §6 L-6: Linux Clang needs a Linux host -- this is it).
-#
-# Not a gate: run manually when evaluating an LLVM major or refreshing
-# the size numbers. Artifacts: the built binaries + a size report.
+# A robust apt.llvm.org installer plus a Clang size-measurement build
+# (minsize-lto / release-lto). Not a gate: run manually when evaluating
+# an LLVM major or refreshing size numbers.
 
 name: LLVM on Linux (manual)
 
@@ -57,13 +50,8 @@ jobs:
 
       - name: Install LLVM Clang ${{ inputs.llvm_version }}
         run: |
-          # The historical failures, in order of frequency:
-          #  1. lsb-release/wget/gnupg missing -> codename/key steps die.
-          #  2. apt-key usage (deprecated/removed) -> use a signed-by
-          #     keyring under /usr/share/keyrings, never apt-key.
-          #  3. No apt update after adding the source -> package not found.
-          #  4. Bare `clang++` expected afterwards -> plant symlinks (our
-          #     toolchain-clang.cmake resolves the bare names from PATH).
+          # Needs lsb-release/wget/gnupg; signed-by keyring (never apt-key);
+          # apt update after adding the source; symlink bare clang++.
           sudo apt-get update
           sudo apt-get install -y lsb-release wget gnupg
           CODENAME="$(lsb_release -cs)"
@@ -102,8 +90,7 @@ jobs:
           cmake --preset ${{ inputs.preset }} $EXTRA
 
       - name: Build
-        # pipefail: without it tee masks a failed build as success (this
-        # hid the first real finding: system g++-13 has no <print>).
+        # pipefail: without it tee masks a failed build as success
         run: |
           set -o pipefail
           cmake --build --preset ${{ inputs.preset }} 2>&1 | tee build.log

@@ -1,33 +1,10 @@
 # Apple Clang (MANUAL observatory, not a gate).
 #
-# Builds with the NATIVE Xcode toolchain instead of brew LLVM to measure the
-# gap against our C++23 baseline (<expected>, <print>). ci.yml policy note:
-# AppleClang lags the baseline, so this workflow is expected to fail at
-# configure or compile time on older Xcodes -- the failure point IS the
-# deliverable (it names the exact feature blocking AppleClang support).
-#
+# Builds with the native Xcode toolchain instead of brew LLVM.
 # Mechanics: cmake/toolchains/detail/llvm-clang.cmake honors
-# -DCAUDIO_APPLE_CLANG=ON by skipping the brew pin, letting the xcrun
-# compiler through; cmake/CompilerPolicy.cmake still requires
-# -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. The job always uploads full logs
-# plus a gap report (first errors), and never fails the run -- promote to
-# a gate only if a future Xcode closes the gap end to end.
-#
-# miniaudio note: the dummy-backend trap is GCC-specific; AppleClang builds
-# the CoreAudio backend normally, so audio behavior (if any) is meaningful.
-
-# AppleClang 17 note (2026-10-15, Xcode 26.0.1: full build + 190/190):
-# compiler version is NOT stdlib version. Linux Clang 18 fails on an old
-# system libstdc++; AppleClang ships its SDK libc++ as one unit with
-# Xcode, and Xcode 26's libc++ is a complete C++23 library. Recorded
-# matrix: macos-14/Xcode 15.4 red (no std::jthread AND no ostream
-# println overloads -- the jthread wall alone spans 38 engine sites, so
-# Xcode 16 is out the same way), macos-15/Xcode 16.4 red (jthread),
-# macos-15/Xcode 26.0.1 green, macos-latest/Xcode 26.6 green. Floor:
-# Xcode 26 to build; macOS 15 to run (floating from_chars was the only
-# 26-gated API in our code, replaced by strtod in cli/shell/parse.hpp).
-# Older macos runners probe older default toolchains; macos-14 is
-# time-boxed (runner retires 2026-11-02).
+# -DCAUDIO_APPLE_CLANG=ON by skipping the brew pin; CompilerPolicy still
+# requires -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. The job uploads full
+# logs plus a gap report (first errors), and never fails the run.
 
 name: Apple Clang (manual)
 

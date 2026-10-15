@@ -1,24 +1,14 @@
 # Modules version matrix (MANUAL observatory, not a gate).
 #
 # Same setup as compilers.yml, but every leg configures a modules-*
-# preset (CAUDIO_ENABLE_MODULES=ON, CLI off). Purpose: map the *modules*
-# floor separately from the default-build floor. Recorded 2026-10-15:
-# gcc-13 red at configure (CMake: no import-graph scanner pre-14) while
-# green in the default matrix -- the split IS the finding (default floor
-# 13, modules floor 14). Clang 18 red for the same stdlib-pairing reason
-# as the default matrix.
+# preset (CAUDIO_ENABLE_MODULES=ON, CLI off) to map the modules floor
+# separately from the default-build floor.
 #
-# Tests are OFF in modules presets by default, so this file is a compile
-# matrix unless `run_tests` is set (which adds -DCAUDIO_ENABLE_TESTS=ON
-# and runs ctest --test-dir; there are no modules-* test presets).
-# The modules+tests combination itself is unproven -- a red Test step
-# with a green Build step is a finding about the combo, not the compiler.
+# Tests are OFF in modules presets; `run_tests` adds -DCAUDIO_ENABLE_TESTS=ON
+# and runs ctest (there are no modules-* test presets).
 #
-# Design notes shared with compilers.yml:
-# - Version selection works through PATH, not CC/CXX (toolchains hard-set
-#   bare names). Legs plant versioned symlinks where they win.
-# - Legs are informational by default (continue-on-error) with a summary
-#   in `report`. Flip `strict` for Tier-1 qualification mode.
+# - Version selection works through PATH (toolchains hard-set bare names).
+# - Legs are informational (continue-on-error) with a summary in `report`.
 
 name: Modules (manual)
 

@@ -99,11 +99,11 @@ jobs:
         run: |
           if gh release download "ffmpeg-trimmed-8.1.2-1" \
             --repo "${{ env.DEPS_REPO }}" \
-            --pattern "ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz" \
+            --pattern "ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz" \
             --dir . \
             --clobber; then
             mkdir -p "$CAUDIO_TRIMMED_ROOT"
-            tar -xzf ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
             echo "CAUDIO_TRIMMED_ROOT=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_ENV"
             echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
           else

@@ -15,6 +15,9 @@ CAUDIO_TRIMMED_ROOT. Host-arch only: for another arch, run on that arch
 --pack tars the prefix for deps-private upload. The asset name encodes the
 host OS/arch (ffmpeg-trimmed-<ver>-<os>-<arch>.tar.gz); name it honestly --
 a misnamed macos-x86_64 asset once shipped arm64 binaries.
+
+Windows runs need a MINGW environment (MSYSTEM=UCRT64 set -- easiest via
+ucrt64.exe); bare MSYS without MSYSTEM makes FFmpeg configure refuse.
 """
 
 import argparse
@@ -118,6 +121,9 @@ def main() -> None:
                     help="override pinned version from FFmpegTrimmed.cmake")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4,
                     help="make -j level (default: cpu count)")
+    ap.add_argument("--extra-configure-args", default="",
+                    help="space-separated extra args appended after the whitelist "
+                         "(e.g. cross-compile --arch/--target-os/--cc)")
     ap.add_argument("--pack", nargs="?", const="auto", default=None, metavar="OUT.tar.gz",
                     help="tar the prefix for upload (default name encodes host os/arch)")
     ap.add_argument("--print-flags", action="store_true",
@@ -137,17 +143,20 @@ def main() -> None:
         print("[ERROR] --prefix is required (or use --print-flags)", file=sys.stderr)
         sys.exit(2)
 
-    if platform.system() == "Windows" and not shutil.which("bash"):
-        print("[ERROR] Windows source builds need bash+make on PATH (MSYS2); "
-              "MSVC cannot compile FFmpeg upstream -- consume a prebuilt tree instead.",
-              file=sys.stderr)
-        sys.exit(1)
-    cc = os.environ.get("CC", "cc")
-    if not shutil.which(cc):
-        print(f"[ERROR] C compiler '{cc}' not on PATH (set CC to override)",
-              file=sys.stderr)
-        sys.exit(1)
-    require("make", "install build essentials (Linux) / Xcode CLT (macOS) / MSYS2 (Windows)")
+    if not args.dry_run:
+        # Dry runs print commands without touching the machine, so tool
+        # presence is checked only for real builds.
+        if platform.system() == "Windows" and not shutil.which("bash"):
+            print("[ERROR] Windows source builds need bash+make on PATH (MSYS2); "
+                  "MSVC cannot compile FFmpeg upstream -- consume a prebuilt tree instead.",
+                  file=sys.stderr)
+            sys.exit(1)
+        cc = os.environ.get("CC") or "cc"
+        if not shutil.which(cc):
+            print(f"[ERROR] C compiler '{cc}' not on PATH (set CC to override)",
+                  file=sys.stderr)
+            sys.exit(1)
+        require("make", "install build essentials (Linux) / Xcode CLT (macOS) / MSYS2 (Windows)")
 
     prefix = args.prefix.resolve()
     with tempfile.TemporaryDirectory(prefix="trimmed-ffmpeg-") as tmp:
@@ -179,12 +188,23 @@ def main() -> None:
         build = tmpdir / "build"
         if not args.dry_run:
             build.mkdir()
-        configure = [str(src / "configure"), f"--prefix={prefix}", *flags]
+        # POSIX forms: on Windows these cross into bash (which would eat
+        # backslashes), while Path-as-cwd stays native for subprocess.
+        configure = [(src / "configure").as_posix(), f"--prefix={prefix.as_posix()}", *flags]
+        if args.extra_configure_args:
+            configure.extend(args.extra_configure_args.split())
         if platform.system() == "Windows":
             configure = ["bash", *configure]
         run(configure, build, args.dry_run)
         run(["make", f"-j{args.jobs}"], build, args.dry_run)
         run(["make", "install"], build, args.dry_run)
+        if platform.system() == "Windows" and not args.dry_run:
+            # DLLs belong in bin/ next to the import libs in lib/ (gyan/choco
+            # layout); the CMake bundling resolves them via <libdir>/../bin.
+            bindir = prefix / "bin"
+            bindir.mkdir(exist_ok=True)
+            for dll in (prefix / "lib").glob("*.dll"):
+                shutil.copy2(dll, bindir / dll.name)
 
     print(f"trimmed FFmpeg {version} installed to {prefix}")
     print(f"configure with: -DCAUDIO_TRIMMED_ROOT={prefix}")
@@ -192,8 +212,11 @@ def main() -> None:
         out = args.pack if args.pack != "auto" else str(prefix.parent / asset_name(version))
         print(f"+ pack {prefix} -> {out}")
         if not args.dry_run:
+            # Contents at the tar root (same layout as `tar -C prefix .`),
+            # so extracting with -C <root> yields <root>/lib etc. directly.
             with tarfile.open(out, "w:gz") as tf:
-                tf.add(prefix, arcname=prefix.name)
+                for child in sorted(prefix.iterdir()):
+                    tf.add(child, arcname=child.name)
         print(f"upload {out} as a deps-private release asset")
 
 

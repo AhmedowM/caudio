@@ -1,28 +1,12 @@
 # Compiler version matrix (MANUAL observatory, not a gate).
 #
-# Purpose: probe which compiler versions build + pass the suite, so version
-# floors can be confirmed (or broadened with tiny tweaks / in-tree polyfills
-# like utils/function.hpp) instead of guessed. Mirrors ci.yml conventions
-# (CAUDIO_TEST_NOAUDIO, dep sets, DLL staging) but pins runners and selects
-# versions explicitly.
+# Probes which compiler versions build + pass the suite, to confirm
+# version floors instead of guessing.
 #
-# Design notes (read before "fixing" red legs):
-# - Version selection works through PATH, not CC/CXX: our toolchain files
-#   hard-set gcc/g++/clang/clang++ and CMake resolves the bare name from
-#   PATH. Each job therefore plants versioned symlinks where they win.
-# - Floors under test: GCC 13 is IN (Ubuntu 24.04's default compiler went
-#   green 2026-10-15 with the print.hpp `__has_include` fallback; the only
-#   known sub-14 blocker was `<print>`). Clang 18 is OUT (2026-10-15: its
-#   default libstdc++ pairing has no working `std::expected`, first-TU
-#   failure -- a toolchain/packaging fact, not our code; compiler version
-#   is not stdlib version). Linux Clang rides the system libstdc++, so the
-#   bar is really libstdc++ >= 14. MSVC legs ride the runner images
-#   (windows-2022 = older VS17 toolset, windows-latest = newest).
-# - Legs are informational by default (continue-on-error) with a summary
-#   table in the `report` job. Flip `strict` to promote failures to fatal
-#   when qualifying a version for Tier-1 (ci.yml).
-# - No macOS legs here: brew-LLVM versions are covered by ci.yml and
-#   AppleClang has its own observatory (apple-clang.yml).
+# - Version selection works through PATH (toolchains hard-set bare names);
+#   each job plants versioned symlinks where they win.
+# - Legs are informational (continue-on-error) with a summary in `report`.
+# - No macOS legs here (see apple-clang.yml).
 
 name: Compilers (manual)
 
@@ -130,11 +114,8 @@ jobs:
 
       - name: Install LLVM Clang ${{ matrix.version }} (apt.llvm.org)
         run: |
-          # Hardened installer -- the historical failures were, in order:
-          # missing lsb-release/wget/gnupg, apt-key deprecation (use a
-          # signed-by keyring, never apt-key), and forgetting apt update
-          # after adding the source. Keep this block in sync with
-          # llvm-linux.yml (its installer is the reference copy).
+          # Needs lsb-release/wget/gnupg; signed-by keyring (never apt-key);
+          # apt update after adding the source. Keep in sync with llvm-linux.yml.
           sudo apt-get update
           sudo apt-get install -y lsb-release wget gnupg
           CODENAME="$(lsb_release -cs)"
@@ -218,8 +199,6 @@ jobs:
         # ci-msvc pins the VS 2026 generator, which windows-2022 (VS17 max)
         # cannot create -- fall back to VS17 there. The older toolset is
         # precisely what this leg probes (C++23 gaps welcome: findings).
-        # NOTE: array form -- a plain $GEN string would split the quoted
-        # generator name into garbage (quotes don't re-expand).
         run: |
           GEN_ARGS=()
           if [ "${{ matrix.os }}" = "windows-2022" ]; then GEN_ARGS=(-G "Visual Studio 17 2022"); fi
