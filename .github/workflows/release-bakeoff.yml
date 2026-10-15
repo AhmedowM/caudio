@@ -190,8 +190,10 @@ jobs:
           otool -L "$BIN" | head -n 12 || true
           echo "bin_bytes=$(stat -f%z "$BIN")"
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
-          PKG=$(ls -t build/$PRESET/*.tar.gz 2>/dev/null | head -n 1 || true)
-          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -f%z "$PKG")"; else echo "pkg_bytes=0"; fi
+          RT=$(ls build/$PRESET/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
+          DEV=$(ls build/$PRESET/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
+          if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -f%z "$RT")"; else echo "pkg_bytes=0"; fi
+          if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -f%z "$DEV")"; else echo "dev_bytes=0"; fi
 
       - name: Upload report
         if: always()
@@ -329,8 +331,10 @@ jobs:
           echo "bin_bytes=$(stat -c%s "$BIN")"
           size -A "$BIN" 2>/dev/null | sort -k2 -n -r | head -n 8 || true
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
-          PKG=$(ls -t build/$PRESET/*.tar.gz 2>/dev/null | head -n 1 || true)
-          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -c%s "$PKG")"; else echo "pkg_bytes=0"; fi
+          RT=$(ls build/$PRESET/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
+          DEV=$(ls build/$PRESET/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
+          if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -c%s "$RT")"; else echo "pkg_bytes=0"; fi
+          if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -c%s "$DEV")"; else echo "dev_bytes=0"; fi
           exit "$SMOKE_RC"
 
       - name: Upload report
@@ -462,8 +466,10 @@ jobs:
           CFG="Release"
           case "${{ matrix.family }}" in minsize*) CFG="MinSizeRel";; esac
           (cd "build/$PRESET" && cpack -C "$CFG" -G ZIP) 2>&1 | tail -n 3 || echo "cpack failed"
-          PKG=$(ls -t build/$PRESET/*.zip 2>/dev/null | head -n 1 || true)
-          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -c%s "$PKG")"; else echo "pkg_bytes=0"; fi
+          RT=$(ls build/$PRESET/*-runtime.zip 2>/dev/null | head -n 1 || true)
+          DEV=$(ls build/$PRESET/*-dev.zip 2>/dev/null | head -n 1 || true)
+          if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -c%s "$RT")"; else echo "pkg_bytes=0"; fi
+          if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -c%s "$DEV")"; else echo "dev_bytes=0"; fi
         shell: bash
 
       - name: Upload report
