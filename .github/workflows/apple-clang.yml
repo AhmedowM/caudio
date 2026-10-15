@@ -80,11 +80,15 @@ jobs:
 
       - name: Build
         if: steps.configure.outputs.code == '0'
-        run: cmake --build --preset ci 2>&1 | tee build.log
+        run: |
+          set -o pipefail
+          cmake --build --preset ci 2>&1 | tee build.log
 
       - name: Test
         if: steps.configure.outputs.code == '0'
-        run: ctest --preset ci --output-on-failure 2>&1 | tee test.log
+        run: |
+          set -o pipefail
+          ctest --preset ci --output-on-failure 2>&1 | tee test.log
 
       - name: Gap report
         if: always()

@@ -140,5 +140,6 @@ jobs:
           path: |
             size-report.md
             build.log
+            test.log
             build/${{ inputs.preset }}/caudio
           if-no-files-found: warn
