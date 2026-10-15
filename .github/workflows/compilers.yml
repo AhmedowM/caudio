@@ -1,0 +1,327 @@
+# Compiler version matrix (MANUAL observatory, not a gate).
+#
+# Purpose: probe which compiler versions build + pass the suite, so version
+# floors can be confirmed (or broadened with tiny tweaks / in-tree polyfills
+# like utils/function.hpp) instead of guessed. Mirrors ci.yml conventions
+# (CAUDIO_TEST_NOAUDIO, dep sets, DLL staging) but pins runners and selects
+# versions explicitly.
+#
+# Design notes (read before "fixing" red legs):
+# - Version selection works through PATH, not CC/CXX: our toolchain files
+#   hard-set gcc/g++/clang/clang++ and CMake resolves the bare name from
+#   PATH. Each job therefore plants versioned symlinks where they win.
+# - Floors under test: GCC 14 (named modules -- 13 cannot follow), Clang 19
+#   (below CI's >=20 full-baseline bar for <expected>/<print> -- a red 19
+#   leg is a finding, not a failure). MSVC legs ride the runner images
+#   (windows-2022 = older VS17 toolset, windows-latest = newest).
+# - Legs are informational by default (continue-on-error) with a summary
+#   table in the `report` job. Flip `strict` to promote failures to fatal
+#   when qualifying a version for Tier-1 (ci.yml).
+# - No macOS legs here: brew-LLVM versions are covered by ci.yml and
+#   AppleClang has its own observatory (apple-clang.yml).
+
+name: Compilers (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      gcc_versions:
+        description: 'GCC majors on ubuntu-24.04 (JSON array)'
+        required: false
+        default: '["14", "15"]'
+      clang_versions:
+        description: 'LLVM majors on ubuntu-24.04 via apt.llvm.org (JSON array)'
+        required: false
+        default: '["19", "20", "21"]'
+      run_msvc:
+        description: 'Run MSVC legs (windows-2022 + windows-latest)'
+        type: boolean
+        default: true
+      run_winclang:
+        description: 'Run LLVM clang++ on Windows leg (MSVC ABI)'
+        type: boolean
+        default: true
+      strict:
+        description: 'Fail the run on any version finding (Tier-1 qualification mode)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gcc:
+    name: gcc-${{ matrix.version }} (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(inputs.gcc_versions) }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GCC ${{ matrix.version }}
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-${{ matrix.version }} g++-${{ matrix.version }}
+          # toolchain-gcc.cmake resolves bare `gcc`/`g++` from PATH, so point
+          # the unversioned names at this leg's version (CI precedent).
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.version }} 100 --slave /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.version }} --slave /usr/bin/gcov gcov /usr/bin/gcov-${{ matrix.version }} || true
+          sudo update-alternatives --set gcc /usr/bin/gcc-${{ matrix.version }} || true
+          gcc --version; g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure (ci-gcc)
+        run: cmake --preset ci-gcc
+
+      - name: Build
+        run: cmake --build --preset ci-gcc 2>&1 | tee build-gcc-${{ matrix.version }}.log
+
+      - name: Test
+        run: ctest --preset ci-gcc --output-on-failure 2>&1 | tee test-gcc-${{ matrix.version }}.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilers-gcc-${{ matrix.version }}-logs
+          path: |
+            build-gcc-${{ matrix.version }}.log
+            test-gcc-${{ matrix.version }}.log
+          if-no-files-found: warn
+
+  clang:
+    name: clang-${{ matrix.version }} (ubuntu-24.04)
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJSON(inputs.clang_versions) }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM Clang ${{ matrix.version }} (apt.llvm.org)
+        run: |
+          # Hardened installer -- the historical failures were, in order:
+          # missing lsb-release/wget/gnupg, apt-key deprecation (use a
+          # signed-by keyring, never apt-key), and forgetting apt update
+          # after adding the source. Keep this block in sync with
+          # llvm-linux.yml (its installer is the reference copy).
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          echo "codename: $CODENAME"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${{ matrix.version }} main" | sudo tee /etc/apt/sources.list.d/llvm-${{ matrix.version }}.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-${{ matrix.version }}
+          /usr/bin/clang-${{ matrix.version }} --version
+          # toolchain-clang.cmake resolves bare `clang` from PATH, so plant
+          # winning symlinks (same mechanism as the GCC alternatives above).
+          sudo ln -sf /usr/bin/clang-${{ matrix.version }} /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-${{ matrix.version }} /usr/local/bin/clang++
+          hash -r; clang --version; clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure (ci-clang)
+        run: cmake --preset ci-clang
+
+      - name: Build
+        run: cmake --build --preset ci-clang 2>&1 | tee build-clang-${{ matrix.version }}.log
+
+      - name: Test
+        run: ctest --preset ci-clang --output-on-failure 2>&1 | tee test-clang-${{ matrix.version }}.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilers-clang-${{ matrix.version }}-logs
+          path: |
+            build-clang-${{ matrix.version }}.log
+            test-clang-${{ matrix.version }}.log
+          if-no-files-found: warn
+
+  msvc:
+    name: msvc (${{ matrix.os }})
+    if: inputs.run_msvc
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-latest]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: MSVC version under test
+        run: |
+          # No version pin: the two images ship different VS generations, so
+          # the pair probes the floor (2022) and the ceiling (latest).
+          vswhere -latest -property installationVersion || echo "vswhere unavailable"
+          cl 2>&1 | head -n 2 || true
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+          ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
+        shell: bash
+
+      - name: Configure (ci-msvc)
+        run: cmake --preset ci-msvc
+
+      - name: Expose DLLs
+        run: |
+          # Same hermeticity rationale as ci.yml: loader needs the FFmpeg
+          # DLLs on PATH (absolute Windows dirs via cygpath -w).
+          dll=$(find build/ci-msvc/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Build
+        run: cmake --build --preset ci-msvc 2>&1 | tee build-msvc-${{ matrix.os }}.log
+        shell: bash
+
+      - name: Test
+        run: ctest --preset ci-msvc --output-on-failure 2>&1 | tee test-msvc-${{ matrix.os }}.log
+        shell: bash
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilers-msvc-${{ matrix.os }}-logs
+          path: |
+            build-msvc-${{ matrix.os }}.log
+            test-msvc-${{ matrix.os }}.log
+          if-no-files-found: warn
+
+  winclang:
+    name: clang++ on Windows (MSVC ABI)
+    if: inputs.run_winclang
+    runs-on: windows-latest
+    continue-on-error: ${{ inputs.strict == false }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM
+        run: |
+          choco install llvm -y --no-progress || echo "llvm choco install failed"
+          export PATH="/c/Program Files/LLVM/bin:$PATH"
+          echo "/c/Program Files/LLVM/bin" >> $GITHUB_PATH
+          clang++ --version || exit 1
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          cmake --version
+          ninja --version
+        shell: bash
+
+      - name: Configure (ci preset, auto toolchain finds clang++)
+        # toolchain-auto prefers clang++ from PATH on Windows (MSVC ABI,
+        # verified locally); lld-link consumes the same .dll.a FFmpeg
+        # import libs as the MinGW builds.
+        run: cmake --preset ci
+
+      - name: Expose DLLs
+        run: |
+          dll=$(find build/ci/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Build
+        run: cmake --build --preset ci 2>&1 | tee build-winclang.log
+        shell: bash
+
+      - name: Test
+        run: ctest --preset ci --output-on-failure 2>&1 | tee test-winclang.log
+        shell: bash
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compilers-winclang-logs
+          path: |
+            build-winclang.log
+            test-winclang.log
+          if-no-files-found: warn
+
+  report:
+    name: version support report
+    needs: [gcc, clang, msvc, winclang]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: |
+          {
+            echo "# Compiler version support (manual run)"
+            echo ""
+            echo "| Leg | Result |"
+            echo "| --- | ------ |"
+            echo "| gcc matrix | ${{ needs.gcc.result }} |"
+            echo "| clang matrix | ${{ needs.clang.result }} |"
+            echo "| msvc | ${{ needs.msvc.result }} |"
+            echo "| winclang | ${{ needs.winclang.result }} |"
+            echo ""
+            echo "Per-version logs are in the run artifacts. A red leg is a"
+            echo "finding (floor/ceiling gap or regression), not necessarily"
+            echo "a product bug -- check the log, then either polyfill in-tree"
+            echo "(see utils/function.hpp precedent), bump the floor in"
+            echo "AGENTS.md + CompilerPolicy.cmake, or file a work item."
+            echo "Re-run with strict=true once a version is Tier-1 candidate."
+          } >> "$GITHUB_STEP_SUMMARY"

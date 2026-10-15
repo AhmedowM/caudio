@@ -1,0 +1,138 @@
+# LLVM on Linux (MANUAL).
+#
+# Two purposes in one file:
+#  1. A robust apt.llvm.org installer (the step that failed before) --
+#     this block is the reference copy; compilers.yml duplicates its core
+#     with a pointer back here.
+#  2. A Clang size-measurement build (minsize-lto / release-lto) to
+#     quantify shipping from LLVM: binary + SDK space cuts vs the GCC
+#     releases (see §6 L-6: Linux Clang needs a Linux host -- this is it).
+#
+# Not a gate: run manually when evaluating an LLVM major or refreshing
+# the size numbers. Artifacts: the built binaries + a size report.
+
+name: LLVM on Linux (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      llvm_version:
+        description: 'LLVM major to install from apt.llvm.org'
+        required: false
+        default: '21'
+      preset:
+        description: 'Build preset (size-oriented)'
+        required: false
+        default: 'minsize-lto'
+        type: choice
+        options:
+          - minsize-lto
+          - release-lto
+          - ci-clang
+      use_lld:
+        description: 'Link with lld (recommended for size/link speed)'
+        type: boolean
+        default: true
+      run_tests:
+        description: 'Run the test suite (headless)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  llvm-linux:
+    name: clang-${{ inputs.llvm_version }} / ${{ inputs.preset }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install LLVM Clang ${{ inputs.llvm_version }}
+        run: |
+          # The historical failures, in order of frequency:
+          #  1. lsb-release/wget/gnupg missing -> codename/key steps die.
+          #  2. apt-key usage (deprecated/removed) -> use a signed-by
+          #     keyring under /usr/share/keyrings, never apt-key.
+          #  3. No apt update after adding the source -> package not found.
+          #  4. Bare `clang++` expected afterwards -> plant symlinks (our
+          #     toolchain-clang.cmake resolves the bare names from PATH).
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          echo "codename: $CODENAME"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-${{ inputs.llvm_version }} main" | sudo tee /etc/apt/sources.list.d/llvm-${{ inputs.llvm_version }}.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-${{ inputs.llvm_version }} lld-${{ inputs.llvm_version }}
+          /usr/bin/clang-${{ inputs.llvm_version }} --version
+          sudo ln -sf /usr/bin/clang-${{ inputs.llvm_version }} /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-${{ inputs.llvm_version }} /usr/local/bin/clang++
+          if [ "${{ inputs.use_lld }}" = "true" ]; then
+            sudo ln -sf /usr/bin/ld.lld-${{ inputs.llvm_version }} /usr/local/bin/ld.lld || echo "ld.lld symlink skipped"
+          fi
+          hash -r; clang --version; clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+
+      - name: Configure
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          # CC/CXX are belt-and-braces (toolchain files resolve bare names
+          # from PATH); the lld flag rides the configure line when asked.
+          EXTRA=""
+          if [ "${{ inputs.use_lld }}" = "true" ]; then
+            EXTRA="-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld"
+          fi
+          cmake --preset ${{ inputs.preset }} $EXTRA
+
+      - name: Build
+        run: cmake --build --preset ${{ inputs.preset }} 2>&1 | tee build.log
+
+      - name: Test
+        if: inputs.run_tests
+        # --test-dir (not --preset): size presets ship no test preset.
+        run: ctest --test-dir build/${{ inputs.preset }} --output-on-failure 2>&1 | tee test.log
+
+      - name: Size report
+        if: always()
+        run: |
+          {
+            echo "# Size report: clang-${{ inputs.llvm_version }} / ${{ inputs.preset }} (lld=${{ inputs.use_lld }})"
+            echo ""
+            echo "## Binaries"
+            find "build/${{ inputs.preset }}" -maxdepth 1 -type f -executable -exec du -b {} \; | sort -n
+            echo ""
+            echo "## caudio link map (size -A)"
+            size -A "build/${{ inputs.preset }}/caudio" 2>/dev/null | sort -k2 -n -r | head -n 15 || echo "caudio binary not at preset root"
+            echo ""
+            echo "## Shared objects staged for shipping"
+            find "build/${{ inputs.preset }}" -name '*.so*' -exec du -b {} \; | sort -n | head -n 20
+          } | tee size-report.md
+          cat size-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload binaries + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caudio-llvm${{ inputs.llvm_version }}-${{ inputs.preset }}-linux
+          path: |
+            size-report.md
+            build.log
+            build/${{ inputs.preset }}/caudio
+          if-no-files-found: warn

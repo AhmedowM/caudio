@@ -1,0 +1,119 @@
+# Apple Clang (MANUAL observatory, not a gate).
+#
+# Builds with the NATIVE Xcode toolchain instead of brew LLVM to measure the
+# gap against our C++23 baseline (<expected>, <print>). ci.yml policy note:
+# AppleClang lags the baseline, so this workflow is expected to fail at
+# configure or compile time on older Xcodes -- the failure point IS the
+# deliverable (it names the exact feature blocking AppleClang support).
+#
+# Mechanics: cmake/toolchains/detail/llvm-clang.cmake honors
+# -DCAUDIO_APPLE_CLANG=ON by skipping the brew pin, letting the xcrun
+# compiler through; cmake/CompilerPolicy.cmake still requires
+# -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. The job always uploads full logs
+# plus a gap report (first errors), and never fails the run -- promote to
+# a gate only if a future Xcode closes the gap end to end.
+#
+# miniaudio note: the dummy-backend trap is GCC-specific; AppleClang builds
+# the CoreAudio backend normally, so audio behavior (if any) is meaningful.
+
+name: Apple Clang (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      xcode:
+        description: 'Xcode to use: "latest" or e.g. "16.4" (must be preinstalled)'
+        required: false
+        default: 'latest'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-clang:
+    name: AppleClang (macos-latest / Xcode ${{ inputs.xcode }})
+    runs-on: macos-latest
+    continue-on-error: true
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      CAUDIO_APPLE_CLANG: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: |
+          ls /Applications | grep -i xcode || echo "no Xcode bundle found"
+          if [ "${{ inputs.xcode }}" != "latest" ]; then
+            sudo xcode-select -s "/Applications/Xcode_${{ inputs.xcode }}.app" || sudo xcode-select -s "/Applications/Xcode-${{ inputs.xcode }}.app" || (echo "Xcode ${{ inputs.xcode }} not preinstalled" && exit 1)
+          fi
+          xcode-select -p
+          xcodebuild -version || true
+          xcrun -f clang; xcrun -f clang++
+          xcrun clang --version
+          # Deliberately NO brew llvm here: the toolchain must see only the
+          # Xcode compiler for the measurement to mean anything.
+
+      - name: Install dependencies
+        run: |
+          brew install ninja ffmpeg || brew upgrade ninja ffmpeg || true
+          ffmpeg -version || true
+          cmake --version
+          ninja --version
+
+      - name: Configure (AppleClang escape hatch)
+        id: configure
+        run: |
+          set +e
+          cmake --preset ci \
+            -DCMAKE_C_COMPILER="$(xcrun -f clang)" \
+            -DCMAKE_CXX_COMPILER="$(xcrun -f clang++)" \
+            -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON \
+            -DCAUDIO_APPLE_CLANG=ON > configure.log 2>&1
+          code=$?
+          echo "code=$code" | tee -a configure.log
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          tail -n 30 configure.log || true
+
+      - name: Build
+        if: steps.configure.outputs.code == '0'
+        run: cmake --build --preset ci 2>&1 | tee build.log
+
+      - name: Test
+        if: steps.configure.outputs.code == '0'
+        run: ctest --preset ci --output-on-failure 2>&1 | tee test.log
+
+      - name: Gap report
+        if: always()
+        run: |
+          {
+            echo "# AppleClang gap report"
+            echo ""
+            echo "Xcode: $(xcodebuild -version 2>/dev/null | tr '\n' ' ')"
+            echo "clang: $(xcrun clang --version 2>/dev/null | head -n 1)"
+            echo "configure exit: ${{ steps.configure.outputs.code }}"
+            echo ""
+            if [ "${{ steps.configure.outputs.code }}" != "0" ]; then
+              echo "## First configure errors"
+              grep -i -m 10 "error" configure.log || tail -n 20 configure.log
+            else
+              echo "## First build/test errors (if any)"
+              grep -i -m 10 "error" build.log test.log 2>/dev/null || echo "no errors captured -- check full logs"
+            fi
+          } | tee gap-report.md
+          cat gap-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-clang-logs
+          path: |
+            configure.log
+            build.log
+            test.log
+            gap-report.md
+          if-no-files-found: warn

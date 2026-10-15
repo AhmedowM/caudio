@@ -1,6 +1,17 @@
 # Resolve brew LLVM Clang on macOS (shared by toolchain-clang and
 # toolchain-auto). Plain `clang` on PATH is AppleClang, which lags our C++23
 # baseline; GCC builds miniaudio with a dummy backend (no audio).
+#
+# AppleClang observatory (apple-clang.yml): when CAUDIO_APPLE_CLANG is set,
+# skip the brew pin entirely so the caller's compiler (xcrun/PATH) flows
+# through; CompilerPolicy.cmake still requires
+# -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. Not a supported configuration --
+# the workflow measures the baseline gap, it does not close it.
+if(CAUDIO_APPLE_CLANG)
+  message(STATUS "AppleClang mode: keeping caller-provided compiler "
+    "(unsupported; see apple-clang.yml)")
+  return()
+endif()
 if(DEFINED ENV{LLVM_ROOT})
   set(_caudio_llvm_root "$ENV{LLVM_ROOT}")
 else()
