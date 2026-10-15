@@ -3,6 +3,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
+#include <cerrno>
 #include <expected>
 #include <optional>
 #include <string>
@@ -13,6 +15,35 @@ namespace caudio::app::cli::parse {
 
 // Use std::string for error message to keep header standalone (no caudio::utils dependency).
 // App module wraps errors into caudio::utils::Error.
+
+// Parse a whole non-empty token as double (nullopt = invalid). Uses strtod
+// instead of the floating-point std::from_chars overloads: Apple libc++
+// gates those on macOS 26+ (deployment target), while the integer overloads
+// and strtod work everywhere. Mirrors from_chars strictness, which strtod
+// alone does not: no leading whitespace (strtod skips it), no hex floats
+// (strtod accepts "0x1p3", from_chars general format does not), full
+// consumption required. Overflow surfaces as inf and is rejected by the
+// callers' isfinite checks, same as from_chars' out-of-range path.
+// Locale note: strtod honors LC_NUMERIC while from_chars always takes
+// '.', but the process never leaves the default "C" locale, so '.' parses
+// identically in practice.
+inline std::optional<double> parseDoubleToken(std::string_view token) {
+    if (token.empty() || token.front() == ' ' || token.front() == '\t' ||
+        token.front() == '\r' || token.front() == '\n')
+        return std::nullopt;
+    size_t digits = (token.front() == '+' || token.front() == '-') ? 1 : 0;
+    if (token.size() > digits + 2 && token[digits] == '0' &&
+        (token[digits + 1] == 'x' || token[digits + 1] == 'X'))
+        return std::nullopt;
+    std::string s(token);
+    const char* begin = s.c_str();
+    char* end = nullptr;
+    errno = 0;
+    double v = std::strtod(begin, &end);
+    if (end != begin + s.size())
+        return std::nullopt;
+    return v;
+}
 
 inline std::expected<double, std::string> parseTime(std::string_view s) {
     // trim whitespace
@@ -49,11 +80,10 @@ inline std::expected<double, std::string> parseTime(std::string_view s) {
             double val = 0;
             if (idx == 2 || (count == 1 && idx == 1)) {
                 // last component may be double
-                auto res = std::from_chars(token.data(), token.data() + token.size(), val);
-                if (res.ec != std::errc{} || res.ptr != token.data() + token.size()) {
-                    // try integer fallback then parse fractional
+                auto parsed = parseDoubleToken(token);
+                if (!parsed)
                     return std::unexpected<std::string>{"invalid time component"};
-                }
+                val = *parsed;
             } else {
                 int iv = 0;
                 auto res = std::from_chars(token.data(), token.data() + token.size(), iv);
@@ -94,11 +124,10 @@ inline std::expected<double, std::string> parseTime(std::string_view s) {
             return std::unexpected<std::string>{"invalid time"};
         return total;
     } else {
-        double v = 0;
-        auto res = std::from_chars(s.data(), s.data() + s.size(), v);
-        if (res.ec != std::errc{} || res.ptr != s.data() + s.size()) {
+        auto parsed = parseDoubleToken(s);
+        if (!parsed)
             return std::unexpected<std::string>{"invalid time"};
-        }
+        double v = *parsed;
         if (!std::isfinite(v) || v < 0)
             return std::unexpected<std::string>{"invalid time"};
         return v;

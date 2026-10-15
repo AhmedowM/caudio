@@ -19,9 +19,11 @@
 # AppleClang 17 note (2026-10-15, Xcode 26.0.1: full build + 190/190):
 # compiler version is NOT stdlib version. Linux Clang 18 fails on an old
 # system libstdc++; AppleClang ships its SDK libc++ as one unit with
-# Xcode, and Xcode 26's libc++ is a complete C++23 library. Older Xcode
-# generations are probed via the `runs_on` input (older macos runners),
-# not by installing old Xcodes onto macos-latest.
+# Xcode, and Xcode 26's libc++ is a complete C++23 library. Xcode 16 is
+# OUT (2026-10-15: its libc++ has no std::jthread -- replacing 38 engine
+# use sites is not a tweak, so the floor stays Xcode 26 by construction).
+# Older macos runners probe older default toolchains; macos-14 is
+# time-boxed (runner retires 2026-11-02).
 
 name: Apple Clang (manual)
 
@@ -36,6 +38,7 @@ name: Apple Clang (manual)
         options:
           - macos-latest
           - macos-15
+          - macos-14
       xcode:
         description: 'Xcode to use: "latest" or e.g. "16.4" (must be preinstalled; job lists /Applications first)'
         required: false
