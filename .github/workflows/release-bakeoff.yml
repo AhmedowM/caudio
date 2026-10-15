@@ -1,0 +1,475 @@
+# Release bake-off (MANUAL observatory, not a gate).
+# Registration probe touch.
+#
+# Compares compiler x preset-family combinations on size and shippability:
+# Linux gcc-16 vs llvm-21, macOS brew-LLVM vs AppleClang, Windows LLVM
+# (MSVC ABI) vs MSVC -- across release / release-lto / minsize /
+# minsize-lto. Answers "what should we ship where" with numbers instead
+# of lore. Release presets do NOT build tests (CAUDIO_ENABLE_TESTS stays
+# off), so legs are build + install + smoke + measure; correctness is
+# gated by ci.yml, not here.
+#
+# Design notes (read before "fixing" red legs):
+# - FFmpeg is held constant per leg the way releases do it: try the
+#   deps-private trimmed asset (DEPS_PAT), fall back to the system
+#   provider. The provider that won is recorded per leg -- size deltas
+#   between trimmed/system legs are data, not noise. Configure passes
+#   -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=<root> on base presets
+#   (same mechanism as the *-trimmed-* presets) plus
+#   -DCAUDIO_BUNDLE_FFMPEG_MACOS=ON (inert off-Apple; mirrors the trimmed
+#   release preset on macOS).
+# - Version selection works through PATH (toolchains hard-set bare names).
+# - Apple legs deliberately do NOT install brew llvm (proves independence);
+#   they reuse the proven apple-clang.yml overrides (xcrun compilers +
+#   CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
+# - minsize* on macOS is expected red: the presets pass -Wl,--gc-sections
+#   (GNU-ld-only; Apple needs -dead_strip). That failure is the finding
+#   that justifies the Apple-conditional dead-strip follow-up.
+# - MSVC legs run windows-latest only (VS18-generator presets).
+# - Release presets require a git tag (CAUDIO_REQUIRE_GIT_VERSION=ON), so
+#   checkout uses fetch-depth: 0 -- shallow clones fail configure loudly.
+# - Legs are informational by default (continue-on-error) with a summary
+#   in `report`. Flip `strict` once a combination is a shipping candidate.
+
+name: Release bake-off (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      run_macos:
+        required: false
+        description: 'Run macOS legs (brew-LLVM vs AppleClang)'
+        type: boolean
+        default: true
+      run_linux:
+        required: false
+        description: 'Run Linux legs (gcc-16 vs llvm-21)'
+        type: boolean
+        default: true
+      run_windows:
+        required: false
+        description: 'Run Windows legs (LLVM vs MSVC)'
+        type: boolean
+        default: true
+      strict:
+        required: false
+        description: 'Fail the run on any finding (shipping-candidate mode)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bake-macos:
+    name: mac ${{ matrix.compiler }} / ${{ matrix.family }}
+    if: inputs.run_macos
+    runs-on: macos-latest
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [brew, apple]
+        family: [release, release-lto, minsize, minsize-lto]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      DEPS_REPO: "AhmedowM/deps-private"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup brew LLVM (brew legs only)
+        if: matrix.compiler == 'brew'
+        run: |
+          brew update || echo "brew update failed, continuing with snapshot"
+          brew install llvm || brew upgrade llvm
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
+          "$LLVM_PREFIX/bin/clang" --version
+          LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
+          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old: $LLVM_MAJOR" && exit 1)
+
+      - name: Select Xcode (apple legs only)
+        if: matrix.compiler == 'apple'
+        run: |
+          ls /Applications | grep -i xcode || echo "no Xcode bundle found"
+          xcode-select -p
+          xcodebuild -version || true
+          xcrun clang --version
+
+      - name: Install dependencies
+        run: |
+          brew install ninja || brew upgrade ninja || true
+          cmake --version
+          ninja --version
+
+      - name: "Download trimmed FFmpeg (fallback: system)"
+        id: trimdl
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+          CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+        run: |
+          if gh release download "ffmpeg-trimmed-8.1.2-1" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz" \
+            --dir . \
+            --clobber; then
+            mkdir -p "$CAUDIO_TRIMMED_ROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
+            echo "trim_root=" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Configure
+        id: cfg
+        run: |
+          # Apple legs reuse the apple-clang.yml override trio on the plain
+          # *-clang preset (no dedicated preset needed until promotion).
+          # CAUDIO_APPLE_CLANG is exported inline (not just -D): try_compile
+          # probes re-run the toolchain in a fresh scope that inherits
+          # environment, not cache variables.
+          PRESET="${{ matrix.family }}-clang"
+          set -o pipefail
+          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=${{ steps.trimdl.outputs.trim_root }}"
+            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+          else
+            echo "provider=system" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${{ matrix.compiler }}" = "apple" ]; then
+            CAUDIO_APPLE_CLANG=1 cmake --preset "$PRESET" $EXTRA \
+              -DCMAKE_C_COMPILER="$(xcrun -f clang)" \
+              -DCMAKE_CXX_COMPILER="$(xcrun -f clang++)" \
+              -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON \
+              -DCAUDIO_APPLE_CLANG=ON 2>&1 | tee configure.log
+          else
+            cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
+          fi
+          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          START=$SECONDS
+          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          echo "build_seconds=$((SECONDS - START))" | tee -a build.log
+
+      - name: Install + smoke + measure
+        id: measure
+        run: |
+          set -o pipefail
+          PRESET="${{ steps.cfg.outputs.preset }}"
+          cmake --install "build/$PRESET" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          echo "=== staged tree (proves what ships) ==="
+          find "$RUNNER_TEMP/stage" -type f | sort
+          BIN="$RUNNER_TEMP/stage/bin/caudio"
+          test -x "$BIN" || (echo "staged binary missing" && exit 1)
+          "$BIN" --version
+          otool -L "$BIN" | head -n 12 || true
+          echo "bin_bytes=$(stat -f%z "$BIN")"
+          (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
+          PKG=$(ls -t build/$PRESET/*.tar.gz 2>/dev/null | head -n 1 || true)
+          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -f%z "$PKG")"; else echo "pkg_bytes=0"; fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bakeoff-macos-${{ matrix.compiler }}-${{ matrix.family }}
+          path: |
+            configure.log
+            build.log
+            install.log
+          if-no-files-found: warn
+
+  bake-linux:
+    name: linux ${{ matrix.compiler }} / ${{ matrix.family }}
+    if: inputs.run_linux
+    runs-on: ubuntu-24.04
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, llvm]
+        family: [release, release-lto, minsize, minsize-lto]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      DEPS_REPO: "AhmedowM/deps-private"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC 16
+        if: matrix.compiler == 'gcc'
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
+          gcc --version; g++ --version
+
+      - name: Setup LLVM 21
+        if: matrix.compiler == 'llvm'
+        run: |
+          # Same hardened installer as llvm-linux.yml / compilers.yml.
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-21 lld-21
+          sudo ln -sf /usr/bin/clang-21 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++
+          hash -r; clang --version; clang++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev
+          cmake --version
+          ninja --version
+
+      - name: "Download trimmed FFmpeg (fallback: system)"
+        id: trimdl
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+          CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+        run: |
+          if gh release download "ffmpeg-trimmed-8.1.2-1" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz" \
+            --dir . \
+            --clobber; then
+            mkdir -p "$CAUDIO_TRIMMED_ROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
+            echo "trim_root=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure
+        id: cfg
+        run: |
+          # Preset name is uniform: <family>-<gcc|clang> (toolchain resolves
+          # bare names from PATH, same as compilers.yml).
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then SUFFIX=gcc; else SUFFIX=clang; fi
+          PRESET="${{ matrix.family }}-$SUFFIX"
+          set -o pipefail
+          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=${{ steps.trimdl.outputs.trim_root }}"
+            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+          else
+            echo "provider=system" >> "$GITHUB_OUTPUT"
+          fi
+          cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
+          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          set -o pipefail
+          START=$SECONDS
+          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          echo "build_seconds=$((SECONDS - START))" | tee -a build.log
+
+      - name: Install + smoke + measure
+        run: |
+          set -o pipefail
+          PRESET="${{ steps.cfg.outputs.preset }}"
+          cmake --install "build/$PRESET" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          echo "=== staged tree (proves what ships) ==="
+          find "$RUNNER_TEMP/stage" -type f | sort
+          BIN="$RUNNER_TEMP/stage/bin/caudio"
+          test -x "$BIN" || (echo "staged binary missing" && exit 1)
+          "$BIN" --version
+          ldd "$BIN" | head -n 15 || true
+          echo "bin_bytes=$(stat -c%s "$BIN")"
+          size -A "$BIN" 2>/dev/null | sort -k2 -n -r | head -n 8 || true
+          (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
+          PKG=$(ls -t build/$PRESET/*.tar.gz 2>/dev/null | head -n 1 || true)
+          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -c%s "$PKG")"; else echo "pkg_bytes=0"; fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bakeoff-linux-${{ matrix.compiler }}-${{ matrix.family }}
+          path: |
+            configure.log
+            build.log
+            install.log
+          if-no-files-found: warn
+
+  bake-windows:
+    name: win ${{ matrix.compiler }} / ${{ matrix.family }}
+    if: inputs.run_windows
+    runs-on: windows-latest
+    continue-on-error: ${{ inputs.strict == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [llvm, msvc]
+        family: [release, release-lto, minsize, minsize-lto]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      DEPS_REPO: "AhmedowM/deps-private"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup LLVM
+        if: matrix.compiler == 'llvm'
+        run: |
+          if ! command -v clang++ >/dev/null 2>&1 && [ ! -x "/c/Program Files/LLVM/bin/clang++.exe" ]; then
+            choco install llvm -y --no-progress
+          fi
+          export PATH="/c/Program Files/LLVM/bin:$PATH"
+          echo "/c/Program Files/LLVM/bin" >> $GITHUB_PATH
+          clang++ --version
+        shell: bash
+
+      - name: Install dependencies
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          cmake --version
+          ninja --version
+        shell: bash
+
+      - name: "Download trimmed FFmpeg (fallback: system)"
+        id: trimdl
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+        run: |
+          if gh release download "ffmpeg-trimmed-8.1.2-1" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz" \
+            --dir . \
+            --clobber; then
+            # Git-Bash (not MSYS2): no automatic path conversion, so
+            # normalize with cygpath like release.yml/ci.yml do -- a raw
+            # "D:\..." path silently mkdirs/tars the wrong place.
+            if command -v cygpath >/dev/null 2>&1; then
+              TROOT="$(cygpath "${{ github.workspace }}/ffmpeg-trimmed")"
+            else
+              TROOT="${{ github.workspace }}/ffmpeg-trimmed"
+            fi
+            mkdir -p "$TROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz -C "$TROOT"
+            echo "trim_root=$TROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
+            echo "trim_root=" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Configure
+        id: cfg
+        run: |
+          # Uniform preset names: <family>-<clang|msvc>. MSVC presets pin the
+          # VS 2026 generator, so all Windows legs stay on windows-latest.
+          if [ "${{ matrix.compiler }}" = "msvc" ]; then SUFFIX=msvc; else SUFFIX=clang; fi
+          PRESET="${{ matrix.family }}-$SUFFIX"
+          set -o pipefail
+          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            if command -v cygpath >/dev/null 2>&1; then
+              TROOT="$(cygpath "${{ steps.trimdl.outputs.trim_root }}")"
+            else
+              TROOT="${{ steps.trimdl.outputs.trim_root }}"
+            fi
+            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=$TROOT"
+            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+          else
+            echo "provider=system" >> "$GITHUB_OUTPUT"
+          fi
+          cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
+          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Build
+        run: |
+          set -o pipefail
+          START=$SECONDS
+          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          echo "build_seconds=$((SECONDS - START))" | tee -a build.log
+        shell: bash
+
+      - name: Install + smoke + measure
+        run: |
+          set -o pipefail
+          PRESET="${{ steps.cfg.outputs.preset }}"
+          # VS generators are multi-config: install defaults to Release
+          # while minsize presets build MinSizeRel (single-config Ninja
+          # ignores --config, so this stays Windows-only).
+          CFG="Release"
+          case "${{ matrix.family }}" in minsize*) CFG="MinSizeRel";; esac
+          cmake --install "build/$PRESET" --config "$CFG" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          echo "=== staged tree (proves what ships) ==="
+          find "$RUNNER_TEMP/stage" -type f | sort
+          BIN="$RUNNER_TEMP/stage/bin/caudio.exe"
+          test -x "$BIN" || (echo "staged binary missing" && exit 1)
+          "$BIN" --version
+          echo "bin_bytes=$(stat -c%s "$BIN")"
+          # Multi-config VS generator: package the built config (MinSizeRel),
+          # not the Release default (same --config stratification as install).
+          CFG="Release"
+          case "${{ matrix.family }}" in minsize*) CFG="MinSizeRel";; esac
+          (cd "build/$PRESET" && cpack -C "$CFG" -G ZIP) 2>&1 | tail -n 3 || echo "cpack failed"
+          PKG=$(ls -t build/$PRESET/*.zip 2>/dev/null | head -n 1 || true)
+          if [ -n "$PKG" ]; then echo "pkg_bytes=$(stat -c%s "$PKG")"; else echo "pkg_bytes=0"; fi
+        shell: bash
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bakeoff-windows-${{ matrix.compiler }}-${{ matrix.family }}
+          path: |
+            configure.log
+            build.log
+            install.log
+          if-no-files-found: warn
+
+  report:
+    name: bake-off report
+    needs: [bake-macos, bake-linux, bake-windows]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: |
+          {
+            echo "# Release bake-off (manual run)"
+            echo ""
+            echo "| Leg | Result |"
+            echo "| --- | ------ |"
+            echo "| macos | ${{ needs.bake-macos.result }} |"
+            echo "| linux | ${{ needs.bake-linux.result }} |"
+            echo "| windows | ${{ needs.bake-windows.result }} |"
+            echo ""
+            echo "Per-leg artifacts (bakeoff-<os>-<compiler>-<family>) hold"
+            echo "configure/build/install logs. Numbers live in the job logs:"
+            echo "search for bin_bytes= / pkg_bytes= / build_seconds= /"
+            echo "provider=, plus the staged-tree listing (what ships) and"
+            echo "otool/ldd output (what it links). Compare within an OS --"
+            echo "cross-OS bytes are not comparable (formats/toolchains)."
+            echo "Known-red: minsize* on macOS (-Wl,--gc-sections is"
+            echo "GNU-ld-only; Apple needs -dead_strip -- follow-up fix)."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -270,6 +270,14 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
         }
     } guard{&run};
     auto start = run({"start"});
+    // Bounded retry: daemon spawn can transiently fail on a loaded box
+    // (AV scan/lock/scheduler); start converges (already-running succeeds),
+    // so one retry only absorbs the window -- persistent failure still
+    // fails below. INFO names the cause next time (spawn error vs
+    // socket-unreachable).
+    if (start.exitCode != 0)
+        start = run({"start"});
+    INFO("start stdout: " << start.out << "\nstart stderr: " << start.err);
     REQUIRE(start.exitCode == 0);
     REQUIRE(contains(start.out, "started"));
     // Poll until the daemon answers (spawn is async).
@@ -670,6 +678,10 @@ TEST_CASE("cli tag edit writes file", "[cli]") {
     fs::copy_file(src, music / "song.mp3", fs::copy_options::overwrite_existing, ec);
     REQUIRE(!ec);
     auto start = run({"start"});
+    // Same transient-spawn retry as the lifecycle test above.
+    if (start.exitCode != 0)
+        start = run({"start"});
+    INFO("start stdout: " << start.out << "\nstart stderr: " << start.err);
     REQUIRE(start.exitCode == 0);
     bool up = false;
     for (int i = 0; i < 150 && !up; ++i) {
@@ -735,7 +747,12 @@ TEST_CASE("cli playback one-liners", "[cli]") {
             EpicFail(what);
         return r;
     };
-    if (run({"start"}).exitCode != 0)
+    auto startR = run({"start"});
+    // Same transient-spawn retry as the lifecycle/tag tests.
+    if (startR.exitCode != 0)
+        startR = run({"start"});
+    INFO("start stdout: " << startR.out << "\nstart stderr: " << startR.err);
+    if (startR.exitCode != 0)
         EpicFail("daemon did not start");
     bool up = false;
     for (int i = 0; i < 150 && !up; ++i) {

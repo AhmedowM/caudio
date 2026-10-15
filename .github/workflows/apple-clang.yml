@@ -19,9 +19,13 @@
 # AppleClang 17 note (2026-10-15, Xcode 26.0.1: full build + 190/190):
 # compiler version is NOT stdlib version. Linux Clang 18 fails on an old
 # system libstdc++; AppleClang ships its SDK libc++ as one unit with
-# Xcode, and Xcode 26's libc++ is a complete C++23 library. Xcode 16 is
-# OUT (2026-10-15: its libc++ has no std::jthread -- replacing 38 engine
-# use sites is not a tweak, so the floor stays Xcode 26 by construction).
+# Xcode, and Xcode 26's libc++ is a complete C++23 library. Recorded
+# matrix: macos-14/Xcode 15.4 red (no std::jthread AND no ostream
+# println overloads -- the jthread wall alone spans 38 engine sites, so
+# Xcode 16 is out the same way), macos-15/Xcode 16.4 red (jthread),
+# macos-15/Xcode 26.0.1 green, macos-latest/Xcode 26.6 green. Floor:
+# Xcode 26 to build; macOS 15 to run (floating from_chars was the only
+# 26-gated API in our code, replaced by strtod in cli/shell/parse.hpp).
 # Older macos runners probe older default toolchains; macos-14 is
 # time-boxed (runner retires 2026-11-02).
 
