@@ -128,12 +128,9 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # CODEBASE_REVIEW.md §5) — no 1.0 artifact ships shared libs.
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" OFF)
-# Section garbage-collection for the minsize-lto presets. The flag is
-# linker-specific and must be chosen after compiler validation: Apple ld
-# rejects -Wl,--gc-sections inside try_compile ("ld: unknown options:
-# --gc-sections"), killing configure before CMakeLists could repair it --
-# so the presets carry only the intent (above) and the translation lives
-# here. MSVC links /OPT:REF by default in optimized configs; nothing to add.
+# Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
+# compiler validation, so presets carry only the intent and the per-linker
+# flag lives here. MSVC links /OPT:REF by default; nothing to add.
 option(CAUDIO_LINK_SECTION_GC "drop unreferenced code/data sections at link (Apple -dead_strip, otherwise --gc-sections)" OFF)
 if(CAUDIO_LINK_SECTION_GC)
   if(APPLE)
@@ -160,6 +157,23 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Threads REQUIRED)
+
+# Trimmed-first: a valid CAUDIO_TRIMMED_ROOT (cache -D or env) auto-selects
+# the trimmed provider. An explicit FFmpeg_ROOT still wins; against an
+# explicit -DCAUDIO_USE_TRIMMED_FFMPEG=OFF the root wins (announced below).
+if(NOT FFmpeg_ROOT AND NOT "$ENV{FFmpeg_ROOT}")
+  if(DEFINED CAUDIO_TRIMMED_ROOT AND EXISTS "${CAUDIO_TRIMMED_ROOT}/lib")
+    set(_trim_root "${CAUDIO_TRIMMED_ROOT}")
+  elseif(DEFINED ENV{CAUDIO_TRIMMED_ROOT} AND EXISTS "$ENV{CAUDIO_TRIMMED_ROOT}/lib")
+    set(_trim_root "$ENV{CAUDIO_TRIMMED_ROOT}")
+  endif()
+  if(DEFINED _trim_root)
+    set(FFmpeg_ROOT "${_trim_root}" CACHE PATH "FFmpeg root (auto-selected from CAUDIO_TRIMMED_ROOT)" FORCE)
+    set(CAUDIO_USE_TRIMMED_FFMPEG ON CACHE BOOL "trimmed FFmpeg (auto-selected from CAUDIO_TRIMMED_ROOT)" FORCE)
+    message(STATUS "Trimmed-first: CAUDIO_TRIMMED_ROOT=${_trim_root}")
+  endif()
+  unset(_trim_root)
+endif()
 
 if(NOT CAUDIO_USE_TRIMMED_FFMPEG)
   find_package(FFmpeg QUIET)
@@ -496,17 +510,11 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
   endif()
 endif()
 
-# Linux distributability: trimmed FFmpeg .so files live outside the system
-# loader path, so the staged binary dies with "libavcodec.so.62: cannot open
-# shared object file" (release bake-off 2026-10-15). Mirror the macOS shape:
-# ship the versioned files in lib/ and point the exe at them via an
-# $ORIGIN-relative RPATH (ELF needs no rewiring or re-signing). Two details
-# matter: (a) the SONAME links (libavcodec.so.62) must ship too -- the
-# loader asks for the SONAME by exact name, so only the bare dev link
-# (libavcodec.so) stays out, via the .so.* glob; (b) CMAKE_INSTALL_RPATH is
-# consumed when caudio_cli is created (above), so touching the variable here
-# is too late -- set the target property explicitly, preserving any value
-# the user configured.
+# Linux distributability: ship the versioned .so files (SONAME links
+# included -- the loader asks for libavcodec.so.62 by exact name) in lib/
+# with an $ORIGIN-relative RPATH. The RPATH goes on the target property:
+# CMAKE_INSTALL_RPATH is consumed at target creation, so the variable is
+# too late here.
 if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
   get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
   set(_ff_sos "")
@@ -542,23 +550,17 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
   get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
   set(_ff_dylibs "")
   foreach(_lib avcodec avformat avutil swresample)
+    # Bundle versioned files AND SONAME links: the loader asks for the
+    # SONAME by exact name (only the bare dev link stays out, via the glob).
     file(GLOB _cand "${_ff_libdir}/lib${_lib}.*.dylib")
-    foreach(_f IN LISTS _cand)
-      # Skip dev symlinks (libavcodec.dylib); bundle versioned files only.
-      if(NOT IS_SYMLINK "${_f}")
-        list(APPEND _ff_dylibs "${_f}")
-      endif()
-    endforeach()
+    list(APPEND _ff_dylibs ${_cand})
   endforeach()
   list(REMOVE_DUPLICATES _ff_dylibs)
   if(NOT _ff_dylibs)
     message(WARNING "CAUDIO_BUNDLE_FFMPEG_MACOS requested but no versioned FFmpeg dylibs near ${FFmpeg_AVCODEC_LIBRARY}")
   else()
     install(FILES ${_ff_dylibs} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-    # Exe-side search path; dylib ids + cross-refs are rewired below. Set the
-    # target property explicitly: CMAKE_INSTALL_RPATH is consumed at target
-    # creation (above), so assigning the variable here would be too late
-    # (same ordering as the Linux block).
+    # Same target-property RPATH ordering as the Linux block.
     get_target_property(_cli_rpath caudio_cli INSTALL_RPATH)
     if(_cli_rpath STREQUAL "_cli_rpath-NOTFOUND")
       set(_cli_rpath "")
@@ -570,8 +572,14 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
       get_filename_component(_n "${_f}" NAME)
       list(APPEND _ff_dylib_names "${_n}")
     endforeach()
+    # Exe file name resolved at configure time: genexes are NOT evaluated
+    # inside install(CODE), and otool errors here are swallowed by ERROR_QUIET.
+    get_target_property(_cli_out caudio_cli OUTPUT_NAME)
+    if(_cli_out STREQUAL "_cli_out-NOTFOUND")
+      set(_cli_out caudio_cli)
+    endif()
     install(CODE "
-      set(_exe \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/$<TARGET_FILE_NAME:caudio_cli>\")
+      set(_exe \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/${_cli_out}\")
       set(_libdir \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\")
       set(_bins \"\${_exe}\")
       foreach(_n ${_ff_dylib_names})
@@ -582,12 +590,22 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
         endif()
       endforeach()
       foreach(_b IN LISTS _bins)
-        execute_process(COMMAND otool -L \"\${_b}\" OUTPUT_VARIABLE _refs OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        # Links share their target's load commands (already handled via the
+        # real file): processing both would re-change @rpath refs onto
+        # themselves and re-sign twice.
+        if(IS_SYMLINK \"${_b}\")
+          continue()
+        endif()
+        execute_process(COMMAND otool -L \"\${_b}\" OUTPUT_VARIABLE _refs OUTPUT_STRIP_TRAILING_WHITESPACE RESULT_VARIABLE _rc_ot ERROR_QUIET)
+        if(NOT _rc_ot EQUAL 0)
+          message(FATAL_ERROR \"FFmpeg bundle: otool failed for \${_b}\")
+        endif()
         foreach(_n ${_ff_dylib_names})
-          string(REGEX MATCH \"[^ \\t\\r\\n]*/\${_n}( |$)\" _hit \"\${_refs}\")
+          # _old keeps the FULL old path: -change matches load commands
+          # exactly, and a bare filename silently no-ops.
+          string(REGEX MATCH \"[^ \\t\\r\\n]*/\${_n}( |\$)\" _hit \"\${_refs}\")
           if(_hit)
-            string(REGEX REPLACE \"^[^ \\t\\r\\n]*/\" \"\" _old \"\${_hit}\")
-            string(STRIP \"\${_old}\" _old)
+            string(STRIP \"\${_hit}\" _old)
             execute_process(COMMAND install_name_tool -change \"\${_old}\" \"@rpath/\${_n}\" \"\${_b}\" RESULT_VARIABLE _rc_ch OUTPUT_QUIET ERROR_QUIET)
             if(NOT _rc_ch EQUAL 0)
               message(FATAL_ERROR \"FFmpeg bundle: install_name_tool -change failed: \${_old} in \${_b}\")

@@ -1,0 +1,89 @@
+# Portability gate (MANUAL release gate): runs the linux runtime tree on a
+# bare ubuntu:24.04 container image with no FFmpeg installed.
+# Requires a git tag (release presets set CAUDIO_REQUIRE_GIT_VERSION=ON).
+
+name: Portability gate (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      preset:
+        required: false
+        description: 'Preset under test (shipping: minsize-lto-clang)'
+        type: choice
+        options:
+          - minsize-lto-clang
+          - release-lto-clang
+          - minsize-clang
+          - release-clang
+        default: minsize-lto-clang
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-bare:
+    name: bare ubuntu-24.04 / ${{ inputs.preset }}
+    runs-on: ubuntu-24.04
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      DEPS_REPO: "AhmedowM/deps-private"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup LLVM 21
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-21 lld-21
+          sudo ln -sf /usr/bin/clang-21 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++
+          hash -r; clang --version
+          sudo apt-get install -y ninja-build
+          cmake --version; ninja --version
+
+      - name: "Download trimmed FFmpeg (required: no system fallback here)"
+        env:
+          GH_TOKEN: ${{ secrets.DEPS_PAT }}
+          CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
+        run: |
+          gh release download "ffmpeg-trimmed-8.1.2-1" \
+            --repo "${{ env.DEPS_REPO }}" \
+            --pattern "ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz" \
+            --dir . \
+            --clobber
+          mkdir -p "$CAUDIO_TRIMMED_ROOT"
+          tar -xzf ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+          echo "CAUDIO_TRIMMED_ROOT=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_ENV"
+
+      - name: Configure + build + install
+        run: |
+          set -o pipefail
+          cmake --preset "${{ inputs.preset }}" 2>&1 | tee configure.log
+          cmake --build --preset "${{ inputs.preset }}" 2>&1 | tee build.log
+          cmake --install "build/${{ inputs.preset }}" --prefix "$PWD/stage" 2>&1 | tee install.log
+
+      - name: Bare-metal run (no FFmpeg in the container)
+        run: |
+          test -n "$(ls stage/lib/libavcodec.so.* 2>/dev/null)" || (echo "bundled FFmpeg missing from stage/lib" && exit 1)
+          docker run --rm -v "$PWD/stage:/stage:ro" ubuntu:24.04 /stage/bin/caudio --version
+          docker run --rm -v "$PWD/stage:/stage:ro" ubuntu:24.04 /stage/bin/caudio --help > /dev/null
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portability-${{ inputs.preset }}
+          path: |
+            configure.log
+            build.log
+            install.log
+          if-no-files-found: warn

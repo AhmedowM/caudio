@@ -1,44 +1,15 @@
 # Release bake-off (MANUAL observatory, not a gate).
-# Registration probe touch.
 #
-# Compares compiler x preset-family combinations on size and shippability:
-# Linux gcc-16 vs llvm-21, macOS brew-LLVM vs AppleClang, Windows LLVM
-# (MSVC ABI) vs MSVC -- across release / release-lto / minsize /
-# minsize-lto. Answers "what should we ship where" with numbers instead
-# of lore. Release presets do NOT build tests (CAUDIO_ENABLE_TESTS stays
-# off), so legs are build + install + smoke + measure; correctness is
-# gated by ci.yml, not here.
+# Compares compiler x preset-family combinations on size and shippability.
+# Legs are build + install + smoke + measure (no tests; correctness is
+# gated by ci.yml, not here).
 #
-# Design notes (read before "fixing" red legs):
-# - FFmpeg is held constant per leg the way releases do it: try the
-#   deps-private trimmed asset (DEPS_PAT), fall back to the system
-#   provider. The provider that won is recorded per leg -- size deltas
-#   between trimmed/system legs are data, not noise. Configure passes
-#   -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=<root> on base presets
-#   (same mechanism as the *-trimmed-* presets) plus
-#   -DCAUDIO_BUNDLE_FFMPEG_MACOS=ON (inert off-Apple; mirrors the trimmed
-#   release preset on macOS).
-# - Version selection works through PATH (toolchains hard-set bare names).
-# - Apple legs deliberately do NOT install brew llvm (proves independence);
-#   they reuse the proven apple-clang.yml overrides (xcrun compilers +
-#   CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
-# - minsize-lto translates section GC per linker (CAUDIO_LINK_SECTION_GC:
-#   GNU --gc-sections, Apple -dead_strip; MSVC needs none). The flag must
-#   not sit in the presets: Apple ld rejects --gc-sections at compiler
-#   validation, before CMakeLists could repair it.
-# - Known-red: linux gcc / minsize-lto (gcc-16 + IPO + -Os/section-flags
-#   miscompiles startup: --version AND --help abort silently right after
-#   config open, no output; never-throwing paths work; loader/DSO-inits
-#   clean per LD_DEBUG, strace shows raw abort()). Exonerated by experiment:
-#   $ORIGIN RPATH + SONAME bundling (fixed the other 7 linux legs),
-#   --allow-multiple-definition scoping, --gc-sections removal (still red
-#   without it). Next probe: minimal reproducer for a gcc-16 LTO bug
-#   report; candidates -fno-ipa-icf or -O3 on minsize-lto-gcc.
-# - MSVC legs run windows-latest only (VS18-generator presets).
-# - Release presets require a git tag (CAUDIO_REQUIRE_GIT_VERSION=ON), so
-#   checkout uses fetch-depth: 0 -- shallow clones fail configure loudly.
-# - Legs are informational by default (continue-on-error) with a summary
-#   in `report`. Flip `strict` once a combination is a shipping candidate.
+# - FFmpeg: deps-private trimmed asset (DEPS_PAT) via CAUDIO_TRIMMED_ROOT,
+#   else system provider. The winning provider is recorded per leg.
+# - Apple legs do NOT install brew llvm; they reuse the apple-clang.yml
+#   overrides (xcrun + CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
+# - Checkout uses fetch-depth: 0 (release presets require a git tag).
+# - Legs are informational (continue-on-error) with a summary in `report`.
 
 name: Release bake-off (manual)
 
@@ -133,6 +104,7 @@ jobs:
             --clobber; then
             mkdir -p "$CAUDIO_TRIMMED_ROOT"
             tar -xzf ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            echo "CAUDIO_TRIMMED_ROOT=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_ENV"
             echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
@@ -152,8 +124,7 @@ jobs:
           set -o pipefail
           EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
-            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=${{ steps.trimdl.outputs.trim_root }}"
-            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+            echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
@@ -188,6 +159,12 @@ jobs:
           test -x "$BIN" || (echo "staged binary missing" && exit 1)
           "$BIN" --version
           otool -L "$BIN" | head -n 12 || true
+          echo "=== portability: no absolute brew/local/build-tree refs allowed ==="
+          otool -L "$BIN"
+          if otool -L "$BIN" | grep -E "/opt/homebrew/|/usr/local/|ffmpeg-trimmed/"; then
+            echo "portability check failed: absolute third-party refs above"
+            exit 1
+          fi
           echo "bin_bytes=$(stat -f%z "$BIN")"
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
           RT=$(ls build/$PRESET/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
@@ -270,6 +247,7 @@ jobs:
             --clobber; then
             mkdir -p "$CAUDIO_TRIMMED_ROOT"
             tar -xzf ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            echo "CAUDIO_TRIMMED_ROOT=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_ENV"
             echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
@@ -286,8 +264,7 @@ jobs:
           set -o pipefail
           EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
-            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=${{ steps.trimdl.outputs.trim_root }}"
-            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+            echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
@@ -312,6 +289,7 @@ jobs:
           BIN="$RUNNER_TEMP/stage/bin/caudio"
           test -x "$BIN" || (echo "staged binary missing" && exit 1)
           SMOKE_RC=0
+          PORT_RC=0
           "$BIN" --version || SMOKE_RC=$?
           if [ "$SMOKE_RC" -ne 0 ] && [ "${{ inputs.smoke_debug }}" = "true" ]; then
             echo "=== smoke failed ($SMOKE_RC): loader + init diagnostics ==="
@@ -328,6 +306,11 @@ jobs:
             tail -n 30 /tmp/strace.log || echo "strace unavailable or empty"
           fi
           ldd "$BIN" | head -n 15 || true
+          echo "=== portability: FFmpeg must resolve under stage/ ==="
+          if ldd "$BIN" | grep -E "libav|swresample|swscale" | grep -vF "$RUNNER_TEMP/stage"; then
+            echo "portability check failed: FFmpeg resolves outside the stage tree"
+            PORT_RC=1
+          fi
           echo "bin_bytes=$(stat -c%s "$BIN")"
           size -A "$BIN" 2>/dev/null | sort -k2 -n -r | head -n 8 || true
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
@@ -335,7 +318,8 @@ jobs:
           DEV=$(ls build/$PRESET/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
           if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -c%s "$RT")"; else echo "pkg_bytes=0"; fi
           if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -c%s "$DEV")"; else echo "dev_bytes=0"; fi
-          exit "$SMOKE_RC"
+          if [ "$SMOKE_RC" -ne 0 ]; then exit "$SMOKE_RC"; fi
+          exit "$PORT_RC"
 
       - name: Upload report
         if: always()
@@ -405,6 +389,7 @@ jobs:
             fi
             mkdir -p "$TROOT"
             tar -xzf ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz -C "$TROOT"
+            echo "CAUDIO_TRIMMED_ROOT=$TROOT" >> "$GITHUB_ENV"
             echo "trim_root=$TROOT" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- leg uses system provider"
@@ -422,13 +407,7 @@ jobs:
           set -o pipefail
           EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
-            if command -v cygpath >/dev/null 2>&1; then
-              TROOT="$(cygpath "${{ steps.trimdl.outputs.trim_root }}")"
-            else
-              TROOT="${{ steps.trimdl.outputs.trim_root }}"
-            fi
-            EXTRA="$EXTRA -DCAUDIO_USE_TRIMMED_FFMPEG=ON -DFFmpeg_ROOT=$TROOT"
-            echo "provider=trimmed" >> "$GITHUB_OUTPUT"
+            echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
@@ -506,8 +485,4 @@ jobs:
             echo "provider=, plus the staged-tree listing (what ships) and"
             echo "otool/ldd output (what it links). Compare within an OS --"
             echo "cross-OS bytes are not comparable (formats/toolchains)."
-            echo "Section GC is linker-matched (CAUDIO_LINK_SECTION_GC:"
-            echo "GNU --gc-sections, Apple -dead_strip)."
-            echo "Known-red: linux gcc / minsize-lto (gcc-16 LTO startup"
-            echo "miscompile -- silent SIGABRT; see header comment)."
           } >> "$GITHUB_STEP_SUMMARY"
