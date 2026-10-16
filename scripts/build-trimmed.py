@@ -223,6 +223,13 @@ def main() -> None:
         configure = [(src / "configure").as_posix(), f"--prefix={prefix.as_posix()}", *flags]
         if args.extra_configure_args:
             configure.extend(args.extra_configure_args.split())
+        cc_env = os.environ.get("CC")
+        if cc_env:
+            # Explicit --cc: FFmpeg configure does not reliably honor a bare
+            # $CC from the environment (observed: cross-target CC silently
+            # ignored, host arch built). As a list element the value keeps
+            # its spaces intact -- no shell splitting.
+            configure.append(f"--cc={cc_env}")
         if platform.system() == "Windows":
             configure = [find_bash(args.bash), *configure]
         run(configure, build, args.dry_run)

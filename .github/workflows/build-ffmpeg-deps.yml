@@ -102,8 +102,8 @@ jobs:
       - name: Assert output arch (Windows)
         if: matrix.os == 'windows'
         run: |
-          ls ffmpeg-trimmed/lib/
-          file ffmpeg-trimmed/lib/* | tee arch.txt
+          ls ffmpeg-trimmed/bin/
+          file ffmpeg-trimmed/bin/*.dll | tee arch.txt
           grep -q "${{ matrix.file_tag }}" arch.txt
         shell: msys2 {0}
 
