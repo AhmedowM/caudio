@@ -1,10 +1,9 @@
 # Apple Clang (MANUAL observatory, not a gate).
 #
-# Builds with the native Xcode toolchain instead of brew LLVM.
-# Mechanics: cmake/toolchains/detail/llvm-clang.cmake honors
-# -DCAUDIO_APPLE_CLANG=ON by skipping the brew pin; CompilerPolicy still
-# requires -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. The job uploads full
-# logs plus a gap report (first errors), and never fails the run.
+# Builds with the native Xcode toolchain instead of brew LLVM, via the
+# ci-apple preset (xcrun toolchain + unsupported-compiler opt-in).
+# The job uploads full logs plus a gap report (first errors), and never
+# fails the run.
 
 name: Apple Clang (manual)
 
@@ -36,7 +35,6 @@ jobs:
     continue-on-error: true
     env:
       CAUDIO_TEST_NOAUDIO: 1
-      CAUDIO_APPLE_CLANG: 1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -63,15 +61,11 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Configure (AppleClang escape hatch)
+      - name: Configure (ci-apple preset)
         id: configure
         run: |
           set +e
-          cmake --preset ci \
-            -DCMAKE_C_COMPILER="$(xcrun -f clang)" \
-            -DCMAKE_CXX_COMPILER="$(xcrun -f clang++)" \
-            -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON \
-            -DCAUDIO_APPLE_CLANG=ON > configure.log 2>&1
+          cmake --preset ci-apple > configure.log 2>&1
           code=$?
           echo "code=$code" | tee -a configure.log
           echo "code=$code" >> "$GITHUB_OUTPUT"
@@ -81,13 +75,13 @@ jobs:
         if: steps.configure.outputs.code == '0'
         run: |
           set -o pipefail
-          cmake --build --preset ci 2>&1 | tee build.log
+          cmake --build --preset ci-apple 2>&1 | tee build.log
 
       - name: Test
         if: steps.configure.outputs.code == '0'
         run: |
           set -o pipefail
-          ctest --preset ci --output-on-failure 2>&1 | tee test.log
+          ctest --preset ci-apple --output-on-failure 2>&1 | tee test.log
 
       - name: Gap report
         if: always()

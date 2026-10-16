@@ -41,6 +41,14 @@
       }
     },
     {
+      "name": "toolchain-apple",
+      "hidden": true,
+      "displayName": "Compiler mixin: Xcode AppleClang via xcrun (no brew LLVM)",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/apple.cmake"
+      }
+    },
+    {
       "name": "toolchain-auto",
       "hidden": true,
       "displayName": "Compiler mixin: host default (Linux GCC, macOS brew LLVM, Windows MSVC-if-usable else PATH)",
@@ -120,6 +128,22 @@
         "toolchain-auto"
       ],
       "displayName": "Headless CI: tests, no audio device"
+    },
+    {
+      "name": "ci-apple",
+      "inherits": [
+        "toolchain-apple",
+        "ci-base"
+      ],
+      "displayName": "Headless CI with Xcode AppleClang: tests, no audio device",
+      "cacheVariables": {
+        "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
     },
     {
       "name": "ci-sanitizers",
@@ -368,6 +392,22 @@
       }
     },
     {
+      "name": "release-apple",
+      "inherits": [
+        "toolchain-apple",
+        "release-base"
+      ],
+      "displayName": "Optimized release build with Xcode AppleClang",
+      "cacheVariables": {
+        "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
       "name": "release-lto-clang",
       "inherits": [
         "toolchain-clang",
@@ -417,6 +457,22 @@
       }
     },
     {
+      "name": "release-lto-apple",
+      "inherits": [
+        "toolchain-apple",
+        "release-lto-base"
+      ],
+      "displayName": "Release + link-time optimization with Xcode AppleClang",
+      "cacheVariables": {
+        "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
       "name": "minsize-clang",
       "inherits": [
         "toolchain-clang",
@@ -440,6 +496,22 @@
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
+      }
+    },
+    {
+      "name": "minsize-apple",
+      "inherits": [
+        "toolchain-apple",
+        "minsize-base"
+      ],
+      "displayName": "Smallest binary with Xcode AppleClang: MinSizeRel",
+      "cacheVariables": {
+        "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
       }
     },
     {
@@ -627,6 +699,22 @@
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
         "CMAKE_CXX_FLAGS": "/Gy"
       }
+    },
+    {
+      "name": "minsize-lto-apple",
+      "inherits": [
+        "toolchain-apple",
+        "minsize-lto"
+      ],
+      "displayName": "Smallest binary with Xcode AppleClang: MinSizeRel + LTO + section GC",
+      "cacheVariables": {
+        "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
     }
   ],
   "buildPresets": [
@@ -643,6 +731,11 @@
     {
       "name": "ci",
       "configurePreset": "ci",
+      "jobs": 4
+    },
+    {
+      "name": "ci-apple",
+      "configurePreset": "ci-apple",
       "jobs": 4
     },
     {
@@ -760,6 +853,11 @@
       "jobs": 4
     },
     {
+      "name": "release-apple",
+      "configurePreset": "release-apple",
+      "jobs": 4
+    },
+    {
       "name": "release-lto-clang",
       "configurePreset": "release-lto-clang",
       "jobs": 4
@@ -771,6 +869,11 @@
       "jobs": 4
     },
     {
+      "name": "release-lto-apple",
+      "configurePreset": "release-lto-apple",
+      "jobs": 4
+    },
+    {
       "name": "minsize-clang",
       "configurePreset": "minsize-clang",
       "jobs": 4
@@ -779,6 +882,11 @@
       "name": "minsize-msvc",
       "configurePreset": "minsize-msvc",
       "configuration": "MinSizeRel",
+      "jobs": 4
+    },
+    {
+      "name": "minsize-apple",
+      "configurePreset": "minsize-apple",
       "jobs": 4
     },
     {
@@ -857,6 +965,11 @@
       "configurePreset": "minsize-lto-msvc",
       "configuration": "MinSizeRel",
       "jobs": 4
+    },
+    {
+      "name": "minsize-lto-apple",
+      "configurePreset": "minsize-lto-apple",
+      "jobs": 4
     }
   ],
   "testPresets": [
@@ -873,6 +986,16 @@
     {
       "name": "ci",
       "configurePreset": "ci",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "jobs": 4
+      }
+    },
+    {
+      "name": "ci-apple",
+      "configurePreset": "ci-apple",
       "output": {
         "outputOnFailure": true
       },

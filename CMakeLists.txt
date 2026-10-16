@@ -127,7 +127,7 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # 1.0 status: EXPERIMENTAL and OFF by default (SH-1…SH-5 deferred post-1.0, see
 # CODEBASE_REVIEW.md §5) — no 1.0 artifact ships shared libs.
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
-option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" OFF)
+option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" ON)
 # Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
 # compiler validation, so presets carry only the intent and the per-linker
 # flag lives here. MSVC links /OPT:REF by default; nothing to add.
