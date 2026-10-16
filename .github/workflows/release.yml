@@ -34,7 +34,7 @@ jobs:
             compiler: clang
             preset: release-lto-clang
             trim_preset: release-lto-trimmed-clang
-            trim_asset: ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz
+            trim_asset: ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz
             pkg_ext: tar.gz
           - os: windows-latest
             compiler: windows-clang
@@ -126,7 +126,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DEPS_PAT }}
           CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
         run: |
-          if gh release download "ffmpeg-trimmed-8.1.2-1" \
+          if gh release download "ffmpeg-trimmed-8.1.2-2" \
             --repo "AhmedowM/deps-private" \
             --pattern "${{ matrix.trim_asset }}" \
             --dir . \

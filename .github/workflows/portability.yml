@@ -17,6 +17,10 @@ name: Portability gate (manual)
           - minsize-clang
           - release-clang
         default: minsize-lto-clang
+      deps_tag:
+        required: false
+        description: 'deps-private trimmed FFmpeg release tag'
+        default: 'ffmpeg-trimmed-8.1.2-2'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,7 +59,7 @@ jobs:
           GH_TOKEN: ${{ secrets.DEPS_PAT }}
           CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
         run: |
-          gh release download "ffmpeg-trimmed-8.1.2-1" \
+          gh release download "${{ inputs.deps_tag }}" \
             --repo "${{ env.DEPS_REPO }}" \
             --pattern "ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz" \
             --dir . \

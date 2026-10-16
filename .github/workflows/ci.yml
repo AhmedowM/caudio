@@ -215,7 +215,7 @@ jobs:
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: "8.1.2"
       REBUILD: "1"
-      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-2"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -333,7 +333,7 @@ jobs:
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: "8.1.2"
       REBUILD: "1"
-      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-2"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -415,7 +415,7 @@ jobs:
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: "8.1.2"
       REBUILD: "1"
-      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-2"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -482,7 +482,7 @@ jobs:
       DEPS_REPO: "AhmedowM/deps-private"
       FFMPEG_VERSION: "8.1.2"
       REBUILD: "1"
-      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-1"
+      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-2"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
