@@ -79,6 +79,32 @@ def asset_name(version: str) -> str:
     return f"ffmpeg-trimmed-{version}-{os_name}-{arch}.tar.gz"
 
 
+def find_bash(explicit: str | None) -> str:
+    """Locate a real msys/cygwin bash on Windows.
+
+    Bare shutil.which("bash") is unusable: Win32 search order finds
+    System32's WSL stub before anything on PATH. Prefer an explicit path,
+    then well-known install roots, then PATH minus the stub.
+    """
+    if explicit:
+        if not Path(explicit).is_file():
+            print(f"[ERROR] --bash not found: {explicit}", file=sys.stderr)
+            sys.exit(1)
+        return explicit
+    for root in (os.environ.get("MSYS2_ROOT", ""),
+                 r"C:\msys64", r"C:\tools\msys64", r"C:\cygwin64"):
+        cand = Path(root) / "usr" / "bin" / "bash.exe" if root else None
+        if cand is not None and cand.is_file():
+            return str(cand)
+    found = shutil.which("bash")
+    if found and "system32" not in found.lower():
+        return found
+    print("[ERROR] no msys/cygwin bash on PATH (System32 WSL stub does not "
+          "count) -- pass --bash explicitly or install MSYS2",
+          file=sys.stderr)
+    sys.exit(1)
+
+
 def require(prog: str, hint: str) -> str:
     path = shutil.which(prog)
     if not path:
@@ -124,6 +150,10 @@ def main() -> None:
     ap.add_argument("--extra-configure-args", default="",
                     help="space-separated extra args appended after the whitelist "
                          "(e.g. cross-compile --arch/--target-os/--cc)")
+    ap.add_argument("--bash", default=None,
+                    help="bash binary for running configure on Windows "
+                         "(default: well-known MSYS2/Cygwin roots, then PATH "
+                         "excluding the System32 WSL stub)")
     ap.add_argument("--pack", nargs="?", const="auto", default=None, metavar="OUT.tar.gz",
                     help="tar the prefix for upload (default name encodes host os/arch)")
     ap.add_argument("--print-flags", action="store_true",
@@ -152,7 +182,7 @@ def main() -> None:
                   file=sys.stderr)
             sys.exit(1)
         cc = os.environ.get("CC") or "cc"
-        if not shutil.which(cc):
+        if not shutil.which(cc.split()[0]):
             print(f"[ERROR] C compiler '{cc}' not on PATH (set CC to override)",
                   file=sys.stderr)
             sys.exit(1)
@@ -194,7 +224,7 @@ def main() -> None:
         if args.extra_configure_args:
             configure.extend(args.extra_configure_args.split())
         if platform.system() == "Windows":
-            configure = ["bash", *configure]
+            configure = [find_bash(args.bash), *configure]
         run(configure, build, args.dry_run)
         run(["make", f"-j{args.jobs}"], build, args.dry_run)
         run(["make", "install"], build, args.dry_run)

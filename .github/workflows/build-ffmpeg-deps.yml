@@ -89,7 +89,7 @@ jobs:
       - name: Build trimmed FFmpeg (Windows)
         if: matrix.os == 'windows'
         run: |
-          python3 scripts/build-trimmed.py --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
+          python3 scripts/build-trimmed.py --bash "$(cygpath -w "$(command -v bash)")" --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
         shell: msys2 {0}
 
       - name: Assert output arch
