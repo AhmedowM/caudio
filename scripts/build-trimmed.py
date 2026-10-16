@@ -24,6 +24,7 @@ import argparse
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -79,6 +80,18 @@ def asset_name(version: str) -> str:
     return f"ffmpeg-trimmed-{version}-{os_name}-{arch}.tar.gz"
 
 
+def _bash_has(bash: str, prog: str) -> bool:
+    """Ask msys bash itself whether prog resolves (exact build-env semantics).
+
+    Needed because an msys2 Python sees PATH with Win32 semantics and cannot
+    parse its colon-separated POSIX entries -- shutil.which misses tools
+    that the build shell finds perfectly well.
+    """
+    r = subprocess.run([bash, "-c", f"command -v {prog}"],
+                       capture_output=True, text=True)
+    return r.returncode == 0 and bool(r.stdout.strip())
+
+
 def find_bash(explicit: str | None) -> str:
     """Locate a real msys/cygwin bash on Windows.
 
@@ -113,12 +126,16 @@ def require(prog: str, hint: str) -> str:
     return path
 
 
-def run(cmd: list[str], cwd: Path, dry_run: bool) -> None:
+def run(cmd: list[str], cwd: Path, dry_run: bool, log_tail: Path | None = None) -> None:
     print(f"+ {' '.join(cmd)}  (in {cwd})")
     if dry_run:
         return
     r = subprocess.run(cmd, cwd=cwd)
     if r.returncode != 0:
+        if log_tail is not None and log_tail.exists():
+            print(f"--- last 40 lines of {log_tail} ---")
+            lines = log_tail.read_text(errors="replace").splitlines()
+            print("\n".join(lines[-40:]))
         print(f"[ERROR] failed ({r.returncode}): {cmd[0]}", file=sys.stderr)
         sys.exit(1)
 
@@ -150,6 +167,9 @@ def main() -> None:
     ap.add_argument("--extra-configure-args", default="",
                     help="space-separated extra args appended after the whitelist "
                          "(e.g. cross-compile --arch/--target-os/--cc)")
+    ap.add_argument("--toolchain", default="",
+                    help="FFmpeg --toolchain value (default: auto-detect; "
+                         "use msvc with clang-cl on Windows)")
     ap.add_argument("--bash", default=None,
                     help="bash binary for running configure on Windows "
                          "(default: well-known MSYS2/Cygwin roots, then PATH "
@@ -176,17 +196,21 @@ def main() -> None:
     if not args.dry_run:
         # Dry runs print commands without touching the machine, so tool
         # presence is checked only for real builds.
-        if platform.system() == "Windows" and not shutil.which("bash"):
-            print("[ERROR] Windows source builds need bash+make on PATH (MSYS2); "
-                  "MSVC cannot compile FFmpeg upstream -- consume a prebuilt tree instead.",
-                  file=sys.stderr)
-            sys.exit(1)
         cc = os.environ.get("CC") or "cc"
-        if not shutil.which(cc.split()[0]):
-            print(f"[ERROR] C compiler '{cc}' not on PATH (set CC to override)",
-                  file=sys.stderr)
-            sys.exit(1)
-        require("make", "install build essentials (Linux) / Xcode CLT (macOS) / MSYS2 (Windows)")
+        if platform.system() == "Windows":
+            bash = find_bash(args.bash)
+            missing = [p for p in ("make", cc.split()[0]) if not _bash_has(bash, p)]
+            if missing:
+                print(f"[ERROR] not found via {bash}: {', '.join(missing)} -- "
+                      "Windows builds need MSYS2 tooling on PATH",
+                      file=sys.stderr)
+                sys.exit(1)
+        else:
+            if not shutil.which(cc.split()[0]):
+                print(f"[ERROR] C compiler '{cc}' not on PATH (set CC to override)",
+                      file=sys.stderr)
+                sys.exit(1)
+            require("make", "install build essentials (Linux) / Xcode CLT (macOS)")
 
     prefix = args.prefix.resolve()
     with tempfile.TemporaryDirectory(prefix="trimmed-ffmpeg-") as tmp:
@@ -221,8 +245,10 @@ def main() -> None:
         # POSIX forms: on Windows these cross into bash (which would eat
         # backslashes), while Path-as-cwd stays native for subprocess.
         configure = [(src / "configure").as_posix(), f"--prefix={prefix.as_posix()}", *flags]
+        if args.toolchain:
+            configure.append(f"--toolchain={args.toolchain}")
         if args.extra_configure_args:
-            configure.extend(args.extra_configure_args.split())
+            configure.extend(shlex.split(args.extra_configure_args))
         cc_env = os.environ.get("CC")
         if cc_env:
             # Explicit --cc: FFmpeg configure does not reliably honor a bare
@@ -232,7 +258,10 @@ def main() -> None:
             configure.append(f"--cc={cc_env}")
         if platform.system() == "Windows":
             configure = [find_bash(args.bash), *configure]
-        run(configure, build, args.dry_run)
+        # ffbuild/config.log carries the real compiler error when configure
+        # fails; the temp dir (and the log) is deleted afterwards, so print
+        # the tail now or the evidence is gone.
+        run(configure, build, args.dry_run, log_tail=build / "ffbuild" / "config.log")
         run(["make", f"-j{args.jobs}"], build, args.dry_run)
         run(["make", "install"], build, args.dry_run)
         if platform.system() == "Windows" and not args.dry_run:
