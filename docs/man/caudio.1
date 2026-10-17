@@ -144,6 +144,12 @@ No argument prints current volume (\fBVolume: muted\fR when muted).
 .B info [\-\-json]
 Show detailed info for the currently playing track (metadata + play
 statistics).
+.TP
+.B version [\-\-json]
+Print the version and build details: compiler, C++ standard, runtime
+library, build mode, operating system, and architecture. Needs no daemon
+and does not read config. \fB\-\-version\fR is a shorthand that prints only
+the version string.
 .SS Queue
 .TP
 .B queue list [\-\-json]

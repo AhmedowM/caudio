@@ -151,6 +151,23 @@ TEST_CASE("cli version prints", "[cli]") {
     REQUIRE(!r.out.empty());
 }
 
+TEST_CASE("cli version subcommand prints details", "[cli]") {
+    auto r = runCli({"version"});
+    REQUIRE(r.exitCode == 0);
+    for (const char* tok : {"caudio ", "short:", "commit:", "compiler:", "std:", "runtime:",
+                            "build:", "os:", "arch:"}) {
+        INFO("missing token: " << tok);
+        REQUIRE(contains(r.out, tok));
+    }
+    auto j = runCli({"version", "--json"});
+    REQUIRE(j.exitCode == 0);
+    for (const char* key :
+         {"\"version\":", "\"commit\":", "\"compiler\":", "\"os\":", "\"arch\":"}) {
+        INFO("missing key: " << key);
+        REQUIRE(contains(j.out, key));
+    }
+}
+
 TEST_CASE("cli rejects unknown command", "[cli]") {
     auto r = runCli({"frobnicate"});
     REQUIRE(r.exitCode == 1);

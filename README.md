@@ -150,6 +150,7 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio config export <path>` | Export config file |
 | `caudio config import <path>` | Validate and import config file |
 | `caudio config reset [key]` | Reset key or all to defaults |
+| `caudio version [--json]` | Version plus build details (compiler, C++ std, runtime, build, os, arch) |
 
 Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::version::version()`), `--help` / `-h`. Exit codes: `0` success, `1` any error (see `EXIT STATUS` in `docs/man/caudio.1`).
 

@@ -254,6 +254,72 @@ int renderBatch(caudio::app::BatchResult res, bool asJson) {
     return rep.exitCode;
 }
 
+// Prints version plus build provenance for the `version` subcommand. Human
+// output is a labelled block; --json emits one flat object.
+int renderVersion(bool asJson) {
+#if defined(__clang__)
+    const std::string compiler = std::string("Clang ") + __clang_version__;
+#elif defined(_MSC_VER)
+    const std::string compiler = std::string("MSVC ") + std::to_string(_MSC_VER);
+#elif defined(__GNUC__)
+    const std::string compiler = std::string("GCC ") + __VERSION__;
+#else
+    const std::string compiler = "unknown";
+#endif
+#if defined(_LIBCPP_VERSION)
+    constexpr std::string_view runtime = "libc++";
+#elif defined(_MSVC_STL_VERSION)
+    constexpr std::string_view runtime = "MSVC STL";
+#elif defined(__GLIBCXX__)
+    constexpr std::string_view runtime = "libstdc++";
+#else
+    constexpr std::string_view runtime = "unknown";
+#endif
+#if defined(_WIN32)
+    constexpr std::string_view platform = "windows";
+#elif defined(__APPLE__)
+    constexpr std::string_view platform = "macos";
+#elif defined(__linux__)
+    constexpr std::string_view platform = "linux";
+#else
+    constexpr std::string_view platform = "unknown";
+#endif
+#if defined(__x86_64__) || defined(_M_X64)
+    constexpr std::string_view arch = "x86_64";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    constexpr std::string_view arch = "arm64";
+#elif defined(__i386__) || defined(_M_IX86)
+    constexpr std::string_view arch = "x86";
+#else
+    constexpr std::string_view arch = "unknown";
+#endif
+#if defined(NDEBUG)
+    constexpr std::string_view build = "release";
+#else
+    constexpr std::string_view build = "debug";
+#endif
+    const std::string full(caudio::version::version());
+    const std::string shortv(caudio::version::shortVersion());
+    const std::string commit(caudio::version::versionCommit());
+    const std::string stdv = std::to_string(__cplusplus);
+    if (asJson) {
+        caudio::println(
+            R"({{"version":"{}","short":"{}","commit":"{}","compiler":"{}","std":"{}","runtime":"{}","build":"{}","os":"{}","arch":"{}"}})",
+            full, shortv, commit, compiler, stdv, runtime, build, platform, arch);
+        return 0;
+    }
+    caudio::println("caudio {}", full);
+    caudio::println("  short:    {}", shortv);
+    caudio::println("  commit:   {}", commit);
+    caudio::println("  compiler: {}", compiler);
+    caudio::println("  std:      {}", stdv);
+    caudio::println("  runtime:  {}", runtime);
+    caudio::println("  build:    {}", build);
+    caudio::println("  os:       {}", platform);
+    caudio::println("  arch:     {}", arch);
+    return 0;
+}
+
 } // namespace detail
 using detail::parseSeek;
 using detail::parseTime;
@@ -604,11 +670,16 @@ int Shell::run(int argc, char** argv) {
     bool infoJson = false;
     auto* infoCmd = cli_->add_subcommand("info", "Show current track info");
     infoCmd->add_flag("--json", infoJson, "JSON output");
+    bool versionJson = false;
+    auto* versionCmd = cli_->add_subcommand("version", "Show version and build details");
+    versionCmd->add_flag("--json", versionJson, "JSON output");
     try {
         cli_->parse(argc, argv);
     } catch (const CLI::ParseError& e) {
         return cli_->exit(e);
     }
+    if (versionCmd->parsed())
+        return detail::renderVersion(versionJson);
     if (!configPathStr.empty())
         config_.configPath = std::filesystem::path(configPathStr);
     {
