@@ -352,17 +352,17 @@ jobs:
   bake-windows:
     name: win ${{ matrix.compiler }} / ${{ matrix.family }} / ${{ matrix.arch }}
     if: inputs.run_windows
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'windows-11-arm' || 'windows-latest' }}
     continue-on-error: ${{ inputs.strict == false }}
     strategy:
       fail-fast: false
       matrix:
-        # MSVC presets pin the VS 2026 x64 generator, so MSVC stays x86_64.
-        include:
-          - { compiler: llvm, arch: x86_64, runner: windows-latest }
-          - { compiler: llvm, arch: arm64,  runner: windows-11-arm }
-          - { compiler: msvc, arch: x86_64, runner: windows-latest }
+        arch: [x86_64, arm64]
+        compiler: [llvm, msvc]
         family: [release, release-lto, minsize, minsize-lto]
+        # MSVC presets pin the VS 2026 x64 generator, so MSVC stays x86_64.
+        exclude:
+          - { compiler: msvc, arch: arm64 }
     env:
       CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
