@@ -10,80 +10,68 @@ permissions:
 
 jobs:
   build-packages:
-    name: package (${{ matrix.os }} / ${{ matrix.compiler }})
+    name: package (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # NOTE: ubuntu-latest is 24.04 today but migrates to 26.04 in Nov 2026
-        # (new kernel/CMake/FFmpeg, PPA gcc-16 support TBD) -- re-validate then.
-        # Compiler lives in the preset (same scheme as ci.yml); `compiler`
-        # below is display + artifact naming only. macOS is LLVM Clang --
-        # GCC builds miniaudio with the dummy backend (no audio).
-        # Windows releases build with LLVM Clang (MSVC stays CI-only).
-        # All legs ship release-lto-* (full optimization + LTO).
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Shipping matrix (decided from the release bake-off): MinSizeRel for
+        # both the runtime and the dev archive from one build; AppleClang on
+        # macOS; LLVM Clang on Linux and Windows (Windows targets the MSVC
+        # ABI). Every GitHub x64+arm64 runner is covered. Compiler lives in
+        # the preset; `label` is display + artifact naming only.
         include:
-          - os: ubuntu-latest
-            compiler: gcc-16
-            preset: release-lto-gcc
-            trim_preset: release-lto-trimmed-gcc
-            trim_asset: ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz
-            pkg_ext: tar.gz
-          - os: macos-latest
-            compiler: clang
-            preset: release-lto-clang
-            trim_preset: release-lto-trimmed-clang
-            trim_asset: ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz
-            pkg_ext: tar.gz
-          - os: windows-latest
-            compiler: windows-clang
-            preset: release-lto-clang
-            trim_preset: release-lto-trimmed-clang
-            trim_asset: ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz
-            pkg_ext: zip
+          - { os: ubuntu-24.04,     label: linux-x86_64,   preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz,    pkg_ext: tar.gz }
+          - { os: ubuntu-24.04-arm, label: linux-arm64,    preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-linux-arm64.tar.gz,     pkg_ext: tar.gz }
+          - { os: macos-15,         label: macos-arm64,    preset: minsize-apple, trim_asset: ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz,     pkg_ext: tar.gz }
+          - { os: macos-15-intel,   label: macos-x86_64,   preset: minsize-apple, trim_asset: ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz,    pkg_ext: tar.gz }
+          - { os: windows-latest,   label: windows-x86_64, preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz,  pkg_ext: zip }
+          - { os: windows-11-arm,   label: windows-arm64,  preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-windows-arm64.tar.gz,   pkg_ext: zip }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup GCC (Ubuntu)
+      - name: Setup LLVM Clang (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          # Same installer as the bake-off / llvm-linux.yml legs.
           sudo apt-get update
-          sudo apt-get install -y gcc-16 g++-16
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
-          gcc-16 --version; g++-16 --version
-          sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-21 lld-21
+          sudo ln -sf /usr/bin/clang-21 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++
+          hash -r; clang --version; clang++ --version
 
-      - name: Setup LLVM Clang (macOS)
+      - name: Select Xcode 26 (macOS)
         if: runner.os == 'macOS'
         run: |
-          # Policy: LLVM Clang only on Apple (brew `llvm` is keg-only, so it
-          # never shadows system clang -- the toolchain resolves
-          # "$(brew --prefix llvm)/bin/clang" explicitly).
-          brew update || echo "brew update failed, continuing with snapshot"
-          brew install llvm || brew upgrade llvm
-          LLVM_PREFIX="$(brew --prefix llvm)"
-          echo "$LLVM_PREFIX/bin" >> $GITHUB_PATH
-          "$LLVM_PREFIX/bin/clang" --version
-          "$LLVM_PREFIX/bin/clang++" --version
-          LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
-          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<expected>, <print>): $LLVM_MAJOR" && exit 1)
+          # AppleClang only (minsize-apple). Pin Xcode 26 when the image ships
+          # it; brew LLVM is deliberately absent from release builds.
+          XC="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -n "$XC" ]; then sudo xcode-select -s "$XC"; fi
+          xcode-select -p
+          xcodebuild -version || true
+          xcrun clang --version
+          xcrun clang++ --version
 
-      - name: Setup LLVM Clang (Windows)
+      - name: Setup LLVM Clang 21 (Windows)
         if: runner.os == 'Windows'
         run: |
-          # Windows releases build with LLVM Clang (MSVC ABI target).
-          # Prefer a preinstalled LLVM; install via choco only if missing.
-          if ! command -v clang++ >/dev/null 2>&1 && [ ! -x "/c/Program Files/LLVM/bin/clang++.exe" ]; then
-            choco install llvm -y --no-progress
-          fi
-          export PATH="/c/Program Files/LLVM/bin:$PATH"
-          clang++ --version
-          clang --version
+          # Pinned LLVM 21; official arch-matched archive (MSVC ABI target).
+          LLVM_VER=21.1.0
+          if [ "${{ matrix.label }}" = "windows-arm64" ]; then TRIPLE=aarch64-pc-windows-msvc; else TRIPLE=x86_64-pc-windows-msvc; fi
+          curl -fsSL -o llvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/clang+llvm-${LLVM_VER}-${TRIPLE}.tar.xz"
+          mkdir -p "$RUNNER_TEMP/llvm"
+          tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
+          echo "$(cygpath -w "$RUNNER_TEMP/llvm/bin")" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/llvm/bin/clang++" --version
+          "$RUNNER_TEMP/llvm/bin/clang" --version
         shell: bash
 
       - name: Install dependencies (Ubuntu)
@@ -114,12 +102,9 @@ jobs:
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
           cpack --version || cmake --version
 
-      # Release packaging only -- testing lives in ci.yml. The release preset
-      # requires a git tag (tag-triggered workflow checks out fetch-depth 0).
-      # Trimmed FFmpeg ships in every archive: the per-OS asset is downloaded
-      # from deps-private and consumed via CAUDIO_TRIMMED_ROOT. Any failure
-      # falls back to the default provider (full FFmpeg) -- a trim outage
-      # must never block a release.
+      # The per-OS trimmed FFmpeg asset comes from deps-private; a failed
+      # download falls back to the system/SetupFFmpeg provider (a trim
+      # outage must never block a release).
       - name: Download trimmed FFmpeg
         id: trimdl
         env:
@@ -152,17 +137,26 @@ jobs:
           tar -xzf "${{ matrix.trim_asset }}" -C "$troot"
         shell: bash
 
-      - name: Configure (release preset)
+      # Release packaging only -- testing lives in ci.yml. The trimmed-first
+      # cascade in CMakeLists.txt picks the trimmed provider when
+      # CAUDIO_TRIMMED_ROOT is set (and falls back to the system/SetupFFmpeg
+      # provider otherwise), so one preset serves both paths. A trim outage
+      # must never block a release. --preset + -D mixes (CMake 3.28+); the
+      # minsize families are also used by the bake-off, so the tag guard is
+      # injected here.
+      - name: Configure
         id: cfg
         env:
           CAUDIO_TRIMMED_ROOT: ${{ steps.trimdl.outputs.trim_root }}
         run: |
-          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ] && cmake --preset ${{ matrix.trim_preset }}; then
-            echo "preset=${{ matrix.trim_preset }}" >> "$GITHUB_OUTPUT"
+          set -o pipefail
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)"
           else
-            cmake --preset ${{ matrix.preset }}
-            echo "preset=${{ matrix.preset }}" >> "$GITHUB_OUTPUT"
+            echo "::warning::trimmed FFmpeg unavailable -- release uses the default provider"
           fi
+          cmake --preset ${{ matrix.preset }} -DCAUDIO_REQUIRE_GIT_VERSION=ON 2>&1 | tee configure.log
+          echo "preset=${{ matrix.preset }}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Build
@@ -186,7 +180,7 @@ jobs:
       - name: Upload artifact - packages
         uses: actions/upload-artifact@v4
         with:
-          name: caudio-packages-${{ matrix.os }}-${{ matrix.compiler }}
+          name: caudio-packages-${{ matrix.label }}
           path: |
             build/${{ steps.cfg.outputs.preset }}/*.${{ matrix.pkg_ext }}
           # One format per OS (pkg_ext above). A missing package must fail

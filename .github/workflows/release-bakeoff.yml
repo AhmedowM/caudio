@@ -47,7 +47,7 @@ name: Release bake-off (manual)
         default: false
       run_arm:
         required: false
-        description: 'Also run linux arm64 legs (ubuntu-24.04-arm)'
+        description: 'Also run linux arm64 legs (ubuntu-24.04-arm); mac/win arches always run'
         type: boolean
         default: false
       smoke_debug:
@@ -62,15 +62,16 @@ concurrency:
 
 jobs:
   bake-macos:
-    name: mac ${{ matrix.compiler }} / ${{ matrix.family }}
+    name: mac ${{ matrix.compiler }} / ${{ matrix.family }} / ${{ matrix.arch }}
     if: inputs.run_macos
-    runs-on: macos-latest
+    runs-on: ${{ matrix.arch == 'x86_64' && 'macos-15-intel' || 'macos-15' }}
     continue-on-error: ${{ inputs.strict == false }}
     strategy:
       fail-fast: false
       matrix:
         compiler: [brew, apple]
         family: [release, release-lto, minsize, minsize-lto]
+        arch: [arm64, x86_64]
     env:
       CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
@@ -91,10 +92,12 @@ jobs:
           LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
           test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old: $LLVM_MAJOR" && exit 1)
 
-      - name: Select Xcode (apple legs only)
+      - name: Select Xcode 26 (apple legs only)
         if: matrix.compiler == 'apple'
         run: |
-          ls /Applications | grep -i xcode || echo "no Xcode bundle found"
+          # Pin Xcode 26 (AppleClang) when the image ships it; no brew LLVM.
+          XC="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -n "$XC" ]; then sudo xcode-select -s "$XC"; fi
           xcode-select -p
           xcodebuild -version || true
           xcrun clang --version
@@ -114,11 +117,11 @@ jobs:
         run: |
           if gh release download "${{ inputs.deps_tag }}" \
             --repo "${{ env.DEPS_REPO }}" \
-            --pattern "ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz" \
+            --pattern "ffmpeg-trimmed-8.1.2-macos-${{ matrix.arch }}.tar.gz" \
             --dir . \
             --clobber; then
             mkdir -p "$CAUDIO_TRIMMED_ROOT"
-            tar -xzf ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-macos-${{ matrix.arch }}.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
             echo "CAUDIO_TRIMMED_ROOT=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_ENV"
             echo "trim_root=$CAUDIO_TRIMMED_ROOT" >> "$GITHUB_OUTPUT"
           else
@@ -164,11 +167,18 @@ jobs:
           test -x "$BIN" || (echo "staged binary missing" && exit 1)
           "$BIN" --version
           otool -L "$BIN" | head -n 12 || true
-          echo "=== portability: no absolute brew/local/build-tree refs allowed ==="
-          otool -L "$BIN"
-          if otool -L "$BIN" | grep -E "/opt/homebrew/|/usr/local/|ffmpeg-trimmed/"; then
-            echo "portability check failed: absolute third-party refs above"
-            exit 1
+          # brew-LLVM legs are build-only: the toolchain emits an absolute
+          # libc++ install-name by design (issue #2), so the shippability
+          # ref check does not apply to them.
+          if [ "${{ matrix.compiler }}" != "brew" ]; then
+            echo "=== portability: no absolute brew/local/build-tree refs allowed ==="
+            otool -L "$BIN"
+            if otool -L "$BIN" | grep -E "/opt/homebrew/|/usr/local/|ffmpeg-trimmed/"; then
+              echo "portability check failed: absolute third-party refs above"
+              exit 1
+            fi
+          else
+            echo "=== portability check skipped (brew-LLVM leg is build-only) ==="
           fi
           echo "bin_bytes=$(stat -f%z "$BIN")"
           (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
@@ -181,7 +191,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bakeoff-macos-${{ matrix.compiler }}-${{ matrix.family }}
+          name: bakeoff-macos-${{ matrix.compiler }}-${{ matrix.family }}-${{ matrix.arch }}
           path: |
             configure.log
             build.log
@@ -340,14 +350,18 @@ jobs:
           if-no-files-found: warn
 
   bake-windows:
-    name: win ${{ matrix.compiler }} / ${{ matrix.family }}
+    name: win ${{ matrix.compiler }} / ${{ matrix.family }} / ${{ matrix.arch }}
     if: inputs.run_windows
-    runs-on: windows-latest
+    runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ inputs.strict == false }}
     strategy:
       fail-fast: false
       matrix:
-        compiler: [llvm, msvc]
+        # MSVC presets pin the VS 2026 x64 generator, so MSVC stays x86_64.
+        include:
+          - { compiler: llvm, arch: x86_64, runner: windows-latest }
+          - { compiler: llvm, arch: arm64,  runner: windows-11-arm }
+          - { compiler: msvc, arch: x86_64, runner: windows-latest }
         family: [release, release-lto, minsize, minsize-lto]
     env:
       CAUDIO_TEST_NOAUDIO: 1
@@ -358,15 +372,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup LLVM
+      - name: Setup LLVM 21
         if: matrix.compiler == 'llvm'
         run: |
-          if ! command -v clang++ >/dev/null 2>&1 && [ ! -x "/c/Program Files/LLVM/bin/clang++.exe" ]; then
-            choco install llvm -y --no-progress
-          fi
-          export PATH="/c/Program Files/LLVM/bin:$PATH"
-          echo "/c/Program Files/LLVM/bin" >> $GITHUB_PATH
-          clang++ --version
+          # Pinned LLVM 21, arch-matched official archive (MSVC ABI target).
+          LLVM_VER=21.1.0
+          if [ "${{ matrix.arch }}" = "arm64" ]; then TRIPLE=aarch64-pc-windows-msvc; else TRIPLE=x86_64-pc-windows-msvc; fi
+          curl -fsSL -o llvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/clang+llvm-${LLVM_VER}-${TRIPLE}.tar.xz"
+          mkdir -p "$RUNNER_TEMP/llvm"
+          tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
+          echo "$(cygpath -w "$RUNNER_TEMP/llvm/bin")" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/llvm/bin/clang++" --version
         shell: bash
 
       - name: Install dependencies
@@ -384,7 +400,7 @@ jobs:
         run: |
           if gh release download "${{ inputs.deps_tag }}" \
             --repo "${{ env.DEPS_REPO }}" \
-            --pattern "ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz" \
+            --pattern "ffmpeg-trimmed-8.1.2-windows-${{ matrix.arch }}.tar.gz" \
             --dir . \
             --clobber; then
             # Git-Bash (not MSYS2): no automatic path conversion, so
@@ -396,7 +412,7 @@ jobs:
               TROOT="${{ github.workspace }}/ffmpeg-trimmed"
             fi
             mkdir -p "$TROOT"
-            tar -xzf ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz -C "$TROOT"
+            tar -xzf ffmpeg-trimmed-8.1.2-windows-${{ matrix.arch }}.tar.gz -C "$TROOT"
             echo "CAUDIO_TRIMMED_ROOT=$TROOT" >> "$GITHUB_ENV"
             echo "trim_root=$TROOT" >> "$GITHUB_OUTPUT"
           else
@@ -409,7 +425,7 @@ jobs:
         id: cfg
         run: |
           # Uniform preset names: <family>-<clang|msvc>. MSVC presets pin the
-          # VS 2026 generator, so all Windows legs stay on windows-latest.
+          # VS 2026 x64 generator, so only the LLVM legs carry an arm64 runner.
           if [ "${{ matrix.compiler }}" = "msvc" ]; then SUFFIX=msvc; else SUFFIX=clang; fi
           PRESET="${{ matrix.family }}-$SUFFIX"
           set -o pipefail
@@ -463,7 +479,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bakeoff-windows-${{ matrix.compiler }}-${{ matrix.family }}
+          name: bakeoff-windows-${{ matrix.compiler }}-${{ matrix.family }}-${{ matrix.arch }}
           path: |
             configure.log
             build.log

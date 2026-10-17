@@ -235,9 +235,9 @@ API docs: `cmake --preset docs && cmake --build --preset docs` → `build/docs/d
 Packaging:
 
 ```sh
-cmake --preset release-lto-clang   # or release-lto-gcc (tag required); releases ship from release-lto-*
-cmake --build --preset release-lto-clang
-cmake --install build/release-lto-clang --prefix /usr/local
+cmake --preset minsize-clang   # or minsize-apple (macOS); releases ship MinSizeRel
+cmake --build --preset minsize-clang
+cmake --install build/minsize-clang --prefix /usr/local
 # man page: /usr/local/share/man/man1/caudio.1
 # modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/modules/*.cppm (same level as include/)
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake

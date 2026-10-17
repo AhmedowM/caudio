@@ -506,14 +506,14 @@ jobs:
         run: |
           gh release download "${{ env.RELEASE_TAG }}" \
             --repo "${{ env.DEPS_REPO }}" \
-            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz" \
+            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-arm64.tar.gz" \
             --dir . \
             --clobber
 
       - name: Extract trimmed archive
         run: |
           mkdir -p "$CAUDIO_TRIMMED_ROOT"
-          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-x86_64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
+          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-macos-arm64.tar.gz -C "$CAUDIO_TRIMMED_ROOT"
           ls "$CAUDIO_TRIMMED_ROOT/lib"
 
       - name: Configure (trimmed, fallback to default provider)
