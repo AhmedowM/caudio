@@ -379,10 +379,13 @@ jobs:
           LLVM_VER=21.1.0
           if [ "${{ matrix.arch }}" = "arm64" ]; then TRIPLE=aarch64-pc-windows-msvc; else TRIPLE=x86_64-pc-windows-msvc; fi
           curl -fsSL -o llvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/clang+llvm-${LLVM_VER}-${TRIPLE}.tar.xz"
-          mkdir -p "$RUNNER_TEMP/llvm"
-          tar -xJf llvm.tar.xz -C "$RUNNER_TEMP/llvm" --strip-components=1
-          echo "$(cygpath -w "$RUNNER_TEMP/llvm/bin")" >> "$GITHUB_PATH"
-          "$RUNNER_TEMP/llvm/bin/clang++" --version
+          # RUNNER_TEMP is a native path (D:\a\_temp); normalize for bash
+          # tools, then hand GITHUB_PATH the native form back via cygpath.
+          LLVM_ROOT="$(cygpath -u "$RUNNER_TEMP")/llvm"
+          mkdir -p "$LLVM_ROOT"
+          tar -xJf llvm.tar.xz -C "$LLVM_ROOT" --strip-components=1
+          echo "$(cygpath -w "$LLVM_ROOT/bin")" >> "$GITHUB_PATH"
+          "$LLVM_ROOT/bin/clang++.exe" --version
         shell: bash
 
       - name: Install dependencies
