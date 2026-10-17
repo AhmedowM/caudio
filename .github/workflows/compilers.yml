@@ -6,7 +6,7 @@
 # - Version selection works through PATH (toolchains hard-set bare names);
 #   each job plants versioned symlinks where they win.
 # - Legs are informational (continue-on-error) with a summary in `report`.
-# - No macOS legs here (see apple-clang.yml).
+# - No macOS legs here (macOS is covered by the release-bakeoff apple legs).
 
 name: Compilers (manual)
 
@@ -115,7 +115,7 @@ jobs:
       - name: Install LLVM Clang ${{ matrix.version }} (apt.llvm.org)
         run: |
           # Needs lsb-release/wget/gnupg; signed-by keyring (never apt-key);
-          # apt update after adding the source. Keep in sync with llvm-linux.yml.
+          # apt update after adding the source. Keep in sync with release.yml / release-bakeoff.yml.
           sudo apt-get update
           sudo apt-get install -y lsb-release wget gnupg
           CODENAME="$(lsb_release -cs)"

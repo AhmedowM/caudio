@@ -6,8 +6,8 @@
 #
 # - FFmpeg: deps-private trimmed asset (DEPS_PAT) via CAUDIO_TRIMMED_ROOT,
 #   else system provider. The winning provider is recorded per leg.
-# - Apple legs do NOT install brew llvm; they reuse the apple-clang.yml
-#   overrides (xcrun + CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
+# - Apple legs do NOT install brew llvm; they use the *-apple presets
+#   (xcrun + CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
 # - Checkout uses fetch-depth: 0 (release presets require a git tag).
 # - Legs are informational (continue-on-error) with a summary in `report`.
 
@@ -45,9 +45,9 @@ name: Release bake-off (manual)
         description: 'Skip trimmed download; exercise the system-provider path'
         type: boolean
         default: false
-      run_arm:
+      run_linux_arm:
         required: false
-        description: 'Also run linux arm64 legs (ubuntu-24.04-arm); mac/win arches always run'
+        description: 'Also run linux arm64 legs (ubuntu-24.04-arm)'
         type: boolean
         default: false
       smoke_debug:
@@ -208,7 +208,7 @@ jobs:
       matrix:
         compiler: [gcc, llvm]
         family: [release, release-lto, minsize, minsize-lto]
-        arch: ${{ fromJSON(inputs.run_arm && '["x86_64", "arm64"]' || '["x86_64"]') }}
+        arch: ${{ fromJSON(inputs.run_linux_arm && '["x86_64", "arm64"]' || '["x86_64"]') }}
     env:
       CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"
@@ -231,7 +231,7 @@ jobs:
       - name: Setup LLVM 21
         if: matrix.compiler == 'llvm'
         run: |
-          # Same hardened installer as llvm-linux.yml / compilers.yml.
+          # Same hardened installer as compilers.yml / release.yml.
           sudo apt-get update
           sudo apt-get install -y lsb-release wget gnupg
           CODENAME="$(lsb_release -cs)"
