@@ -1,8 +1,14 @@
 # CaudioHelpers.cmake -- DRY helpers for caudio components
 # Provides ca_set_warnings / ca_set_module_warnings and shared component scaffolding.
 
+if(DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL})
+  set(CAUDIO_MSVC_MP_FLAG "/MP$ENV{CMAKE_BUILD_PARALLEL_LEVEL}")
+else()
+  set(CAUDIO_MSVC_MP_FLAG "/MP")
+endif()
+
 set(CAUDIO_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 ${CAUDIO_MSVC_MP_FLAG}>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 
 function(ca_set_warnings tgt)
@@ -49,6 +55,9 @@ function(caudio_add_component NAME)
   # ship CXX_MODULES interface units -- consumers (incl. module synth targets)
   # must compile at C++23 or newer.
   target_compile_features(${NAME} PUBLIC cxx_std_23)
+  # Precompiled-header preamble: stable system headers compiled once per
+  # target instead of re-parsed in every TU. Biggest win on MSVC.
+  target_precompile_headers(${NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/caudio/pch.hpp)
   # FFmpeg is required (sole decoder backend); every component links it.
   target_link_libraries(${NAME} PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
   ca_set_warnings(${NAME})

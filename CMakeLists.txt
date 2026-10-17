@@ -120,6 +120,7 @@ option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,u
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
+option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" OFF)
 # Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
 # to work around duplicate-symbol/ODR issues from merged static twins. Static +
 # header-only is the default; opt in only if you need shared libs.
@@ -137,8 +138,22 @@ if(CAUDIO_LINK_SECTION_GC)
     add_link_options(-Wl,--gc-sections)
   endif()
 endif()
-# NOTE: ccache is environment configuration, not a project option; pass
-# -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache instead.
+# NOTE: ccache/sccache is opt-in via CAUDIO_ENABLE_CCACHE; never hard-required
+# so user builds don't crash when the launcher is missing.
+if(CAUDIO_ENABLE_CCACHE)
+  foreach(_launcher ccache sccache)
+    find_program(_CAUDIO_LAUNCHER ${_launcher})
+    if(_CAUDIO_LAUNCHER)
+      set(CMAKE_CXX_COMPILER_LAUNCHER ${_CAUDIO_LAUNCHER})
+      set(CMAKE_C_COMPILER_LAUNCHER ${_CAUDIO_LAUNCHER})
+      message(STATUS "Compiler launcher: ${_CAUDIO_LAUNCHER}")
+      break()
+    endif()
+  endforeach()
+  if(NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    message(WARNING "CAUDIO_ENABLE_CCACHE=ON but neither ccache nor sccache found -- compiling without launcher")
+  endif()
+endif()
 
 # clang-tidy integration (requires compile_commands.json)
 if(CAUDIO_ENABLE_CLANG_TIDY)
