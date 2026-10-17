@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.0] - 2026-10-17
+
+### Added
+- Release archives for every GitHub x64+arm64 runner: Linux (x86_64,
+  arm64), macOS (arm64, x86_64), Windows (x86_64, arm64)
+- `scripts/build-trimmed.py` and a deps workflow build the trimmed
+  decode-only FFmpeg on all six OS/arch legs, published to the
+  deps-private release used at build time
+
+### Changed
+- Shipping matrix: MinSizeRel for both the runtime and the dev archive
+  from a single build; AppleClang on macOS (no brew LLVM), LLVM Clang on
+  Linux and Windows
+- `CAUDIO_BUNDLE_FFMPEG_MACOS` defaults ON: macOS archives bundle the
+  trimmed dylibs with `@rpath` fixups and run standalone
+- Linux archives bundle versioned FFmpeg `.so` files with SONAME links
+- Removed the `release-lto-trimmed-*` presets; the `CAUDIO_TRIMMED_ROOT`
+  cascade selects the trimmed provider with a system fallback
+
 ## [v1.5.0] - 2026-10-14
 
 ### Fixed
