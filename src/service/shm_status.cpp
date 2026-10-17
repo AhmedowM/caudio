@@ -5,6 +5,7 @@
 #include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <caudio/windows_fwd.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -13,19 +14,11 @@
 #include <string_view>
 #include <thread>
 #include <utility>
-
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#else
-// HANDLE etc are already defined in shm_status.hpp -- do not redefine
-inline constexpr DWORD kFileMapRead = 0x0004UL;
-inline constexpr DWORD kFileMapWrite = 0x0002UL;
-inline constexpr DWORD kPageReadWrite = 0x04UL;
-inline const HANDLE kInvalidHandleValue = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
-inline constexpr BOOL kFalse = 0;
 #endif
 
 namespace caudio::service {
@@ -104,7 +97,7 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
             caudio::utils::StatusCode::Io,
             "CreateFileMapping/OpenFileMapping failed: " + std::to_string(::GetLastError()))};
     }
-    handle.hMap_ = hMap;
+    handle.handle_ = reinterpret_cast<std::intptr_t>(hMap);
 
     void* ptr = ::MapViewOfFile(hMap, access, 0, 0, sizeof(AtomicShmStatus));
     if (!ptr) {
@@ -129,22 +122,11 @@ ShmStatusHandle::~ShmStatusHandle() {
 }
 
 ShmStatusHandle::ShmStatusHandle(ShmStatusHandle&& other) noexcept
-    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)), create_(other.create_)
-#ifndef _WIN32
-      ,
-      fd_(other.fd_)
-#else
-      ,
-      hMap_(other.hMap_)
-#endif
-{
+    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)), create_(other.create_),
+      handle_(other.handle_) {
     other.map_ = nullptr;
     other.size_ = 0;
-#ifndef _WIN32
-    other.fd_ = -1;
-#else
-    other.hMap_ = nullptr;
-#endif
+    other.handle_ = -1;
     other.create_ = false;
 }
 
@@ -155,18 +137,10 @@ ShmStatusHandle& ShmStatusHandle::operator=(ShmStatusHandle&& other) noexcept {
         size_ = other.size_;
         name_ = std::move(other.name_);
         create_ = other.create_;
-#ifndef _WIN32
-        fd_ = other.fd_;
-#else
-        hMap_ = other.hMap_;
-#endif
+        handle_ = other.handle_;
         other.map_ = nullptr;
         other.size_ = 0;
-#ifndef _WIN32
-        other.fd_ = -1;
-#else
-        other.hMap_ = nullptr;
-#endif
+        other.handle_ = -1;
         other.create_ = false;
     }
     return *this;
@@ -270,19 +244,19 @@ void ShmStatusHandle::close() noexcept {
 #ifndef _WIN32
         ::munmap(map_, size_);
         map_ = nullptr;
-        if (fd_ >= 0) {
+        if (handle_ >= 0) {
             if (create_) {
                 ::shm_unlink(name_.c_str());
             }
-            ::close(fd_);
-            fd_ = -1;
+            ::close(static_cast<int>(handle_));
+            handle_ = -1;
         }
 #else
         ::UnmapViewOfFile(map_);
         map_ = nullptr;
-        if (hMap_) {
-            ::CloseHandle(hMap_);
-            hMap_ = nullptr;
+        if (handle_ != -1) {
+            ::CloseHandle(reinterpret_cast<HANDLE>(handle_));
+            handle_ = -1;
         }
 #endif
     }

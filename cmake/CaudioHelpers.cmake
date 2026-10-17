@@ -2,7 +2,7 @@
 # Provides ca_set_warnings / ca_set_module_warnings and shared component scaffolding.
 
 set(CAUDIO_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
 
 function(ca_set_warnings tgt)

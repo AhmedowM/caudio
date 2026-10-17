@@ -6,21 +6,6 @@
  * @ingroup caudio_client
  */
 
-#ifndef _WIN32
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
-#include <cerrno>
-#include <cstring>
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
 #include <atomic>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
@@ -118,14 +103,9 @@ class IpcClient {
     std::string socketPath_;
     /** @brief True if using Windows named pipe, false for Unix socket. */
     bool isWinPipe_{false};
-#ifdef _WIN32
-    /** @brief Windows named pipe handle. */
-    /// Opaque pipe handle (real HANDLE when windows.h is present, else void*).
-    void* pipeHandle_{nullptr};
-#else
-    /** @brief Unix domain socket file descriptor. */
-    int fd_{-1};
-#endif
+    /** @brief Connected handle (pipe HANDLE on Windows, socket fd on POSIX).
+     * -1 = invalid on both platforms. */
+    std::intptr_t pipeHandle_{-1};
     /** @brief Atomic request ID counter for framing. */
     std::atomic<uint32_t> nextId_{0};
 };

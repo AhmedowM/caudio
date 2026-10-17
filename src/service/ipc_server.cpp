@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include <caudio/windows_fwd.hpp>
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -52,7 +53,7 @@ class PipeDacl {
         LPVOID sd = nullptr;
         DWORD len = 0;
         if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                kPipeSddl, caudio::service::kSddlRevision1, &sd, &len) &&
+                kPipeSddl, kSddlRevision1, &sd, &len) &&
             sd) {
             sa_.descriptor = sd;
         }
@@ -92,8 +93,8 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
 
 #ifdef _WIN32
     // Atomic take-over: whoever exchanges non-null owns the close.
-    HANDLE prev = pipeHandle_.exchange(nullptr);
-    if (prev && prev != kInvalidHandle) {
+    HANDLE prev = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+    if (prev && prev != kInvalidHandleValue) {
         ::CloseHandle(prev);
     }
     std::string pathStr = socketPath_;
@@ -104,15 +105,15 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
     PipeDacl dacl;
     HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
                                   kPipeUnlimited, 16384, 16384, 0, dacl.attributes());
-    if (h == kInvalidHandle) {
+    if (h == kInvalidHandleValue) {
         DWORD err = ::GetLastError();
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "CreateNamedPipeW failed: " + std::to_string(err))};
     }
-    pipeHandle_.store(h);
+    pipeHandle_.store(reinterpret_cast<std::intptr_t>(h));
     return {};
 #else
-    int prevFd = listenFd_.exchange(-1);
+    int prevFd = pipeHandle_.exchange(-1);
     if (prevFd >= 0) {
         ::close(prevFd);
     }
@@ -157,7 +158,7 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "listen failed")};
     }
-    listenFd_.store(fd);
+    pipeHandle_.store(fd);
     return {};
 #endif
 }
@@ -175,8 +176,8 @@ void IpcServer::run(std::stop_token st,
         while (!st.stop_requested() && !stopSource_.get_token().stop_requested() &&
                running_.load()) {
 #ifdef _WIN32
-            HANDLE listenH = pipeHandle_.load();
-            if (!listenH || listenH == kInvalidHandle) {
+            HANDLE listenH = reinterpret_cast<HANDLE>(pipeHandle_.load());
+            if (pipeHandle_.load() == -1) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
             }
@@ -195,8 +196,8 @@ void IpcServer::run(std::stop_token st,
             // concurrently -- whoever exchanges non-null owns the handle, so
             // a close here can never double-close. (Only this loop creates
             // instances, so a non-null take is always the connected one.)
-            HANDLE clientHandle = pipeHandle_.exchange(nullptr);
-            if (!clientHandle || clientHandle == kInvalidHandle) {
+            HANDLE clientHandle = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+            if (!clientHandle || clientHandle == kInvalidHandleValue) {
                 // Lost the race with shutdown; loop back to the stop check.
                 continue;
             }
@@ -210,8 +211,8 @@ void IpcServer::run(std::stop_token st,
                 HANDLE next = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex,
                                                        kPipeTypeByte | kPipeWait, kPipeUnlimited,
                                                        16384, 16384, 0, nextDacl.attributes());
-                if (next != kInvalidHandle) {
-                    pipeHandle_.store(next);
+                if (next != kInvalidHandleValue) {
+                    pipeHandle_.store(reinterpret_cast<std::intptr_t>(next));
                 }
                 // else: stay without a listener; the loop re-checks stop
                 // flags and shutdown's post-join drain closes strays.
@@ -293,7 +294,7 @@ void IpcServer::run(std::stop_token st,
                 std::erase_if(clients_, [](const ClientSlot& s) { return s.done; });
             }
 #else
-            int listenSnapshot = listenFd_.load();
+            int listenSnapshot = static_cast<int>(pipeHandle_.load());
             if (listenSnapshot < 0) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
@@ -444,8 +445,8 @@ void IpcServer::shutdown() {
 #ifdef _WIN32
     // Take-over (see listen()): if the accept loop is mid-handshake it owns
     // its handle; anything left here is ours to close.
-    HANDLE cur = pipeHandle_.exchange(nullptr);
-    if (cur && cur != kInvalidHandle) {
+    HANDLE cur = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+    if (cur && cur != kInvalidHandleValue) {
         ::CloseHandle(cur);
     }
     if (!socketPath_.empty()) {
@@ -456,11 +457,11 @@ void IpcServer::shutdown() {
             w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
         HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting,
                                  0, nullptr);
-        if (h != kInvalidHandle)
+        if (h != kInvalidHandleValue)
             ::CloseHandle(h);
     }
 #else
-    int listenCur = listenFd_.exchange(-1);
+    int listenCur = static_cast<int>(pipeHandle_.exchange(-1));
     if (listenCur >= 0) {
         ::close(listenCur);
         if (!socketPath_.empty()) {
@@ -476,8 +477,8 @@ void IpcServer::shutdown() {
 #ifdef _WIN32
     // Post-join drain: the accept loop may have stored a fresh listen
     // instance after our pre-join take. Exchange is idempotent.
-    HANDLE leftover = pipeHandle_.exchange(nullptr);
-    if (leftover && leftover != kInvalidHandle) {
+    HANDLE leftover = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+    if (leftover && leftover != kInvalidHandleValue) {
         ::CloseHandle(leftover);
     }
 #endif

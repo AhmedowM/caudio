@@ -68,9 +68,9 @@ AppResult App::queueCreate(const std::string& name) {
         // Hoisted: copy before Outcome moves *res (moved-from strings read
         // empty on some toolchains; see App::resume).
         std::int64_t id = qc->id;
-        std::string name = qc->name;
+        std::string qName = qc->name;
         return Outcome{.result = std::move(*res),
-                       .line = std::format("Created queue {} '{}'", id, name),
+                       .line = std::format("Created queue {} '{}'", id, qName),
                        .toStderr = false,
                        .failed = false};
     }

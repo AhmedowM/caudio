@@ -1,25 +1,20 @@
 #include <cstdio>
 #ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-#ifdef _WIN32
-// NOTE: <windows.h> must precede all other includes in this TU. thread.hpp
-// hand-declares HANDLE/HMODULE/etc. when windows.h is absent, which then
-// conflicts with the real declarations pulled in by CLI11. Keep this block
-// first: clang-format must not sort it.
-// clang-format off
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#include <io.h>
 #include <windows.h>
-// Granular API headers used directly: kept after windows.h.
-// clang-format on
-#include <minwindef.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #endif
 
 #include <CLI/CLI.hpp>
@@ -29,89 +24,15 @@
 #include <caudio/app/paths.hpp>
 #include <caudio/client/core.hpp>
 #include <caudio/client/output_formatter.hpp>
+#include <caudio/config.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>
-#include <memory>
-#include <system_error>
-
-#include "parse.hpp"
-#include "shell.hpp"
-
-// Transitional: app-internal reporting helpers for not-yet-moved groups
-// (playlist tracks). Frontends must use the public caudio/app/* headers.
-
-#ifdef _WIN32
-#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-// Avoid including <windows.h> -- causes HMODULE conflict with caudio::utils (like
-// service_paths.cpp) thread.hpp already defines HANDLE, DWORD, HMODULE, LPWSTR, etc. Provide
-// missing decls.
-using BOOL = int;
-using LPCWSTR = const wchar_t*;
-using LPSECURITY_ATTRIBUTES = void*;
-#ifndef MAX_PATH
-#define MAX_PATH 260
-#endif
-#ifndef DETACHED_PROCESS
-#define DETACHED_PROCESS 0x00000008
-#endif
-#ifndef FALSE
-#define FALSE 0
-#endif
-struct STARTUPINFOW {
-    DWORD cb{0};
-    LPCWSTR lpReserved{nullptr};
-    LPCWSTR lpDesktop{nullptr};
-    LPCWSTR lpTitle{nullptr};
-    DWORD dwX{0};
-    DWORD dwY{0};
-    DWORD dwXSize{0};
-    DWORD dwYSize{0};
-    DWORD dwXCountChars{0};
-    DWORD dwYCountChars{0};
-    DWORD dwFillAttribute{0};
-    DWORD dwFlags{0};
-    short wShowWindow{0};
-    short cbReserved2{0};
-    void* lpReserved2{nullptr};
-    HANDLE hStdInput{nullptr};
-    HANDLE hStdOutput{nullptr};
-    HANDLE hStdError{nullptr};
-};
-struct PROCESS_INFORMATION {
-    HANDLE hProcess{nullptr};
-    HANDLE hThread{nullptr};
-    DWORD dwProcessId{0};
-    DWORD dwThreadId{0};
-};
-extern "C" {
-__declspec(dllimport) DWORD __stdcall GetModuleFileNameW(HANDLE, LPWSTR, DWORD);
-__declspec(dllimport) DWORD __stdcall GetLastError();
-__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_ATTRIBUTES,
-                                                    LPSECURITY_ATTRIBUTES, BOOL, DWORD, void*,
-                                                    LPCWSTR, STARTUPINFOW*, PROCESS_INFORMATION*);
-}
-#else
-#include <windows.h>
-#endif
-#else
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#if defined(__APPLE__)
-#include <mach-o/dyld.h>
-#endif
-#endif
-#include <caudio/client/output_formatter.hpp>
-#include <caudio/config.hpp>
-#include <caudio/ipc/command.hpp>
-#include <caudio/ipc/protocol.hpp>
-#include <caudio/ipc/result.hpp>
-#include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -120,13 +41,18 @@ __declspec(dllimport) BOOL __stdcall CreateProcessW(LPCWSTR, LPWSTR, LPSECURITY_
 #include <filesystem>
 #include <format>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <thread>
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include "parse.hpp"
+#include "shell.hpp"
 
 namespace caudio::app::cli {
 

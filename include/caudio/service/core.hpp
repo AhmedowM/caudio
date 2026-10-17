@@ -7,15 +7,6 @@
  * @ingroup caudio_service
  */
 
-// Ensure cli headers are included first to avoid windows.h conflicts
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#include <atomic>
 #include <caudio/db/json.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/ipc/command.hpp>

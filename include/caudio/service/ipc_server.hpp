@@ -15,12 +15,6 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -33,58 +27,6 @@
 #include <string_view>
 #include <thread>
 #include <vector>
-
-#ifndef _WIN32
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
-
-#include <cerrno>
-#include <cstring>
-#else
-#if !defined(_WINDOWS_) && !defined(_WINDEF_) && !defined(_MINWINDEF_)
-using HANDLE = void*;
-using DWORD = unsigned long;
-using BOOL = int;
-using LPCWSTR = const wchar_t*;
-using LPCVOID = const void*;
-using LPVOID = void*;
-using LPDWORD = DWORD*;
-namespace caudio::service {
-inline constexpr DWORD kGenericRead = 0x80000000UL;
-inline constexpr DWORD kGenericWrite = 0x40000000UL;
-inline constexpr DWORD kOpenExisting = 3UL;
-inline constexpr DWORD kPipeAccessDuplex = 0x00000003UL;
-inline constexpr DWORD kPipeTypeByte = 0x00000000UL;
-inline constexpr DWORD kPipeWait = 0x00000000UL;
-inline constexpr DWORD kPipeUnlimited = 255UL;
-inline const HANDLE kInvalidHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
-inline constexpr DWORD kSddlRevision1 = 1UL;
-} // namespace caudio::service
-extern "C" {
-__declspec(dllimport) HANDLE __stdcall CreateFileW(LPCWSTR, DWORD, DWORD, LPVOID, DWORD, DWORD,
-                                                   HANDLE);
-__declspec(dllimport) HANDLE __stdcall CreateNamedPipeW(LPCWSTR, DWORD, DWORD, DWORD, DWORD, DWORD,
-                                                        DWORD, LPVOID);
-__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) BOOL __stdcall ReadFile(HANDLE, LPVOID, DWORD, LPDWORD, LPVOID);
-__declspec(dllimport) BOOL __stdcall WriteFile(HANDLE, LPCVOID, DWORD, LPDWORD, LPVOID);
-__declspec(dllimport) DWORD __stdcall GetLastError();
-__declspec(dllimport) BOOL __stdcall ConnectNamedPipe(HANDLE, LPVOID);
-__declspec(dllimport) BOOL __stdcall DisconnectNamedPipe(HANDLE);
-__declspec(dllimport) BOOL __stdcall FlushFileBuffers(HANDLE);
-__declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
-__declspec(dllimport) BOOL __stdcall WaitNamedPipeW(LPCWSTR, DWORD);
-__declspec(dllimport) BOOL __stdcall ConvertStringSecurityDescriptorToSecurityDescriptorW(LPCWSTR,
-                                                                                           DWORD,
-                                                                                           LPVOID*,
-                                                                                           LPDWORD);
-__declspec(dllimport) LPVOID __stdcall LocalFree(LPVOID);
-}
-#else
-#include <windows.h>
-#endif
-#endif
 
 namespace caudio::service {
 
@@ -152,14 +94,11 @@ class IpcServer {
     std::condition_variable cv_;
     std::string socketPath_;
     std::stop_source stopSource_;
-#ifdef _WIN32
-    // Listen handle, shared between the accept loop (take/replace) and
-    // shutdown/listen (take/close). Atomic take-over (exchange) gives single
-    // ownership on every handoff -- no double-close on the shutdown race.
-    std::atomic<HANDLE> pipeHandle_{nullptr};
-#else
-    std::atomic<int> listenFd_{-1};
-#endif
+    // Listen handle / listen fd, shared between the accept loop (take/replace)
+    // and shutdown/listen (take/close). Atomic take-over (exchange) gives
+    // single ownership on every handoff -- no double-close on the shutdown
+    // race. -1 = invalid on both platforms.
+    std::atomic<std::intptr_t> pipeHandle_{-1};
 };
 
 } // namespace caudio::service

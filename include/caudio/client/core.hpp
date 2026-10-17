@@ -6,10 +6,6 @@
  * @ingroup caudio_client
  */
 
-#ifndef _WIN32
-#include <poll.h>
-#endif
-
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

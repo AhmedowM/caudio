@@ -46,9 +46,9 @@ AppResult App::playlistCreate(const std::string& name) {
     if (auto* pc = std::get_if<caudio::ipc::PlaylistCreated>(&*res)) {
         // Hoisted: copy before Outcome moves *res (see App::resume).
         std::int64_t id = pc->id;
-        std::string name = pc->name;
+        std::string pName = pc->name;
         return Outcome{.result = std::move(*res),
-                       .line = std::format("Created playlist {} '{}'", id, name),
+                       .line = std::format("Created playlist {} '{}'", id, pName),
                        .toStderr = false,
                        .failed = false};
     }

@@ -2,60 +2,43 @@
 
 /**
  * @file print.hpp
- * @brief Portable `print`/`println` facade over `<print>` / `<format>`.
+ * @brief Portable `print`/`println` facade over `<format>`.
  * @ingroup caudio_utils
- * @details libstdc++ on MinGW GCC 16.x (notably the msys2 UCRT build) ships
- * `<print>` headers whose stream/`FILE*` overloads lower to the
- * Windows-console helpers `std::__open_terminal` / `std::__write_to_terminal`,
- * which are absent from its `libstdc++` binary (`libstdc++exp` no longer
- * exists post-merge) -- any TU using `std::println(cout/cerr/os)` or bare
- * `std::println(...)` fails at link with undefined references. Other
- * toolchains are unaffected.
- *
- * This header routes through `std::format` + classic insertion on MinGW
- * (byte-identical output for our UTF-8/ASCII usage; no console transcoding
- * is performed, matching the daemon/pipe use case) and forwards to
- * `std::print`/`std::println` everywhere else. Toolchains without `<print>`
- * at all (e.g. GCC 13 libstdc++) take the same format-based route, which
- * keeps the floor at `<format>`/`<expected>` instead of `<print>`. Always
- * call `caudio::print`/`caudio::println`, never `std::` directly.
+ * @details Routes through `std::format` + classic insertion on every
+ * toolchain. MinGW GCC 16.x is included: its `<print>` stream/`FILE*`
+ * overloads lower to missing Windows-console helpers, so the format-based
+ * path is used universally for byte-identical output. Always call
+ * `caudio::print`/`caudio::println`, never `std::` directly.
  */
 
 #include <cstdio>
 #include <format>
+#include <iostream>
 #include <ostream>
 #include <string>
 #include <utility>
 
-#if defined(__MINGW32__) || !__has_include(<print>)
-#include <iostream>
-#else
-#include <print>
-#endif
-
 namespace caudio {
 
-#if defined(__MINGW32__) || !__has_include(<print>)
-
-/// @brief Format to a stream (MinGW: avoids missing terminal helpers).
+/// @brief Format to a stream.
 template <typename... A>
 void print(std::ostream& os, std::format_string<A...> fmt, A&&... args) {
     os << std::format(fmt, std::forward<A>(args)...);
 }
 
-/// @brief Format a line to a stream (MinGW).
+/// @brief Format a line to a stream.
 template <typename... A>
 void println(std::ostream& os, std::format_string<A...> fmt, A&&... args) {
     os << std::format(fmt, std::forward<A>(args)...) << '\n';
 }
 
-/// @brief Format to a C stream (MinGW).
+/// @brief Format to a C stream.
 template <typename... A>
 void print(std::FILE* f, std::format_string<A...> fmt, A&&... args) {
     std::fputs(std::format(fmt, std::forward<A>(args)...).c_str(), f);
 }
 
-/// @brief Format a line to a C stream (MinGW).
+/// @brief Format a line to a C stream.
 template <typename... A>
 void println(std::FILE* f, std::format_string<A...> fmt, A&&... args) {
     std::string s = std::format(fmt, std::forward<A>(args)...);
@@ -63,23 +46,16 @@ void println(std::FILE* f, std::format_string<A...> fmt, A&&... args) {
     std::fputs(s.c_str(), f);
 }
 
-/// @brief Format to stdout (MinGW).
+/// @brief Format to stdout.
 template <typename... A>
 void print(std::format_string<A...> fmt, A&&... args) {
     std::cout << std::format(fmt, std::forward<A>(args)...);
 }
 
-/// @brief Format a line to stdout (MinGW).
+/// @brief Format a line to stdout.
 template <typename... A>
 void println(std::format_string<A...> fmt, A&&... args) {
     std::cout << std::format(fmt, std::forward<A>(args)...) << '\n';
 }
-
-#else
-
-using std::print;
-using std::println;
-
-#endif
 
 } // namespace caudio

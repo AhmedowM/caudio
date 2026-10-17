@@ -1,15 +1,23 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/thread.hpp>
+#include <caudio/windows_fwd.hpp>
 #include <cstddef>
 #include <cstring>
 #include <string>
 #include <string_view>
 
+#ifdef _WIN32
+inline constexpr unsigned kUtf8CodePage = 65001;
+#else
+#include <pthread.h>
+#include <time.h>
+
+#include <cerrno>
+#endif
+
 namespace caudio::utils::detail {
 
-#if defined(_WIN32) || defined(_WIN64)
-/// UTF-8 code page for MultiByteToWideChar (matches CP_UTF8 without windows.h).
-inline constexpr unsigned kUtf8CodePage = 65001;
+#ifdef _WIN32
 Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) noexcept {
     HMODULE k32 = GetModuleHandleA("kernel32.dll");
     if (k32) {
@@ -61,3 +69,103 @@ int setPthreadName(pthread_t th, std::string_view name) noexcept {
 #endif
 
 } // namespace caudio::utils::detail
+
+namespace caudio::utils {
+
+[[nodiscard]] Expected<void> setThreadName(std::string_view name) noexcept {
+    if (name.empty()) {
+        return std::unexpected(Error{StatusCode::InvalidArg, std::string_view("empty name")});
+    }
+#ifdef _WIN32
+    return detail::setCurrentThreadNameImpl(name);
+#else
+#if defined(__APPLE__) && defined(__MACH__)
+    std::string_view t = detail::truncate15(name);
+    char buf[16]{};
+    if (!t.empty())
+        std::memcpy(buf, t.data(), t.size());
+    buf[t.size()] = '\0';
+    int rc = pthread_setname_np(buf);
+    if (rc != 0) {
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+    }
+    return {};
+#elif defined(__linux__) || defined(_GNU_SOURCE) || defined(__GLIBC__)
+    int rc = detail::setPthreadName(pthread_self(), name);
+    if (rc != 0) {
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+    }
+    return {};
+#else
+    (void)name;
+    return std::unexpected(
+        Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
+#endif
+#endif
+}
+
+[[nodiscard]] Expected<void> setThreadName(std::jthread& jt, std::string_view name) noexcept {
+    if (!jt.joinable()) {
+        return std::unexpected(Error{StatusCode::State, std::string_view("thread not joinable")});
+    }
+    if (name.empty()) {
+        return std::unexpected(Error{StatusCode::InvalidArg, std::string_view("empty name")});
+    }
+#ifdef _WIN32
+    HANDLE h = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(jt.native_handle()));
+    return detail::setNativeHandleName(h, name);
+#else
+    pthread_t th = jt.native_handle();
+#if defined(__APPLE__) && defined(__MACH__)
+    // macOS pthread_setname_np only supports naming the current thread (no handle arg).
+    // std::jthread native_handle is not the current thread, so we cannot name it.
+    (void)th;
+    (void)name;
+    return std::unexpected(
+        Error{StatusCode::Unsupported,
+              std::string_view("setThreadName with jthread not supported on macOS")});
+#elif defined(__linux__)
+    int rc = detail::setPthreadName(th, name);
+    if (rc != 0) {
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+    }
+    return {};
+#else
+    (void)th;
+    (void)name;
+    return std::unexpected(
+        Error{StatusCode::Unsupported, std::string_view("setThreadName not supported")});
+#endif
+#endif
+}
+
+[[nodiscard]] Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept {
+    if (!t.joinable()) {
+        return std::unexpected(Error{StatusCode::State, std::string_view("thread not joinable")});
+    }
+    if (name.empty()) {
+        return std::unexpected(Error{StatusCode::InvalidArg, std::string_view("empty name")});
+    }
+#ifdef _WIN32
+    HANDLE h = reinterpret_cast<HANDLE>(reinterpret_cast<uintptr_t>(t.native_handle()));
+    return detail::setNativeHandleName(h, name);
+#else
+#if defined(__linux__) && !defined(__APPLE__)
+    pthread_t th = t.native_handle();
+    int rc = detail::setPthreadName(th, name);
+    if (rc != 0)
+        return std::unexpected(
+            Error{StatusCode::Unsupported, std::string_view("pthread_setname_np failed")});
+    return {};
+#else
+    (void)t;
+    (void)name;
+    return std::unexpected(Error{StatusCode::Unsupported, std::string_view("not supported")});
+#endif
+#endif
+}
+
+} // namespace caudio::utils

@@ -1,9 +1,4 @@
 #ifdef _WIN32
-// NOTE: <windows.h> must precede all other includes in this TU. thread.hpp
-// (via utils.hpp below) hand-declares HANDLE/etc. when windows.h is absent,
-// which then conflicts with the real declarations. Keep this block first:
-// clang-format must not sort it.
-// clang-format off
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -11,7 +6,6 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
-// clang-format on
 #endif
 
 #include <caudio/client/ipc_client.hpp>
@@ -63,7 +57,7 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
     DWORD mode = PIPE_READMODE_BYTE;
     ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
     IpcClient c;
-    c.pipeHandle_ = h;
+    c.pipeHandle_ = reinterpret_cast<std::intptr_t>(h);
     c.socketPath_ = std::move(path);
     c.isWinPipe_ = true;
     return c;
@@ -87,7 +81,7 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "connect failed")};
     }
     IpcClient c;
-    c.fd_ = fd;
+    c.pipeHandle_ = fd;
     c.socketPath_ = std::move(path);
     c.isWinPipe_ = false;
     return c;
@@ -105,13 +99,13 @@ IpcClient::IpcClient(IpcClient&& other) noexcept
       pipeHandle_(other.pipeHandle_)
 #else
       ,
-      fd_(other.fd_)
+      pipeHandle_(other.pipeHandle_)
 #endif
 {
 #ifdef _WIN32
-    other.pipeHandle_ = nullptr;
+    other.pipeHandle_ = -1;
 #else
-    other.fd_ = -1;
+    other.pipeHandle_ = -1;
 #endif
     nextId_.store(other.nextId_.load());
 }
@@ -123,10 +117,10 @@ IpcClient& IpcClient::operator=(IpcClient&& other) noexcept {
         isWinPipe_ = other.isWinPipe_;
 #ifdef _WIN32
         pipeHandle_ = other.pipeHandle_;
-        other.pipeHandle_ = nullptr;
+        other.pipeHandle_ = -1;
 #else
-        fd_ = other.fd_;
-        other.fd_ = -1;
+        pipeHandle_ = other.pipeHandle_;
+        other.pipeHandle_ = -1;
 #endif
         nextId_.store(other.nextId_.load());
     }
@@ -163,28 +157,29 @@ caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::
 
 void IpcClient::close() noexcept {
 #ifdef _WIN32
-    if (pipeHandle_ && pipeHandle_ != INVALID_HANDLE_VALUE) {
-        ::CloseHandle(pipeHandle_);
-        pipeHandle_ = nullptr;
+    if (pipeHandle_ != -1) {
+        ::CloseHandle(reinterpret_cast<HANDLE>(pipeHandle_));
+        pipeHandle_ = -1;
     }
 #else
-    if (fd_ >= 0) {
-        ::close(fd_);
-        fd_ = -1;
+    if (pipeHandle_ >= 0) {
+        ::close(static_cast<int>(pipeHandle_));
+        pipeHandle_ = -1;
     }
 #endif
 }
 
 caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data) {
 #ifdef _WIN32
-    if (!pipeHandle_ || pipeHandle_ == INVALID_HANDLE_VALUE) {
+    if (pipeHandle_ == -1) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::size_t sent = 0;
     while (sent < data.size()) {
         DWORD w = 0;
-        BOOL ok = ::WriteFile(pipeHandle_, reinterpret_cast<const char*>(data.data()) + sent,
+        BOOL ok = ::WriteFile(reinterpret_cast<HANDLE>(pipeHandle_),
+                              reinterpret_cast<const char*>(data.data()) + sent,
                               static_cast<DWORD>(data.size() - sent), &w, nullptr);
         if (ok == 0) {
             DWORD err = ::GetLastError();
@@ -195,14 +190,15 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
     }
     return {};
 #else
-    if (fd_ < 0) {
+    if (pipeHandle_ < 0) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::size_t sent = 0;
     while (sent < data.size()) {
         ::ssize_t n =
-            ::send(fd_, reinterpret_cast<const char*>(data.data()) + sent, data.size() - sent, 0);
+            ::send(static_cast<int>(pipeHandle_), reinterpret_cast<const char*>(data.data()) + sent,
+                   data.size() - sent, 0);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
@@ -217,7 +213,7 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
 
 caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
 #ifdef _WIN32
-    if (!pipeHandle_ || pipeHandle_ == INVALID_HANDLE_VALUE) {
+    if (pipeHandle_ == -1) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
@@ -225,8 +221,9 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     std::size_t got = 0;
     while (got < 4) {
         DWORD r = 0;
-        BOOL ok = ::ReadFile(pipeHandle_, reinterpret_cast<char*>(hdr.data()) + got,
-                             4 - static_cast<DWORD>(got), &r, nullptr);
+        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle_),
+                             reinterpret_cast<char*>(hdr.data()) + got, 4 - static_cast<DWORD>(got),
+                             &r, nullptr);
         if (ok == 0) {
             DWORD err = ::GetLastError();
             return std::unexpected{caudio::utils::makeError(
@@ -249,7 +246,8 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     got = 0;
     while (got < len) {
         DWORD r = 0;
-        BOOL ok = ::ReadFile(pipeHandle_, reinterpret_cast<char*>(payload.data()) + got,
+        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle_),
+                             reinterpret_cast<char*>(payload.data()) + got,
                              static_cast<DWORD>(len - got), &r, nullptr);
         if (ok == 0) {
             DWORD err = ::GetLastError();
@@ -263,14 +261,15 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     }
     return payload;
 #else
-    if (fd_ < 0) {
+    if (pipeHandle_ < 0) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::array<std::byte, 4> hdr{};
     std::size_t got = 0;
     while (got < 4) {
-        ::ssize_t n = ::recv(fd_, reinterpret_cast<char*>(hdr.data()) + got, 4 - got, 0);
+        ::ssize_t n = ::recv(static_cast<int>(pipeHandle_),
+                             reinterpret_cast<char*>(hdr.data()) + got, 4 - got, 0);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
@@ -293,7 +292,8 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     std::vector<std::byte> payload(len);
     got = 0;
     while (got < len) {
-        ::ssize_t n = ::recv(fd_, reinterpret_cast<char*>(payload.data()) + got, len - got, 0);
+        ::ssize_t n = ::recv(static_cast<int>(pipeHandle_),
+                             reinterpret_cast<char*>(payload.data()) + got, len - got, 0);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
