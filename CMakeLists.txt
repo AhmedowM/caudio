@@ -122,10 +122,8 @@ option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" O
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 # Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
 # to work around duplicate-symbol/ODR issues from merged static twins. Static +
-# header-only is the default; opt in only if you need shared libs
-# (CODEBASE_REVIEW.md KISS-1).
-# 1.0 status: EXPERIMENTAL and OFF by default (SH-1…SH-5 deferred post-1.0, see
-# CODEBASE_REVIEW.md §5) — no 1.0 artifact ships shared libs.
+# header-only is the default; opt in only if you need shared libs.
+# Status: EXPERIMENTAL and OFF by default — no shipped artifact uses shared libs.
 option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" ON)
 # Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
@@ -242,7 +240,7 @@ target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 target_include_directories(sqlite3 SYSTEM PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
-# Trimmed amalgamation (CODEBASE_REVIEW.md §3 leftovers): only the API surface
+# Trimmed amalgamation: only the API surface
 # in use (prepare/bind/step/column/finalize, exec, open_v2, WAL + foreign_keys
 # + FTS5). OMIT_LOAD_EXTENSION is also hardening. None of the omitted areas
 # (JSON1 SQL, authorizer, progress callbacks, get_table, loadable extensions,

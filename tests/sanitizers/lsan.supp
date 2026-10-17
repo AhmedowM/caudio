@@ -12,5 +12,5 @@
 # Narrowly scoped: caudio never calls av_realloc* itself, so this cannot mask
 # our own leaks. UBSan, ASan (OOB/UAF) and all other LSan reports stay fatal.
 # Revisit with a Linux+ASan environment (or newer system FFmpeg) to confirm
-# the drip is gone; see CODEBASE_REVIEW KISS-4-adjacent notes.
+# the drip is gone.
 leak:av_realloc_f

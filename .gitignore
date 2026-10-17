@@ -32,6 +32,9 @@ Thumbs.db
 .opencode/
 .worktrees/
 
+# Dev-environment artifacts (audits, plans, scratch tooling) — never shipped
+.dev/
+
 # Vendored build artefacts
 *.o
 *.obj
