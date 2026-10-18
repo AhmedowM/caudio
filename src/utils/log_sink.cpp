@@ -1,12 +1,17 @@
 #include <caudio/utils/log_sink.hpp>
-
 #include <caudio/utils/print.hpp>
 #include <chrono>
-#include <cstdio>
+#include <cstddef>
+#include <filesystem>
 #include <format>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <thread>
 
 namespace caudio::utils {
@@ -30,46 +35,7 @@ std::string_view levelTag(LogLevel lvl) noexcept {
     }
 }
 
-} // namespace
-
-std::shared_ptr<FileLogSink> FileLogSink::open(const std::filesystem::path& path,
-                                               const FileSinkOptions& opts) {
-    auto sink = std::shared_ptr<FileLogSink>(new FileLogSink());
-    sink->path_ = path;
-    sink->opts_ = opts;
-    if (sink->opts_.generations < 1)
-        sink->opts_.generations = 1;
-    sink->out_.open(path, std::ios::out | std::ios::app);
-    if (!sink->out_.is_open())
-        return nullptr;
-    std::error_code ec;
-    auto size = std::filesystem::file_size(path, ec);
-    sink->currentBytes_ = ec ? 0 : static_cast<std::size_t>(size);
-    sink->valid_ = true;
-    if (sink->currentBytes_ > sink->opts_.maxBytes) {
-        std::lock_guard<std::mutex> lk(sink->mutex_);
-        sink->rotate();
-    }
-    return sink;
-}
-
-Logger::Callback FileLogSink::callback() {
-    std::shared_ptr<FileLogSink> self = shared_from_this();
-    return [self](LogLevel lvl, std::string_view msg) { self->writeLine(lvl, msg); };
-}
-
-bool FileLogSink::valid() const noexcept {
-    std::lock_guard<std::mutex> lk(mutex_);
-    return valid_;
-}
-
-void FileLogSink::flush() {
-    std::lock_guard<std::mutex> lk(mutex_);
-    if (valid_)
-        out_.flush();
-}
-
-std::string FileLogSink::formatLine(LogLevel lvl, std::string_view msg) {
+std::string formatLine(LogLevel lvl, std::string_view msg) {
     const auto now = std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now());
     // Low 24 bits distinguish the daemon's handful of threads; the full
     // 64-bit hash is visual noise in every line.
@@ -77,31 +43,89 @@ std::string FileLogSink::formatLine(LogLevel lvl, std::string_view msg) {
     return std::format("[{:%FT%TZ}] [{}] [t:{:06x}] {}\n", now, levelTag(lvl), tid, msg);
 }
 
-void FileLogSink::writeLine(LogLevel lvl, std::string_view msg) {
+} // namespace
+
+// All sink state lives behind the pimpl so the public header stays free of
+// <fstream>/<mutex> and the filesystem backend.
+struct FileLogSink::Impl {
+    mutable std::mutex mutex;
+    std::ofstream out;
+    std::filesystem::path path;
+    FileSinkOptions opts;
+    std::size_t currentBytes{0};
+    bool valid{false};
+
+    void writeLine(LogLevel lvl, std::string_view msg);
+    void rotate();
+    std::filesystem::path indexedPath(int i) const;
+};
+
+FileLogSink::FileLogSink() : impl_(std::make_unique<Impl>()) {}
+FileLogSink::~FileLogSink() = default;
+
+std::shared_ptr<FileLogSink> FileLogSink::open(const std::filesystem::path& path,
+                                               const FileSinkOptions& opts) {
+    auto sink = std::shared_ptr<FileLogSink>(new FileLogSink());
+    Impl& impl = *sink->impl_;
+    impl.path = path;
+    impl.opts = opts;
+    if (impl.opts.generations < 1)
+        impl.opts.generations = 1;
+    impl.out.open(path, std::ios::out | std::ios::app);
+    if (!impl.out.is_open())
+        return nullptr;
+    std::error_code ec;
+    auto size = std::filesystem::file_size(path, ec);
+    impl.currentBytes = ec ? 0 : static_cast<std::size_t>(size);
+    impl.valid = true;
+    if (impl.currentBytes > impl.opts.maxBytes) {
+        std::lock_guard<std::mutex> lk(impl.mutex);
+        impl.rotate();
+    }
+    return sink;
+}
+
+Logger::Callback FileLogSink::callback() {
+    std::shared_ptr<FileLogSink> self = shared_from_this();
+    return [self](LogLevel lvl, std::string_view msg) { self->impl_->writeLine(lvl, msg); };
+}
+
+bool FileLogSink::valid() const noexcept {
+    std::lock_guard<std::mutex> lk(impl_->mutex);
+    return impl_->valid;
+}
+
+void FileLogSink::flush() {
+    std::lock_guard<std::mutex> lk(impl_->mutex);
+    if (impl_->valid)
+        impl_->out.flush();
+}
+
+void FileLogSink::Impl::writeLine(LogLevel lvl, std::string_view msg) {
     std::string line;
     try {
         line = formatLine(lvl, msg);
     } catch (...) {
         return;
     }
-    std::lock_guard<std::mutex> lk(mutex_);
-    if (!valid_)
+    std::lock_guard<std::mutex> lk(mutex);
+    if (!valid)
         return;
     try {
-        if (currentBytes_ + line.size() > opts_.maxBytes)
+        if (currentBytes + line.size() > opts.maxBytes)
             rotate();
-        if (!valid_)
+        if (!valid)
             return;
-        out_ << line;
-        out_.flush();
-        if (!out_)
-            valid_ = false;
+        out << line;
+        out.flush();
+        if (!out)
+            valid = false;
         else
-            currentBytes_ += line.size();
+            currentBytes += line.size();
     } catch (...) {
-        valid_ = false;
+        valid = false;
     }
-    if (opts_.teeStderr) {
+    if (opts.teeStderr) {
         try {
             caudio::println(std::cerr, "[{}] {}", levelTag(lvl), msg);
         } catch (...) {
@@ -109,28 +133,28 @@ void FileLogSink::writeLine(LogLevel lvl, std::string_view msg) {
     }
 }
 
-void FileLogSink::rotate() {
-    // Caller holds mutex_. Failures degrade to truncate-and-continue so the
+void FileLogSink::Impl::rotate() {
+    // Caller holds mutex. Failures degrade to truncate-and-continue so the
     // bound (generations * maxBytes) always holds.
     try {
-        out_.close();
-        const int gens = opts_.generations;
+        out.close();
+        const int gens = opts.generations;
         std::error_code ec;
         std::filesystem::remove(indexedPath(gens - 1), ec);
         for (int i = gens - 2; i >= 0; --i)
             std::filesystem::rename(indexedPath(i), indexedPath(i + 1), ec);
-        out_.open(path_, std::ios::out | std::ios::trunc);
-        valid_ = out_.is_open();
-        currentBytes_ = 0;
+        out.open(path, std::ios::out | std::ios::trunc);
+        valid = out.is_open();
+        currentBytes = 0;
     } catch (...) {
-        valid_ = false;
+        valid = false;
     }
 }
 
-std::filesystem::path FileLogSink::indexedPath(int i) const {
+std::filesystem::path FileLogSink::Impl::indexedPath(int i) const {
     if (i <= 0)
-        return path_;
-    return std::filesystem::path(path_.string() + "." + std::to_string(i));
+        return path;
+    return std::filesystem::path(path.string() + "." + std::to_string(i));
 }
 
 } // namespace caudio::utils

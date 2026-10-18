@@ -17,16 +17,13 @@
  * I/O failures degrade to dropped lines so logging can never crash the
  * daemon. Open failure returns nullptr — the caller falls back to silence.
  *
- * Thread safety: thread-safe; all state under mutex_.
+ * Thread safety: thread-safe; all state under an internal mutex.
  */
 
 #include <caudio/utils/log.hpp>
 #include <cstddef>
 #include <filesystem>
-#include <fstream>
 #include <memory>
-#include <mutex>
-#include <string>
 
 namespace caudio::utils {
 
@@ -59,6 +56,9 @@ class FileLogSink : public std::enable_shared_from_this<FileLogSink> {
     FileLogSink(const FileLogSink&) = delete;
     FileLogSink& operator=(const FileLogSink&) = delete;
 
+    /** @brief Destructor (out-of-line: pimpl). */
+    ~FileLogSink();
+
     /** @brief Logger-compatible callback writing formatted lines. */
     Logger::Callback callback();
 
@@ -69,18 +69,10 @@ class FileLogSink : public std::enable_shared_from_this<FileLogSink> {
     void flush();
 
   private:
-    FileLogSink() = default;
-    void writeLine(LogLevel lvl, std::string_view msg);
-    void rotate();
-    static std::string formatLine(LogLevel lvl, std::string_view msg);
-    std::filesystem::path indexedPath(int i) const;
+    FileLogSink();
 
-    mutable std::mutex mutex_;
-    std::ofstream out_;
-    std::filesystem::path path_;
-    FileSinkOptions opts_;
-    std::size_t currentBytes_{0};
-    bool valid_{false};
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::utils

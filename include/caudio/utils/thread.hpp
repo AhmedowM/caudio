@@ -1,7 +1,6 @@
 #pragma once
 
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>
