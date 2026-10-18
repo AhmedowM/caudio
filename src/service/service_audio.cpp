@@ -2,6 +2,7 @@
 
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <filesystem>
 

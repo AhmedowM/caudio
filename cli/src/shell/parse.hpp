@@ -1,10 +1,11 @@
 #pragma once
+#include <caudio/utils/error.hpp>
+#include <cerrno>
 #include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
-#include <cerrno>
 #include <expected>
 #include <optional>
 #include <string>
@@ -28,8 +29,8 @@ namespace caudio::app::cli::parse {
 // '.', but the process never leaves the default "C" locale, so '.' parses
 // identically in practice.
 inline std::optional<double> parseDoubleToken(std::string_view token) {
-    if (token.empty() || token.front() == ' ' || token.front() == '\t' ||
-        token.front() == '\r' || token.front() == '\n')
+    if (token.empty() || token.front() == ' ' || token.front() == '\t' || token.front() == '\r' ||
+        token.front() == '\n')
         return std::nullopt;
     size_t digits = (token.front() == '+' || token.front() == '-') ? 1 : 0;
     if (token.size() > digits + 2 && token[digits] == '0' &&

@@ -30,7 +30,6 @@
  */
 
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <expected>
 #include <memory>

@@ -39,7 +39,6 @@
  */
 
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>

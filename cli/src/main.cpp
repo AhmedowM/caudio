@@ -15,6 +15,8 @@
 #if defined(_WIN32) && defined(_DEBUG)
 #include <crtdbg.h>
 #include <process.h>
+
+#include <caudio/utils/error.hpp>
 // Debug-only abort tripwire: the Debug CRT shows a modal dialog on
 // abort()/terminate and blocks the process, which then looks like a deaf
 // daemon or a hung CLI (and cascades into start/shutdown races). Route the

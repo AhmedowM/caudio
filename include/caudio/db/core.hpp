@@ -13,7 +13,6 @@
 #include <array>
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>

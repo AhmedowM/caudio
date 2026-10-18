@@ -6,9 +6,9 @@
  * @ingroup caudio_client
  */
 
+#include <caudio/fwd.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
 #include <filesystem>
 #include <memory>
 #include <string_view>

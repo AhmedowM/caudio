@@ -11,6 +11,7 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <cctype>
 #include <cstdint>
 #include <expected>

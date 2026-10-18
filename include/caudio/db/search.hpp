@@ -13,7 +13,6 @@
 
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
 #include <expected>
 #include <string>
 #include <string_view>

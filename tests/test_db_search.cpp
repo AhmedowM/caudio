@@ -2,6 +2,7 @@
 #include <caudio/db/core.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <string>
 #include <utility>

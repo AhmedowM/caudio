@@ -1,4 +1,4 @@
-﻿#include "service_status.hpp"
+#include "service_status.hpp"
 
 #include <blake3.h>
 
@@ -23,6 +23,7 @@
 #include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/utils.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/version.hpp>
 #include <caudio/windows_fwd.hpp>
 

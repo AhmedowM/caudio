@@ -10,6 +10,7 @@
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <expected>
 #include <format>
 #include <optional>

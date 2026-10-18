@@ -4,6 +4,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/core.hpp>
+#include <caudio/utils/error.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <filesystem>

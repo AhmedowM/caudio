@@ -41,7 +41,6 @@
  */
 
 #include <caudio/fwd.hpp>
-#include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>

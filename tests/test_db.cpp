@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/core.hpp>
 #include <caudio/db/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstdint>

@@ -9,7 +9,6 @@
 #include <caudio/fwd.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
 #include <chrono>
 #include <filesystem>
 #include <string>

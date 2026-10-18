@@ -2,6 +2,7 @@
 #include <caudio/db/core.hpp>
 #include <caudio/db/json.hpp>
 #include <caudio/db/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <common.hpp>
 #include <cstdint>

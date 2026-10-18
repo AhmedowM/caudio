@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/thread.hpp>
 #include <chrono>

@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/core.hpp>
 #include <caudio/db/scan.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <chrono>
 #include <common.hpp>

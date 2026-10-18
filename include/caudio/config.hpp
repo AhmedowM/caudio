@@ -7,7 +7,7 @@
  * @defgroup caudio_config caudio configuration
  */
 
-#include <caudio/utils/error.hpp>
+#include <caudio/fwd.hpp>
 #include <filesystem>
 #include <string>
 #include <string_view>

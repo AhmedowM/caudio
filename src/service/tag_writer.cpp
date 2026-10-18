@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <caudio/db/core.hpp>
 #include <caudio/player/decoder.hpp>
+#include <caudio/utils/error.hpp>
 #include <cctype>
 #include <cstdint>
 #include <db/fingerprint.hpp>

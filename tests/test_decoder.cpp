@@ -2,6 +2,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cmath>
@@ -31,8 +32,9 @@ TEST_CASE("decoder open emits lifecycle log", "[decoder]") {
     auto r = FileReader::open(path);
     REQUIRE(r.has_value());
     std::vector<std::pair<LogLevel, std::string>> out;
-    Logger logger([&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
-                  LogLevel::Trace);
+    Logger logger(
+        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+        LogLevel::Trace);
     auto dec = Decoder::open(**r, &logger);
     REQUIRE(dec.has_value());
     REQUIRE(out.size() == 1);

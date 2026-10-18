@@ -8,11 +8,12 @@
 #include <windows.h>
 #endif
 
+#include <array>
+#include <atomic>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
-#include <array>
-#include <atomic>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

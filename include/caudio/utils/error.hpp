@@ -6,8 +6,8 @@
  * @ingroup caudio_utils
  */
 
+#include <caudio/fwd.hpp>
 #include <caudio/utils/result.hpp>
-#include <expected>
 #include <format>
 #include <string>
 #include <string_view>
@@ -50,19 +50,6 @@ struct Error {
      */
     bool operator==(const Error&) const = default;
 };
-
-/**
- * @brief Alias for `std::expected<T, Error>`.
- * @ingroup caudio_utils
- * @tparam T Value type on success.
- * @details Use with `std::unexpected(Error{...})` on failure. Error codes
- * are documented per-function; common codes are InvalidArg, Busy, State,
- * Unsupported and Internal.
- * @see Error
- * @see StatusCode
- */
-template <typename T>
-using Expected = std::expected<T, Error>;
 
 /**
  * @brief Helper to construct an Error.

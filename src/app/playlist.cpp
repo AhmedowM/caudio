@@ -14,6 +14,7 @@
 #include <caudio/client/core.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <expected>
 #include <filesystem>

@@ -24,7 +24,7 @@
  * - NoMem: Allocation failure
  */
 
-#include <caudio/utils/error.hpp>
+#include <caudio/fwd.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>

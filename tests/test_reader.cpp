@@ -2,6 +2,7 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>

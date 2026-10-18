@@ -8,6 +8,7 @@
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
 #include <chrono>

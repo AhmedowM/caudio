@@ -5,6 +5,7 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <common.hpp>
 #include <cstdint>

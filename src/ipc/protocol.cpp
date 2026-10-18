@@ -5,6 +5,7 @@
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>

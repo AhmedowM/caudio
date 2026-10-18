@@ -757,6 +757,6 @@ using Result =
  * Used for functions that return either a Result or a CliError.
  * @see caudio::utils::Error
  */
-using ReplyExpected = std::expected<Result, CliError>;
+using ExpectedReply = caudio::utils::Expected<Result>;
 
 } // namespace caudio::ipc

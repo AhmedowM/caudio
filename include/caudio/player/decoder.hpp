@@ -28,7 +28,6 @@
  */
 
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>

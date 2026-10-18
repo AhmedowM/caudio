@@ -6,6 +6,7 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <cstdint>
@@ -92,10 +93,9 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
-    const int64_t wallLo =
-        (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count();
+    const int64_t wallLo = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
     REQUIRE(eng->play(1).has_value());
     // wait deterministically for history to be marked (threshold 1s or 10% of 10s=1s, so ~1s)
     // poll every 50ms with overall timeout 2000ms, breaking early when condition met
@@ -126,10 +126,9 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     // Stored timestamps must be wall-clock (regression: the monotonic clock
     // rendered every history date as 1970-01-01). Bounds come from the test's
     // own clock, so this holds at any machine uptime.
-    const int64_t wallHi =
-        (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count();
+    const int64_t wallHi = (int64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count();
     auto wallPlausible = [&](int64_t v) { return v >= wallLo - 5000 && v <= wallHi + 5000; };
     sqlite3* h4 = nullptr;
     REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h4, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);

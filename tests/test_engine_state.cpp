@@ -5,6 +5,7 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/core.hpp>
 #include <caudio/engine/types.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <common.hpp>
 #include <cstdint>
@@ -134,8 +135,9 @@ TEST_CASE("engine state volume clamped 0-1", "[engine_state]") {
 
 TEST_CASE("engine create emits lifecycle log", "[engine_state]") {
     std::vector<std::pair<LogLevel, std::string>> out;
-    Logger logger([&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
-                  LogLevel::Trace);
+    Logger logger(
+        [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
+        LogLevel::Trace);
     EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;

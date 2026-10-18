@@ -12,8 +12,6 @@
 #include <algorithm>
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
-#include <caudio/utils/error.hpp>
-#include <caudio/utils/generator.hpp>
 #include <cctype>
 #include <cstdint>
 #include <expected>

@@ -12,9 +12,9 @@
  * `utils/thread.hpp` for the same pattern.
  */
 
+#include <caudio/fwd.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/utils/error.hpp>
 #include <expected>
 #include <filesystem>
 #include <functional>

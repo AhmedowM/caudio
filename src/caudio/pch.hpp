@@ -8,13 +8,23 @@
  * every consumer TU to rebuild. Keep this set small.
  */
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <string>
-#include <string_view>
-#include <vector>
+#include <cstdio>
+#include <cstdlib>
 #include <expected>
-#include <chrono>
-#include <thread>
 #include <filesystem>
 #include <format>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <unordered_map>
+#include <vector>

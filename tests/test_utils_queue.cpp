@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/utils/error.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
