@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "service_impl.hpp"
 #include "track_resolve.hpp"
 
 namespace caudio::service {
@@ -36,7 +37,7 @@ using caudio::ipc::QueueShuffle;
 using caudio::ipc::QueueSwitch;
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueList& ql) {
+Service::Impl::handle(const caudio::ipc::QueueList& ql) {
     if (ql.order != "playback" && ql.order != "added" && !ql.order.empty())
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::InvalidArg, "queue list: invalid order (added|playback)")};
@@ -83,7 +84,7 @@ Service::handle(const caudio::ipc::QueueList& ql) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueQueues&) {
+Service::Impl::handle(const caudio::ipc::QueueQueues&) {
     auto qs = db_->listQueues();
     if (!qs)
         return std::unexpected{qs.error()};
@@ -98,7 +99,7 @@ Service::handle(const caudio::ipc::QueueQueues&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueCreate& qc) {
+Service::Impl::handle(const caudio::ipc::QueueCreate& qc) {
     if (qc.name.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "queue create: missing name")};
@@ -109,7 +110,7 @@ Service::handle(const caudio::ipc::QueueCreate& qc) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueDelete& qd) {
+Service::Impl::handle(const caudio::ipc::QueueDelete& qd) {
     if (qd.qid == engine_->activeQueueId())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "cannot delete the active queue")};
@@ -123,7 +124,7 @@ Service::handle(const caudio::ipc::QueueDelete& qd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::PlayFiles& cmd) {
+Service::Impl::handle(const caudio::ipc::PlayFiles& cmd) {
     if (cmd.paths.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "play files: missing paths")};
@@ -175,7 +176,7 @@ Service::handle(const caudio::ipc::PlayFiles& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueSwitch& qs) {
+Service::Impl::handle(const caudio::ipc::QueueSwitch& qs) {
     auto q = db_->getQueue(qs.qid);
     if (!q) {
         if (q.error().message.empty())
@@ -191,7 +192,7 @@ Service::handle(const caudio::ipc::QueueSwitch& qs) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueAdd& qa) {
+Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
     int64_t qid = engine_->activeQueueId();
     auto q = db_->getQueue(qid);
     if (!q)
@@ -320,7 +321,7 @@ Service::handle(const caudio::ipc::QueueAdd& qa) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueRemove& qr) {
+Service::Impl::handle(const caudio::ipc::QueueRemove& qr) {
     int64_t qid = engine_->activeQueueId();
     auto q = db_->getQueue(qid);
     if (!q)
@@ -390,7 +391,7 @@ Service::handle(const caudio::ipc::QueueRemove& qr) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueMove& qm) {
+Service::Impl::handle(const caudio::ipc::QueueMove& qm) {
     // QueueMove: reorder within queue via playlistReorder? For queue we lack direct
     // move. Simulate via remove+enqueue: fetch items, reorder vector, clear and
     // re-enqueue
@@ -434,7 +435,7 @@ Service::handle(const caudio::ipc::QueueMove& qm) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueClear&) {
+Service::Impl::handle(const caudio::ipc::QueueClear&) {
     int64_t qid = engine_->activeQueueId();
     auto q = db_->getQueue(qid);
     if (!q)
@@ -447,7 +448,7 @@ Service::handle(const caudio::ipc::QueueClear&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueShuffle& qs) {
+Service::Impl::handle(const caudio::ipc::QueueShuffle& qs) {
     bool on;
     if (qs.on.has_value()) {
         on = *qs.on;
@@ -463,7 +464,7 @@ Service::handle(const caudio::ipc::QueueShuffle& qs) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::QueueRepeat& qr) {
+Service::Impl::handle(const caudio::ipc::QueueRepeat& qr) {
     if (qr.mode.has_value()) {
         auto r = engine_->setRepeat(*qr.mode);
         if (!r)

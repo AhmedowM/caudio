@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "service_impl.hpp"
 #include "service_paths.hpp"
 
 namespace caudio::service {
@@ -38,7 +39,7 @@ using caudio::ipc::DeviceTest;
 using caudio::ipc::Shutdown;
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigGet& cmd) {
+Service::Impl::handle(const caudio::ipc::ConfigGet& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     auto vRes = caudio::config::configGetRaw(p, cmd.key);
     if (!vRes)
@@ -47,7 +48,7 @@ Service::handle(const caudio::ipc::ConfigGet& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigSet& cmd) {
+Service::Impl::handle(const caudio::ipc::ConfigSet& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     // logLevel applies live: validate first (garbage is rejected, never
     // stored), canonicalize names to ints on write, then setLevel.
@@ -57,10 +58,10 @@ Service::handle(const caudio::ipc::ConfigSet& cmd) {
     if (isLevel) {
         auto lvl = caudio::utils::parseLogLevelValue(cmd.value);
         if (!lvl)
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::InvalidArg,
-                "invalid logLevel '" + cmd.value +
-                    "' (expected trace|debug|info|warn|error or 0-4)")};
+            return std::unexpected{
+                caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                         "invalid logLevel '" + cmd.value +
+                                             "' (expected trace|debug|info|warn|error or 0-4)")};
         newLevel = *lvl;
         storedValue = std::to_string(std::to_underlying(newLevel));
     }
@@ -75,7 +76,7 @@ Service::handle(const caudio::ipc::ConfigSet& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigList&) {
+Service::Impl::handle(const caudio::ipc::ConfigList&) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     auto lRes = caudio::config::configListRaw(p);
     if (!lRes)
@@ -88,7 +89,7 @@ Service::handle(const caudio::ipc::ConfigList&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigExport& cmd) {
+Service::Impl::handle(const caudio::ipc::ConfigExport& cmd) {
     auto src = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     std::filesystem::path dst{cmd.path};
     std::error_code ec;
@@ -104,7 +105,7 @@ Service::handle(const caudio::ipc::ConfigExport& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigImport& cmd) {
+Service::Impl::handle(const caudio::ipc::ConfigImport& cmd) {
     std::filesystem::path src{cmd.path};
     auto dst = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     std::error_code ec;
@@ -149,9 +150,9 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
         // Names are tolerated (loadConfig canonicalizes); garbage is not.
         if (v->isString() && caudio::utils::parseLogLevelValue(v->get<std::string>()))
             continue;
-        return std::unexpected{caudio::utils::makeError(
-            caudio::utils::StatusCode::InvalidArg,
-            std::string("import key '") + k + "' must be a number or level name")};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        std::string("import key '") + k +
+                                                            "' must be a number or level name")};
     }
     std::filesystem::create_directories(dst.parent_path(), ec);
     std::filesystem::copy_file(src, dst, std::filesystem::copy_options::overwrite_existing, ec);
@@ -162,7 +163,7 @@ Service::handle(const caudio::ipc::ConfigImport& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::ConfigReset& cmd) {
+Service::Impl::handle(const caudio::ipc::ConfigReset& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     if (cmd.key.has_value() && !cmd.key->empty()) {
         auto r = caudio::config::configDeleteRaw(p, *cmd.key);
@@ -180,14 +181,14 @@ Service::handle(const caudio::ipc::ConfigReset& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::Shutdown&) {
+Service::Impl::handle(const caudio::ipc::Shutdown&) {
     shutdownRequested_.store(true, std::memory_order_release);
     // defer actual shutdown to run loop to avoid deadlock
     return Result{Empty{}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::DeviceList&) {
+Service::Impl::handle(const caudio::ipc::DeviceList&) {
     auto devList = caudio::player::enumerateDevices();
     caudio::ipc::Devices result;
     result.devices.reserve(devList.devices.size());
@@ -198,7 +199,7 @@ Service::handle(const caudio::ipc::DeviceList&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::DeviceSet& cmd) {
+Service::Impl::handle(const caudio::ipc::DeviceSet& cmd) {
     // Validate device exists
     auto devList = caudio::player::enumerateDevices();
     bool found = false;
@@ -224,7 +225,7 @@ Service::handle(const caudio::ipc::DeviceSet& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::DeviceTest& cmd) {
+Service::Impl::handle(const caudio::ipc::DeviceTest& cmd) {
     // Get device ID to test
     std::string testId;
     if (cmd.id.has_value()) {

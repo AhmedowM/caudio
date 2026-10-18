@@ -6,9 +6,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <caudio/config.hpp>
 #include <caudio/db/core.hpp>
 #include <caudio/engine/types.hpp>
-#include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
@@ -38,6 +38,7 @@
 #include <variant>
 
 #include "config_detail.hpp"
+#include "service_impl.hpp"
 #include "service_paths.hpp"
 #include "service_status.hpp"
 
@@ -116,8 +117,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // Daemon log first: rotating file next to the db (see logPathFor), so
     // db/engine creation below already emit. A log that cannot be opened
     // degrades to silence — logging must never block startup.
-    caudio::utils::Logger::Callback logCb =
-        [](caudio::utils::LogLevel, std::string_view) {};
+    caudio::utils::Logger::Callback logCb = [](caudio::utils::LogLevel, std::string_view) {};
     if (auto lp = caudio::config::logPathFor(cfg.dbPath)) {
         caudio::utils::FileSinkOptions sinkOpts;
         sinkOpts.teeStderr = cfg.logToStderr;
@@ -125,10 +125,9 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
             logCb = sink->callback();
     }
     auto loggerPtr = std::make_unique<caudio::utils::Logger>(
-        std::move(logCb),
-        static_cast<caudio::utils::LogLevel>(std::clamp(
-            cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
-            std::to_underlying(caudio::utils::LogLevel::Error))));
+        std::move(logCb), static_cast<caudio::utils::LogLevel>(std::clamp(
+                              cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
+                              std::to_underlying(caudio::utils::LogLevel::Error))));
     caudio::utils::Logger* logger = loggerPtr.get();
 
     // open DB
@@ -166,7 +165,6 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{listenRes.error()};
     }
 
-
     // Create PID file with current PID
     std::string pidStr;
     try {
@@ -202,8 +200,9 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     auto svc = std::unique_ptr<Service>(
         new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath,
                     spStr, lockFd, std::move(shmHandle), shmName));
-    svc->logger_->info("daemon started version={} pid={} db={} socket={}",
-                       caudio::version::version(), pidStr, cfg.dbPath.generic_string(), spStr);
+    svc->impl_->logger_->info("daemon started version={} pid={} db={} socket={}",
+                              caudio::version::version(), pidStr, cfg.dbPath.generic_string(),
+                              spStr);
     return svc;
 }
 
@@ -212,11 +211,25 @@ Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database>
                  std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                  std::string socketPath, std::intptr_t lockFd,
                  std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName)
+    : impl_(std::make_unique<Impl>(cfg, std::move(db), std::move(eng), std::move(srv),
+                                   std::move(logger), std::move(pidPath), std::move(socketPath),
+                                   lockFd, std::move(shmHandle), std::move(shmName))) {}
+
+Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
+                    std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
+                    std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
+                    std::string socketPath, std::intptr_t lockFd,
+                    std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle,
+                    std::string shmName)
     : config_(cfg), db_(std::move(db)), engine_(std::move(eng)), server_(std::move(srv)),
       logger_(std::move(logger)), pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)),
       lockFd_(lockFd), shmHandle_(std::move(shmHandle)), shmName_(std::move(shmName)) {}
 
 caudio::utils::Expected<void> Service::run(std::stop_token st) {
+    return impl_->run(st);
+}
+
+caudio::utils::Expected<void> Service::Impl::run(std::stop_token st) {
     if (running_.exchange(true)) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "already running")};
@@ -241,6 +254,10 @@ caudio::utils::Expected<void> Service::run(std::stop_token st) {
 }
 
 void Service::shutdown() {
+    impl_->shutdown();
+}
+
+void Service::Impl::shutdown() {
     bool was = running_.exchange(false);
     (void)was;
     shutdownRequested_.store(true, std::memory_order_release);
@@ -285,38 +302,38 @@ void Service::shutdown() {
 }
 
 caudio::db::Database& Service::db() noexcept {
-    return *db_;
+    return *impl_->db_;
 }
 /**
  * @brief Access the audio engine instance.
  * @return Reference to the Engine.
  */
 caudio::engine::Engine& Service::engine() noexcept {
-    return *engine_;
+    return *impl_->engine_;
 }
 /**
  * @brief Access the IPC server instance.
  * @return Reference to the IpcServer.
  */
 IpcServer& Service::server() noexcept {
-    return *server_;
+    return *impl_->server_;
 }
 /**
  * @brief Get the shared memory name used for status block.
  * @return Shared memory name (hash of dbPath).
  */
 const std::string& Service::shmName() const noexcept {
-    return shmName_;
+    return impl_->shmName_;
 }
 /**
  * @brief Get the shared memory status handle (if available).
  * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
  */
 caudio::service::ShmStatusHandle* Service::shmHandle() noexcept {
-    return shmHandle_.get();
+    return impl_->shmHandle_.get();
 }
 
-void Service::updateShmStatus() {
+void Service::Impl::updateShmStatus() {
     if (!shmHandle_ || !shmHandle_->valid())
         return;
     auto& eng = *engine_;
@@ -345,7 +362,7 @@ void Service::updateShmStatus() {
     }
 }
 
-std::expected<caudio::ipc::Result, caudio::utils::Error> Service::statusResult() {
+std::expected<caudio::ipc::Result, caudio::utils::Error> Service::Impl::statusResult() {
     auto st = detail::buildStatus(*engine_, *db_);
     if (!st)
         return std::unexpected{st.error()};
@@ -353,7 +370,7 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::statusResult()
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::dispatch(const caudio::ipc::Command& cmd) {
+Service::Impl::dispatch(const caudio::ipc::Command& cmd) {
     // Per-command trace at debug: what the daemon was asked to do. Guarded
     // by enabled() (dump() walks the whole command) and try/catch (a log
     // line must never break dispatch on adversarial input).

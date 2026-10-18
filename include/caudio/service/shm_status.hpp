@@ -14,7 +14,7 @@
  */
 
 #include <atomic>
-#include <caudio/engine/core.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>

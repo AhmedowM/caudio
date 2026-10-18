@@ -15,18 +15,13 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
-#include <atomic>
-#include <condition_variable>
-#include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
-#include <mutex>
+#include <memory>
 #include <stop_token>
 #include <string>
 #include <string_view>
-#include <thread>
-#include <vector>
 
 namespace caudio::service {
 
@@ -37,7 +32,7 @@ namespace caudio::service {
 class IpcServer {
   public:
     /** @brief Default-constructs an idle server (call listen() next). */
-    IpcServer() = default;
+    IpcServer();
     /** @brief Shuts down and joins threads. */
     ~IpcServer();
 
@@ -77,28 +72,8 @@ class IpcServer {
     void retireClient();
 
   private:
-    // One slot per connection. A connection thread marks its own slot done
-    // on exit (retireClient); the accept loop sweeps done slots, so the
-    // list holds only live threads and shutdown joins a bounded set.
-    // Retire never erases/joins (shutdown may be joining concurrently);
-    // erase/swap only happens with no other thread touching the list.
-    struct ClientSlot {
-        std::jthread thread;
-        bool done{false};
-    };
-    std::atomic<bool> running_{false};
-    std::jthread acceptThread_;
-    std::vector<ClientSlot> clients_;
-    std::mutex clientsMtx_;
-    std::mutex cvMtx_;
-    std::condition_variable cv_;
-    std::string socketPath_;
-    std::stop_source stopSource_;
-    // Listen handle / listen fd, shared between the accept loop (take/replace)
-    // and shutdown/listen (take/close). Atomic take-over (exchange) gives
-    // single ownership on every handoff -- no double-close on the shutdown
-    // race. -1 = invalid on both platforms.
-    std::atomic<std::intptr_t> pipeHandle_{-1};
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::service

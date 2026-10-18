@@ -11,6 +11,8 @@
 #include <optional>
 #include <string_view>
 
+#include "service_impl.hpp"
+
 namespace caudio::service {
 
 using namespace caudio::ipc;
@@ -26,7 +28,8 @@ using caudio::ipc::Stop;
 using caudio::ipc::VolumeSet;
 
 // Play command: start/resume playback of active queue
-std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const caudio::ipc::Play&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::Play&) {
     int64_t aq = engine_->activeQueueId();
     auto r = engine_->play(aq);
     if (!r)
@@ -36,7 +39,7 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const c
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::Pause&) {
+Service::Impl::handle(const caudio::ipc::Pause&) {
     auto r = engine_->pause();
     if (!r)
         return std::unexpected{r.error()};
@@ -45,7 +48,7 @@ Service::handle(const caudio::ipc::Pause&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::Resume&) {
+Service::Impl::handle(const caudio::ipc::Resume&) {
     auto r = engine_->resume();
     if (!r)
         return std::unexpected{r.error()};
@@ -54,7 +57,7 @@ Service::handle(const caudio::ipc::Resume&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::Restart&) {
+Service::Impl::handle(const caudio::ipc::Restart&) {
     // restart: seek to 0, ensure playing
     auto r = engine_->seek(0.0);
     if (!r) {
@@ -74,7 +77,8 @@ Service::handle(const caudio::ipc::Restart&) {
     return statusResult();
 }
 
-std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const caudio::ipc::Stop&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::Stop&) {
     auto r = engine_->stop();
     if (!r)
         return std::unexpected{r.error()};
@@ -82,7 +86,8 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const c
     return statusResult();
 }
 
-std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const caudio::ipc::Next&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::Next&) {
     auto r = engine_->next();
     if (!r)
         return std::unexpected{r.error()};
@@ -90,7 +95,8 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const c
     return statusResult();
 }
 
-std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const caudio::ipc::Prev&) {
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::Prev&) {
     auto r = engine_->prev();
     if (!r)
         return std::unexpected{r.error()};
@@ -99,7 +105,7 @@ std::expected<caudio::ipc::Result, caudio::utils::Error> Service::handle(const c
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::Seek& s) {
+Service::Impl::handle(const caudio::ipc::Seek& s) {
     if (!std::isfinite(s.seconds) || s.seconds < 0) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
                                                         "seek: invalid seconds")};
@@ -112,12 +118,12 @@ Service::handle(const caudio::ipc::Seek& s) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::StatusReq&) {
+Service::Impl::handle(const caudio::ipc::StatusReq&) {
     return statusResult();
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::handle(const caudio::ipc::VolumeSet& v) {
+Service::Impl::handle(const caudio::ipc::VolumeSet& v) {
     float cur = engine_->volume();
     float target = cur;
     bool hasTarget = false;

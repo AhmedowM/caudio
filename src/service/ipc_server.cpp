@@ -1,16 +1,20 @@
 #include <array>
+#include <atomic>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/ipc_server.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <caudio/windows_fwd.hpp>
 #include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <stop_token>
 #include <string>
@@ -18,8 +22,6 @@
 #include <thread>
 #include <utility>
 #include <vector>
-
-#include <caudio/windows_fwd.hpp>
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -52,8 +54,8 @@ class PipeDacl {
         sa_.nLength = sizeof(sa_);
         LPVOID sd = nullptr;
         DWORD len = 0;
-        if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(
-                kPipeSddl, kSddlRevision1, &sd, &len) &&
+        if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(kPipeSddl, kSddlRevision1, &sd,
+                                                                   &len) &&
             sd) {
             sa_.descriptor = sd;
         }
@@ -64,7 +66,9 @@ class PipeDacl {
     }
     PipeDacl(const PipeDacl&) = delete;
     PipeDacl& operator=(const PipeDacl&) = delete;
-    LPVOID attributes() { return sa_.descriptor ? &sa_ : nullptr; }
+    LPVOID attributes() {
+        return sa_.descriptor ? &sa_ : nullptr;
+    }
 
   private:
     PipeSecurityAttributes sa_;
@@ -74,12 +78,71 @@ class PipeDacl {
 
 namespace caudio::service {
 
+// All acceptor state and threads live here so the public header stays free
+// of std::thread/mutex/condition_variable/vector includes.
+struct IpcServer::Impl {
+    // One slot per connection. A connection thread marks its own slot done
+    // on exit (retireClient); the accept loop sweeps done slots, so the
+    // list holds only live threads and shutdown joins a bounded set.
+    // Retire never erases/joins (shutdown may be joining concurrently);
+    // erase/swap only happens with no other thread touching the list.
+    struct ClientSlot {
+        std::jthread thread;
+        bool done{false};
+    };
+
+    caudio::utils::Expected<void> listen(const std::filesystem::path& dbPath,
+                                         std::string_view socketPathOverride);
+    void run(std::stop_token st,
+             std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
+                 const caudio::ipc::Command&)>
+                 dispatch);
+    void retireClient();
+    void shutdown();
+
+    std::atomic<bool> running_{false};
+    std::jthread acceptThread_;
+    std::vector<ClientSlot> clients_;
+    std::mutex clientsMtx_;
+    std::mutex cvMtx_;
+    std::condition_variable cv_;
+    std::string socketPath_;
+    std::stop_source stopSource_;
+    // Listen handle / listen fd, shared between the accept loop (take/replace)
+    // and shutdown/listen (take/close). Atomic take-over (exchange) gives
+    // single ownership on every handoff -- no double-close on the shutdown
+    // race. -1 = invalid on both platforms.
+    std::atomic<std::intptr_t> pipeHandle_{-1};
+};
+
+IpcServer::IpcServer() : impl_(std::make_unique<Impl>()) {}
+
 IpcServer::~IpcServer() {
     shutdown();
 }
 
 caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbPath,
                                                 std::string_view socketPathOverride) {
+    return impl_->listen(dbPath, socketPathOverride);
+}
+
+void IpcServer::run(std::stop_token st,
+                    std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
+                        const caudio::ipc::Command&)>
+                        dispatch) {
+    impl_->run(st, std::move(dispatch));
+}
+
+void IpcServer::retireClient() {
+    impl_->retireClient();
+}
+
+void IpcServer::shutdown() {
+    impl_->shutdown();
+}
+
+caudio::utils::Expected<void> IpcServer::Impl::listen(const std::filesystem::path& dbPath,
+                                                      std::string_view socketPathOverride) {
     caudio::utils::Expected<std::string> sp;
     if (!socketPathOverride.empty()) {
         sp = std::string(socketPathOverride.data(), socketPathOverride.size());
@@ -163,10 +226,10 @@ caudio::utils::Expected<void> IpcServer::listen(const std::filesystem::path& dbP
 #endif
 }
 
-void IpcServer::run(std::stop_token st,
-                    std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
-                        const caudio::ipc::Command&)>
-                        dispatch) {
+void IpcServer::Impl::run(std::stop_token st,
+                          std::function<std::expected<caudio::ipc::Result, caudio::utils::Error>(
+                              const caudio::ipc::Command&)>
+                              dispatch) {
     if (running_.exchange(true)) {
         return;
     }
@@ -208,9 +271,9 @@ void IpcServer::run(std::stop_token st,
                 for (char c : pathStr)
                     w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
                 PipeDacl nextDacl;
-                HANDLE next = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex,
-                                                       kPipeTypeByte | kPipeWait, kPipeUnlimited,
-                                                       16384, 16384, 0, nextDacl.attributes());
+                HANDLE next =
+                    ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
+                                       kPipeUnlimited, 16384, 16384, 0, nextDacl.attributes());
                 if (next != kInvalidHandleValue) {
                     pipeHandle_.store(reinterpret_cast<std::intptr_t>(next));
                 }
@@ -220,14 +283,16 @@ void IpcServer::run(std::stop_token st,
             {
                 std::lock_guard<std::mutex> lk(clientsMtx_);
                 clients_.emplace_back();
-                clients_.back().thread = std::jthread(
-                    [this, clientHandle, dispatch](std::stop_token ct) {
+                clients_.back().thread =
+                    std::jthread([this, clientHandle, dispatch](std::stop_token ct) {
                         (void)ct;
                         // Self-retire on every exit path (including
                         // exceptions): the slot is swept by the accept loop.
                         struct RetireGuard {
-                            IpcServer* self;
-                            ~RetireGuard() { self->retireClient(); }
+                            Impl* self;
+                            ~RetireGuard() {
+                                self->retireClient();
+                            }
                         } retire{this};
                         try {
                             std::array<std::byte, 4> hdr{};
@@ -258,8 +323,7 @@ void IpcServer::run(std::stop_token st,
                             std::string reqStr;
                             reqStr.reserve(payload.size());
                             for (auto b : payload)
-                                reqStr.push_back(
-                                    static_cast<char>(static_cast<unsigned char>(b)));
+                                reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
                             auto reqExp = caudio::ipc::deserializeRequest(reqStr);
                             caudio::ipc::IpcReply reply;
                             if (!reqExp) {
@@ -277,8 +341,7 @@ void IpcServer::run(std::stop_token st,
                             auto framed = caudio::ipc::frame(repJson);
                             DWORD w2 = 0;
                             BOOL okW = ::WriteFile(clientHandle, framed.data(),
-                                                   static_cast<DWORD>(framed.size()), &w2,
-                                                   nullptr);
+                                                   static_cast<DWORD>(framed.size()), &w2, nullptr);
                             if (!okW) {
                                 ::CloseHandle(clientHandle);
                                 return;
@@ -323,94 +386,93 @@ void IpcServer::run(std::stop_token st,
             {
                 std::lock_guard<std::mutex> lk(clientsMtx_);
                 clients_.emplace_back();
-                clients_.back().thread = std::jthread(
-                    [this, cfd, dispatch](std::stop_token ct) {
-                        (void)ct;
-                        // Self-retire on every exit path (including
-                        // exceptions): the slot is swept by the accept loop.
-                        struct RetireGuard {
-                            IpcServer* self;
-                            ~RetireGuard() { self->retireClient(); }
-                        } retire{this};
-                        try {
-                            std::array<std::byte, 4> hdr{};
-                            auto recvExact = [cfd](std::span<std::byte> out) -> bool {
-                                std::size_t got = 0;
-                                while (got < out.size()) {
-                                    ::ssize_t n = ::recv(
-                                        cfd, reinterpret_cast<char*>(out.data()) + got,
-                                        out.size() - got, 0);
-                                    if (n <= 0) {
-                                        if (n < 0 && errno == EINTR)
-                                            continue;
-                                        return false;
-                                    }
-                                    got += static_cast<std::size_t>(n);
-                                }
-                                return true;
-                            };
-                            auto sendAll = [cfd](std::span<const std::byte> data) -> bool {
-                                std::size_t sent = 0;
-                                while (sent < data.size()) {
-                                    ::ssize_t n = ::send(
-                                        cfd, reinterpret_cast<const char*>(data.data()) + sent,
-                                        data.size() - sent, 0);
-                                    if (n < 0) {
-                                        if (errno == EINTR)
-                                            continue;
-                                        return false;
-                                    }
-                                    sent += static_cast<std::size_t>(n);
-                                }
-                                return true;
-                            };
-                            if (!recvExact(std::span<std::byte>(hdr))) {
-                                ::close(cfd);
-                                return;
-                            }
-                            std::uint32_t len =
-                                (static_cast<std::uint32_t>(std::to_underlying(hdr[0])) << 24) |
-                                (static_cast<std::uint32_t>(std::to_underlying(hdr[1])) << 16) |
-                                (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
-                                static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
-                            if (len > 16 * 1024 * 1024) {
-                                ::close(cfd);
-                                return;
-                            }
-                            std::vector<std::byte> payload(len);
-                            if (len > 0 && !recvExact(std::span<std::byte>(payload))) {
-                                ::close(cfd);
-                                return;
-                            }
-                            std::string reqStr;
-                            reqStr.reserve(payload.size());
-                            for (auto b : payload)
-                                reqStr.push_back(
-                                    static_cast<char>(static_cast<unsigned char>(b)));
-                            auto reqExp = caudio::ipc::deserializeRequest(reqStr);
-                            caudio::ipc::IpcReply reply;
-                            if (!reqExp) {
-                                reply.id = 0;
-                                reply.result = std::unexpected{reqExp.error()};
-                            } else {
-                                reply.id = reqExp->id;
-                                auto resExp = dispatch(reqExp->cmd);
-                                if (!resExp)
-                                    reply.result = std::unexpected{resExp.error()};
-                                else
-                                    reply.result = *resExp;
-                            }
-                            std::string repJson = caudio::ipc::serializeReply(reply);
-                            auto framed = caudio::ipc::frame(repJson);
-                            if (!sendAll(framed)) {
-                                ::close(cfd);
-                                return;
-                            }
-                            ::close(cfd);
-                        } catch (...) {
-                            ::close(cfd);
+                clients_.back().thread = std::jthread([this, cfd, dispatch](std::stop_token ct) {
+                    (void)ct;
+                    // Self-retire on every exit path (including
+                    // exceptions): the slot is swept by the accept loop.
+                    struct RetireGuard {
+                        Impl* self;
+                        ~RetireGuard() {
+                            self->retireClient();
                         }
-                    });
+                    } retire{this};
+                    try {
+                        std::array<std::byte, 4> hdr{};
+                        auto recvExact = [cfd](std::span<std::byte> out) -> bool {
+                            std::size_t got = 0;
+                            while (got < out.size()) {
+                                ::ssize_t n = ::recv(cfd, reinterpret_cast<char*>(out.data()) + got,
+                                                     out.size() - got, 0);
+                                if (n <= 0) {
+                                    if (n < 0 && errno == EINTR)
+                                        continue;
+                                    return false;
+                                }
+                                got += static_cast<std::size_t>(n);
+                            }
+                            return true;
+                        };
+                        auto sendAll = [cfd](std::span<const std::byte> data) -> bool {
+                            std::size_t sent = 0;
+                            while (sent < data.size()) {
+                                ::ssize_t n =
+                                    ::send(cfd, reinterpret_cast<const char*>(data.data()) + sent,
+                                           data.size() - sent, 0);
+                                if (n < 0) {
+                                    if (errno == EINTR)
+                                        continue;
+                                    return false;
+                                }
+                                sent += static_cast<std::size_t>(n);
+                            }
+                            return true;
+                        };
+                        if (!recvExact(std::span<std::byte>(hdr))) {
+                            ::close(cfd);
+                            return;
+                        }
+                        std::uint32_t len =
+                            (static_cast<std::uint32_t>(std::to_underlying(hdr[0])) << 24) |
+                            (static_cast<std::uint32_t>(std::to_underlying(hdr[1])) << 16) |
+                            (static_cast<std::uint32_t>(std::to_underlying(hdr[2])) << 8) |
+                            static_cast<std::uint32_t>(std::to_underlying(hdr[3]));
+                        if (len > 16 * 1024 * 1024) {
+                            ::close(cfd);
+                            return;
+                        }
+                        std::vector<std::byte> payload(len);
+                        if (len > 0 && !recvExact(std::span<std::byte>(payload))) {
+                            ::close(cfd);
+                            return;
+                        }
+                        std::string reqStr;
+                        reqStr.reserve(payload.size());
+                        for (auto b : payload)
+                            reqStr.push_back(static_cast<char>(static_cast<unsigned char>(b)));
+                        auto reqExp = caudio::ipc::deserializeRequest(reqStr);
+                        caudio::ipc::IpcReply reply;
+                        if (!reqExp) {
+                            reply.id = 0;
+                            reply.result = std::unexpected{reqExp.error()};
+                        } else {
+                            reply.id = reqExp->id;
+                            auto resExp = dispatch(reqExp->cmd);
+                            if (!resExp)
+                                reply.result = std::unexpected{resExp.error()};
+                            else
+                                reply.result = *resExp;
+                        }
+                        std::string repJson = caudio::ipc::serializeReply(reply);
+                        auto framed = caudio::ipc::frame(repJson);
+                        if (!sendAll(framed)) {
+                            ::close(cfd);
+                            return;
+                        }
+                        ::close(cfd);
+                    } catch (...) {
+                        ::close(cfd);
+                    }
+                });
                 // Reap exited connections: the list holds live threads only.
                 std::erase_if(clients_, [](const ClientSlot& s) { return s.done; });
             }
@@ -423,7 +485,7 @@ void IpcServer::run(std::stop_token st,
     });
 }
 
-void IpcServer::retireClient() {
+void IpcServer::Impl::retireClient() {
     // Marks the CALLING connection thread done. Never erases/joins/detaches:
     // shutdown may be iterating the list concurrently (it never holds
     // clientsMtx_ while joining, so this brief lock cannot deadlock it).
@@ -437,7 +499,7 @@ void IpcServer::retireClient() {
     }
 }
 
-void IpcServer::shutdown() {
+void IpcServer::Impl::shutdown() {
     bool was = running_.exchange(false);
     (void)was;
     stopSource_.request_stop();
