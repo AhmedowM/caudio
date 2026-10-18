@@ -71,6 +71,38 @@ function(caudio_add_component NAME)
   ca_set_warnings(${NAME})
 endfunction()
 
+# D-4: header self-containment. Every public header is compiled as its own
+# translation unit with only include/ on the search path -- no PCH and no
+# other caudio headers pre-included -- so a header that silently leans on
+# another header's includes (or on the component PCH) fails the build instead
+# of leaking the requirement downstream. Compile-only: the objects are never
+# linked. Policy: every include/caudio/**.hpp (and the caudio.hpp umbrella)
+# must stand alone.
+function(caudio_add_header_self_containment)
+  set(_hsc_inc "${CMAKE_CURRENT_SOURCE_DIR}/include")
+  file(GLOB_RECURSE _hsc_headers CONFIGURE_DEPENDS "${_hsc_inc}/caudio/*.hpp")
+  list(APPEND _hsc_headers "${_hsc_inc}/caudio.hpp")
+
+  add_library(caudio_header_self_containment OBJECT)
+  target_include_directories(caudio_header_self_containment PRIVATE
+    "${_hsc_inc}"
+    "${CMAKE_CURRENT_BINARY_DIR}/include")
+  target_compile_features(caudio_header_self_containment PRIVATE cxx_std_23)
+  ca_set_warnings(caudio_header_self_containment)
+
+  set(_hsc_gen "${CMAKE_CURRENT_BINARY_DIR}/header_self_containment")
+  file(MAKE_DIRECTORY "${_hsc_gen}")
+  foreach(_hdr IN LISTS _hsc_headers)
+    file(RELATIVE_PATH _rel "${_hsc_inc}" "${_hdr}")
+    string(REPLACE "\\" "/" _rel "${_rel}")
+    string(REPLACE "/" "_" _stem "${_rel}")
+    string(REPLACE ".hpp" ".cpp" _stem "${_stem}")
+    set(_tu "${_hsc_gen}/${_stem}")
+    file(WRITE "${_tu}" "// D-4: standalone TU for <${_rel}> (generated).\n#include <${_rel}>\n")
+    target_sources(caudio_header_self_containment PRIVATE "${_tu}")
+  endforeach()
+endfunction()
+
 function(caudio_add_shared_variant NAME)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "EXTRA_DEPS")
   add_library(${NAME}_shared SHARED)

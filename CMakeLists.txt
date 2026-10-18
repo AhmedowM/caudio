@@ -819,4 +819,8 @@ if(CAUDIO_ENABLE_TESTS)
     add_test(NAME test_cli_golden COMMAND test_cli_golden)
     set_tests_properties(test_cli_golden PROPERTIES SKIP_RETURN_CODE 4)
   endif()
+
+  # D-4: compile every public header as a standalone TU (build gate, no ctest
+  # entry -- the objects are never linked, only compiled).
+  caudio_add_header_self_containment()
 endif()
