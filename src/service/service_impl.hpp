@@ -14,9 +14,9 @@
 #include <caudio/engine/core.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/ipc/shm_status.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <cstdint>
@@ -33,7 +33,7 @@ struct Service::Impl {
          std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
          std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
          std::string socketPath, std::intptr_t lockFd,
-         std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName);
+         std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName);
 
     caudio::utils::Expected<void> run(std::stop_token st);
     void shutdown();
@@ -153,7 +153,7 @@ struct Service::Impl {
     std::filesystem::path pidPath_;
     std::string socketPath_;
     std::intptr_t lockFd_{-1};
-    std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle_;
+    std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle_;
     std::string shmName_;
     std::atomic<bool> running_{false};
     std::atomic<bool> shutdownRequested_{false};

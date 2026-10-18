@@ -35,6 +35,12 @@ function(caudio_add_component NAME)
     # BASE_DIRS strips the leading modules/ so the install tree gets
     # <prefix>/modules/<component>/*.cppm (not modules/modules/...).
     target_sources(${NAME} PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES ${ARG_MODULE_SOURCES})
+    # A module interface unit must begin with `module;`/`export module`;
+    # forcing the PCH (-include cmake_pch.hxx) ahead of it is ill-formed
+    # (GCC rejects with "module-declaration only permitted as first
+    # declaration"). Keep the PCH for regular TUs, skip it for .cppm.
+    set_source_files_properties(${ARG_MODULE_SOURCES} TARGET_DIRECTORY ${NAME}
+      PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   endif()
   target_include_directories(${NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

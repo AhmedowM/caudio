@@ -3,31 +3,33 @@
 /**
  * @file shm_status.hpp
  * @brief Seqlock shared-memory playback snapshot (daemon writes, clients poll).
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  * @details Lets `Client::snapshotStatus()` read the latest event-driven
  * position/state snapshot without an IPC round-trip. The daemon publishes
  * on dispatch only (no periodic writer), so position can go stale between
- * commands — use the IPC status path when freshness matters. Writers publish
+ * commands -- use the IPC status path when freshness matters. Writers publish
  * (lock-free atomics + seqlock sequence); readers get a plain `ShmStatus`
- * copy. Windows pattern as in `ipc_server.hpp`: local API declarations
- * unless `windows.h` is already included.
+ * copy.
+ *
+ * This is the shared set of types; the writer takes plain data via
+ * `ShmStatusUpdate` so `ipc` never depends on `engine::Engine` (the daemon
+ * extracts the fields). Windows pattern as in `ipc_server.hpp`: local API
+ * declarations unless `windows.h` is already included.
  */
 
 #include <atomic>
-#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <string>
 #include <string_view>
 
-namespace caudio::service {
+namespace caudio::ipc {
 
 /**
  * @brief Plain snapshot copy (no atomics); what readers take home.
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  * @details Strings are fixed `char` arrays (atomics can't hold them);
  * writers publish under an odd seqlock sequence, readers retry on mismatch.
  */
@@ -45,8 +47,25 @@ struct ShmStatus {
 };
 
 /**
+ * @brief Plain data handed to `ShmStatusHandle::publish` by the daemon.
+ * @ingroup caudio_ipc
+ * @details Decouples the writer from `engine::Engine` (the daemon extracts
+ * these fields; `ipc` never sees the engine). `title`/`artist` are views into
+ * caller-owned storage, copied into the fixed arrays under the seqlock.
+ */
+struct ShmStatusUpdate final {
+    double position{0.0}; // current playback position in seconds
+    float volume{1.0f};   // volume 0.0-1.0
+    bool muted{false};    // muted flag
+    int state{0};         // PlaybackState enum (int)
+    int64_t track_id{0};  // current track ID
+    std::string_view title;
+    std::string_view artist;
+};
+
+/**
  * @brief Lock-free shared-memory view (`bit_cast` doubles/floats through integers).
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  * @details Cache-line aligned; fits one page (static_assert below).
  */
 struct alignas(64) AtomicShmStatus {
@@ -67,19 +86,19 @@ static_assert(sizeof(AtomicShmStatus) <= 4096, "AtomicShmStatus should fit in on
 
 /**
  * @brief `bit_cast` atomic helpers for the double/float snapshot fields.
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  */
 inline double atomicLoadDouble(const std::atomic<uint64_t>& a) noexcept;
-/** @ingroup caudio_service */
+/** @ingroup caudio_ipc */
 inline void atomicStoreDouble(std::atomic<uint64_t>& a, double v) noexcept;
-/** @ingroup caudio_service */
+/** @ingroup caudio_ipc */
 inline float atomicLoadFloat(const std::atomic<uint32_t>& a) noexcept;
-/** @ingroup caudio_service */
+/** @ingroup caudio_ipc */
 inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept;
 
 /**
  * @brief RAII owner of the shared-memory segment (creator or reader side).
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  */
 class ShmStatusHandle {
   public:
@@ -87,14 +106,14 @@ class ShmStatusHandle {
 
     /**
      * @brief Creates or opens the segment by name.
-     * @ingroup caudio_service
+     * @ingroup caudio_ipc
      * @param name Platform segment name (derived from the database path).
      * @param create True to create, false to open an existing one.
      */
     static ExpectedShm create(const std::string& name, bool create);
     /**
      * @brief Opens an existing segment read-only (client side).
-     * @ingroup caudio_service
+     * @ingroup caudio_ipc
      */
     static ExpectedShm openReadOnly(const std::string& name);
 
@@ -109,27 +128,27 @@ class ShmStatusHandle {
     /** @brief Move-assigns, transferring the mapping. */
     ShmStatusHandle& operator=(ShmStatusHandle&& other) noexcept;
 
-    /** @brief True when the mapping is live. @ingroup caudio_service */
+    /** @brief True when the mapping is live. @ingroup caudio_ipc */
     bool valid() const noexcept;
-    /** @brief Segment name. @ingroup caudio_service */
+    /** @brief Segment name. @ingroup caudio_ipc */
     const std::string& name() const noexcept;
 
     /**
      * @brief Seqlock reader: returns a snapshot copy of the status.
-     * @ingroup caudio_service
+     * @ingroup caudio_ipc
      */
     ShmStatus snapshot() const;
 
     /**
-     * @brief Seqlock writer: updates all fields atomically.
-     * @ingroup caudio_service
+     * @brief Seqlock writer: publishes position/volume/state/track/title/artist.
+     * @ingroup caudio_ipc
+     * @param u Plain data; no `engine::Engine` needed at this layer.
      */
-    void updateFromEngine(const caudio::engine::Engine& eng, int64_t track_id,
-                          std::string_view title, std::string_view artist);
+    void publish(const ShmStatusUpdate& u) noexcept;
 
-    /** @ingroup caudio_service */
+    /** @ingroup caudio_ipc */
     void setDuration(double dur) noexcept;
-    /** @ingroup caudio_service */
+    /** @ingroup caudio_ipc */
     void setQueueSize(size_t sz) noexcept;
 
   private:
@@ -147,10 +166,10 @@ class ShmStatusHandle {
 
 /**
  * @brief Creates the daemon-side status segment for a database hash.
- * @ingroup caudio_service
+ * @ingroup caudio_ipc
  * @param hash Database identity hash (from the db path).
  * @param create True to create, false to open.
  */
 ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, bool create);
 
-} // namespace caudio::service
+} // namespace caudio::ipc

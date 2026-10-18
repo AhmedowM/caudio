@@ -4,7 +4,7 @@
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/shm_status.hpp>
+#include <caudio/ipc/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
@@ -128,7 +128,7 @@ caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
     // Derive shm name via canonical hex8 (consistent with service)
     std::string shmName = caudio::config::detail_paths::hex8ForDb(config_.dbPath);
 
-    auto shmRes = caudio::service::ShmStatusHandle::openReadOnly(shmName);
+    auto shmRes = caudio::ipc::ShmStatusHandle::openReadOnly(shmName);
     if (shmRes) {
         auto snapshot = shmRes->snapshot();
         caudio::ipc::Status s{};

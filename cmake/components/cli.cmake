@@ -6,10 +6,12 @@ set(CAUDIO_IPC_MODULE_SOURCES
   modules/caudio/ipc/command.cppm
   modules/caudio/ipc/result.cppm
   modules/caudio/ipc/protocol.cppm
+  modules/caudio/ipc/shm_status.cppm
   modules/caudio/config.cppm
 )
 set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
+  src/ipc/shm_status.cpp
   src/config.cpp
 )
 caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::db caudio::utils Threads::Threads INCLUDES vendor)
@@ -23,14 +25,12 @@ target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/caudio/service.cppm
   modules/caudio/service/core.cppm
-  modules/caudio/service/shm_status.cppm
   modules/caudio/service/ipc_channel.cppm
   modules/caudio/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_channel.cpp
   src/service/ipc_server.cpp
-  src/service/shm_status.cpp
   src/service/service_paths.cpp
   src/service/service_status.cpp
   src/service/service_audio.cpp
@@ -75,11 +75,11 @@ set(CAUDIO_CLIENT_SOURCES
   src/client/client_impl.cpp
   src/client/output_formatter.cpp
 )
-caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::ipc caudio::utils caudio::service Threads::Threads INCLUDES vendor)
+caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::ipc caudio::utils Threads::Threads INCLUDES vendor)
 ca_set_module_warnings(client)
 if(CAUDIO_ENABLE_MODULES)
   target_compile_options(client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
 endif()
 if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(client EXTRA_DEPS caudio::ipc caudio::utils_shared caudio::service_shared Threads::Threads)
+  caudio_add_shared_variant(client EXTRA_DEPS caudio::ipc caudio::utils_shared Threads::Threads)
 endif()

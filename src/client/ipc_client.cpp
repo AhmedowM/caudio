@@ -22,6 +22,11 @@
 #include <string>
 #include <utility>
 #include <vector>
+#ifndef _WIN32
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <unistd.h>
+#endif
 
 namespace caudio::client {
 

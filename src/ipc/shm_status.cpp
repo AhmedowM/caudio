@@ -1,8 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <bit>
-#include <caudio/engine/core.hpp>
-#include <caudio/service/shm_status.hpp>
+#include <caudio/ipc/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/windows_fwd.hpp>
@@ -21,7 +20,7 @@
 #include <unistd.h>
 #endif
 
-namespace caudio::service {
+namespace caudio::ipc {
 
 // Helpers for bit_cast atomic operations
 double atomicLoadDouble(const std::atomic<uint64_t>& a) noexcept {
@@ -53,7 +52,7 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
             caudio::utils::makeError(caudio::utils::StatusCode::Io,
                                      "shm_open failed: " + std::string(std::strerror(errno)))};
     }
-    handle.fd_ = fd;
+    handle.handle_ = fd;
 
     if (create) {
         if (::ftruncate(fd, sizeof(AtomicShmStatus)) != 0) {
@@ -190,9 +189,8 @@ ShmStatus ShmStatusHandle::snapshot() const {
     return out;
 }
 
-// Seqlock writer: updates all fields atomically
-void ShmStatusHandle::updateFromEngine(const caudio::engine::Engine& eng, int64_t track_id,
-                                       std::string_view title, std::string_view artist) {
+// Seqlock writer: publishes the plain update under an odd/even sequence.
+void ShmStatusHandle::publish(const ShmStatusUpdate& u) noexcept {
     if (!map_)
         return;
     AtomicShmStatus* s = map_;
@@ -205,21 +203,21 @@ void ShmStatusHandle::updateFromEngine(const caudio::engine::Engine& eng, int64_
     s->seq.store(old + 1, std::memory_order_release);
     std::atomic_thread_fence(std::memory_order_release);
 
-    atomicStoreDouble(s->position, eng.position());
-    atomicStoreFloat(s->volume, eng.volume());
-    s->state.store(static_cast<int>(eng.state()), std::memory_order_relaxed);
-    s->track_id.store(track_id, std::memory_order_relaxed);
-    s->muted.store(eng.volume() == 0.0f, std::memory_order_relaxed);
+    atomicStoreDouble(s->position, u.position);
+    atomicStoreFloat(s->volume, u.volume);
+    s->state.store(u.state, std::memory_order_relaxed);
+    s->track_id.store(u.track_id, std::memory_order_relaxed);
+    s->muted.store(u.muted, std::memory_order_relaxed);
 
     // Copy strings with bounds checking
-    if (!title.empty()) {
-        std::size_t n = std::min(title.size(), sizeof(s->title) - 1);
-        std::memcpy(s->title, title.data(), n);
+    if (!u.title.empty()) {
+        std::size_t n = std::min(u.title.size(), sizeof(s->title) - 1);
+        std::memcpy(s->title, u.title.data(), n);
         s->title[n] = '\0';
     }
-    if (!artist.empty()) {
-        std::size_t n = std::min(artist.size(), sizeof(s->artist) - 1);
-        std::memcpy(s->artist, artist.data(), n);
+    if (!u.artist.empty()) {
+        std::size_t n = std::min(u.artist.size(), sizeof(s->artist) - 1);
+        std::memcpy(s->artist, u.artist.data(), n);
         s->artist[n] = '\0';
     }
 
@@ -266,4 +264,4 @@ ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, bool creat
     return ShmStatusHandle::create(hash, create);
 }
 
-} // namespace caudio::service
+} // namespace caudio::ipc

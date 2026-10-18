@@ -18,7 +18,7 @@
 - **Queue & Playlist** -- SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
 - **FTS5 search** -- `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
 - **Fingerprint dedup** -- BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cpp`), sampled/full scan modes
-- **SHM status at 10 Hz** -- lock-free `AtomicShmStatus` shared-memory block polled by TUIs (`src/service/shm_status.cpp`)
+- **SHM status at 10 Hz** -- lock-free `AtomicShmStatus` shared-memory block polled by TUIs (`src/ipc/shm_status.cpp`)
 - **Daemon lifecycle** -- single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, live `STATUS` via `--watch`
 
 ## Quickstart

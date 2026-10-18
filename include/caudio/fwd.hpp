@@ -53,11 +53,11 @@ class AudioOutput;
 namespace caudio::service {
 class IpcServer;
 class Service;
-class ShmStatusHandle;
 } // namespace caudio::service
 
 namespace caudio::ipc {
 struct Status;
+class ShmStatusHandle;
 } // namespace caudio::ipc
 
 namespace caudio::types {

@@ -126,7 +126,7 @@ class Service final {
      * @brief Get the shared memory status handle (if available).
      * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
      */
-    caudio::service::ShmStatusHandle* shmHandle() noexcept;
+    caudio::ipc::ShmStatusHandle* shmHandle() noexcept;
 
   private:
     /**
@@ -136,7 +136,7 @@ class Service final {
             std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
             std::string socketPath, std::intptr_t lockFd,
-            std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName);
+            std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName);
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

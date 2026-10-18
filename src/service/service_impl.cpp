@@ -12,9 +12,9 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/ipc/shm_status.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
-#include <caudio/service/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/log_sink.hpp>
@@ -187,15 +187,15 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // Create shared memory status block for event-driven status snapshots
     // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
     std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
-    auto shmRes = caudio::service::createShmStatus(shmName, true);
+    auto shmRes = caudio::ipc::createShmStatus(shmName, true);
     if (!shmRes) {
         // Non-fatal: continue without shm (clients fall back to IPC status).
         loggerPtr->warn("shm status unavailable: {} (falling back to IPC status)",
                         shmRes.error().message);
     }
-    std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle;
+    std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle;
     if (shmRes)
-        shmHandle = std::make_unique<caudio::service::ShmStatusHandle>(std::move(*shmRes));
+        shmHandle = std::make_unique<caudio::ipc::ShmStatusHandle>(std::move(*shmRes));
 
     auto svc = std::unique_ptr<Service>(
         new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath,
@@ -210,7 +210,7 @@ Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database>
                  std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                  std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                  std::string socketPath, std::intptr_t lockFd,
-                 std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle, std::string shmName)
+                 std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName)
     : impl_(std::make_unique<Impl>(cfg, std::move(db), std::move(eng), std::move(srv),
                                    std::move(logger), std::move(pidPath), std::move(socketPath),
                                    lockFd, std::move(shmHandle), std::move(shmName))) {}
@@ -219,8 +219,7 @@ Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Databa
                     std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                     std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                     std::string socketPath, std::intptr_t lockFd,
-                    std::unique_ptr<caudio::service::ShmStatusHandle> shmHandle,
-                    std::string shmName)
+                    std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName)
     : config_(cfg), db_(std::move(db)), engine_(std::move(eng)), server_(std::move(srv)),
       logger_(std::move(logger)), pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)),
       lockFd_(lockFd), shmHandle_(std::move(shmHandle)), shmName_(std::move(shmName)) {}
@@ -329,7 +328,7 @@ const std::string& Service::shmName() const noexcept {
  * @brief Get the shared memory status handle (if available).
  * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
  */
-caudio::service::ShmStatusHandle* Service::shmHandle() noexcept {
+caudio::ipc::ShmStatusHandle* Service::shmHandle() noexcept {
     return impl_->shmHandle_.get();
 }
 
@@ -355,7 +354,15 @@ void Service::Impl::updateShmStatus() {
         int64_t aq = eng.activeQueueId();
         qSize = db_->queueCountLocked(aq);
     }
-    shmHandle_->updateFromEngine(eng, track_id, title, artist);
+    caudio::ipc::ShmStatusUpdate u{};
+    u.position = eng.position();
+    u.volume = eng.volume();
+    u.muted = (eng.volume() == 0.0f);
+    u.state = static_cast<int>(eng.state());
+    u.track_id = track_id;
+    u.title = title;
+    u.artist = artist;
+    shmHandle_->publish(u);
     shmHandle_->setQueueSize(qSize);
     if (track_id != 0) {
         shmHandle_->setDuration(duration);
