@@ -27,11 +27,8 @@
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <memory>
-#include <mutex>
 #include <span>
 #include <vector>
 
@@ -147,10 +144,10 @@ class FileReader final : public Reader {
     [[nodiscard]] int64_t size() noexcept override;
 
   private:
-    explicit FileReader(FILE* f);
-    FILE* file_{nullptr};
-    int64_t fileSize_{-1};
-    mutable std::mutex seekMutex_{};
+    struct FileToken {};
+    explicit FileReader(FileToken token);
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 /**

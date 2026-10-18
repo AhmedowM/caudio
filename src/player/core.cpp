@@ -10,6 +10,7 @@
 #include <caudio/utils/ring.hpp>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -17,6 +18,7 @@
 #include <mutex>
 #include <span>
 #include <stop_token>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
@@ -24,11 +26,60 @@
 
 namespace caudio::player {
 
-Player::Player() = default;
+/// Player state and playback components, hidden from the public header.
+struct Player::Impl {
+    // Configuration
+    uint32_t sampleRate_{48000};
+    uint32_t channels_{2};
+
+    // Playback components
+    std::unique_ptr<Reader> reader_;
+    std::unique_ptr<Decoder> decoder_;
+    std::unique_ptr<caudio::utils::SpscRing<float>> ring_;
+    std::unique_ptr<AudioOutput> output_;
+
+    // Threading
+    std::jthread decodeThread_;
+    std::mutex cvMutex_;
+    std::condition_variable cv_;
+    std::mutex openMutex_;
+
+    // Atomic state (C ca_player.c atomic fields)
+    std::atomic<State> state_{State::Stopped};
+    std::atomic<uint64_t> posBase_{0};
+    std::atomic<int64_t> posStartMs_{0};
+    std::atomic<bool> isPlaying_{false};
+    std::atomic<bool> openGate_{false};
+    std::atomic<bool> decodeBusy_{false};
+    std::atomic<float> volume_{1.0f};
+
+    std::string lastError_;
+    caudio::utils::Logger* logger_{nullptr};
+
+    bool init(const PlayerOpts& opts);
+    Player::ExpectedVoid open(std::string_view path);
+    Player::ExpectedVoid openReader(std::unique_ptr<Reader> reader);
+    Player::ExpectedVoid play();
+    Player::ExpectedVoid pause();
+    Player::ExpectedVoid resume();
+    Player::ExpectedVoid stop();
+    Player::ExpectedVoid seek(double seconds);
+    Player::ExpectedVoid setVolume(float volume);
+    [[nodiscard]] State state() const noexcept;
+    [[nodiscard]] std::chrono::duration<double> position() const noexcept;
+    [[nodiscard]] std::string_view lastError() const noexcept;
+
+    Player::ExpectedVoid stopInternal();
+    void preroll();
+    void decodeLoop(std::stop_token st);
+    static int64_t nowMs() noexcept;
+};
+
+Player::Player() : impl_(std::make_unique<Impl>()) {}
 
 Player::ExpectedPlayer Player::create(const PlayerOpts& opts) {
     auto p = std::unique_ptr<Player>(new Player());
-    if (!p->init(opts)) {
+    if (!p->impl_->init(opts)) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
                                                     std::string_view("player init failed")});
     }
@@ -36,15 +87,72 @@ Player::ExpectedPlayer Player::create(const PlayerOpts& opts) {
 }
 
 Player::~Player() {
-    (void)stop();
-    if (decodeThread_.joinable()) {
-        decodeThread_.request_stop();
-        cv_.notify_all();
-        decodeThread_.join();
+    (void)impl_->stop();
+    if (impl_->decodeThread_.joinable()) {
+        impl_->decodeThread_.request_stop();
+        impl_->cv_.notify_all();
+        impl_->decodeThread_.join();
     }
 }
 
 Player::ExpectedVoid Player::open(std::string_view path) {
+    return impl_->open(path);
+}
+
+Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
+    return impl_->openReader(std::move(reader));
+}
+
+Player::ExpectedVoid Player::play() {
+    return impl_->play();
+}
+
+Player::ExpectedVoid Player::pause() {
+    return impl_->pause();
+}
+
+Player::ExpectedVoid Player::resume() {
+    return impl_->resume();
+}
+
+Player::ExpectedVoid Player::stop() {
+    return impl_->stop();
+}
+
+Player::ExpectedVoid Player::seek(double seconds) {
+    return impl_->seek(seconds);
+}
+
+Player::ExpectedVoid Player::setVolume(float volume) {
+    return impl_->setVolume(volume);
+}
+
+State Player::state() const noexcept {
+    return impl_->state();
+}
+
+std::chrono::duration<double> Player::position() const noexcept {
+    return impl_->position();
+}
+
+std::string_view Player::lastError() const noexcept {
+    return impl_->lastError();
+}
+
+bool Player::Impl::init(const PlayerOpts& opts) {
+    sampleRate_ = opts.sampleRate ? opts.sampleRate : 48000;
+    channels_ = opts.channels ? opts.channels : 2;
+    logger_ = opts.logger;
+    volume_.store(1.0f, std::memory_order_relaxed);
+    state_.store(State::Stopped, std::memory_order_relaxed);
+
+    // Start decode thread
+    decodeThread_ = std::jthread([this](std::stop_token st) { decodeLoop(st); });
+
+    return true;
+}
+
+Player::ExpectedVoid Player::Impl::open(std::string_view path) {
     if (path.empty()) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("empty path")});
@@ -63,7 +171,7 @@ Player::ExpectedVoid Player::open(std::string_view path) {
     return rRes;
 }
 
-Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
+Player::ExpectedVoid Player::Impl::openReader(std::unique_ptr<Reader> reader) {
     if (!reader) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("null reader")});
@@ -134,7 +242,7 @@ Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
     return {};
 }
 
-Player::ExpectedVoid Player::play() {
+Player::ExpectedVoid Player::Impl::play() {
     if (!decoder_ || !output_ || !ring_) {
         return std::unexpected(
             caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not opened")});
@@ -165,7 +273,7 @@ Player::ExpectedVoid Player::play() {
     return {};
 }
 
-Player::ExpectedVoid Player::pause() {
+Player::ExpectedVoid Player::Impl::pause() {
     State expected = State::Playing;
     if (!state_.compare_exchange_strong(expected, State::Paused, std::memory_order_acq_rel)) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::State,
@@ -188,7 +296,7 @@ Player::ExpectedVoid Player::pause() {
     return {};
 }
 
-Player::ExpectedVoid Player::resume() {
+Player::ExpectedVoid Player::Impl::resume() {
     State expected = State::Paused;
     if (!state_.compare_exchange_strong(expected, State::Playing, std::memory_order_acq_rel)) {
         return std::unexpected(
@@ -208,12 +316,12 @@ Player::ExpectedVoid Player::resume() {
     return {};
 }
 
-Player::ExpectedVoid Player::stop() {
+Player::ExpectedVoid Player::Impl::stop() {
     std::lock_guard<std::mutex> lk(openMutex_);
     return stopInternal();
 }
 
-Player::ExpectedVoid Player::seek(double seconds) {
+Player::ExpectedVoid Player::Impl::seek(double seconds) {
     if (!decoder_ || !ring_) {
         return std::unexpected(
             caudio::utils::Error{caudio::utils::StatusCode::State, std::string_view("not opened")});
@@ -250,7 +358,7 @@ Player::ExpectedVoid Player::seek(double seconds) {
     return {};
 }
 
-Player::ExpectedVoid Player::setVolume(float volume) {
+Player::ExpectedVoid Player::Impl::setVolume(float volume) {
     if (std::isnan(volume) || std::isinf(volume)) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("bad volume")});
@@ -263,11 +371,11 @@ Player::ExpectedVoid Player::setVolume(float volume) {
     return {};
 }
 
-State Player::state() const noexcept {
+State Player::Impl::state() const noexcept {
     return state_.load(std::memory_order_acquire);
 }
 
-std::chrono::duration<double> Player::position() const noexcept {
+std::chrono::duration<double> Player::Impl::position() const noexcept {
     State s = state_.load(std::memory_order_acquire);
     if (s == State::Stopped || s == State::Error) {
         return std::chrono::duration<double>(0.0);
@@ -286,24 +394,11 @@ std::chrono::duration<double> Player::position() const noexcept {
     return std::chrono::duration<double>(static_cast<double>(base) / sampleRate_);
 }
 
-std::string_view Player::lastError() const noexcept {
+std::string_view Player::Impl::lastError() const noexcept {
     return lastError_;
 }
 
-bool Player::init(const PlayerOpts& opts) {
-    sampleRate_ = opts.sampleRate ? opts.sampleRate : 48000;
-    channels_ = opts.channels ? opts.channels : 2;
-    logger_ = opts.logger;
-    volume_.store(1.0f, std::memory_order_relaxed);
-    state_.store(State::Stopped, std::memory_order_relaxed);
-
-    // Start decode thread
-    decodeThread_ = std::jthread([this](std::stop_token st) { decodeLoop(st); });
-
-    return true;
-}
-
-Player::ExpectedVoid Player::stopInternal() {
+Player::ExpectedVoid Player::Impl::stopInternal() {
     State s = state_.load(std::memory_order_acquire);
     if (s == State::Stopped && !decoder_) {
         return {};
@@ -327,7 +422,7 @@ Player::ExpectedVoid Player::stopInternal() {
     return {};
 }
 
-void Player::preroll() {
+void Player::Impl::preroll() {
     if (!decoder_ || !ring_)
         return;
 
@@ -356,7 +451,7 @@ void Player::preroll() {
     }
 }
 
-void Player::decodeLoop(std::stop_token st) {
+void Player::Impl::decodeLoop(std::stop_token st) {
     constexpr std::size_t kMaxChunkFrames = 1024;
     // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
     std::vector<float> scratch;
@@ -422,7 +517,7 @@ void Player::decodeLoop(std::stop_token st) {
     }
 }
 
-int64_t Player::nowMs() noexcept {
+int64_t Player::Impl::nowMs() noexcept {
     using namespace std::chrono;
     return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 }

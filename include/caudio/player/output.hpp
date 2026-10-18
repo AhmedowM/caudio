@@ -29,23 +29,14 @@
  * - NoMem: Allocation failure
  */
 
-#include <atomic>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/ring.hpp>
 #include <cstdint>
 #include <expected>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
-
-/// Opaque miniaudio device handle; full type visible only in output.cpp.
-struct ma_device;
-
-namespace caudio::utils {
-// Full type in utils/log.hpp; AudioOutput holds it non-owning only.
-class Logger;
-} // namespace caudio::utils
 
 namespace caudio::player {
 
@@ -157,7 +148,7 @@ class AudioOutput {
     };
 
     /** @brief Default-constructs an uninitialized output; use create(). */
-    AudioOutput() = default;
+    AudioOutput();
 
     /** @brief Shuts down the device. */
     ~AudioOutput();
@@ -274,16 +265,9 @@ class AudioOutput {
     bool init(const Config& cfg);
 
   private:
-    /// Audio-thread entry point (backend trampoline); defined in output.cpp.
-    static void dataCallback(struct ma_device* pDevice, void* pOutput, const void* pInput,
-                             std::uint32_t frameCount);
-    /// Opaque audio backend (miniaudio device); defined in output.cpp.
-    struct DeviceState;
-    Config cfg_;
-    std::unique_ptr<DeviceState> device_;
-    std::atomic<float> volume_{1.0f};
-    std::atomic<bool> running_{false};
-    std::atomic<bool> initialized_{false};
+    /// Opaque audio backend (miniaudio device) and mutable state, defined in output.cpp.
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::player

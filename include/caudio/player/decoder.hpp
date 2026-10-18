@@ -27,7 +27,7 @@
  * sampleRate(), channels() and totalFrames() are thread-safe (const noexcept).
  */
 
-#include <caudio/player/reader.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -35,11 +35,6 @@
 #include <span>
 #include <string>
 #include <string_view>
-
-namespace caudio::utils {
-// Full type in utils/log.hpp; Decoder holds it non-owning only.
-class Logger;
-} // namespace caudio::utils
 
 namespace caudio::player {
 

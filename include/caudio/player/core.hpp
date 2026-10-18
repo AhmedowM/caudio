@@ -38,31 +38,15 @@
  * - Seeking uses stream time_base for accurate container positioning
  */
 
-#include <atomic>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/ring.hpp>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <expected>
 #include <memory>
-#include <mutex>
-#include <stop_token>
-#include <string>
 #include <string_view>
-#include <thread>
-
-namespace caudio::utils {
-// Full type in utils/log.hpp; Player holds it non-owning only.
-class Logger;
-} // namespace caudio::utils
 
 namespace caudio::player {
-// Decoder/Reader/AudioOutput live in their own public headers; Player holds
-// them by unique_ptr only (ctor/dtor out-of-line), so declarations suffice.
-class Reader;
-class Decoder;
-class AudioOutput;
 
 /**
  * @enum State
@@ -311,117 +295,9 @@ class Player {
     /** @brief Private default ctor; use create() factory. */
     Player();
 
-    /**
-     * @brief Initialize player with options
-     * @param opts Configuration options
-     * @return true on success, false on failure
-     *
-     * Sets up sample rate, channels, volume, and starts the decode thread.
-     * Called by create() during factory construction.
-     *
-     * Thread Safety: Called once during construction (single-threaded)
-     */
-    bool init(const PlayerOpts& opts);
-
-    /**
-     * @brief Internal stop implementation (no mutex)
-     * @return void on success, Error on failure
-     *
-     * Stops playback, resets all state, and wakes the decode thread.
-     * Called by public stop() and openReader() (which holds openMutex_).
-     *
-     * Thread Safety: Must be called with openMutex_ held
-     */
-    ExpectedVoid stopInternal();
-
-    /**
-     * @brief Preroll ring buffer before playback starts
-     *
-     * Fills the ring buffer to half capacity (cap/2) by decoding
-     * initial audio frames. This ensures immediate audio output when
-     * play() starts the audio device, achieving gapless startup.
-     *
-     * Chunk size follows C ca_player.c: min(avail, 1024, 2048/channels)
-     *
-     * Thread Safety: Called from control thread during open() (single-threaded)
-     */
-    void preroll();
-
-    /**
-     * @brief Decode thread main loop
-     * @param st Stop token for graceful shutdown
-     *
-     * Runs on dedicated jthread. Waits for openGate and decodeBusy signals,
-     * then decodes audio frames into the ring buffer. Handles:
-     * - Ring buffer backpressure (sleeps when full)
-     * - EOF detection (transitions to Stopped)
-     * - Dynamic chunk sizing based on available space and channel count
-     *
-     * Chunk size: min(available, 1024, 2048/channels) frames per iteration
-     *
-     * Thread Safety: Runs on decode thread only. Synchronizes with control
-     * thread via atomics (openGate, decodeBusy, isPlaying) and cv_.
-     */
-    void decodeLoop(std::stop_token st);
-
-    /**
-     * @brief Get current time in milliseconds (monotonic)
-     * @return Milliseconds since epoch (steady_clock)
-     *
-     * Used for position tracking and elapsed time calculations.
-     * steady_clock ensures monotonicity across system time changes.
-     *
-     * Thread Safety: Thread-safe (pure function)
-     */
-    static int64_t nowMs() noexcept;
-
-    // Configuration
-    /// Output sample rate (from decoder or opts)
-    uint32_t sampleRate_{48000};
-    /// Output channel count (from decoder or opts)
-    uint32_t channels_{2};
-
-    // Playback components
-    /// Input reader (FileReader, MemoryReader, etc.)
-    std::unique_ptr<Reader> reader_;
-    /// Format decoder (FFmpeg, etc.)
-    std::unique_ptr<Decoder> decoder_;
-    /// Lock-free SPSC ring buffer for decode/audio thread communication
-    std::unique_ptr<caudio::utils::SpscRing<float>> ring_;
-    /// Audio output device (miniaudio)
-    std::unique_ptr<AudioOutput> output_;
-
-    // Threading
-    /// Dedicated decode thread
-    std::jthread decodeThread_;
-    /// Mutex for condition variable
-    std::mutex cvMutex_;
-    /// Condition variable for decode thread wakeup
-    std::condition_variable cv_;
-    /// Mutex for open/stop mutual exclusion
-    std::mutex openMutex_;
-
-    // Atomic state (C ca_player.c atomic fields)
-    /// Current playback state
-    std::atomic<State> state_{State::Stopped};
-    /// Frame position base (at last seek/start)
-    std::atomic<uint64_t> posBase_{0};
-    /// Milliseconds when playback started (0 if paused/stopped)
-    std::atomic<int64_t> posStartMs_{0};
-    /// True when actively playing (audio device running)
-    std::atomic<bool> isPlaying_{false};
-    /// True when player is open (decoder/reader/output valid)
-    std::atomic<bool> openGate_{false};
-    /// True when decode thread should decode
-    std::atomic<bool> decodeBusy_{false};
-    /// Current volume (0.0 to 1.0)
-    std::atomic<float> volume_{1.0f};
-
-    /// Last error message (for lastError())
-    std::string lastError_;
-
-    /// Non-owning log sink from PlayerOpts (null = silent). See PlayerOpts::logger.
-    caudio::utils::Logger* logger_{nullptr};
+    /// Opaque implementation holding the playback components and state.
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::player

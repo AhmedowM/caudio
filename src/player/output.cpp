@@ -19,8 +19,17 @@
 
 namespace caudio::player {
 
-struct AudioOutput::DeviceState {
+/// miniaudio playback device and mutable control flags, hidden from the header.
+struct AudioOutput::Impl {
+    AudioOutput::Config cfg;
     ma_device device{};
+    std::atomic<float> volume{1.0f};
+    std::atomic<bool> running{false};
+    std::atomic<bool> initialized{false};
+
+    /// Audio-thread entry point (backend trampoline).
+    static void dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
+                             ma_uint32 frameCount);
 };
 
 DeviceList enumerateDevices() {
@@ -56,6 +65,8 @@ DeviceList enumerateDevices() {
     return list;
 }
 
+AudioOutput::AudioOutput() : impl_(std::make_unique<Impl>()) {}
+
 AudioOutput::~AudioOutput() {
     shutdown();
 }
@@ -67,17 +78,16 @@ AudioOutput::Expected AudioOutput::create(const Config& cfg) {
             caudio::utils::StatusCode::Device, std::string_view("miniaudio device init failed")});
     }
     if (cfg.logger)
-        cfg.logger->debug("audio output opened rate={} channels={}", cfg.sampleRate,
-                          cfg.channels);
+        cfg.logger->debug("audio output opened rate={} channels={}", cfg.sampleRate, cfg.channels);
     return out;
 }
 
 void AudioOutput::setVolume(float vol) {
-    volume_.store(caudio::utils::clampVolume(vol), std::memory_order_relaxed);
+    impl_->volume.store(caudio::utils::clampVolume(vol), std::memory_order_relaxed);
 }
 
 float AudioOutput::volume() const noexcept {
-    return volume_.load(std::memory_order_relaxed);
+    return impl_->volume.load(std::memory_order_relaxed);
 }
 
 void AudioOutput::fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
@@ -100,72 +110,72 @@ void AudioOutput::fillFromRing(std::span<float> out, caudio::utils::SpscRing<flo
 }
 
 bool AudioOutput::isPlaying() const noexcept {
-    return running_.load(std::memory_order_acquire);
+    return impl_->running.load(std::memory_order_acquire);
 }
 
 void AudioOutput::start() {
-    if (!initialized_.load(std::memory_order_acquire))
+    if (!impl_->initialized.load(std::memory_order_acquire))
         return;
     bool expected = false;
-    if (running_.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-        ma_device_start(&device_->device);
+    if (impl_->running.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+        ma_device_start(&impl_->device);
     }
 }
 
 void AudioOutput::stop() {
     bool expected = true;
-    if (running_.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
-        ma_device_stop(&device_->device);
+    if (impl_->running.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
+        ma_device_stop(&impl_->device);
     }
 }
 
 void AudioOutput::shutdown() noexcept {
     stop();
-    if (initialized_.exchange(false, std::memory_order_acq_rel)) {
-        ma_device_uninit(&device_->device);
+    if (impl_->initialized.exchange(false, std::memory_order_acq_rel)) {
+        ma_device_uninit(&impl_->device);
     }
 }
 
 bool AudioOutput::init(const Config& cfg) {
     if (cfg.channels == 0 || cfg.channels > 32 || cfg.sampleRate == 0)
         return false;
-    cfg_ = cfg;
+    impl_->cfg = cfg;
     float v = caudio::utils::clampVolume(cfg.volume);
-    volume_.store(v, std::memory_order_relaxed);
-    device_ = std::make_unique<DeviceState>();
+    impl_->volume.store(v, std::memory_order_relaxed);
 
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
     deviceConfig.playback.format = ma_format_f32;
     deviceConfig.playback.channels = cfg.channels;
     deviceConfig.sampleRate = cfg.sampleRate;
-    deviceConfig.dataCallback = &AudioOutput::dataCallback;
-    deviceConfig.pUserData = this;
+    deviceConfig.dataCallback = &Impl::dataCallback;
+    deviceConfig.pUserData = impl_.get();
 
-    ma_result res = ma_device_init(nullptr, &deviceConfig, &device_->device);
+    ma_result res = ma_device_init(nullptr, &deviceConfig, &impl_->device);
     if (res != MA_SUCCESS) {
         return false;
     }
-    initialized_.store(true, std::memory_order_release);
+    impl_->initialized.store(true, std::memory_order_release);
 
     // @pre caller must start() after preroll, cap/2 frames
-    running_.store(false, std::memory_order_release);
+    impl_->running.store(false, std::memory_order_release);
 
     return true;
 }
 
-void AudioOutput::dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
-                               ma_uint32 frameCount) {
+void AudioOutput::Impl::dataCallback(ma_device* pDevice, void* pOutput, const void* pInput,
+                                     ma_uint32 frameCount) {
     (void)pInput;
-    auto* self = static_cast<AudioOutput*>(pDevice->pUserData);
+    auto* self = static_cast<Impl*>(pDevice->pUserData);
     if (!self)
         return;
 
     float* output = static_cast<float*>(pOutput);
     ma_uint32 channels = pDevice->playback.channels;
     ma_uint32 totalSamples = frameCount * channels;
-    float vol = self->volume_.load(std::memory_order_relaxed);
+    float vol = self->volume.load(std::memory_order_relaxed);
     // lock-free, no allocation
-    fillFromRing(std::span<float>(output, totalSamples), self->cfg_.ring, channels, vol);
+    AudioOutput::fillFromRing(std::span<float>(output, totalSamples), self->cfg.ring, channels,
+                              vol);
 }
 
 } // namespace caudio::player

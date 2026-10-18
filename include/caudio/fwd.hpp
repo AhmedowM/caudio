@@ -9,6 +9,8 @@
  * blocks. Include this instead of re-declaring in each header.
  */
 
+#include <type_traits>
+
 struct sqlite3;
 struct sqlite3_stmt;
 
@@ -53,6 +55,9 @@ class OutputFormatter;
 namespace caudio::utils {
 template <typename T>
 class MpscQueue;
+template <typename T>
+    requires std::is_trivially_copyable_v<T>
+class SpscRing;
 class Logger;
 class Json;
 class JsonRef;

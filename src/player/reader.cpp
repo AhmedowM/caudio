@@ -55,6 +55,13 @@ int64_t fileSizeInner(FILE* f) noexcept {
 }
 } // namespace detail
 
+/// File handle, cached size and seek lock, hidden from the public header.
+struct FileReader::Impl {
+    FILE* file = nullptr;
+    int64_t fileSize = -1;
+    mutable std::mutex seekMutex;
+};
+
 caudio::utils::Expected<std::unique_ptr<Reader>>
 FileReader::open(const std::filesystem::path& path) {
     if (path.empty()) {
@@ -94,37 +101,38 @@ FileReader::open(const std::filesystem::path& path) {
                                                     std::string_view("fseek failed")});
     }
     // Wrap immediately in unique_ptr so FILE* is owned even if Expected construction throws
-    auto holder = std::unique_ptr<FileReader>(new FileReader(f));
-    holder->fileSize_ = sz;
+    auto holder = std::unique_ptr<FileReader>(new FileReader(FileToken{}));
+    holder->impl_->file = f;
+    holder->impl_->fileSize = sz;
     std::unique_ptr<Reader> base = std::move(holder);
     return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
 }
 
 FileReader::~FileReader() {
-    if (file_)
-        std::fclose(file_);
+    if (impl_->file)
+        std::fclose(impl_->file);
 }
 
 std::size_t FileReader::read(std::span<std::byte> dst) {
-    if (!file_ || dst.empty())
+    if (!impl_->file || dst.empty())
         return 0;
-    return std::fread(dst.data(), 1, dst.size(), file_);
+    return std::fread(dst.data(), 1, dst.size(), impl_->file);
 }
 
 caudio::utils::Expected<void> FileReader::seek(int64_t offset, int whence) {
-    if (!file_)
+    if (!impl_->file)
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("null file")});
     if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("bad whence")});
     }
-    std::lock_guard<std::mutex> lock(seekMutex_);
-    int64_t cur = detail::ftell64(file_);
+    std::lock_guard<std::mutex> lock(impl_->seekMutex);
+    int64_t cur = detail::ftell64(impl_->file);
     if (cur < 0)
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Internal,
                                                     std::string_view("ftell failed")});
-    int64_t sz = fileSize_;
+    int64_t sz = impl_->fileSize;
     if (sz < 0)
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Internal,
                                                     std::string_view("size not cached")});
@@ -148,7 +156,7 @@ caudio::utils::Expected<void> FileReader::seek(int64_t offset, int whence) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("seek out of range")});
     }
-    if (detail::fseek64(file_, newPos, SEEK_SET) != 0) {
+    if (detail::fseek64(impl_->file, newPos, SEEK_SET) != 0) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Internal,
                                                     std::string_view("fseek failed")});
     }
@@ -156,17 +164,17 @@ caudio::utils::Expected<void> FileReader::seek(int64_t offset, int whence) {
 }
 
 int64_t FileReader::tell() noexcept {
-    if (!file_)
+    if (!impl_->file)
         return -1;
-    std::lock_guard<std::mutex> lock(seekMutex_);
-    return detail::ftell64(file_);
+    std::lock_guard<std::mutex> lock(impl_->seekMutex);
+    return detail::ftell64(impl_->file);
 }
 
 int64_t FileReader::size() noexcept {
-    return fileSize_;
+    return impl_->fileSize;
 }
 
-FileReader::FileReader(FILE* f) : file_(f) {}
+FileReader::FileReader(FileToken) : impl_(std::make_unique<Impl>()) {}
 
 caudio::utils::Expected<std::unique_ptr<Reader>>
 MemoryReader::open(std::span<const std::byte> data) {
