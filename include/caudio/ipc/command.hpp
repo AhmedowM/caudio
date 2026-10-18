@@ -22,7 +22,7 @@
  * @see caudio::ipc::Result for response types
  */
 
-#include <caudio/engine/types.hpp>
+#include <caudio/fwd.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
