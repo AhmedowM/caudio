@@ -9,8 +9,7 @@
  * those). Moved out of the CLI shell so TUIs render identically.
  */
 
-#include <caudio/db/types.hpp>
-#include <caudio/ipc/result.hpp>
+#include <caudio/fwd.hpp>
 #include <ostream>
 #include <string>
 #include <string_view>
