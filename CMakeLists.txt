@@ -383,7 +383,8 @@ target_include_directories(caudio_cli PRIVATE cli/src/shell)
 target_include_directories(caudio_cli SYSTEM PRIVATE vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
-target_link_libraries(caudio_cli PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+# FFmpeg is not linked here directly: caudio::player links it PRIVATE (see
+# player.cmake) and that propagates as $<LINK_ONLY:...> through app -> player.
 ca_set_warnings(caudio_cli)
 ca_set_module_warnings(caudio_cli)
 # Needed on MinGW for template instantiation deduplication across executable + static libs.

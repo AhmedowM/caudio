@@ -58,8 +58,10 @@ function(caudio_add_component NAME)
   # Precompiled-header preamble: stable system headers compiled once per
   # target instead of re-parsed in every TU. Biggest win on MSVC.
   target_precompile_headers(${NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/caudio/pch.hpp)
-  # FFmpeg is required (sole decoder backend); every component links it.
-  target_link_libraries(${NAME} PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+  # FFmpeg (the decoder backend) is linked PRIVATE by the components that
+  # actually use it (currently only `player`, see player.cmake) -- not blanket-
+  # linked to every component, which forced every target to resolve FFmpeg at
+  # link time and pulled its include dirs into unrelated TUs.
   ca_set_warnings(${NAME})
 endfunction()
 

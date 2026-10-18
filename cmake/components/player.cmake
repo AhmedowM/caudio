@@ -15,6 +15,11 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/decoders/ffmpeg.cpp
 )
 caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor)
+# FFmpeg (sole decoder backend) is used only by src/player/decoders/ffmpeg.cpp
+# (via ffmpeg_impl.hpp), so link it here PRIVATE rather than blanket-linking it
+# onto every component. STATIC private deps propagate as $<LINK_ONLY:...> to the
+# final executables, so consumers of caudio::player still resolve libav symbols.
+target_link_libraries(player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 # GCC cannot parse Apple's ObjC-blocks system headers pulled in by miniaudio's
 # CoreAudio backend; Apple Clang-only. Local mac devs (Xcode Clang) keep full
 # audio; GNU-on-macOS CI builds fall back to the other backends (NOAUDIO anyway).
