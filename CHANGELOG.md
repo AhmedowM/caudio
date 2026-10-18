@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.0] - 2026-10-18
+
+### Added
+- `caudio version [--json]`: prints the version plus build provenance
+  (compiler, C++ standard, runtime, build mode, OS, arch) with no daemon
+  and no config read; `--version` still prints only the version string
+- `caudio.types` layer (headers + C++23 module): dependency-free shared
+  value types -- the wire enums `RepeatMode`/`PlaybackState` and the
+  records `Track`/`Playlist`/`QueueItem`/`HistoryEntry`/`Bookmark` -- now
+  owned by `caudio::types` and re-exported from `caudio::engine` and
+  `caudio::db` as source-compatible aliases
+- Opt-in `CAUDIO_ENABLE_CCACHE` (ccache/sccache launcher); per-component
+  precompiled headers and MSVC `/MP` parallel compilation
+
+### Changed
+- Public headers no longer expose internals: `Engine`, `Service`,
+  `IpcServer`, `IpcClient`, `Database`, `WriterThread`, `FileLogSink` and
+  the player classes are pimpl'd and pull in forward declarations only;
+  platform headers dropped from the public interface. Downstream source
+  stays compatible and must recompile (class layouts changed)
+- Dependency edges tightened: `shm_status` moved from `service` to `ipc`,
+  `ipc` no longer depends on `engine`, `client` no longer depends on
+  `service`; FFmpeg now links only into `player`
+
+### Removed
+- Stale CI workflows `llvm-linux.yml` and `apple-clang.yml` (covered by
+  the release and bake-off pipelines); `docs/known-issues.md` (GitHub
+  issues is the record); `docs/polyglot-integration.md` (untracked `.dev/`)
+
 ## [v1.6.0] - 2026-10-17
 
 ### Added
