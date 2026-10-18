@@ -38,7 +38,7 @@ namespace caudio::db {
  * @see tryFtsQuery
  * @see searchLike
  */
-std::expected<std::vector<Track>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 searchFts(Database& db, std::string_view query, int limit = 50);
 
 /**
@@ -52,7 +52,7 @@ searchFts(Database& db, std::string_view query, int limit = 50);
  * @par Thread safety
  * Thread-safe: acquires `shared_lock`.
  */
-std::expected<std::vector<Track>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 searchLike(Database& db, std::string_view query, int limit = 50);
 
 /**
@@ -75,7 +75,7 @@ std::string sanitizeFtsTerm(std::string_view term);
  * Thread-safe (delegates to `searchFts`).
  * @see searchFts
  */
-std::expected<std::vector<Track>, caudio::utils::Error> search(Database& db, std::string_view query,
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> search(Database& db, std::string_view query,
                                                                int limit = 50);
 
 } // namespace caudio::db

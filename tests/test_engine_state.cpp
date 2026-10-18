@@ -29,7 +29,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
         REQUIRE(dbRes.has_value());
         auto db = std::move(dbRes.value());
         for (int i = 0; i < 2; ++i) {
-            Track t;
+            caudio::types::Track t;
             t.path = "state" + std::to_string(i) + ".wav";
             t.duration = 1.0;
             for (int b = 0; b < 32; ++b)
@@ -155,7 +155,7 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "tog" + std::to_string(i) + ".wav";
         t.duration = 1.0;
         for (int b = 0; b < 32; ++b)

@@ -44,7 +44,7 @@ std::string trackWho(const caudio::ipc::Status& st) {
     return "unknown track";
 }
 
-std::string addedLabel(const caudio::db::Track& t) {
+std::string addedLabel(const caudio::types::Track& t) {
     std::string fn = std::filesystem::path(t.path).filename().generic_string();
     std::string who;
     if (!t.artist.empty() && !t.title.empty())
@@ -60,7 +60,7 @@ std::string addedLabel(const caudio::db::Track& t) {
     return "track " + std::to_string(t.id);
 }
 
-void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& tracks,
+void writePlaylistText(std::ostream& os, const std::vector<caudio::types::Track>& tracks,
                        std::string_view format) {
     if (format == "m3u") {
         os << "#EXTM3U\n";
@@ -94,7 +94,7 @@ void writePlaylistText(std::ostream& os, const std::vector<caudio::db::Track>& t
     }
 }
 
-void writePlaylistJson(std::ostream& os, const std::vector<caudio::db::Track>& tracks) {
+void writePlaylistJson(std::ostream& os, const std::vector<caudio::types::Track>& tracks) {
     caudio::utils::Json j;
     j["format"] = "caudio-playlist";
     j["version"] = 1;

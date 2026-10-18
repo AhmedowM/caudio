@@ -68,7 +68,7 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t;
+    caudio::types::Track t;
     t.path = "hist.wav";
     t.duration = 10.0;
     for (int b = 0; b < 32; ++b)

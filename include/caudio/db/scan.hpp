@@ -67,7 +67,7 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
  * @see scanDirectory
  * @see scanLibrary
  */
-caudio::utils::Generator<Track> scan(const std::filesystem::path& root,
+caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
                                      ScanMode mode = ScanMode::Sampled);
 
 /**
@@ -79,7 +79,7 @@ caudio::utils::Generator<Track> scan(const std::filesystem::path& root,
  * @par Thread safety
  * Re-entrant; not thread-safe with concurrent filesystem mutation.
  */
-std::expected<std::vector<Track>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
 
 /**

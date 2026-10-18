@@ -60,7 +60,7 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
  * @par Thread safety
  * Caller must hold Database::mutex() exclusively.
  */
-std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid);
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid);
 
 /**
  * @brief Peeks the head item without removing (caller holds DB mutex).
@@ -71,7 +71,7 @@ std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, i
  * @par Thread safety
  * Caller must hold Database::mutex() (shared or exclusive).
  */
-std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid);
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid);
 
 /**
  * @brief Removes item at position (caller holds DB mutex).
@@ -107,7 +107,7 @@ std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, int64_t 
  * @par Thread safety
  * Caller must hold Database::mutex() (shared or exclusive).
  */
-std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
                                                                             int64_t qid);
 
 /**
@@ -218,7 +218,7 @@ std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_
  * Caller must hold Database::mutex().
  * @see queueListLocked
  */
-std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
                                                                                 int64_t qid);
 
 } // namespace caudio::db

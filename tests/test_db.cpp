@@ -16,8 +16,8 @@
 using namespace caudio::db;
 using namespace caudio::utils;
 
-static Track makeTrack(int idx, const std::string& pathOverride = "") {
-    Track t;
+static caudio::types::Track makeTrack(int idx, const std::string& pathOverride = "") {
+    caudio::types::Track t;
     t.path = pathOverride.empty() ? ("/tmp/track_" + std::to_string(idx) + ".mp3") : pathOverride;
     t.title = "Title" + std::to_string(idx);
     t.artist = "Artist" + std::to_string(idx);
@@ -33,18 +33,18 @@ TEST_CASE("insertTrack duplicate AlreadyExists", "[db]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t = makeTrack(1);
+    caudio::types::Track t = makeTrack(1);
     auto r1 = db->insertTrack(t);
     REQUIRE(r1.has_value());
     // fingerprint is UNIQUE per schema; duplicate fingerprint should be AlreadyExists
-    Track t2 = makeTrack(1);
+    caudio::types::Track t2 = makeTrack(1);
     // ensure same fingerprint but different path to prove fingerprint uniqueness
     t2.path = "/tmp/track_dup_path.mp3";
     auto r2 = db->insertTrack(t2);
     REQUIRE(!r2.has_value());
     REQUIRE(r2.error().code == StatusCode::AlreadyExists);
     // same path with different fingerprint should succeed (path not unique)
-    Track t3 = makeTrack(99, t.path);
+    caudio::types::Track t3 = makeTrack(99, t.path);
     for (int b = 0; b < 32; ++b)
         t3.fingerprint[b] = (uint8_t)(0xFF - b);
     auto r3 = db->insertTrack(t3);
@@ -56,7 +56,7 @@ TEST_CASE("updateTrack missing NotFound", "[db]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t = makeTrack(2);
+    caudio::types::Track t = makeTrack(2);
     t.id = 9999; // non-existent id
     auto r = db->updateTrack(t);
     REQUIRE(!r.has_value());
@@ -84,7 +84,7 @@ TEST_CASE("deleteTrack and verify", "[db]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t = makeTrack(3);
+    caudio::types::Track t = makeTrack(3);
     auto ins = db->insertTrack(t);
     REQUIRE(ins.has_value());
     int64_t id = *ins;
@@ -106,7 +106,7 @@ TEST_CASE("listTracks pagination limit/offset", "[db]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 5; ++i) {
-        Track t = makeTrack(10 + i);
+        caudio::types::Track t = makeTrack(10 + i);
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
     }
@@ -148,7 +148,7 @@ TEST_CASE("findByFingerprint and findByPath", "[db]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t = makeTrack(42, "/tmp/find_test.mp3");
+    caudio::types::Track t = makeTrack(42, "/tmp/find_test.mp3");
     auto ins = db->insertTrack(t);
     REQUIRE(ins.has_value());
     // findByPath success

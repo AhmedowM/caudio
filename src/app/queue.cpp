@@ -223,7 +223,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
     // Snapshot insertion-order positions with labels for output.
     struct RemTarget {
         std::size_t pos{0};
-        caudio::db::Track track{};
+        caudio::types::Track track{};
     };
     std::vector<RemTarget> all;
     {
@@ -327,7 +327,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
     std::sort(targets.begin(), targets.end(),
               [](const RemTarget& a, const RemTarget& b) { return a.pos > b.pos; });
     int removed = 0;
-    std::vector<caudio::db::Track> removedTracks;
+    std::vector<caudio::types::Track> removedTracks;
     for (auto& t : targets) {
         caudio::ipc::Command cmd{caudio::ipc::QueueRemove{std::to_string(t.pos)}};
         auto res = sendRaw(cmd);

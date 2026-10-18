@@ -96,6 +96,6 @@ struct StmtGuard {
  * Caller must hold the DB lock protecting the statement's connection.
  * @see kSelectTracksCols
  */
-void fillTrackFromStmt(sqlite3_stmt* stmt, Track& t);
+void fillTrackFromStmt(sqlite3_stmt* stmt, caudio::types::Track& t);
 
 } // namespace caudio::db::internal

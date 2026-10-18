@@ -120,7 +120,7 @@ resultCodeFromString(std::string_view sv) {
 // (The former ipc::detail subset is deleted; wire readers tolerate the
 // fuller db field set: all reads are contains-guarded.)
 
-Json playlistToJson(const caudio::db::Playlist& p) {
+Json playlistToJson(const caudio::types::Playlist& p) {
     Json j;
     j["id"] = p.id;
     j["name"] = p.name;
@@ -132,9 +132,9 @@ Json playlistToJson(const caudio::db::Playlist& p) {
     return j;
 }
 
-std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const Json& j) {
+std::expected<caudio::types::Playlist, caudio::utils::Error> playlistFromJson(const Json& j) {
     try {
-        caudio::db::Playlist p{};
+        caudio::types::Playlist p{};
         if (j.contains("id") && j["id"].isNumber())
             p.id = j["id"].get<int64_t>();
         if (j.contains("name") && j["name"].isString())

@@ -257,7 +257,7 @@ Database::queueReplaceAll(int64_t qid, const std::vector<int64_t>& ids) {
     return queueReplaceAll(qid, std::span<const int64_t>(ids.data(), ids.size()));
 }
 
-std::expected<Track, caudio::utils::Error> Database::findByPathLocked(std::string_view path) {
+std::expected<caudio::types::Track, caudio::utils::Error> Database::findByPathLocked(std::string_view path) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -269,7 +269,7 @@ std::expected<Track, caudio::utils::Error> Database::findByPathLocked(std::strin
     SqliteStatement& st = *(*sRes);
     st.bindText(1, path);
     bool hasRow = st.step();
-    Track t;
+    caudio::types::Track t;
     if (hasRow)
         internal::fillTrackFromStmt(st.get(), t);
     st.reset();
@@ -278,7 +278,7 @@ std::expected<Track, caudio::utils::Error> Database::findByPathLocked(std::strin
     return t;
 }
 
-std::expected<Track, caudio::utils::Error>
+std::expected<caudio::types::Track, caudio::utils::Error>
 Database::findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
     if (!impl_->db_)
         return std::unexpected{
@@ -292,7 +292,7 @@ Database::findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
     st.bindBlob(
         1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(fp.data()), fp.size()});
     bool hasRow = st.step();
-    Track t;
+    caudio::types::Track t;
     if (hasRow)
         internal::fillTrackFromStmt(st.get(), t);
     st.reset();
@@ -301,7 +301,7 @@ Database::findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
     return t;
 }
 
-std::expected<int64_t, caudio::utils::Error> Database::insertTrackLocked(const Track& t) {
+std::expected<int64_t, caudio::utils::Error> Database::insertTrackLocked(const caudio::types::Track& t) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -324,7 +324,7 @@ std::expected<int64_t, caudio::utils::Error> Database::insertTrackLocked(const T
     return sqlite3_last_insert_rowid(impl_->db_.get());
 }
 
-std::expected<void, caudio::utils::Error> Database::updateTrackLocked(const Track& t) {
+std::expected<void, caudio::utils::Error> Database::updateTrackLocked(const caudio::types::Track& t) {
     if (t.id == 0)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "id 0")};
@@ -427,7 +427,7 @@ std::expected<void, caudio::utils::Error> Database::libraryUpdateLocked(const Li
     return {};
 }
 
-void Database::bindTrackForInsert(SqliteStatement& st, const Track& t) {
+void Database::bindTrackForInsert(SqliteStatement& st, const caudio::types::Track& t) {
     st.bindBlob(1,
                 std::span<const std::byte>{reinterpret_cast<const std::byte*>(t.fingerprint.data()),
                                            t.fingerprint.size()});
@@ -459,7 +459,7 @@ void Database::bindTrackForInsert(SqliteStatement& st, const Track& t) {
     st.bindInt(24, t.library_id ? t.library_id : 1);
 }
 
-void Database::bindTrackForUpdate(SqliteStatement& st, const Track& t) {
+void Database::bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t) {
     st.bindBlob(1,
                 std::span<const std::byte>{reinterpret_cast<const std::byte*>(t.fingerprint.data()),
                                            t.fingerprint.size()});
@@ -493,12 +493,12 @@ void Database::bindTrackForUpdate(SqliteStatement& st, const Track& t) {
     st.bindInt(26, t.id);
 }
 
-std::expected<int64_t, caudio::utils::Error> Database::insertTrack(const Track& t) {
+std::expected<int64_t, caudio::utils::Error> Database::insertTrack(const caudio::types::Track& t) {
     std::unique_lock lk{impl_->dbMutex_};
     return insertTrackLocked(t);
 }
 
-std::expected<void, caudio::utils::Error> Database::updateTrack(const Track& t) {
+std::expected<void, caudio::utils::Error> Database::updateTrack(const caudio::types::Track& t) {
     std::unique_lock lk{impl_->dbMutex_};
     return updateTrackLocked(t);
 }
@@ -508,12 +508,12 @@ std::expected<void, caudio::utils::Error> Database::deleteTrack(int64_t id) {
     return deleteTrackLocked(id);
 }
 
-std::expected<Track, caudio::utils::Error> Database::getTrack(int64_t id) {
+std::expected<caudio::types::Track, caudio::utils::Error> Database::getTrack(int64_t id) {
     std::shared_lock lk{impl_->dbMutex_};
     return getTrackLocked(id);
 }
 
-std::expected<Track, caudio::utils::Error> Database::getTrackLocked(int64_t id) {
+std::expected<caudio::types::Track, caudio::utils::Error> Database::getTrackLocked(int64_t id) {
     if (id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!impl_->db_)
@@ -527,7 +527,7 @@ std::expected<Track, caudio::utils::Error> Database::getTrackLocked(int64_t id) 
     SqliteStatement& st = *(*sRes);
     st.bindInt(1, id);
     bool hasRow = st.step();
-    Track t;
+    caudio::types::Track t;
     if (hasRow)
         internal::fillTrackFromStmt(st.get(), t);
     st.reset();
@@ -536,7 +536,7 @@ std::expected<Track, caudio::utils::Error> Database::getTrackLocked(int64_t id) 
     return t;
 }
 
-std::expected<Track, caudio::utils::Error>
+std::expected<caudio::types::Track, caudio::utils::Error>
 Database::findByFingerprint(const std::array<uint8_t, 32>& fp) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
@@ -551,7 +551,7 @@ Database::findByFingerprint(const std::array<uint8_t, 32>& fp) {
     st.bindBlob(
         1, std::span<const std::byte>{reinterpret_cast<const std::byte*>(fp.data()), fp.size()});
     bool hasRow = st.step();
-    Track t;
+    caudio::types::Track t;
     if (hasRow)
         internal::fillTrackFromStmt(st.get(), t);
     st.reset();
@@ -560,7 +560,7 @@ Database::findByFingerprint(const std::array<uint8_t, 32>& fp) {
     return t;
 }
 
-std::expected<Track, caudio::utils::Error> Database::findByPath(std::string_view path) {
+std::expected<caudio::types::Track, caudio::utils::Error> Database::findByPath(std::string_view path) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -573,7 +573,7 @@ std::expected<Track, caudio::utils::Error> Database::findByPath(std::string_view
     SqliteStatement& st = *(*sRes);
     st.bindText(1, path);
     bool hasRow = st.step();
-    Track t;
+    caudio::types::Track t;
     if (hasRow)
         internal::fillTrackFromStmt(st.get(), t);
     st.reset();
@@ -582,7 +582,7 @@ std::expected<Track, caudio::utils::Error> Database::findByPath(std::string_view
     return t;
 }
 
-std::expected<std::vector<Track>, caudio::utils::Error> Database::listTracks(const TrackQuery* q) {
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> Database::listTracks(const TrackQuery* q) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -647,9 +647,9 @@ std::expected<std::vector<Track>, caudio::utils::Error> Database::listTracks(con
         } else if (has_offset)
             st.bindInt(idx++, q->offset);
     }
-    std::vector<Track> out;
+    std::vector<caudio::types::Track> out;
     while (st.step()) {
-        Track t;
+        caudio::types::Track t;
         internal::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
@@ -707,7 +707,7 @@ Database::createPlaylist(std::string_view name, int type, std::string_view smart
     return sqlite3_last_insert_rowid(impl_->db_.get());
 }
 
-std::expected<Playlist, caudio::utils::Error> Database::getPlaylist(int64_t id) {
+std::expected<caudio::types::Playlist, caudio::utils::Error> Database::getPlaylist(int64_t id) {
     if (id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::shared_lock lk{impl_->dbMutex_};
@@ -723,7 +723,7 @@ std::expected<Playlist, caudio::utils::Error> Database::getPlaylist(int64_t id) 
     st.bindInt(1, id);
     if (!st.step())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
-    Playlist p;
+    caudio::types::Playlist p;
     p.id = st.columnInt(0);
     p.name = st.columnText(1);
     p.type = (int)st.columnInt(2);
@@ -734,7 +734,7 @@ std::expected<Playlist, caudio::utils::Error> Database::getPlaylist(int64_t id) 
     return p;
 }
 
-std::expected<void, caudio::utils::Error> Database::updatePlaylist(const Playlist& p) {
+std::expected<void, caudio::utils::Error> Database::updatePlaylist(const caudio::types::Playlist& p) {
     if (p.id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::unique_lock lk{impl_->dbMutex_};
@@ -917,7 +917,7 @@ std::expected<void, caudio::utils::Error> Database::playlistAddTrackLocked(int64
     return {};
 }
 
-std::expected<std::vector<Playlist>, caudio::utils::Error> Database::listPlaylists() {
+std::expected<std::vector<caudio::types::Playlist>, caudio::utils::Error> Database::listPlaylists() {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -928,9 +928,9 @@ std::expected<std::vector<Playlist>, caudio::utils::Error> Database::listPlaylis
                                          "library_id FROM playlists ORDER BY id");
         !e)
         return std::unexpected{e.error()};
-    std::vector<Playlist> out;
+    std::vector<caudio::types::Playlist> out;
     while (st.step()) {
-        Playlist p;
+        caudio::types::Playlist p;
         p.id = st.columnInt(0);
         p.name = st.columnText(1);
         p.type = (int)st.columnInt(2);
@@ -1070,7 +1070,7 @@ std::expected<void, caudio::utils::Error> Database::playlistReorder(int64_t pid,
     return {};
 }
 
-std::expected<std::vector<Track>, caudio::utils::Error> Database::playlistGetTracks(int64_t pid) {
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> Database::playlistGetTracks(int64_t pid) {
     if (pid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::shared_lock lk{impl_->dbMutex_};
@@ -1084,9 +1084,9 @@ std::expected<std::vector<Track>, caudio::utils::Error> Database::playlistGetTra
     if (auto e = st.prepare(impl_->db_.get(), sql); !e)
         return std::unexpected{e.error()};
     st.bindInt(1, pid);
-    std::vector<Track> out;
+    std::vector<caudio::types::Track> out;
     while (st.step()) {
-        Track t;
+        caudio::types::Track t;
         internal::fillTrackFromStmt(st.get(), t);
         out.push_back(std::move(t));
     }
@@ -1104,20 +1104,20 @@ std::expected<void, caudio::utils::Error> Database::queueEnqueueLocked(int64_t q
     return caudio::db::queueEnqueueLocked(impl_->db_.get(), qid, tid, pos);
 }
 
-std::expected<QueueItem, caudio::utils::Error> Database::queueDequeue(int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> Database::queueDequeue(int64_t qid) {
     std::unique_lock lk{impl_->dbMutex_};
     return queueDequeueLocked(qid);
 }
 
-std::expected<QueueItem, caudio::utils::Error> Database::queueDequeueLocked(int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> Database::queueDequeueLocked(int64_t qid) {
     return caudio::db::queueDequeueLocked(impl_->db_.get(), qid);
 }
 
-std::expected<QueueItem, caudio::utils::Error> Database::queuePeekLocked(int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> Database::queuePeekLocked(int64_t qid) {
     return caudio::db::queuePeekLocked(impl_->db_.get(), qid);
 }
 
-std::expected<QueueItem, caudio::utils::Error> Database::queuePeek(int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> Database::queuePeek(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
@@ -1138,14 +1138,14 @@ std::expected<void, caudio::utils::Error> Database::queueClear(int64_t qid) {
     return caudio::db::queueClearLocked(impl_->db_.get(), qid);
 }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error> Database::queueList(int64_t qid) {
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> Database::queueList(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
     return caudio::db::queueListLocked(impl_->db_.get(), qid);
 }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error> Database::getQueueItems(int64_t qid) {
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> Database::getQueueItems(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
@@ -1209,7 +1209,7 @@ std::optional<size_t> Database::queueIndexOf(int64_t qid, int64_t trackId) {
     return caudio::db::queueIndexOfLocked(impl_->db_.get(), qid, trackId);
 }
 
-std::expected<void, caudio::utils::Error> Database::historyAdd(const HistoryEntry& e) {
+std::expected<void, caudio::utils::Error> Database::historyAdd(const caudio::types::HistoryEntry& e) {
     std::unique_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -1238,7 +1238,7 @@ std::expected<void, caudio::utils::Error> Database::historyAdd(const HistoryEntr
     return {};
 }
 
-std::expected<std::vector<HistoryEntry>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
 Database::historyList(const HistoryQuery* q) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
@@ -1275,9 +1275,9 @@ Database::historyList(const HistoryQuery* q) {
         } else if (has_off)
             st.bindInt(idx++, q->offset);
     }
-    std::vector<HistoryEntry> out;
+    std::vector<caudio::types::HistoryEntry> out;
     while (st.step()) {
-        HistoryEntry e;
+        caudio::types::HistoryEntry e;
         e.id = st.columnInt(0);
         e.track_id = st.columnInt(1);
         e.started_at = st.columnInt(2);
@@ -1334,7 +1334,7 @@ std::expected<void, caudio::utils::Error> Database::bookmarkAdd(int64_t tid, int
     return {};
 }
 
-std::expected<std::vector<Bookmark>, caudio::utils::Error> Database::bookmarkList(int64_t tid) {
+std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error> Database::bookmarkList(int64_t tid) {
     if (tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::shared_lock lk{impl_->dbMutex_};
@@ -1348,9 +1348,9 @@ std::expected<std::vector<Bookmark>, caudio::utils::Error> Database::bookmarkLis
         !e)
         return std::unexpected{e.error()};
     st.bindInt(1, tid);
-    std::vector<Bookmark> out;
+    std::vector<caudio::types::Bookmark> out;
     while (st.step()) {
-        Bookmark b;
+        caudio::types::Bookmark b;
         b.id = st.columnInt(0);
         b.track_id = st.columnInt(1);
         b.position_ms = st.columnInt(2);
@@ -1502,7 +1502,7 @@ Database::libraryStatsDetailed(int topN) {
         if (sRes) {
             SqliteStatement& st = *(*sRes);
             while (st.step()) {
-                caudio::db::Track t;
+                caudio::types::Track t;
                 internal::fillTrackFromStmt(st.get(), t);
                 d.most_played.push_back(std::move(t));
             }

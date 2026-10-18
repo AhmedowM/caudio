@@ -79,9 +79,9 @@ History::ExpectedEntries History::listHistory(int limit) {
     if (hasLimit)
         sqlite3_bind_int(raw, 1, limit);
 
-    std::vector<caudio::db::HistoryEntry> out;
+    std::vector<caudio::types::HistoryEntry> out;
     while (sqlite3_step(raw) == SQLITE_ROW) {
-        caudio::db::HistoryEntry e;
+        caudio::types::HistoryEntry e;
         e.id = sqlite3_column_int64(raw, 0);
         e.track_id = sqlite3_column_int64(raw, 1);
         e.started_at = sqlite3_column_int64(raw, 2);

@@ -36,7 +36,7 @@ bool canWriteFileTags(const std::filesystem::path& p);
  * TagLib open/save failures).
  */
 caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
-                                            const caudio::db::Track& t);
+                                            const caudio::types::Track& t);
 
 /**
  * @brief Re-registers a track row after its file was tag-edited.
@@ -47,7 +47,7 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
  * mtime, and audio technicals refresh from the new bytes. The id is stable:
  * lookup is path-keyed, never fingerprint-keyed (the fingerprint changed).
  */
-caudio::utils::Expected<caudio::db::Track> reregisterTrackRow(caudio::db::Database& db,
-                                                              caudio::db::Track t);
+caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
+                                                              caudio::types::Track t);
 
 } // namespace caudio::service::detail

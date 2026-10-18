@@ -27,7 +27,7 @@ namespace caudio::db {
 
 using caudio::utils::Json;
 
-Json trackToJson(const Track& t) {
+Json trackToJson(const caudio::types::Track& t) {
     Json j;
     j["id"] = t.id;
     j["size"] = t.size;
@@ -58,9 +58,9 @@ Json trackToJson(const Track& t) {
     return j;
 }
 
-std::expected<Track, caudio::utils::Error> trackFromJson(const Json& j) {
+std::expected<caudio::types::Track, caudio::utils::Error> trackFromJson(const Json& j) {
     try {
-        Track t;
+        caudio::types::Track t;
         auto getI64 = [&](const char* k, int64_t& out, int64_t def = 0) {
             if (j.contains(k) && !j[k].isNull()) {
                 if (j[k].isNumber())
@@ -213,7 +213,7 @@ std::expected<void, caudio::utils::Error> importJson(Database& db,
             corrupt = true;
             break;
         }
-        Track t = *tr;
+        caudio::types::Track t = *tr;
         SqliteStatement stmt;
         if (auto e =
                 stmt.prepare(h, "INSERT INTO tracks (fingerprint, path, size, mtime, duration, "

@@ -25,7 +25,7 @@ TEST_CASE("gapless CAS arms once via Engine", "[engine_gapless]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "cas" + std::to_string(i) + ".wav";
         t.duration = 0.8;
         for (int b = 0; b < 32; ++b)
@@ -72,7 +72,7 @@ TEST_CASE("gapless 300ms lookahead triggers next once", "[engine_gapless]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "gap" + std::to_string(i) + ".wav";
         t.duration = 0.8;
         for (int b = 0; b < 32; ++b)
@@ -120,7 +120,7 @@ TEST_CASE("gapless not triggered when remaining > gap", "[engine_gapless]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "gap_n" + std::to_string(i) + ".wav";
         t.duration = 5.0;
         for (int b = 0; b < 32; ++b)

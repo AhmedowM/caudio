@@ -83,7 +83,7 @@ struct LibraryStatsDetailedData {
     std::size_t playlists{0};         ///< Total playlists.
     int64_t total_duration_ms{0};     ///< Sum of durations (ms).
     int64_t total_play_time_ms{0};    ///< Sum of play_count * duration (ms).
-    std::vector<Track> most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
+    std::vector<caudio::types::Track> most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
 };
 
 /**

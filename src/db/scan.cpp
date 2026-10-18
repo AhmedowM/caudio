@@ -30,7 +30,7 @@
 
 namespace caudio::db {
 
-caudio::utils::Generator<Track> scan(const std::filesystem::path& root, ScanMode mode) {
+caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root, ScanMode mode) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         co_return;
@@ -38,7 +38,7 @@ caudio::utils::Generator<Track> scan(const std::filesystem::path& root, ScanMode
              root, std::filesystem::directory_options::skip_permission_denied, ec);
          it != std::filesystem::recursive_directory_iterator(); ++it) {
         if (it->is_regular_file(ec) && detail::hasAudioExt(it->path())) {
-            Track t;
+            caudio::types::Track t;
             t.path = it->path().generic_string();
             std::error_code e2;
             auto sz = it->file_size(e2);
@@ -83,9 +83,9 @@ caudio::utils::Generator<Track> scan(const std::filesystem::path& root, ScanMode
     }
 }
 
-std::expected<std::vector<Track>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 scanDirectory(const std::filesystem::path& root, ScanMode mode) {
-    std::vector<Track> out;
+    std::vector<caudio::types::Track> out;
     for (auto t : scan(root, mode))
         out.push_back(std::move(t));
     return out;
@@ -193,7 +193,7 @@ scanLibrary(Database& db, int64_t libraryId,
         }
         auto byFp = db.findByFingerprintLocked(trk.fingerprint);
         if (byFp) {
-            Track upd = *byFp;
+            caudio::types::Track upd = *byFp;
             upd.path = trk.path;
             upd.size = trk.size;
             upd.mtime = trk.mtime;
@@ -280,7 +280,7 @@ scanLibrary(Database& db, int64_t libraryId,
                     (void)db.deleteTrackLocked(existingPath->id);
             }
         } else if (existingPath) {
-            Track upd = *existingPath;
+            caudio::types::Track upd = *existingPath;
             int64_t keepPlay = upd.play_count;
             int keepRating = upd.rating;
             int64_t keepAdded = upd.date_added;

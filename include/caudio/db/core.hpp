@@ -235,7 +235,7 @@ class Database final {
      * Caller must hold dbMutex_ (shared or exclusive); internally locks cacheMutex_.
      * @see findByPath
      */
-    std::expected<Track, caudio::utils::Error> findByPathLocked(std::string_view path);
+    std::expected<caudio::types::Track, caudio::utils::Error> findByPathLocked(std::string_view path);
     /**
      * @brief Finds a track by fingerprint (caller holds dbMutex_).
      * @ingroup caudio_db
@@ -244,7 +244,7 @@ class Database final {
      * @par Thread safety
      * Caller must hold dbMutex_; locks cacheMutex_ internally.
      */
-    std::expected<Track, caudio::utils::Error>
+    std::expected<caudio::types::Track, caudio::utils::Error>
     findByFingerprintLocked(const std::array<uint8_t, 32>& fp);
     /**
      * @brief Inserts a track (caller holds dbMutex_).
@@ -256,7 +256,7 @@ class Database final {
      * @see insertTrack
      * @see bindTrackForInsert
      */
-    std::expected<int64_t, caudio::utils::Error> insertTrackLocked(const Track& t);
+    std::expected<int64_t, caudio::utils::Error> insertTrackLocked(const caudio::types::Track& t);
     /**
      * @brief Updates a track by id (caller holds dbMutex_).
      * @ingroup caudio_db
@@ -267,7 +267,7 @@ class Database final {
      * @see updateTrack
      * @see bindTrackForUpdate
      */
-    std::expected<void, caudio::utils::Error> updateTrackLocked(const Track& t);
+    std::expected<void, caudio::utils::Error> updateTrackLocked(const caudio::types::Track& t);
     /**
      * @brief Deletes a track by id (caller holds dbMutex_).
      * @ingroup caudio_db
@@ -315,7 +315,7 @@ class Database final {
      * last_played, date_added, last_scanned, dirty, library_id.
      * NULL binds for optional date_added.
      */
-    static void bindTrackForInsert(SqliteStatement& st, const Track& t);
+    static void bindTrackForInsert(SqliteStatement& st, const caudio::types::Track& t);
     /**
      * @brief Binds all Track fields for UPDATE statement (26 parameters).
      * @ingroup caudio_db
@@ -327,7 +327,7 @@ class Database final {
      * last_played, date_added, last_scanned, dirty, library_id, deleted_at, id.
      * NULL binds for optional deleted_at.
      */
-    static void bindTrackForUpdate(SqliteStatement& st, const Track& t);
+    static void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t);
     static constexpr std::string_view kInsertTrackSql =
         "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
@@ -353,7 +353,7 @@ class Database final {
      * Thread-safe: unique_lock on dbMutex_.
      * @see insertTrackLocked
      */
-    std::expected<int64_t, caudio::utils::Error> insertTrack(const Track& t);
+    std::expected<int64_t, caudio::utils::Error> insertTrack(const caudio::types::Track& t);
     /**
      * @brief Updates a track by id.
      * @ingroup caudio_db
@@ -362,7 +362,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: unique_lock on dbMutex_.
      */
-    std::expected<void, caudio::utils::Error> updateTrack(const Track& t);
+    std::expected<void, caudio::utils::Error> updateTrack(const caudio::types::Track& t);
     /**
      * @brief Deletes a track by id.
      * @ingroup caudio_db
@@ -380,7 +380,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<Track, caudio::utils::Error> getTrack(int64_t id);
+    std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id);
 
     /**
      * @brief Gets a track by id (caller holds dbMutex_).
@@ -390,7 +390,7 @@ class Database final {
      * @par Thread safety
      * Caller must hold dbMutex_; locks cacheMutex_.
      */
-    std::expected<Track, caudio::utils::Error> getTrackLocked(int64_t id);
+    std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(int64_t id);
     /**
      * @brief Finds a track by fingerprint.
      * @ingroup caudio_db
@@ -399,7 +399,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<Track, caudio::utils::Error> findByFingerprint(const std::array<uint8_t, 32>& fp);
+    std::expected<caudio::types::Track, caudio::utils::Error> findByFingerprint(const std::array<uint8_t, 32>& fp);
     /**
      * @brief Finds a track by path.
      * @ingroup caudio_db
@@ -408,7 +408,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<Track, caudio::utils::Error> findByPath(std::string_view path);
+    std::expected<caudio::types::Track, caudio::utils::Error> findByPath(std::string_view path);
     /**
      * @brief Lists tracks with optional filters.
      * @ingroup caudio_db
@@ -419,7 +419,7 @@ class Database final {
      * Thread-safe: shared_lock on dbMutex_.
      * @see TrackQuery
      */
-    std::expected<std::vector<Track>, caudio::utils::Error>
+    std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
     listTracks(const TrackQuery* q = nullptr);
     /**
      * @brief Sets the dirty flag for a track.
@@ -453,7 +453,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<Playlist, caudio::utils::Error> getPlaylist(int64_t id);
+    std::expected<caudio::types::Playlist, caudio::utils::Error> getPlaylist(int64_t id);
     /**
      * @brief Updates a playlist.
      * @ingroup caudio_db
@@ -462,7 +462,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: unique_lock.
      */
-    std::expected<void, caudio::utils::Error> updatePlaylist(const Playlist& p);
+    std::expected<void, caudio::utils::Error> updatePlaylist(const caudio::types::Playlist& p);
     /**
      * @brief Deletes a playlist.
      * @ingroup caudio_db
@@ -495,7 +495,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<Playlist>, caudio::utils::Error> listPlaylists();
+    std::expected<std::vector<caudio::types::Playlist>, caudio::utils::Error> listPlaylists();
     std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
                                                                int64_t pos = -1);
     std::expected<void, caudio::utils::Error> playlistRemoveTrack(int64_t pid, int64_t tid);
@@ -509,7 +509,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<Track>, caudio::utils::Error> playlistGetTracks(int64_t pid);
+    std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> playlistGetTracks(int64_t pid);
 
     /**
      * @brief Queue operations -- forwarded to queue partition (see queue.cppm).
@@ -541,11 +541,11 @@ class Database final {
      * @par Thread safety
      * Thread-safe: unique_lock.
      */
-    std::expected<QueueItem, caudio::utils::Error> queueDequeue(int64_t qid);
+    std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeue(int64_t qid);
 
-    std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid);
+    std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid);
 
-    std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(int64_t qid);
+    std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(int64_t qid);
 
     /**
      * @brief Peeks the head item without removing.
@@ -555,7 +555,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<QueueItem, caudio::utils::Error> queuePeek(int64_t qid);
+    std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeek(int64_t qid);
 
     /**
      * @brief Removes item at position.
@@ -586,9 +586,9 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<QueueItem>, caudio::utils::Error> queueList(int64_t qid);
+    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> queueList(int64_t qid);
 
-    std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItems(int64_t qid);
+    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> getQueueItems(int64_t qid);
 
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
 
@@ -637,7 +637,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: unique_lock.
      */
-    std::expected<void, caudio::utils::Error> historyAdd(const HistoryEntry& e);
+    std::expected<void, caudio::utils::Error> historyAdd(const caudio::types::HistoryEntry& e);
     /**
      * @brief Lists history entries with optional filters.
      * @ingroup caudio_db
@@ -646,7 +646,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<HistoryEntry>, caudio::utils::Error>
+    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     historyList(const HistoryQuery* q = nullptr);
 
     /**
@@ -679,7 +679,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<Bookmark>, caudio::utils::Error> bookmarkList(int64_t tid);
+    std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error> bookmarkList(int64_t tid);
 
     // Libraries
     /**

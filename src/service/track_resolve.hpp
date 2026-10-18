@@ -25,12 +25,12 @@ namespace caudio::service::detail {
  * @param p Existing audio file path.
  * @return Track row (with id) or Error.
  */
-inline std::expected<caudio::db::Track, caudio::utils::Error>
+inline std::expected<caudio::types::Track, caudio::utils::Error>
 ensureLibraryTrack(caudio::db::Database& db, const std::filesystem::path& p) {
     auto fpRes = caudio::db::internal::computeFingerprint(p);
     if (!fpRes)
         return std::unexpected{fpRes.error()};
-    caudio::db::Track t;
+    caudio::types::Track t;
     t.path = p.generic_string();
     t.fingerprint = *fpRes;
     t.duration = durationFromDecoder(p);

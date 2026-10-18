@@ -39,7 +39,7 @@ std::string OutputFormatter::truncateField(const std::string& s, std::size_t max
     return s.substr(0, maxLen - 3) + "...";
 }
 
-void OutputFormatter::printTrackDetail(std::ostream& os, const caudio::db::Track& t) {
+void OutputFormatter::printTrackDetail(std::ostream& os, const caudio::types::Track& t) {
     caudio::println(os, "Track [{}]", t.id);
     caudio::println(os, "  Path:         {}", t.path);
     caudio::println(os, "  Title:        {}", t.title.empty() ? "---" : t.title);
@@ -149,7 +149,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os, this](const caudio::ipc::QueueTracks& v) {
-                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os, "Queue ({} tracks):", tracksSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
                                 "Title", "Dur");
@@ -214,7 +214,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os](const caudio::ipc::Tracks& v) {
-                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os, "Tracks ({}):", tracksSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
                                 "Title", "Dur");
@@ -226,7 +226,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os, this](const caudio::ipc::SearchResults& v) {
-                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 if (tracksSpan.size() == 1)
                     caudio::println(os, "1 track found:");
                 else
@@ -255,7 +255,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 caudio::println(os, "Created playlist {} '{}'", v.id, v.name);
             },
             [&os](const caudio::ipc::PlaylistImportReport& v) {
-                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os,
                                 "Imported playlist '{}' ({} tracks, {} matched, {} skipped, "
                                 "{} duplicates):",
@@ -270,7 +270,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os](const caudio::ipc::Playlists& v) {
-                std::span<const caudio::db::Playlist> playlistSpan(v.playlists.data(),
+                std::span<const caudio::types::Playlist> playlistSpan(v.playlists.data(),
                                                                    v.playlists.size());
                 caudio::println(os, "Playlists ({}):", playlistSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40}", "#", "ID", "Name");
@@ -290,7 +290,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os](const caudio::ipc::PlaylistData& v) {
-                std::span<const caudio::db::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
                 caudio::println(os, "Playlist ({} tracks):", tracksSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
                                 "Title", "Dur");

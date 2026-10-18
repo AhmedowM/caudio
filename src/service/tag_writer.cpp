@@ -54,12 +54,12 @@ void setXiphText(TagLib::Ogg::XiphComment* xc, const char* key, const std::strin
     xc->addField(key, toTagString(v), true);
 }
 
-void setXiphExtras(TagLib::Ogg::XiphComment* xc, const caudio::db::Track& t) {
+void setXiphExtras(TagLib::Ogg::XiphComment* xc, const caudio::types::Track& t) {
     setXiphText(xc, "ALBUMARTIST", t.album_artist);
     setXiphText(xc, "DISCNUMBER", t.disc_num > 0 ? std::to_string(t.disc_num) : std::string{});
 }
 
-void setId3v2Extras(TagLib::ID3v2::Tag* t2, const caudio::db::Track& t) {
+void setId3v2Extras(TagLib::ID3v2::Tag* t2, const caudio::types::Track& t) {
     setId3v2Text(t2, "TPE2", t.album_artist);
     if (t.disc_num > 0)
         setId3v2Text(t2, "TPOS", std::to_string(t.disc_num));
@@ -67,7 +67,7 @@ void setId3v2Extras(TagLib::ID3v2::Tag* t2, const caudio::db::Track& t) {
         t2->removeFrames("TPOS");
 }
 
-void setApeExtras(TagLib::APE::Tag* ape, const caudio::db::Track& t) {
+void setApeExtras(TagLib::APE::Tag* ape, const caudio::types::Track& t) {
     if (t.album_artist.empty())
         ape->removeItem("Album Artist");
     else
@@ -94,7 +94,7 @@ bool canWriteFileTags(const std::filesystem::path& p) {
 }
 
 caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
-                                            const caudio::db::Track& t) {
+                                            const caudio::types::Track& t) {
     if (!canWriteFileTags(p)) {
         return std::unexpected(caudio::utils::makeError(
             caudio::utils::StatusCode::InvalidArg,
@@ -185,8 +185,8 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
     return {};
 }
 
-caudio::utils::Expected<caudio::db::Track> reregisterTrackRow(caudio::db::Database& db,
-                                                              caudio::db::Track t) {
+caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
+                                                              caudio::types::Track t) {
     auto fpRes = caudio::db::internal::computeFingerprint(t.path);
     if (!fpRes)
         return std::unexpected{fpRes.error()};

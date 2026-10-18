@@ -63,7 +63,7 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
     return {};
 }
 
-std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -79,7 +79,7 @@ std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, i
     if (!hasRow) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
     }
-    QueueItem it;
+    caudio::types::QueueItem it;
     it.id = st.columnInt(0);
     it.queue_id = st.columnInt(1);
     it.track_id = st.columnInt(2);
@@ -105,7 +105,7 @@ std::expected<QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, i
     return it;
 }
 
-std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -121,7 +121,7 @@ std::expected<QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int6
     if (!hasRow) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
     }
-    QueueItem it;
+    caudio::types::QueueItem it;
     it.id = st.columnInt(0);
     it.queue_id = st.columnInt(1);
     it.track_id = st.columnInt(2);
@@ -179,7 +179,7 @@ std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, int64_t 
     return {};
 }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
                                                                             int64_t qid) {
     if (qid == 0)
         qid = 1;
@@ -192,9 +192,9 @@ std::expected<std::vector<QueueItem>, caudio::utils::Error> queueListLocked(sqli
     if (!e)
         return std::unexpected{e.error()};
     st.bindInt(1, qid);
-    std::vector<QueueItem> out;
+    std::vector<caudio::types::QueueItem> out;
     while (st.step()) {
-        QueueItem it;
+        caudio::types::QueueItem it;
         it.id = st.columnInt(0);
         it.queue_id = st.columnInt(1);
         it.track_id = st.columnInt(2);
@@ -392,7 +392,7 @@ std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_
     return {};
 }
 
-std::expected<std::vector<QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
                                                                                 int64_t qid) {
     return queueListLocked(db, qid);
 }

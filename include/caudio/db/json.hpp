@@ -25,7 +25,7 @@ namespace caudio::db {
  * @par Thread safety
  * Pure function, thread-safe.
  */
-caudio::utils::Json trackToJson(const Track& t);
+caudio::utils::Json trackToJson(const caudio::types::Track& t);
 
 /**
  * @brief Deserializes a Track from ordered JSON.
@@ -39,7 +39,7 @@ caudio::utils::Json trackToJson(const Track& t);
  * Pure function, thread-safe.
  * @see trackToJson
  */
-std::expected<Track, caudio::utils::Error> trackFromJson(const caudio::utils::Json& j);
+std::expected<caudio::types::Track, caudio::utils::Error> trackFromJson(const caudio::utils::Json& j);
 
 /**
  * @brief Exports all tracks to a JSON file.

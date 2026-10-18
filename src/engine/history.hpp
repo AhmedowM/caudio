@@ -65,7 +65,7 @@ namespace caudio::engine {
 class History final {
   public:
     using ExpectedVoid = std::expected<void, caudio::utils::Error>; ///< Void or Error.
-    using ExpectedEntries = std::expected<std::vector<caudio::db::HistoryEntry>,
+    using ExpectedEntries = std::expected<std::vector<caudio::types::HistoryEntry>,
                                           caudio::utils::Error>; ///< Entries or Error.
 
     /**

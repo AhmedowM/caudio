@@ -28,7 +28,7 @@ TEST_CASE("engine queue shuffle creates perm via mt19937", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 4; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "p" + std::to_string(i) + ".wav";
         t.duration = 1.0;
         for (int b = 0; b < 32; ++b)
@@ -78,7 +78,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "p" + std::to_string(i) + ".wav";
         t.duration = 1.0;
         for (int b = 0; b < 32; ++b)
@@ -137,7 +137,7 @@ TEST_CASE("engine queue repeat All loops", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "q" + std::to_string(i) + ".wav";
         t.duration = 1.0;
         for (int b = 0; b < 32; ++b)
@@ -192,7 +192,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t;
+    caudio::types::Track t;
     t.path = "one.wav";
     t.duration = 5.0;
     for (int b = 0; b < 32; ++b)
@@ -202,7 +202,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     // add second track to have queue non-empty for non-shuffle One path? But One with !shuffle uses
     // seek path, not queue
-    Track t2;
+    caudio::types::Track t2;
     t2.path = "two.wav";
     t2.duration = 5.0;
     for (int b = 0; b < 32; ++b)
@@ -235,7 +235,7 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
         REQUIRE(dbRes.has_value());
         auto db = std::move(dbRes.value());
         for (int i = 0; i < 3; ++i) {
-            Track t;
+            caudio::types::Track t;
             t.path = "persist" + std::to_string(i) + ".wav";
             t.duration = 1.0;
             for (int b = 0; b < 32; ++b)
@@ -334,7 +334,7 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 2; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "resume" + std::to_string(i) + ".wav";
         t.duration = 10.0;
         for (int b = 0; b < 32; ++b)
@@ -372,7 +372,7 @@ TEST_CASE("engine prev non-shuffle", "[engine_queue]") {
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
     for (int i = 0; i < 3; ++i) {
-        Track t;
+        caudio::types::Track t;
         t.path = "prev" + std::to_string(i) + ".wav";
         t.duration = 1.0;
         for (int b = 0; b < 32; ++b)
@@ -408,7 +408,7 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         REQUIRE(dbRes.has_value());
         auto db = std::move(dbRes.value());
         for (int i = 0; i < 4; ++i) {
-            Track t;
+            caudio::types::Track t;
             t.path = "persist_cursor" + std::to_string(i) + ".wav";
             t.duration = 1.0;
             for (int b = 0; b < 32; ++b)
@@ -475,7 +475,7 @@ TEST_CASE("engine play missing file fails without simulation", "[engine_queue]")
     auto dbRes = Database::open(dbPath);
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t;
+    caudio::types::Track t;
     t.path = "no-such-file.wav";
     t.duration = 1.0;
     for (int b = 0; b < 32; ++b)

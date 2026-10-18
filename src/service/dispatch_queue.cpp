@@ -51,7 +51,7 @@ Service::Impl::handle(const caudio::ipc::QueueList& ql) {
     auto items = db_->queueList(qid);
     if (!items)
         return std::unexpected{items.error()};
-    std::vector<caudio::db::Track> tracks;
+    std::vector<caudio::types::Track> tracks;
     tracks.reserve(items->size());
     for (auto& it : *items) {
         auto tr = db_->getTrack(it.track_id);
@@ -64,7 +64,7 @@ Service::Impl::handle(const caudio::ipc::QueueList& ql) {
         // anything missing follows in insertion order.
         auto perm = engine_->shufflePermFor(qid);
         if (!perm.empty()) {
-            std::vector<caudio::db::Track> ordered;
+            std::vector<caudio::types::Track> ordered;
             ordered.reserve(tracks.size());
             std::vector<char> seen(tracks.size(), 0);
             for (int64_t p : perm) {
@@ -209,7 +209,7 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
             auto trRes = detail::ensureLibraryTrack(*db_, p);
             if (!trRes)
                 return std::unexpected{trRes.error()};
-            caudio::db::Track t = std::move(*trRes);
+            caudio::types::Track t = std::move(*trRes);
             int64_t newId = t.id;
             // Skip the enqueue when already queued: duplicates warn
             // client-side, they must not create rows.
@@ -229,13 +229,13 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
                 engine_->noteEnqueued(qid, 1);
             }
             updateShmStatus();
-            std::vector<caudio::db::Track> single;
+            std::vector<caudio::types::Track> single;
             single.reserve(1);
             single.push_back(std::move(t));
             return Result{QueueTracks{std::move(single)}};
         }
     }
-    std::vector<caudio::db::Track> toAdd;
+    std::vector<caudio::types::Track> toAdd;
     if (qa.search) {
         auto sr = caudio::db::search(*db_, qa.query, 50);
         if (!sr)
@@ -380,7 +380,7 @@ Service::Impl::handle(const caudio::ipc::QueueRemove& qr) {
     auto items = db_->queueList(qid);
     if (!items)
         return std::unexpected{items.error()};
-    std::vector<caudio::db::Track> tracks;
+    std::vector<caudio::types::Track> tracks;
     for (auto& it : *items) {
         auto tr = db_->getTrack(it.track_id);
         if (tr)
@@ -424,7 +424,7 @@ Service::Impl::handle(const caudio::ipc::QueueMove& qm) {
     auto nitems = db_->queueList(qid);
     if (!nitems)
         return std::unexpected{nitems.error()};
-    std::vector<caudio::db::Track> tracks;
+    std::vector<caudio::types::Track> tracks;
     for (auto& it : *nitems) {
         auto tr = db_->getTrack(it.track_id);
         if (tr)

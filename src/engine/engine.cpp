@@ -69,7 +69,7 @@ struct Engine::Impl {
     std::shared_mutex* dbMutex() const noexcept;
     std::expected<void, caudio::utils::Error>
     withTransaction(std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
-    std::expected<caudio::db::Track, caudio::utils::Error> fetchTrackByPosLocked(int64_t qid,
+    std::expected<caudio::types::Track, caudio::utils::Error> fetchTrackByPosLocked(int64_t qid,
                                                                                  int64_t pos);
 
     // queue locking
@@ -86,7 +86,7 @@ struct Engine::Impl {
     ExpectedVoid stop();
     ExpectedVoid seek(double seconds);
     ExpectedVoid suspendCurrentTrack();
-    ExpectedVoid resumeAfterTagWrite(const caudio::db::Track& t, double pos, bool wasPaused);
+    ExpectedVoid resumeAfterTagWrite(const caudio::types::Track& t, double pos, bool wasPaused);
     ExpectedVoid next();
     ExpectedVoid autoNext();
     ExpectedVoid prev();
@@ -116,15 +116,15 @@ struct Engine::Impl {
 
     // library / history
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats();
-    std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     listHistory(int limit);
     std::expected<void, caudio::utils::Error> clearHistory();
     std::string lastError() const;
 
     // queue traversal
-    std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out);
-    std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::db::Track& out);
-    std::expected<void, caudio::utils::Error> doPlayTrack(caudio::db::Track& t);
+    std::expected<void, caudio::utils::Error> queueNextLocked(caudio::types::Track& out);
+    std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::types::Track& out);
+    std::expected<void, caudio::utils::Error> doPlayTrack(caudio::types::Track& t);
     void preroll();
 
     // callbacks / events
@@ -144,7 +144,7 @@ struct Engine::Impl {
     EngineConfig cfg_{};
     EngineState state_{};
     QueueState queue_{};
-    caudio::db::Track currentTrack_{};
+    caudio::types::Track currentTrack_{};
     std::atomic<bool> hasCurrent_{false};
     double duration_{0};
     std::atomic<float> volume_{1.0f};
@@ -225,7 +225,7 @@ Engine::ExpectedVoid Engine::suspendCurrentTrack() {
     return impl_->suspendCurrentTrack();
 }
 
-Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
+Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::types::Track& t, double pos,
                                                  bool wasPaused) {
     return impl_->resumeAfterTagWrite(t, pos, wasPaused);
 }
@@ -282,7 +282,7 @@ std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
     return impl_->getStats();
 }
 
-std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
 Engine::listHistory(int limit) {
     return impl_->listHistory(limit);
 }
@@ -452,7 +452,7 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     if (!tryLockQueueFor(kQueueLockWait))
         return queueBusy("play", "queue busy");
     queue_.queue_id = queueId;
-    caudio::db::Track t;
+    caudio::types::Track t;
     auto r = queueNextLocked(t);
     if (!r) {
         unlockQueue();
@@ -593,7 +593,7 @@ Engine::ExpectedVoid Engine::Impl::suspendCurrentTrack() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
+Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::types::Track& t, double pos,
                                                        bool wasPaused) {
     if (!tryLockQueueFor(kQueueLockWait)) {
         return queueBusy("resume", "queue busy");
@@ -606,7 +606,7 @@ Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::db::Track& 
         return {};
     }
     bool marked = markedPlayed_.load(std::memory_order_acquire);
-    caudio::db::Track reopen = t;
+    caudio::types::Track reopen = t;
     auto r = doPlayTrack(reopen);
     markedPlayed_.store(marked, std::memory_order_release);
     if (!r) {
@@ -725,7 +725,7 @@ std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::Impl::getStats(
     return db_->getStats();
 }
 
-std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
 Engine::Impl::listHistory(int limit) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
@@ -901,7 +901,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
             return {};
         }
     }
-    caudio::db::Track t;
+    caudio::types::Track t;
     auto r = queueNextLocked(t);
     if (!r) {
         unlockQueue();
@@ -919,7 +919,7 @@ Engine::ExpectedVoid Engine::Impl::prev() {
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueueFor(kQueueLockWait))
         return queueBusy("prev", "busy");
-    caudio::db::Track t;
+    caudio::types::Track t;
     auto r = queuePrevLocked(t);
     if (!r) {
         unlockQueue();
@@ -1325,7 +1325,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::persistCursorLocked() {
     });
 }
 
-std::expected<caudio::db::Track, caudio::utils::Error>
+std::expected<caudio::types::Track, caudio::utils::Error>
 Engine::Impl::fetchTrackByPosLocked(int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;
@@ -1405,7 +1405,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::setShuffleLocked(bool on
     }
 }
 
-std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::db::Track& out) {
+std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::types::Track& out) {
     if (queue_.queue_id == 0)
         queue_.queue_id = 1;
     if (queue_.shuffle) {
@@ -1486,7 +1486,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::db::Track& out) {
+std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::types::Track& out) {
     if (!queue_.shuffle) {
         size_t cnt = db_->queueCountLocked(queue_.queue_id);
         if (cnt == 0)
@@ -1533,7 +1533,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::db::Track& t) {
+std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::types::Track& t) {
     // try to open decoder path
     std::string path = t.path;
     // reset previous

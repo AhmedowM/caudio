@@ -17,7 +17,7 @@ using namespace caudio::utils;
 using namespace caudio::test_helpers;
 
 TEST_CASE("trackToJson and trackFromJson roundtrip ordered", "[db_json]") {
-    Track t;
+    caudio::types::Track t;
     t.id = 1;
     t.path = "/music/a.mp3";
     t.title = "Title";
@@ -59,7 +59,7 @@ TEST_CASE("exportJson and importJson roundtrip", "[db_json]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t;
+    caudio::types::Track t;
     t.path = "/tmp/j.mp3";
     t.title = "JsonTrack";
     t.artist = "JsonArtist";
@@ -96,7 +96,7 @@ TEST_CASE("importJson handles duplicate fingerprint upsert", "[db_json]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
     auto db = std::move(dbRes.value());
-    Track t;
+    caudio::types::Track t;
     t.path = "/tmp/dup.mp3";
     t.title = "Dup";
     for (int b = 0; b < 32; ++b)

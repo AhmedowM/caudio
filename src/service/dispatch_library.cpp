@@ -124,8 +124,8 @@ Service::Impl::handle(const caudio::ipc::LibrarySearch& cmd) {
     if (!tracks)
         return std::unexpected{tracks.error()};
     // fallback to like handled inside search; if empty still return
-    std::span<const caudio::db::Track> span{*tracks};
-    std::vector<caudio::db::Track> out(span.begin(), span.end());
+    std::span<const caudio::types::Track> span{*tracks};
+    std::vector<caudio::types::Track> out(span.begin(), span.end());
     return Result{caudio::ipc::SearchResults{cmd.query, std::move(out)}};
 }
 
@@ -248,7 +248,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
         auto fpRes = caudio::db::internal::computeFingerprint(fp);
         if (!fpRes)
             return std::unexpected{fpRes.error()};
-        caudio::db::Track t;
+        caudio::types::Track t;
         t.path = fp.generic_string();
         t.fingerprint = *fpRes;
         t.duration = detail::durationFromDecoder(fp);
@@ -423,7 +423,7 @@ Service::Impl::handle(const caudio::ipc::TagEdit& cmd) {
     auto trRes = db_->getTrack(cmd.id);
     if (!trRes)
         return std::unexpected{trRes.error()};
-    caudio::db::Track t = std::move(*trRes);
+    caudio::types::Track t = std::move(*trRes);
     if (cmd.field == "title")
         t.title = cmd.value;
     else if (cmd.field == "artist")
@@ -537,8 +537,8 @@ Service::Impl::handle(const caudio::ipc::PlaylistList&) {
     auto pls = db_->listPlaylists();
     if (!pls)
         return std::unexpected{pls.error()};
-    std::span<const caudio::db::Playlist> span{*pls};
-    std::vector<caudio::db::Playlist> out(span.begin(), span.end());
+    std::span<const caudio::types::Playlist> span{*pls};
+    std::vector<caudio::types::Playlist> out(span.begin(), span.end());
     return Result{Playlists{std::move(out)}};
 }
 
@@ -547,8 +547,8 @@ Service::Impl::handle(const caudio::ipc::PlaylistTracks& cmd) {
     auto tracks = db_->playlistGetTracks(cmd.pid);
     if (!tracks)
         return std::unexpected{tracks.error()};
-    std::span<const caudio::db::Track> span{*tracks};
-    std::vector<caudio::db::Track> out(span.begin(), span.end());
+    std::span<const caudio::types::Track> span{*tracks};
+    std::vector<caudio::types::Track> out(span.begin(), span.end());
     return Result{PlaylistData{std::move(out), {}}};
 }
 
@@ -575,7 +575,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistLoad& cmd) {
     }
     std::vector<int64_t> ids;
     ids.reserve(tracks->size());
-    for (auto& t : std::span<const caudio::db::Track>(*tracks))
+    for (auto& t : std::span<const caudio::types::Track>(*tracks))
         ids.push_back(t.id);
     if (!ids.empty()) {
         auto er = db_->queueEnqueueBatch(qid, ids);
@@ -614,7 +614,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistSave& cmd) {
     // Queues may hold legacy duplicates; playlists forbid them.
     std::vector<int64_t> seen;
     seen.reserve(items->size());
-    for (auto& it : std::span<const caudio::db::QueueItem>(*items)) {
+    for (auto& it : std::span<const caudio::types::QueueItem>(*items)) {
         if (std::find(seen.begin(), seen.end(), it.track_id) != seen.end())
             continue;
         seen.push_back(it.track_id);
@@ -645,7 +645,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistAdd& cmd) {
     if (!tr)
         return std::unexpected{tr.error()};
     if (auto items = db_->playlistGetTracks(cmd.pid)) {
-        for (auto& t : std::span<const caudio::db::Track>(*items)) {
+        for (auto& t : std::span<const caudio::types::Track>(*items)) {
             if (t.id == cmd.track_id) {
                 return std::unexpected{caudio::utils::makeError(
                     caudio::utils::StatusCode::AlreadyExists, "already on playlist")};
@@ -682,9 +682,9 @@ Service::Impl::handle(const caudio::ipc::PlaylistExport& cmd) {
     auto tracks = db_->playlistGetTracks(cmd.pid);
     if (!tracks)
         return std::unexpected{tracks.error()};
-    std::vector<caudio::db::Track> out;
+    std::vector<caudio::types::Track> out;
     out.reserve(tracks->size());
-    for (auto& t : std::span<const caudio::db::Track>(*tracks))
+    for (auto& t : std::span<const caudio::types::Track>(*tracks))
         out.push_back(std::move(t));
     return Result{PlaylistData{std::move(out), cmd.format}};
 }
@@ -763,7 +763,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistImport& cmd) {
     std::vector<int64_t> trackIds;
     trackIds.reserve(lines.size());
     // Separator-insensitive lookup: stored rows mix native and generic forms.
-    auto findTrack = [&](const std::string& line, caudio::db::Track& out) -> bool {
+    auto findTrack = [&](const std::string& line, caudio::types::Track& out) -> bool {
         if (auto tr = db_->findByPath(line)) {
             out = std::move(*tr);
             return true;
@@ -793,7 +793,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistImport& cmd) {
     };
     size_t matched = 0, skipped = 0, duplicates = 0;
     for (const auto& line : lines) {
-        caudio::db::Track tr;
+        caudio::types::Track tr;
         if (!findTrack(line, tr)) {
             ++skipped;
             continue;
@@ -821,7 +821,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistImport& cmd) {
     rep.duplicates = duplicates;
     auto tracksRes = db_->playlistGetTracks(*pidRes);
     if (tracksRes) {
-        for (auto& t : std::span<const caudio::db::Track>(*tracksRes))
+        for (auto& t : std::span<const caudio::types::Track>(*tracksRes))
             rep.tracks.push_back(std::move(t));
     }
     return Result{std::move(rep)};
