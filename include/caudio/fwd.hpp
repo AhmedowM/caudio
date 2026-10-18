@@ -39,9 +39,9 @@ struct EngineCallbacks;
 struct EngineEvent;
 struct EngineState;
 struct QueueState;
-enum class PlaybackState : int;
-enum class RepeatMode : int;
 enum class EngineEventType : int;
+// PlaybackState / RepeatMode are wire enums owned by `caudio::types` (see
+// types/wire.hpp); `caudio::engine` re-exports them as aliases (engine/types.hpp).
 } // namespace caudio::engine
 
 namespace caudio::player {
@@ -59,6 +59,11 @@ class ShmStatusHandle;
 namespace caudio::ipc {
 struct Status;
 } // namespace caudio::ipc
+
+namespace caudio::types {
+enum class RepeatMode : int;
+enum class PlaybackState : int;
+} // namespace caudio::types
 
 namespace caudio::client {
 class IpcClient;

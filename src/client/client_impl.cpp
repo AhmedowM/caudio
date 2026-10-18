@@ -2,7 +2,6 @@
 #include <caudio/client/core.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
-#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/shm_status.hpp>
@@ -133,7 +132,7 @@ caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
     if (shmRes) {
         auto snapshot = shmRes->snapshot();
         caudio::ipc::Status s{};
-        s.state = static_cast<caudio::engine::PlaybackState>(snapshot.state);
+        s.state = static_cast<caudio::types::PlaybackState>(snapshot.state);
         s.pos = snapshot.position;
         s.dur = snapshot.duration;
         s.vol = snapshot.volume;

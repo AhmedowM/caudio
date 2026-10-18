@@ -383,7 +383,7 @@ struct QueueRepeat final {
     /**
      * @brief Repeat mode to set. If omitted, returns current mode via status.
      */
-    std::optional<caudio::engine::RepeatMode> mode{};
+    std::optional<caudio::types::RepeatMode> mode{};
 };
 
 // ---------------------------------------------------------------------------

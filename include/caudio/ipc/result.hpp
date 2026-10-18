@@ -24,7 +24,7 @@
  */
 
 #include <caudio/db/types.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -66,7 +66,7 @@ struct Status final {
     /**
      * @brief Current playback state.
      */
-    caudio::engine::PlaybackState state{caudio::engine::PlaybackState::Stopped};
+    caudio::types::PlaybackState state{caudio::types::PlaybackState::Stopped};
     /**
      * @brief Current playback position in seconds.
      */
@@ -90,7 +90,7 @@ struct Status final {
     /**
      * @brief Current repeat mode.
      */
-    caudio::engine::RepeatMode repeat{caudio::engine::RepeatMode::Off};
+    caudio::types::RepeatMode repeat{caudio::types::RepeatMode::Off};
     /**
      * @brief ID of the currently playing track (0 if none).
      */

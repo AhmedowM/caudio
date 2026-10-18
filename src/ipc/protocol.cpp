@@ -1,9 +1,9 @@
 #include <caudio/db/json.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/result.hpp>
@@ -22,8 +22,8 @@
 
 namespace caudio::ipc::detail {
 
-std::string playbackStateToString(caudio::engine::PlaybackState s) {
-    using PS = caudio::engine::PlaybackState;
+std::string playbackStateToString(caudio::types::PlaybackState s) {
+    using PS = caudio::types::PlaybackState;
     switch (s) {
     case PS::Stopped:
         return "Stopped";
@@ -38,9 +38,9 @@ std::string playbackStateToString(caudio::engine::PlaybackState s) {
     }
 }
 
-std::expected<caudio::engine::PlaybackState, caudio::utils::Error>
+std::expected<caudio::types::PlaybackState, caudio::utils::Error>
 playbackStateFromString(std::string_view sv) {
-    using PS = caudio::engine::PlaybackState;
+    using PS = caudio::types::PlaybackState;
     if (sv == "Stopped")
         return PS::Stopped;
     if (sv == "Ready")
@@ -53,8 +53,8 @@ playbackStateFromString(std::string_view sv) {
         caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown PlaybackState")};
 }
 
-std::string repeatModeToString(caudio::engine::RepeatMode m) {
-    using RM = caudio::engine::RepeatMode;
+std::string repeatModeToString(caudio::types::RepeatMode m) {
+    using RM = caudio::types::RepeatMode;
     switch (m) {
     case RM::Off:
         return "Off";
@@ -67,9 +67,9 @@ std::string repeatModeToString(caudio::engine::RepeatMode m) {
     }
 }
 
-std::expected<caudio::engine::RepeatMode, caudio::utils::Error>
+std::expected<caudio::types::RepeatMode, caudio::utils::Error>
 repeatModeFromString(std::string_view sv) {
-    using RM = caudio::engine::RepeatMode;
+    using RM = caudio::types::RepeatMode;
     if (sv == "Off")
         return RM::Off;
     if (sv == "All")
@@ -1037,7 +1037,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 s.state = *ps;
             } else if (j.contains("state_value") && j["state_value"].isNumber()) {
                 int v = j["state_value"].get<int>();
-                s.state = static_cast<caudio::engine::PlaybackState>(v);
+                s.state = static_cast<caudio::types::PlaybackState>(v);
             }
             if (j.contains("pos") && j["pos"].isNumber())
                 s.pos = j["pos"].get<double>();
@@ -1056,7 +1056,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 s.repeat = *rm;
             } else if (j.contains("repeat_value") && j["repeat_value"].isNumber()) {
                 int v = j["repeat_value"].get<int>();
-                s.repeat = static_cast<caudio::engine::RepeatMode>(v);
+                s.repeat = static_cast<caudio::types::RepeatMode>(v);
             }
             if (j.contains("track_id") && j["track_id"].isNumber())
                 s.track_id = j["track_id"].get<int64_t>();

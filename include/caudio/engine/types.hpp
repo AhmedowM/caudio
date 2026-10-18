@@ -41,6 +41,7 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/types/wire.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -53,32 +54,24 @@ namespace caudio::engine {
 /**
  * @brief Repeat mode for queue advancement.
  * @ingroup caudio_engine
- * @details Controls wrap behaviour in Engine::queueNextLocked and
- * Engine::queuePrevLocked when `cursor` reaches the end or start.
- * - `Off`: linear; shuffle wrappers reshuffle and non-shuffle wraps to 0.
- * - `All`: same wrap as Off; single-track repeat is only via `One`.
- * - `One`: repeats the current track (seek 0 / stay on last position)
- *   without advancing the cursor.
- * @see QueueState
- * @see Engine::setRepeat
+ * @details Alias of the wire enum owned by `caudio::types` (see
+ * `caudio/types/wire.hpp`); re-exported here so engine-side code keeps the
+ * `caudio::engine::RepeatMode` spelling. Controls wrap behaviour in
+ * Engine::queueNextLocked / Engine::queuePrevLocked.
+ * @see caudio::types::RepeatMode
  */
-enum class RepeatMode : int { Off = 0, All = 1, One = 2 };
+using RepeatMode = caudio::types::RepeatMode;
 
 /**
  * @brief Playback state machine.
  * @ingroup caudio_engine
- * @details State transitions (Engine):
- * - `Stopped -> Playing` via Engine::play() (queueNextLocked + doPlayTrack).
- * - `Playing -> Paused` via Engine::pause() (records pausePos_).
- * - `Paused -> Playing` via Engine::resume() / play() resume path.
- * - `Playing -> Playing` (restart) via play() when already playing (seek 0).
- * - Any -> `Stopped` via Engine::stop().
- * Backed by `std::atomic<PlaybackState>` (`playbackState_`).
- * @see Engine::state
- * @see Engine::play
- * @see Engine::pause
+ * @details Alias of the wire enum owned by `caudio::types` (see
+ * `caudio/types/wire.hpp`); re-exported here so engine-side code keeps the
+ * `caudio::engine::PlaybackState` spelling. Backed by
+ * `std::atomic<PlaybackState>` (`playbackState_`).
+ * @see caudio::types::PlaybackState
  */
-enum class PlaybackState : int { Stopped = 0, Ready = 1, Playing = 2, Paused = 3 };
+using PlaybackState = caudio::types::PlaybackState;
 
 /**
  * @brief Engine event types emitted via MpscQueue.

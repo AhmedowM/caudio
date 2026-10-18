@@ -120,7 +120,7 @@ namespace detail {
  * @param s Playback state to convert.
  * @return String representation ("Stopped", "Ready", "Playing", "Paused", "Unknown").
  */
-std::string playbackStateToString(caudio::engine::PlaybackState s);
+std::string playbackStateToString(caudio::types::PlaybackState s);
 
 /**
  * @brief Convert string to PlaybackState enum.
@@ -128,7 +128,7 @@ std::string playbackStateToString(caudio::engine::PlaybackState s);
  * @param sv String to parse ("Stopped", "Ready", "Playing", "Paused").
  * @return PlaybackState enum value, or error if unknown.
  */
-std::expected<caudio::engine::PlaybackState, caudio::utils::Error>
+std::expected<caudio::types::PlaybackState, caudio::utils::Error>
 playbackStateFromString(std::string_view sv);
 
 /**
@@ -137,7 +137,7 @@ playbackStateFromString(std::string_view sv);
  * @param m Repeat mode to convert.
  * @return String representation ("Off", "Queue", "One", "Unknown").
  */
-std::string repeatModeToString(caudio::engine::RepeatMode m);
+std::string repeatModeToString(caudio::types::RepeatMode m);
 
 /**
  * @brief Convert string to RepeatMode enum.
@@ -145,7 +145,7 @@ std::string repeatModeToString(caudio::engine::RepeatMode m);
  * @param sv String to parse ("Off", "Queue", "One").
  * @return RepeatMode enum value, or error if unknown.
  */
-std::expected<caudio::engine::RepeatMode, caudio::utils::Error>
+std::expected<caudio::types::RepeatMode, caudio::utils::Error>
 repeatModeFromString(std::string_view sv);
 
 /**

@@ -965,7 +965,7 @@ int Shell::run(int argc, char** argv) {
         // resume afterwards. Best-effort and silent: daemon-less runs and
         // mid-preview failures just preview. Only resumes if still paused
         // (the user may have driven the daemon from elsewhere meanwhile).
-        auto daemonState = [this]() -> std::optional<caudio::engine::PlaybackState> {
+        auto daemonState = [this]() -> std::optional<caudio::types::PlaybackState> {
             caudio::client::Client probe{config_.dbPath, config_.socketPath};
             auto pres = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}},
                                    std::chrono::milliseconds{2000});
@@ -978,11 +978,11 @@ int Shell::run(int argc, char** argv) {
         bool ducked = false;
         if (!previewKeepPlaying) {
             auto state = daemonState();
-            if (state == caudio::engine::PlaybackState::Playing)
+            if (state == caudio::types::PlaybackState::Playing)
                 ducked = app_.pause().has_value();
         }
         auto rc = detail::render(app_.previewFile(previewFile), false);
-        if (ducked && daemonState() == caudio::engine::PlaybackState::Paused)
+        if (ducked && daemonState() == caudio::types::PlaybackState::Paused)
             (void)app_.resume();
         return rc;
     }
