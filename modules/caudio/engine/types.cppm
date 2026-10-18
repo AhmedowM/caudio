@@ -9,7 +9,5 @@ using ::caudio::engine::EngineConfig;
 using ::caudio::engine::EngineEvent;
 using ::caudio::engine::EngineEventType;
 using ::caudio::engine::EngineState;
-using ::caudio::engine::PlaybackState;
 using ::caudio::engine::QueueState;
-using ::caudio::engine::RepeatMode;
 } // namespace caudio::engine

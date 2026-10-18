@@ -40,17 +40,18 @@
  *   Engine, Database and the IPC server.
  * - config -- JSON config file, socket/pid/lock path derivation.
  *
- * Layer rule (enforced by link dependencies):
+ * Layer rule (enforced by link dependencies; each line lists its direct
+ * caudio dependencies):
  * @code
- * caudio.utils  (no deps) -- caudio.types (no deps)
- *    |'
- * caudio.player (utils) -- caudio.db (utils)
- *    |'                        |'
- * caudio.engine (utils, player, db)
- *    |'
- * caudio.ipc (engine, db, utils) -- caudio.client (ipc, utils, service)
- *    |'
- * caudio.service (ipc, engine, db, utils)
+ * caudio.types   (no deps)
+ * caudio.utils   (no caudio deps)
+ * caudio.player  (utils)
+ * caudio.db      (utils, player)
+ * caudio.engine  (utils, player, db)
+ * caudio.ipc     (utils, db)
+ * caudio.client  (utils, ipc)
+ * caudio.service (utils, ipc, engine, db)
+ * caudio.app     (utils, ipc, client, service, db, player)
  * @endcode
  *
  * Threading model:
