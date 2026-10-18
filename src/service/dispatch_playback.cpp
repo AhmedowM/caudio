@@ -70,7 +70,7 @@ Service::Impl::handle(const caudio::ipc::Restart&) {
         return statusResult();
     }
     // ensure playing
-    if (engine_->state() == caudio::engine::PlaybackState::Paused) {
+    if (engine_->state() == caudio::types::PlaybackState::Paused) {
         (void)engine_->resume();
     }
     updateShmStatus();

@@ -98,13 +98,13 @@ struct Engine::Impl {
     float volume() const noexcept;
     ExpectedVoid setPreMuteVolume(float g);
     float preMuteVolume() const noexcept;
-    PlaybackState state() const noexcept;
+    caudio::types::PlaybackState state() const noexcept;
     double duration() const noexcept;
     double position() const noexcept;
     int64_t currentTrackId() const noexcept;
     double currentPositionLocked() const noexcept;
     bool shuffle() const noexcept;
-    RepeatMode repeat() const noexcept;
+    caudio::types::RepeatMode repeat() const noexcept;
     int64_t activeQueueId() const noexcept;
 
     // shuffle / repeat
@@ -112,7 +112,7 @@ struct Engine::Impl {
     void noteEnqueued(int64_t qid, std::size_t count) noexcept;
     ExpectedVoid setShuffle(bool on);
     std::expected<void, caudio::utils::Error> setShuffleLocked(bool on);
-    ExpectedVoid setRepeat(RepeatMode m);
+    ExpectedVoid setRepeat(caudio::types::RepeatMode m);
 
     // library / history
     std::expected<caudio::db::DbStats, caudio::utils::Error> getStats();
@@ -149,7 +149,7 @@ struct Engine::Impl {
     double duration_{0};
     std::atomic<float> volume_{1.0f};
     std::atomic<float> preMute_{0.5f};
-    std::atomic<PlaybackState> playbackState_{PlaybackState::Stopped};
+    std::atomic<caudio::types::PlaybackState> playbackState_{caudio::types::PlaybackState::Stopped};
     std::chrono::steady_clock::time_point playStart_{};
     double pausePos_{0};
     std::atomic<bool> markedPlayed_{false};
@@ -246,7 +246,7 @@ Engine::ExpectedVoid Engine::setPreMuteVolume(float g) {
     return impl_->setPreMuteVolume(g);
 }
 
-PlaybackState Engine::state() const noexcept {
+caudio::types::PlaybackState Engine::state() const noexcept {
     return impl_->state();
 }
 
@@ -274,7 +274,7 @@ void Engine::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     impl_->noteEnqueued(qid, count);
 }
 
-RepeatMode Engine::repeat() const noexcept {
+caudio::types::RepeatMode Engine::repeat() const noexcept {
     return impl_->repeat();
 }
 
@@ -299,7 +299,7 @@ Engine::ExpectedVoid Engine::setShuffle(bool on) {
     return impl_->setShuffle(on);
 }
 
-Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
+Engine::ExpectedVoid Engine::setRepeat(caudio::types::RepeatMode m) {
     return impl_->setRepeat(m);
 }
 
@@ -418,17 +418,17 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     if (queueId == 0)
         queueId = 1;
     auto s = playbackState_.load(std::memory_order_acquire);
-    if (s == PlaybackState::Paused) {
+    if (s == caudio::types::PlaybackState::Paused) {
         // resume, don't dequeue
         playStart_ = std::chrono::steady_clock::now();
-        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+        playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
         if (output_)
             output_->start();
         decodeCv_.notify_all();
         monCv_.notify_all();
         return {};
     }
-    if (s == PlaybackState::Playing) {
+    if (s == caudio::types::PlaybackState::Playing) {
         // already playing, restart current track (seek 0), don't dequeue
         // serialize with decodeLoop (decoder_->decode / ring_->write) via decodeMtx_
         std::unique_lock<std::mutex> lk(decodeMtx_);
@@ -467,12 +467,12 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
 
 Engine::ExpectedVoid Engine::Impl::pause() {
     auto s = playbackState_.load(std::memory_order_acquire);
-    if (s != PlaybackState::Playing)
+    if (s != caudio::types::PlaybackState::Playing)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not playing"));
     // record pause position
     pausePos_ = currentPositionLocked();
-    playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Paused, std::memory_order_release);
     if (output_)
         output_->stop();
     return {};
@@ -480,11 +480,11 @@ Engine::ExpectedVoid Engine::Impl::pause() {
 
 Engine::ExpectedVoid Engine::Impl::resume() {
     auto s = playbackState_.load(std::memory_order_acquire);
-    if (s != PlaybackState::Paused)
+    if (s != caudio::types::PlaybackState::Paused)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not paused"));
     playStart_ = std::chrono::steady_clock::now();
-    playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
     if (output_)
         output_->start();
     decodeCv_.notify_all();
@@ -494,9 +494,9 @@ Engine::ExpectedVoid Engine::Impl::resume() {
 
 Engine::ExpectedVoid Engine::Impl::stop() {
     auto s = playbackState_.load(std::memory_order_acquire);
-    if (s == PlaybackState::Stopped)
+    if (s == caudio::types::PlaybackState::Stopped)
         return {};
-    playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
     // Release playback resources (decoder/output/ring hold tens of MB for
     // large files; measured +47 MB private retained after stop). Replay
     // re-opens via doPlayTrack. decodeMtx_ serializes with an in-flight
@@ -536,7 +536,7 @@ Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
 
     // Pause decode thread to safely seek + reset ring (prevents race with decodeLoop)
     std::unique_lock<std::mutex> lk(decodeMtx_);
-    playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Paused, std::memory_order_release);
     // snapshot for restore on error (Task 1: seek hardening)
     double savedPause = pausePos_;
     auto savedStart = playStart_;
@@ -546,7 +546,7 @@ Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
         if (!res) {
             pausePos_ = savedPause;
             playStart_ = savedStart;
-            playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+            playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
             return std::unexpected(res.error());
         }
     }
@@ -561,7 +561,7 @@ Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
         ring_->reset();
 
     // Resume decode thread
-    playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
     decodeCv_.notify_all();
     return {};
 }
@@ -579,7 +579,7 @@ Engine::ExpectedVoid Engine::Impl::suspendCurrentTrack() {
     // everything needed to resume stays in place. decodeMtx_ serializes with
     // an in-flight decode chunk (like stop(); queue-to-decodeMtx_ order).
     std::unique_lock<std::mutex> lk(decodeMtx_);
-    playbackState_.store(PlaybackState::Paused, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Paused, std::memory_order_release);
     if (output_)
         output_->stop();
     if (ring_)
@@ -670,7 +670,7 @@ float Engine::Impl::preMuteVolume() const noexcept {
     return preMute_.load(std::memory_order_relaxed);
 }
 
-PlaybackState Engine::Impl::state() const noexcept {
+caudio::types::PlaybackState Engine::Impl::state() const noexcept {
     return playbackState_.load(std::memory_order_acquire);
 }
 
@@ -692,7 +692,7 @@ bool Engine::Impl::shuffle() const noexcept {
     return queue_.shuffle;
 }
 
-RepeatMode Engine::Impl::repeat() const noexcept {
+caudio::types::RepeatMode Engine::Impl::repeat() const noexcept {
     return queue_.repeat;
 }
 
@@ -763,8 +763,8 @@ Engine::ExpectedVoid Engine::Impl::setShuffle(bool on) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::Impl::setRepeat(RepeatMode m) {
-    if (m != RepeatMode::Off && m != RepeatMode::All && m != RepeatMode::One)
+Engine::ExpectedVoid Engine::Impl::setRepeat(caudio::types::RepeatMode m) {
+    if (m != caudio::types::RepeatMode::Off && m != caudio::types::RepeatMode::All && m != caudio::types::RepeatMode::One)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
     if (!tryLockQueue())
@@ -840,7 +840,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
     // && hasCurrent => seek 0 and play - serialize with decodeLoop via decodeMtx_
-    if (!queue_.shuffle && queue_.repeat == RepeatMode::One &&
+    if (!queue_.shuffle && queue_.repeat == caudio::types::RepeatMode::One &&
         hasCurrent_.load(std::memory_order_acquire)) {
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
@@ -854,7 +854,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         }
         pausePos_ = 0;
         playStart_ = std::chrono::steady_clock::now();
-        playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+        playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
         markedPlayed_.store(false, std::memory_order_release);
         gaplessArmed_.store(false, std::memory_order_release);
         startedMs_ = (int64_t)detail::wallMs();
@@ -878,7 +878,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
             return queueBusy("next", "busy");
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Busy, "busy"));
     }
-    if (stopAtEnd && queue_.repeat == RepeatMode::Off) {
+    if (stopAtEnd && queue_.repeat == caudio::types::RepeatMode::Off) {
         // Natural track end: halt instead of wrapping. The cursor stays parked
         // past the end, so a later play wraps to the head. Manual next() still
         // wraps (same repeat mode).
@@ -891,7 +891,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         }
         if (atEnd) {
             unlockQueue();
-            playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+            playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
             if (output_)
                 output_->stop();
             if (ring_)
@@ -984,10 +984,10 @@ Engine::Impl::Impl(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
     cfg_.historyThresholdSecs = cfg.historyThresholdSecs ? cfg.historyThresholdSecs : 90;
     state_.volume = 1.0f;
     volume_.store(1.0f, std::memory_order_relaxed);
-    state_.repeatMode = RepeatMode::Off;
-    queue_.repeat = RepeatMode::Off;
+    state_.repeatMode = caudio::types::RepeatMode::Off;
+    queue_.repeat = caudio::types::RepeatMode::Off;
     queue_.queue_id = 1;
-    playbackState_.store(PlaybackState::Stopped, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
     hasCurrent_.store(false, std::memory_order_release);
     markedPlayed_.store(false, std::memory_order_release);
     gaplessArmed_.store(false, std::memory_order_release);
@@ -1036,9 +1036,9 @@ double Engine::Impl::currentPositionLocked() const noexcept {
     if (!hasCurrent_.load(std::memory_order_acquire))
         return 0.0;
     auto st = playbackState_.load(std::memory_order_acquire);
-    if (st == PlaybackState::Paused)
+    if (st == caudio::types::PlaybackState::Paused)
         return pausePos_;
-    if (st != PlaybackState::Playing)
+    if (st != caudio::types::PlaybackState::Playing)
         return pausePos_;
     auto now = std::chrono::steady_clock::now();
     double elapsed = std::chrono::duration<double>(now - playStart_).count();
@@ -1091,7 +1091,7 @@ std::optional<caudio::utils::Error> Engine::Impl::loadState() {
     rc = sqlite3_step(raw);
     if (rc == SQLITE_ROW) {
         state_.shuffleEnabled = sqlite3_column_int(raw, 0);
-        state_.repeatMode = (RepeatMode)sqlite3_column_int(raw, 1);
+        state_.repeatMode = (caudio::types::RepeatMode)sqlite3_column_int(raw, 1);
         state_.cursorPos = sqlite3_column_int64(raw, 2);
         state_.currentTrackId = sqlite3_column_int64(raw, 3);
         state_.volume = (float)sqlite3_column_double(raw, 4);
@@ -1163,7 +1163,7 @@ std::optional<caudio::utils::Error> Engine::Impl::loadState() {
     }
     if (rc == SQLITE_DONE) {
         state_.shuffleEnabled = 0;
-        state_.repeatMode = RepeatMode::Off;
+        state_.repeatMode = caudio::types::RepeatMode::Off;
         state_.cursorPos = 0;
         state_.currentTrackId = 0;
         state_.volume = 1.0f;
@@ -1172,7 +1172,7 @@ std::optional<caudio::utils::Error> Engine::Impl::loadState() {
         queue_.perm.clear();
         queue_.cursor = 0;
         queue_.shuffle = false;
-        queue_.repeat = RepeatMode::Off;
+        queue_.repeat = caudio::types::RepeatMode::Off;
         queue_.queue_id = 1;
         return std::nullopt;
     }
@@ -1422,7 +1422,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
                     caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no perm"));
         }
         if (queue_.cursor >= queue_.perm.size()) {
-            if (queue_.repeat == RepeatMode::One) {
+            if (queue_.repeat == caudio::types::RepeatMode::One) {
                 size_t idx = queue_.perm.size() - 1;
                 if (queue_.cursor > 0 && queue_.cursor <= queue_.perm.size())
                     idx = queue_.cursor - 1;
@@ -1455,7 +1455,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
     if (queue_.cursor >= cnt) {
-        if (queue_.repeat == RepeatMode::One) {
+        if (queue_.repeat == caudio::types::RepeatMode::One) {
             size_t idx = cnt - 1;
             if (queue_.cursor > 0 && queue_.cursor <= cnt)
                 idx = queue_.cursor - 1;
@@ -1632,7 +1632,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
     startedMs_ = (int64_t)detail::wallMs();
     state_.currentTrackId = t.id;
     state_.cursorPos = (int64_t)queue_.cursor;
-    playbackState_.store(PlaybackState::Playing, std::memory_order_release);
+    playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
     playStart_ = std::chrono::steady_clock::now();
     pausePos_ = 0;
     if (hasDb())
@@ -1843,7 +1843,7 @@ void Engine::Impl::doHistoryMark() {
 void Engine::Impl::engineTick() {
     doHistoryMark();
     auto st = playbackState_.load(std::memory_order_acquire);
-    if (st == PlaybackState::Playing) {
+    if (st == caudio::types::PlaybackState::Playing) {
         uint64_t now = detail::nowMs();
         uint64_t last = lastProgressMs_.load(std::memory_order_acquire);
         if (now - last >= 500) {
@@ -1891,7 +1891,7 @@ void Engine::Impl::monitorLoop(std::stop_token st) {
         lk.unlock();
         engineTick();
         int poll;
-        if (playbackState_.load(std::memory_order_acquire) == PlaybackState::Playing)
+        if (playbackState_.load(std::memory_order_acquire) == caudio::types::PlaybackState::Playing)
             poll = customPoll ? cfgPoll : 25;
         else
             poll = customPoll ? (cfgPoll > 100 ? cfgPoll : 100) : 100;
@@ -1909,13 +1909,13 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
     scratch.reserve(kMaxChunkFrames * 8);
     while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
         auto ps = playbackState_.load(std::memory_order_acquire);
-        if (ps != PlaybackState::Playing || !decoder_ || !ring_) {
+        if (ps != caudio::types::PlaybackState::Playing || !decoder_ || !ring_) {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Idle backoff (C-1): woken immediately by decodeCv_ on
             // play/seek/resume, so the longer timeout costs no latency.
             decodeCv_.wait_for(lk, std::chrono::milliseconds(50), [&st, this] {
                 return st.stop_requested() ||
-                       playbackState_.load(std::memory_order_acquire) == PlaybackState::Playing;
+                       playbackState_.load(std::memory_order_acquire) == caudio::types::PlaybackState::Playing;
             });
             continue;
         }
@@ -1943,7 +1943,7 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek()
-            if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+            if (playbackState_.load(std::memory_order_acquire) != caudio::types::PlaybackState::Playing)
                 continue;
             frames = decoder_->decode(chunk);
         }
@@ -1957,7 +1957,7 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek() ring reset
-            if (playbackState_.load(std::memory_order_acquire) != PlaybackState::Playing)
+            if (playbackState_.load(std::memory_order_acquire) != caudio::types::PlaybackState::Playing)
                 continue;
             writtenFrames = ring_->write(std::span<float>(scratch.data(), samples));
         }

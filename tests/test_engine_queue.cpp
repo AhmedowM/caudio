@@ -94,7 +94,7 @@ TEST_CASE("engine queue repeat Off stops at end", "[engine_queue]") {
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
-    REQUIRE(eng->setRepeat(RepeatMode::Off).has_value());
+    REQUIRE(eng->setRepeat(caudio::types::RepeatMode::Off).has_value());
     REQUIRE(eng->play(1).has_value());
     {
         sqlite3* ch = nullptr;
@@ -153,7 +153,7 @@ TEST_CASE("engine queue repeat All loops", "[engine_queue]") {
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
-    REQUIRE(eng->setRepeat(RepeatMode::All).has_value());
+    REQUIRE(eng->setRepeat(caudio::types::RepeatMode::All).has_value());
     REQUIRE(eng->play(1).has_value());
     // queue persists via cursor, count stays 2 after play (not dequeued)
     {
@@ -217,7 +217,7 @@ TEST_CASE("engine queue repeat One seek without dequeue", "[engine_queue]") {
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
-    REQUIRE(eng->setRepeat(RepeatMode::One).has_value());
+    REQUIRE(eng->setRepeat(caudio::types::RepeatMode::One).has_value());
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
     REQUIRE(eng->next().has_value());
@@ -285,7 +285,7 @@ TEST_CASE("engine queue invalid repeat returns InvalidArg", "[engine_queue]") {
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     // without db should fail State
-    REQUIRE(!eng->setRepeat((RepeatMode)99).has_value());
+    REQUIRE(!eng->setRepeat((caudio::types::RepeatMode)99).has_value());
 }
 
 TEST_CASE("shufflePerm deterministic with mt19937 seed 42", "[engine_queue][shuffle]") {
@@ -353,10 +353,10 @@ TEST_CASE("engine play resumes when paused", "[engine_queue]") {
     REQUIRE(eng->play(1).has_value());
     int64_t first = eng->currentTrackId();
     REQUIRE(eng->pause().has_value());
-    REQUIRE(eng->state() == PlaybackState::Paused);
+    REQUIRE(eng->state() == caudio::types::PlaybackState::Paused);
     // play when paused should resume, not next
     REQUIRE(eng->play(1).has_value());
-    REQUIRE(eng->state() == PlaybackState::Playing);
+    REQUIRE(eng->state() == caudio::types::PlaybackState::Playing);
     REQUIRE(eng->currentTrackId() == first);
     // play when playing should restart, not next
     REQUIRE(eng->play(1).has_value());
@@ -493,7 +493,7 @@ TEST_CASE("engine play missing file fails without simulation", "[engine_queue]")
     REQUIRE(!pr.has_value());
     REQUIRE(pr.error().code == StatusCode::NotFound);
     // stays stopped and emits no TrackStarted event
-    REQUIRE(eng->state() == PlaybackState::Stopped);
+    REQUIRE(eng->state() == caudio::types::PlaybackState::Stopped);
     REQUIRE(!eng->pollEvent().has_value());
     eng.reset();
     safeRemoveDb(dbPath);

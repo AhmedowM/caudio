@@ -162,7 +162,7 @@ struct EngineConfig {
  */
 struct QueueState {
     bool shuffle{false};                ///< Whether shuffle is enabled.
-    RepeatMode repeat{RepeatMode::Off}; ///< Repeat mode.
+    caudio::types::RepeatMode repeat{caudio::types::RepeatMode::Off}; ///< Repeat mode.
     std::vector<int64_t> perm{};        ///< Shuffle permutation (positions, not track_ids).
     size_t cursor{0};                   ///< Next position index in perm or linear queue.
     int64_t queue_id{1};                ///< Active queue id.
@@ -182,7 +182,7 @@ struct QueueState {
  */
 struct EngineState {
     int shuffleEnabled{0};                  ///< Persisted shuffle flag (0/1).
-    RepeatMode repeatMode{RepeatMode::Off}; ///< Persisted repeat mode.
+    caudio::types::RepeatMode repeatMode{caudio::types::RepeatMode::Off}; ///< Persisted repeat mode.
     int64_t cursorPos{0};                   ///< Persisted cursor (QueueState::cursor).
     int64_t currentTrackId{0};              ///< Last current track id.
     float volume{1.0f};                     ///< Persisted volume [0,1].

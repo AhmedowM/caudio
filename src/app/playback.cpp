@@ -40,7 +40,7 @@ AppResult App::doPlay() {
         caudio::client::Client probe{config_.dbPath, config_.socketPath};
         if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
             if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
-                wasPaused = (st->state == caudio::engine::PlaybackState::Paused);
+                wasPaused = (st->state == caudio::types::PlaybackState::Paused);
                 priorPos = st->pos;
             }
         }
@@ -110,7 +110,7 @@ AppResult App::resume() {
             if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
                 if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
                     probed = true;
-                    playing = (st->state == caudio::engine::PlaybackState::Playing);
+                    playing = (st->state == caudio::types::PlaybackState::Playing);
                 }
             }
             if (probed && playing)

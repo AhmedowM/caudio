@@ -59,7 +59,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
             using U = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<U, Status>) {
                 hasStatus = true;
-                REQUIRE(v.state == PlaybackState::Stopped);
+                REQUIRE(v.state == caudio::types::PlaybackState::Stopped);
                 REQUIRE(v.q_size == 0);
             }
         },
@@ -176,7 +176,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
             using U = std::decay_t<decltype(v)>;
             if constexpr (std::is_same_v<U, Status>) {
                 hasStatus = true;
-                REQUIRE(v.state == PlaybackState::Stopped);
+                REQUIRE(v.state == caudio::types::PlaybackState::Stopped);
                 REQUIRE(v.q_size == 0);
             }
         },

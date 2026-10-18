@@ -396,7 +396,7 @@ AppResult App::queueShuffle(const std::string& mode) {
 }
 
 AppResult App::queueRepeat(const std::string& mode) {
-    using RM = caudio::engine::RepeatMode;
+    using RM = caudio::types::RepeatMode;
     std::optional<RM> m;
     if (mode == "off")
         m = RM::Off;

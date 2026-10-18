@@ -479,14 +479,14 @@ Service::Impl::handle(const caudio::ipc::TagEdit& cmd) {
     // A loaded (playing or paused) track holds the file open through the
     // decoder: suspend to release the handles, write + re-register, reopen.
     auto& eng = *engine_;
-    bool loaded = (eng.state() == caudio::engine::PlaybackState::Playing ||
-                   eng.state() == caudio::engine::PlaybackState::Paused) &&
+    bool loaded = (eng.state() == caudio::types::PlaybackState::Playing ||
+                   eng.state() == caudio::types::PlaybackState::Paused) &&
                   eng.currentTrackId() == t.id;
     double resumePos = 0.0;
     bool wasPaused = false;
     if (loaded) {
         resumePos = eng.position();
-        wasPaused = (eng.state() == caudio::engine::PlaybackState::Paused);
+        wasPaused = (eng.state() == caudio::types::PlaybackState::Paused);
         if (auto s = eng.suspendCurrentTrack(); !s)
             return std::unexpected{s.error()};
     }

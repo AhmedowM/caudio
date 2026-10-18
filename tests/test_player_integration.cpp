@@ -107,7 +107,7 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
         REQUIRE(
             eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
         REQUIRE(eng->play(1).has_value());
-        REQUIRE(eng->state() == PlaybackState::Playing);
+        REQUIRE(eng->state() == caudio::types::PlaybackState::Playing);
         double pos0 = eng->position();
         std::this_thread::sleep_for(std::chrono::milliseconds(120));
         double pos1 = eng->position();
@@ -115,17 +115,17 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
         REQUIRE(pos1 >= 0.08);
         // pause should freeze position
         REQUIRE(eng->pause().has_value());
-        REQUIRE(eng->state() == PlaybackState::Paused);
+        REQUIRE(eng->state() == caudio::types::PlaybackState::Paused);
         double paused = eng->position();
         std::this_thread::sleep_for(std::chrono::milliseconds(80));
         REQUIRE(eng->position() == paused);
         // resume should advance
         REQUIRE(eng->resume().has_value());
-        REQUIRE(eng->state() == PlaybackState::Playing);
+        REQUIRE(eng->state() == caudio::types::PlaybackState::Playing);
         std::this_thread::sleep_for(std::chrono::milliseconds(80));
         REQUIRE(eng->position() > paused);
         REQUIRE(eng->stop().has_value());
-        REQUIRE(eng->state() == PlaybackState::Stopped);
+        REQUIRE(eng->state() == caudio::types::PlaybackState::Stopped);
     }
     std::error_code ec;
     std::filesystem::remove(dbPath, ec);
@@ -185,7 +185,7 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     // Loop the single track: natural end stops on repeat Off, which would
     // end playback mid-test and fail the seeks below (this test races seeks,
     // not end behavior).
-    REQUIRE(eng->setRepeat(caudio::engine::RepeatMode::All).has_value());
+    REQUIRE(eng->setRepeat(caudio::types::RepeatMode::All).has_value());
     // sequential seeks while playing (decode thread races with seek's ring reset)
     // we do small delays to let decode thread interleave but avoid true concurrent seeks which
     // cause data race
@@ -202,7 +202,7 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     }
     REQUIRE(okCount > 5);
     // ensure engine still playing and position is valid
-    REQUIRE(eng->state() == PlaybackState::Playing);
+    REQUIRE(eng->state() == caudio::types::PlaybackState::Playing);
     // seek to invalid -> should fail InvalidArg
     REQUIRE(!eng->seek(-1.0).has_value());
     REQUIRE(eng->seek(-1.0).error().code == StatusCode::InvalidArg);

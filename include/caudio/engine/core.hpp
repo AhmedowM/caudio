@@ -270,7 +270,7 @@ class Engine final {
     ExpectedVoid setPreMuteVolume(float g);
     /** @brief Returns current playback state. @ingroup caudio_engine
      * @return PlaybackState (atomic load, acquire). */
-    PlaybackState state() const noexcept;
+    caudio::types::PlaybackState state() const noexcept;
     /** @brief Returns current track duration in seconds. @ingroup caudio_engine
      * @return Duration (cached from decoder or metadata). */
     double duration() const noexcept;
@@ -305,7 +305,7 @@ class Engine final {
 
     /** @brief Returns current repeat mode. @ingroup caudio_engine
      * @return RepeatMode (Off/All/One). */
-    RepeatMode repeat() const noexcept;
+    caudio::types::RepeatMode repeat() const noexcept;
 
     /**
      * @brief Returns database statistics.
@@ -376,7 +376,7 @@ class Engine final {
      * @par Thread safety
      * Thread-safe; try_lock on queueMutex_.
      */
-    ExpectedVoid setRepeat(RepeatMode m);
+    ExpectedVoid setRepeat(caudio::types::RepeatMode m);
 
     /**
      * @brief Returns the active queue id.
