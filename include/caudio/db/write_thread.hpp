@@ -10,28 +10,13 @@
  * The queue is bounded: `push()` returns `Busy` when full.
  */
 
-#include <atomic>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/function.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
-#include <condition_variable>
 #include <cstddef>
 #include <expected>
 #include <memory>
-#include <mutex>
-#include <stop_token>
 #include <string>
-#include <thread>
-
-// Forward declarations (sqlite3.h + statement impl stay in src/db/).
-struct sqlite3;
-struct sqlite3_stmt;
-
-namespace caudio::db {
-// Defined in src/db/statement.hpp (NOT installed); unique_ptr members only
-// need the declaration here (all WriteOp/WriterThread methods are out-of-line).
-class SqliteStatement;
-} // namespace caudio::db
 
 namespace caudio::db {
 
@@ -186,15 +171,8 @@ class WriterThread final {
     std::size_t size() const;
 
   private:
-    void worker(std::stop_token st);
-
-    std::unique_ptr<caudio::utils::MpscQueue<WriteOp>>
-        queue_;                     ///< Bounded queue (capacity = batch size).
-    sqlite3* db_{nullptr};          ///< Borrowed handle (not owned).
-    std::jthread thread_{};         ///< Worker thread.
-    std::mutex mtx_;                ///< Protects cv_/flush coordination.
-    std::condition_variable cv_;    ///< Notified on push and op completion.
-    std::atomic<int> in_flight_{0}; ///< Ops currently executing.
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::db

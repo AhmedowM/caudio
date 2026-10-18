@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <caudio/db/types.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/generator.hpp>
 #include <cctype>
@@ -21,15 +22,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-namespace caudio::db {
-// Defined in db/core.hpp (full Database API); reference params need only this.
-class Database;
-} // namespace caudio::db
-
-// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
-struct sqlite3;
-struct sqlite3_stmt;
 
 namespace caudio::db {
 
@@ -56,10 +48,9 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
     std::transform(ext.begin(), ext.end(), ext.begin(),
                    [](unsigned char c) { return std::tolower(c); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" ||
-           ext == ".oga" || ext == ".wav" || ext == ".m4a" || ext == ".mp4" ||
-           ext == ".wma" || ext == ".asf" || ext == ".aiff" || ext == ".aif" ||
-           ext == ".ape" || ext == ".mpc" || ext == ".wv";
+    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" || ext == ".oga" ||
+           ext == ".wav" || ext == ".m4a" || ext == ".mp4" || ext == ".wma" || ext == ".asf" ||
+           ext == ".aiff" || ext == ".aif" || ext == ".ape" || ext == ".mpc" || ext == ".wv";
 }
 
 } // namespace detail

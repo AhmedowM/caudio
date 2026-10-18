@@ -12,36 +12,20 @@
 
 #include <array>
 #include <caudio/db/types.hpp>
-#include <caudio/db/write_thread.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <expected>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
-// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
-struct sqlite3;
-struct sqlite3_stmt;
-
-namespace caudio::utils {
-// Full type in utils/log.hpp; Database holds it non-owning only.
-class Logger;
-} // namespace caudio::utils
-
 namespace caudio::db {
-
-// Statement/transaction internals live in src/db/ (NOT installed);
-// the cache below only needs the declaration (Database dtor is out-of-line).
-class SqliteStatement;
 
 /**
  * @brief Options for opening a Database.
@@ -81,14 +65,13 @@ class Database final {
      * @brief Default-constructs an empty (not open) Database.
      * @ingroup caudio_db
      */
-    Database() = default;
+    Database();
     /**
      * @brief Constructs with options (sets WriterThread batch size).
      * @ingroup caudio_db
      * @param opts Options; writeBatchSize forwarded to WriterThread.
      */
-    // Out-of-line (core.cpp): constructing writer_ with only a
-    // forward-declared SqliteStatement in scope is insufficient for inline.
+    // Out-of-line (core.cpp): Impl is defined there.
     explicit Database(const DbOpts& opts);
     /**
      * @brief Closes the writer, clears the statement cache and resets the handle.
@@ -98,8 +81,7 @@ class Database final {
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
     // Move is not thread-safe after open: caller must ensure no concurrent DB access.
-    // If move is used, lock order must be dbMutex_ (dbMutex_) -> stmtCacheMutex_ (cacheMutex_)
-    // to match normal operation (unique_lock dbMutex_ then cacheMutex_).
+    // The moved-from object is left empty; its accessors must not be used.
     Database(Database&& o) noexcept;
     Database& operator=(Database&& o) noexcept;
     /**
@@ -196,9 +178,7 @@ class Database final {
      * @details For free functions (scan) that act on the database but take
      * no logger of their own. Never null-dereference; check before use.
      */
-    caudio::utils::Logger* logger() const noexcept {
-        return logger_;
-    }
+    caudio::utils::Logger* logger() const noexcept;
     /**
      * @brief Flushes the background WriterThread queue.
      * @ingroup caudio_db
@@ -320,17 +300,8 @@ class Database final {
     std::expected<void, caudio::utils::Error> libraryUpdateLocked(const Library& l);
 
   private:
-    WriterThread writer_;
-    std::unique_ptr<sqlite3, SqliteCloser> db_;
-    /// Non-owning log sink from DbOpts (null = silent). See DbOpts::logger.
-    caudio::utils::Logger* logger_{nullptr};
-    // Naming clarity: dbMutex_ is dbMutex_ (protects db_ handle and serializes DB ops),
-    // cacheMutex_ is stmtCacheMutex_ (protects stmtCache_), queueLock_ concept maps to
-    // engineQueueSpin_ in engine but DB uses dbMutex_ for queue table as well.
-    // Lock order: dbMutex_ (dbMutex_) -> stmtCacheMutex_ (cacheMutex_)
-    mutable std::shared_mutex dbMutex_;
-    mutable std::unordered_map<std::string, std::unique_ptr<SqliteStatement>> stmtCache_;
-    mutable std::mutex cacheMutex_; // stmtCacheMutex_
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 
   private:
     // Inline helpers -- reduce duplication between insert/update binds

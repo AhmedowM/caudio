@@ -10,18 +10,13 @@
  */
 
 #include <caudio/db/types.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <expected>
 #include <filesystem>
 
-// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
-struct sqlite3;
-struct sqlite3_stmt;
-
 namespace caudio::db {
-// Defined in db/core.hpp (full Database API); reference params need only this.
-class Database;
 
 /**
  * @brief Serializes a Track to JSON.

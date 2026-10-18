@@ -12,19 +12,14 @@
  */
 
 #include <caudio/db/types.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <expected>
 #include <string>
 #include <string_view>
 #include <vector>
 
-// Forward declarations for SQLite handles (sqlite3.h stays in .cpp files).
-struct sqlite3;
-struct sqlite3_stmt;
-
 namespace caudio::db {
-// Defined in db/core.hpp (full Database API); reference params need only this.
-class Database;
 
 /**
  * @brief FTS5 search with LIKE fallback (three stages).
