@@ -11,10 +11,47 @@
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
+#include <array>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <memory>
+#include <span>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace caudio::client {
+
+struct IpcClient::Impl {
+    /** @brief Connected socket/named pipe path. */
+    std::string socketPath;
+    /** @brief True if using Windows named pipe, false for Unix socket. */
+    bool isWinPipe{false};
+    /** @brief Connected handle (pipe HANDLE on Windows, socket fd on POSIX).
+     * -1 = invalid on both platforms. */
+    std::intptr_t pipeHandle{-1};
+    /** @brief Atomic request ID counter for framing. */
+    std::atomic<uint32_t> nextId{0};
+
+    /**
+     * @brief Send raw framed data.
+     * @param data Byte span to send (already framed with length prefix).
+     * @return void on success, Error on send failure or not connected.
+     */
+    caudio::utils::Expected<void> rawSend(std::span<const std::byte> data);
+
+    /**
+     * @brief Receive a framed response.
+     * Reads 4-byte BE length header, then reads exact payload length.
+     * Enforces 16MB max frame size.
+     * @return Payload bytes (without length header) on success, Error on failure.
+     */
+    caudio::utils::Expected<std::vector<std::byte>> rawRecv();
+};
+
+IpcClient::IpcClient() : impl_(std::make_unique<Impl>()) {}
 
 caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::path& dbPath,
                                                       std::string_view socketPathOverride) {
@@ -57,9 +94,9 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
     DWORD mode = PIPE_READMODE_BYTE;
     ::SetNamedPipeHandleState(h, &mode, nullptr, nullptr);
     IpcClient c;
-    c.pipeHandle_ = reinterpret_cast<std::intptr_t>(h);
-    c.socketPath_ = std::move(path);
-    c.isWinPipe_ = true;
+    c.impl_->pipeHandle = reinterpret_cast<std::intptr_t>(h);
+    c.impl_->socketPath = std::move(path);
+    c.impl_->isWinPipe = true;
     return c;
 #else
     int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
@@ -81,9 +118,9 @@ caudio::utils::Expected<IpcClient> IpcClient::connect(const std::filesystem::pat
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "connect failed")};
     }
     IpcClient c;
-    c.pipeHandle_ = fd;
-    c.socketPath_ = std::move(path);
-    c.isWinPipe_ = false;
+    c.impl_->pipeHandle = fd;
+    c.impl_->socketPath = std::move(path);
+    c.impl_->isWinPipe = false;
     return c;
 #endif
 }
@@ -92,51 +129,23 @@ IpcClient::~IpcClient() {
     close();
 }
 
-IpcClient::IpcClient(IpcClient&& other) noexcept
-    : socketPath_(std::move(other.socketPath_)), isWinPipe_(other.isWinPipe_)
-#ifdef _WIN32
-      ,
-      pipeHandle_(other.pipeHandle_)
-#else
-      ,
-      pipeHandle_(other.pipeHandle_)
-#endif
-{
-#ifdef _WIN32
-    other.pipeHandle_ = -1;
-#else
-    other.pipeHandle_ = -1;
-#endif
-    nextId_.store(other.nextId_.load());
-}
+IpcClient::IpcClient(IpcClient&& other) noexcept = default;
 
-IpcClient& IpcClient::operator=(IpcClient&& other) noexcept {
-    if (this != &other) {
-        close();
-        socketPath_ = std::move(other.socketPath_);
-        isWinPipe_ = other.isWinPipe_;
-#ifdef _WIN32
-        pipeHandle_ = other.pipeHandle_;
-        other.pipeHandle_ = -1;
-#else
-        pipeHandle_ = other.pipeHandle_;
-        other.pipeHandle_ = -1;
-#endif
-        nextId_.store(other.nextId_.load());
-    }
-    return *this;
-}
+IpcClient& IpcClient::operator=(IpcClient&& other) noexcept = default;
 
 caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::Command& cmd) {
-    uint32_t id = nextId_.fetch_add(1) + 1;
+    if (!impl_)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
+    uint32_t id = impl_->nextId.fetch_add(1) + 1;
     caudio::ipc::IpcRequest req{id, cmd};
     std::string json = caudio::ipc::serializeRequest(req);
     auto framed = caudio::ipc::frame(json);
 
-    if (auto e = rawSend(framed); !e)
+    if (auto e = impl_->rawSend(framed); !e)
         return std::unexpected{e.error()};
 
-    auto raw = rawRecv();
+    auto raw = impl_->rawRecv();
     if (!raw)
         return std::unexpected{raw.error()};
 
@@ -156,29 +165,31 @@ caudio::utils::Expected<caudio::ipc::Result> IpcClient::send(const caudio::ipc::
 }
 
 void IpcClient::close() noexcept {
+    if (!impl_)
+        return;
 #ifdef _WIN32
-    if (pipeHandle_ != -1) {
-        ::CloseHandle(reinterpret_cast<HANDLE>(pipeHandle_));
-        pipeHandle_ = -1;
+    if (impl_->pipeHandle != -1) {
+        ::CloseHandle(reinterpret_cast<HANDLE>(impl_->pipeHandle));
+        impl_->pipeHandle = -1;
     }
 #else
-    if (pipeHandle_ >= 0) {
-        ::close(static_cast<int>(pipeHandle_));
-        pipeHandle_ = -1;
+    if (impl_->pipeHandle >= 0) {
+        ::close(static_cast<int>(impl_->pipeHandle));
+        impl_->pipeHandle = -1;
     }
 #endif
 }
 
-caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data) {
+caudio::utils::Expected<void> IpcClient::Impl::rawSend(std::span<const std::byte> data) {
 #ifdef _WIN32
-    if (pipeHandle_ == -1) {
+    if (pipeHandle == -1) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::size_t sent = 0;
     while (sent < data.size()) {
         DWORD w = 0;
-        BOOL ok = ::WriteFile(reinterpret_cast<HANDLE>(pipeHandle_),
+        BOOL ok = ::WriteFile(reinterpret_cast<HANDLE>(pipeHandle),
                               reinterpret_cast<const char*>(data.data()) + sent,
                               static_cast<DWORD>(data.size() - sent), &w, nullptr);
         if (ok == 0) {
@@ -190,14 +201,14 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
     }
     return {};
 #else
-    if (pipeHandle_ < 0) {
+    if (pipeHandle < 0) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::size_t sent = 0;
     while (sent < data.size()) {
         ::ssize_t n =
-            ::send(static_cast<int>(pipeHandle_), reinterpret_cast<const char*>(data.data()) + sent,
+            ::send(static_cast<int>(pipeHandle), reinterpret_cast<const char*>(data.data()) + sent,
                    data.size() - sent, 0);
         if (n < 0) {
             if (errno == EINTR)
@@ -211,9 +222,9 @@ caudio::utils::Expected<void> IpcClient::rawSend(std::span<const std::byte> data
 #endif
 }
 
-caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
+caudio::utils::Expected<std::vector<std::byte>> IpcClient::Impl::rawRecv() {
 #ifdef _WIN32
-    if (pipeHandle_ == -1) {
+    if (pipeHandle == -1) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
@@ -221,7 +232,7 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     std::size_t got = 0;
     while (got < 4) {
         DWORD r = 0;
-        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle_),
+        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle),
                              reinterpret_cast<char*>(hdr.data()) + got, 4 - static_cast<DWORD>(got),
                              &r, nullptr);
         if (ok == 0) {
@@ -246,7 +257,7 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     got = 0;
     while (got < len) {
         DWORD r = 0;
-        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle_),
+        BOOL ok = ::ReadFile(reinterpret_cast<HANDLE>(pipeHandle),
                              reinterpret_cast<char*>(payload.data()) + got,
                              static_cast<DWORD>(len - got), &r, nullptr);
         if (ok == 0) {
@@ -261,14 +272,14 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     }
     return payload;
 #else
-    if (pipeHandle_ < 0) {
+    if (pipeHandle < 0) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not connected")};
     }
     std::array<std::byte, 4> hdr{};
     std::size_t got = 0;
     while (got < 4) {
-        ::ssize_t n = ::recv(static_cast<int>(pipeHandle_),
+        ::ssize_t n = ::recv(static_cast<int>(pipeHandle),
                              reinterpret_cast<char*>(hdr.data()) + got, 4 - got, 0);
         if (n < 0) {
             if (errno == EINTR)
@@ -292,7 +303,7 @@ caudio::utils::Expected<std::vector<std::byte>> IpcClient::rawRecv() {
     std::vector<std::byte> payload(len);
     got = 0;
     while (got < len) {
-        ::ssize_t n = ::recv(static_cast<int>(pipeHandle_),
+        ::ssize_t n = ::recv(static_cast<int>(pipeHandle),
                              reinterpret_cast<char*>(payload.data()) + got, len - got, 0);
         if (n < 0) {
             if (errno == EINTR)

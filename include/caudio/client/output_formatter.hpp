@@ -9,7 +9,6 @@
 #include <caudio/ipc/result.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <iostream>
 #include <ostream>
 #include <string>
 #include <utility>

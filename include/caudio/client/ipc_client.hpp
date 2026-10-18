@@ -6,17 +6,12 @@
  * @ingroup caudio_client
  */
 
-#include <atomic>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
-#include <cstddef>
-#include <cstdint>
 #include <filesystem>
-#include <span>
-#include <string>
+#include <memory>
 #include <string_view>
-#include <vector>
 
 namespace caudio::client {
 
@@ -82,32 +77,10 @@ class IpcClient {
     void close() noexcept;
 
   private:
-    IpcClient() = default;
+    IpcClient();
 
-    /**
-     * @brief Send raw framed data.
-     * @param data Byte span to send (already framed with length prefix).
-     * @return void on success, Error on send failure or not connected.
-     */
-    caudio::utils::Expected<void> rawSend(std::span<const std::byte> data);
-
-    /**
-     * @brief Receive a framed response.
-     * Reads 4-byte BE length header, then reads exact payload length.
-     * Enforces 16MB max frame size.
-     * @return Payload bytes (without length header) on success, Error on failure.
-     */
-    caudio::utils::Expected<std::vector<std::byte>> rawRecv();
-
-    /** @brief Connected socket/named pipe path. */
-    std::string socketPath_;
-    /** @brief True if using Windows named pipe, false for Unix socket. */
-    bool isWinPipe_{false};
-    /** @brief Connected handle (pipe HANDLE on Windows, socket fd on POSIX).
-     * -1 = invalid on both platforms. */
-    std::intptr_t pipeHandle_{-1};
-    /** @brief Atomic request ID counter for framing. */
-    std::atomic<uint32_t> nextId_{0};
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::client

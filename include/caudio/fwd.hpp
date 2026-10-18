@@ -14,6 +14,10 @@
 struct sqlite3;
 struct sqlite3_stmt;
 
+namespace caudio::config {
+struct Config;
+} // namespace caudio::config
+
 namespace caudio::db {
 class Database;
 struct Track;
@@ -46,6 +50,10 @@ class IpcServer;
 class Service;
 class ShmStatusHandle;
 } // namespace caudio::service
+
+namespace caudio::ipc {
+struct Status;
+} // namespace caudio::ipc
 
 namespace caudio::client {
 class IpcClient;
