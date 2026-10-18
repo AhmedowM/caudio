@@ -2,7 +2,6 @@
 
 #include <caudio/app.hpp>
 #include <caudio/config.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/utils/error.hpp>
 #include <chrono>
