@@ -351,6 +351,7 @@ foreach(_h IN LISTS _taglib_hdrs)
 endforeach()
 list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
+include(cmake/components/types.cmake)
 include(cmake/components/utils.cmake)
 include(cmake/components/player.cmake)
 include(cmake/components/db.cmake)
@@ -364,7 +365,7 @@ if(CAUDIO_ENABLE_MODULES)
   add_library(caudio_umbrella STATIC modules/caudio.cppm)
   target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-  target_link_libraries(caudio_umbrella PUBLIC caudio::utils caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client)
+  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
 endif()
@@ -415,6 +416,7 @@ endif()
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 # (GNUInstallDirs included once, right after project() above.)
 set(CAUDIO_INSTALL_LIBS
+  types
   utils
   player
   db

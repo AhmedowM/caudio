@@ -12,6 +12,7 @@ module;
 export module caudio;
 
 export import caudio.version;
+export import caudio.types;
 export import caudio.utils;
 export import caudio.player;
 export import caudio.db;

@@ -24,9 +24,6 @@ struct Config;
 
 namespace caudio::db {
 class Database;
-struct Track;
-struct Playlist;
-struct HistoryEntry;
 struct DbStats;
 class SqliteStatement;
 struct LibraryStatsDetailedData;
@@ -63,6 +60,11 @@ class ShmStatusHandle;
 namespace caudio::types {
 enum class RepeatMode : int;
 enum class PlaybackState : int;
+struct Track;
+struct Playlist;
+struct QueueItem;
+struct HistoryEntry;
+struct Bookmark;
 } // namespace caudio::types
 
 namespace caudio::client {

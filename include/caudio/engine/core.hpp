@@ -240,7 +240,7 @@ class Engine final {
      * Thread-safe; holds the queue lock across reopen (same order as above).
      * @see suspendCurrentTrack
      */
-    ExpectedVoid resumeAfterTagWrite(const caudio::db::Track& t, double pos, bool wasPaused);
+    ExpectedVoid resumeAfterTagWrite(const caudio::types::Track& t, double pos, bool wasPaused);
 
     /**
      * @brief Sets playback volume and persists it.
@@ -322,13 +322,13 @@ class Engine final {
      * @brief Lists history entries.
      * @ingroup caudio_engine
      * @param limit Max rows (0 = no limit, default 50).
-     * @return `std::expected<std::vector<db::HistoryEntry>, Error>` -- vector on success, State if
-     * no db. Entries carry track snapshots (title/artist/path/duration).
+     * @return `std::expected<std::vector<types::HistoryEntry>, Error>` -- vector on success, State
+     * if no db. Entries carry track snapshots (title/artist/path/duration).
      * @par Thread safety
      * Thread-safe; takes shared_lock on the database mutex.
-     * @see caudio::db::HistoryEntry
+     * @see caudio::types::HistoryEntry
      */
-    std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     listHistory(int limit = 50);
 
     /**

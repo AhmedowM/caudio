@@ -173,7 +173,7 @@ resultCodeFromString(std::string_view sv);
  * @param p Playlist to convert.
  * @return JSON object with all playlist fields.
  */
-Json playlistToJson(const caudio::db::Playlist& p);
+Json playlistToJson(const caudio::types::Playlist& p);
 
 /**
  * @brief Convert JSON object to Playlist struct.
@@ -181,7 +181,7 @@ Json playlistToJson(const caudio::db::Playlist& p);
  * @param j JSON object with playlist fields.
  * @return Playlist struct, or error if parsing fails.
  */
-std::expected<caudio::db::Playlist, caudio::utils::Error> playlistFromJson(const Json& j);
+std::expected<caudio::types::Playlist, caudio::utils::Error> playlistFromJson(const Json& j);
 
 /**
  * @brief Convert Error struct to JSON object.

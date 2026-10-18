@@ -23,7 +23,7 @@
  * @see caudio::ipc::Command for request types
  */
 
-#include <caudio/db/types.hpp>
+#include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
@@ -140,7 +140,7 @@ struct QueueTracks final {
     /**
      * @brief Vector of tracks in the queue.
      */
-    std::vector<caudio::db::Track> tracks{};
+    std::vector<caudio::types::Track> tracks{};
 };
 
 /**
@@ -332,7 +332,7 @@ struct LibraryStatsDetailedData final {
     /**
      * @brief Most played tracks (up to 10).
      */
-    std::vector<caudio::db::Track> most_played{};
+    std::vector<caudio::types::Track> most_played{};
 };
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ struct Tracks final {
     /**
      * @brief Vector of tracks.
      */
-    std::vector<caudio::db::Track> tracks{};
+    std::vector<caudio::types::Track> tracks{};
 };
 
 /**
@@ -373,7 +373,7 @@ struct SearchResults final {
     /**
      * @brief Matching tracks.
      */
-    std::vector<caudio::db::Track> tracks{};
+    std::vector<caudio::types::Track> tracks{};
 };
 
 /**
@@ -389,7 +389,7 @@ struct Playlists final {
     /**
      * @brief Vector of playlists.
      */
-    std::vector<caudio::db::Playlist> playlists{};
+    std::vector<caudio::types::Playlist> playlists{};
 };
 
 /**
@@ -406,7 +406,7 @@ struct PlaylistData final {
     /**
      * @brief Tracks in the playlist.
      */
-    std::vector<caudio::db::Track> tracks{};
+    std::vector<caudio::types::Track> tracks{};
     /**
      * @brief Export format (e.g., "m3u").
      */
@@ -460,7 +460,7 @@ struct PlaylistImportReport final {
     /**
      * @brief Imported tracks.
      */
-    std::vector<caudio::db::Track> tracks{};
+    std::vector<caudio::types::Track> tracks{};
     /**
      * @brief Lines matched to library tracks.
      */
@@ -549,7 +549,7 @@ struct SingleTrack final {
     /**
      * @brief Track metadata.
      */
-    caudio::db::Track track{};
+    caudio::types::Track track{};
 };
 
 /**
@@ -568,7 +568,7 @@ struct TrackInfo final {
     /**
      * @brief Track metadata.
      */
-    caudio::db::Track track{};
+    caudio::types::Track track{};
     /**
      * @brief Number of times this track has been played.
      */

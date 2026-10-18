@@ -34,7 +34,7 @@ class OutputFormatter {
     /** @brief Ellipsizes overlong table cells. */
     static std::string truncateField(const std::string& s, std::size_t maxLen = 40);
     /** @brief Shared track-detail block for SingleTrack/TrackInfo. */
-    static void printTrackDetail(std::ostream& os, const caudio::db::Track& t);
+    static void printTrackDetail(std::ostream& os, const caudio::types::Track& t);
 
   public:
     /**

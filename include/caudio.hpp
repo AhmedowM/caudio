@@ -7,6 +7,7 @@
 #include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
 #include <caudio/service.hpp>
+#include <caudio/types.hpp>
 #include <caudio/utils.hpp>
 #include <caudio/version.hpp>
 
@@ -20,6 +21,9 @@
  * written in modern C++23. It provides layered libraries (this header
  * includes all of them):
  *
+ * - @ref caudio_types "caudio.types" -- Dependency-free shared value types:
+ *   wire enums (RepeatMode, PlaybackState) and plain-data records (Track,
+ *   Playlist, QueueItem, HistoryEntry, Bookmark) used across all layers.
  * - @ref caudio_utils "caudio.utils" -- Core utilities: error handling (`std::expected`),
  *   lock-free SPSC/MPSC queues, thread helpers, logging, opaque JSON value.
  * - @ref caudio_player "caudio.player" -- Audio playback: reader abstractions,
@@ -38,7 +42,7 @@
  *
  * Layer rule (enforced by link dependencies):
  * @code
- * caudio.utils  (no deps)
+ * caudio.utils  (no deps) -- caudio.types (no deps)
  *    |'
  * caudio.player (utils) -- caudio.db (utils)
  *    |'                        |'
@@ -67,6 +71,7 @@
  * miniaudio, BLAKE3, FFmpeg (required). JSON (nlohmann backend) is private
  * to the build -- downstream needs no JSON package.
  *
+ * @see caudio.types
  * @see caudio.utils
  * @see caudio.player
  * @see caudio.db
