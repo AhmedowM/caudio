@@ -40,6 +40,7 @@
  * inserts into `history`.
  */
 
+#include <caudio/fwd.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -47,11 +48,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-namespace caudio::utils {
-// Full type in utils/log.hpp; Engine holds it non-owning only.
-class Logger;
-} // namespace caudio::utils
 
 namespace caudio::engine {
 

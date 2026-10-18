@@ -12,10 +12,12 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
+#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -47,9 +49,299 @@ namespace {
 constexpr std::chrono::milliseconds kQueueLockWait{500};
 }
 
+// All engine state and implementation live here so the public header stays
+// cheap (no mpsc/ring/std-threading includes). Engine methods delegate.
+struct Engine::Impl {
+    explicit Impl(const EngineConfig& cfg);
+
+    // lifecycle
+    std::optional<caudio::utils::Error> init();
+    void shutdown();
+
+    // database / persistence
+    bool hasDb() const noexcept;
+    ExpectedVoid attachDatabase(std::shared_ptr<caudio::db::Database> db);
+    std::optional<caudio::utils::Error> loadState();
+    std::expected<void, caudio::utils::Error> saveState();
+    std::expected<void, caudio::utils::Error> persistShuffleBlobLocked();
+    std::expected<void, caudio::utils::Error> persistCursorLocked();
+    sqlite3* dbHandle() const noexcept;
+    std::shared_mutex* dbMutex() const noexcept;
+    std::expected<void, caudio::utils::Error>
+    withTransaction(std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
+    std::expected<caudio::db::Track, caudio::utils::Error> fetchTrackByPosLocked(int64_t qid,
+                                                                                 int64_t pos);
+
+    // queue locking
+    bool tryLockQueue() noexcept;
+    bool tryLockQueueFor(std::chrono::milliseconds wait) noexcept;
+    void unlockQueue() noexcept;
+    std::unexpected<caudio::utils::Error> queueBusy(std::string_view op,
+                                                    std::string_view msg) const;
+
+    // transport
+    ExpectedVoid play(int64_t queueId);
+    ExpectedVoid pause();
+    ExpectedVoid resume();
+    ExpectedVoid stop();
+    ExpectedVoid seek(double seconds);
+    ExpectedVoid suspendCurrentTrack();
+    ExpectedVoid resumeAfterTagWrite(const caudio::db::Track& t, double pos, bool wasPaused);
+    ExpectedVoid next();
+    ExpectedVoid autoNext();
+    ExpectedVoid prev();
+    ExpectedVoid advanceLocked(bool stopAtEnd, int lockWaitMs = 0);
+    ExpectedVoid switchQueue(int64_t qid);
+
+    // volume / state accessors
+    ExpectedVoid setVolume(float g);
+    float volume() const noexcept;
+    ExpectedVoid setPreMuteVolume(float g);
+    float preMuteVolume() const noexcept;
+    PlaybackState state() const noexcept;
+    double duration() const noexcept;
+    double position() const noexcept;
+    int64_t currentTrackId() const noexcept;
+    double currentPositionLocked() const noexcept;
+    bool shuffle() const noexcept;
+    RepeatMode repeat() const noexcept;
+    int64_t activeQueueId() const noexcept;
+
+    // shuffle / repeat
+    std::vector<int64_t> shufflePermFor(int64_t qid) noexcept;
+    void noteEnqueued(int64_t qid, std::size_t count) noexcept;
+    ExpectedVoid setShuffle(bool on);
+    std::expected<void, caudio::utils::Error> setShuffleLocked(bool on);
+    ExpectedVoid setRepeat(RepeatMode m);
+
+    // library / history
+    std::expected<caudio::db::DbStats, caudio::utils::Error> getStats();
+    std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+    listHistory(int limit);
+    std::expected<void, caudio::utils::Error> clearHistory();
+    std::string lastError() const;
+
+    // queue traversal
+    std::expected<void, caudio::utils::Error> queueNextLocked(caudio::db::Track& out);
+    std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::db::Track& out);
+    std::expected<void, caudio::utils::Error> doPlayTrack(caudio::db::Track& t);
+    void preroll();
+
+    // callbacks / events
+    ExpectedVoid setCallbacks(const EngineCallbacks& cbs);
+    std::expected<EngineEvent, caudio::utils::Error> pollEvent();
+    ExpectedVoid drainEvents(EngineEvent* buf, size_t cap, size_t* n);
+    std::vector<EngineEvent> drainAll();
+
+    // monitor / decode
+    void engineTick();
+    void monitorLoop(std::stop_token st);
+    void decodeLoop(std::stop_token st);
+    void doHistoryMark();
+    void pushEvent(const EngineEvent& ev);
+
+    // members (moved verbatim from Engine)
+    EngineConfig cfg_{};
+    EngineState state_{};
+    QueueState queue_{};
+    caudio::db::Track currentTrack_{};
+    std::atomic<bool> hasCurrent_{false};
+    double duration_{0};
+    std::atomic<float> volume_{1.0f};
+    std::atomic<float> preMute_{0.5f};
+    std::atomic<PlaybackState> playbackState_{PlaybackState::Stopped};
+    std::chrono::steady_clock::time_point playStart_{};
+    double pausePos_{0};
+    std::atomic<bool> markedPlayed_{false};
+    int64_t startedMs_{0};
+    std::string lastErr_{};
+
+    std::shared_ptr<caudio::db::Database> db_{};
+
+    // player
+    std::unique_ptr<caudio::player::Reader> reader_{};
+    std::unique_ptr<caudio::player::Decoder> decoder_{};
+    std::unique_ptr<caudio::utils::SpscRing<float>> ring_{};
+    std::unique_ptr<caudio::player::AudioOutput> output_{};
+
+    std::jthread decodeThread_{};
+    std::atomic<bool> decodeRun_{false};
+    std::mutex decodeMtx_{};
+    std::condition_variable_any decodeCv_{};
+
+    // monitor
+    std::jthread monitorThread_{};
+    std::atomic<bool> monRun_{false};
+    std::mutex monMtx_{};
+    std::condition_variable_any monCv_{};
+
+    // events
+    caudio::utils::MpscQueue<EngineEvent> eventQueue_{64};
+    std::mutex cbMutex_{};
+    EngineCallbacks callbacks_{};
+
+    // atomics spec required
+    std::atomic<uint64_t> lastProgressMs_{0};
+    // M-3: volume-drag throttle -- setVolume() persists at most 1x/s
+    // (crash-window volume loss <= 1 s; shutdown/track-change saves cover it).
+    std::atomic<uint64_t> lastVolSaveMs_{0};
+    // gaplessArmed_: 0->1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
+    // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
+    std::atomic<bool> gaplessArmed_{false};
+    mutable std::timed_mutex queueMutex_;
+};
+
+Engine::Engine(const EngineConfig& cfg) : impl_(std::make_unique<Impl>(cfg)) {}
+
+Engine::ExpectedVoid Engine::attachDatabase(std::shared_ptr<caudio::db::Database> db) {
+    return impl_->attachDatabase(std::move(db));
+}
+
+void Engine::shutdown() {
+    impl_->shutdown();
+}
+
+Engine::ExpectedVoid Engine::play(int64_t queueId) {
+    return impl_->play(queueId);
+}
+
+Engine::ExpectedVoid Engine::pause() {
+    return impl_->pause();
+}
+
+Engine::ExpectedVoid Engine::resume() {
+    return impl_->resume();
+}
+
+Engine::ExpectedVoid Engine::stop() {
+    return impl_->stop();
+}
+
+Engine::ExpectedVoid Engine::seek(double seconds) {
+    return impl_->seek(seconds);
+}
+
+Engine::ExpectedVoid Engine::suspendCurrentTrack() {
+    return impl_->suspendCurrentTrack();
+}
+
+Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
+                                                 bool wasPaused) {
+    return impl_->resumeAfterTagWrite(t, pos, wasPaused);
+}
+
+Engine::ExpectedVoid Engine::setVolume(float g) {
+    return impl_->setVolume(g);
+}
+
+float Engine::volume() const noexcept {
+    return impl_->volume();
+}
+
+float Engine::preMuteVolume() const noexcept {
+    return impl_->preMuteVolume();
+}
+
+Engine::ExpectedVoid Engine::setPreMuteVolume(float g) {
+    return impl_->setPreMuteVolume(g);
+}
+
+PlaybackState Engine::state() const noexcept {
+    return impl_->state();
+}
+
+double Engine::duration() const noexcept {
+    return impl_->duration();
+}
+
+double Engine::position() const noexcept {
+    return impl_->position();
+}
+
+int64_t Engine::currentTrackId() const noexcept {
+    return impl_->currentTrackId();
+}
+
+bool Engine::shuffle() const noexcept {
+    return impl_->shuffle();
+}
+
+std::vector<int64_t> Engine::shufflePermFor(int64_t qid) noexcept {
+    return impl_->shufflePermFor(qid);
+}
+
+void Engine::noteEnqueued(int64_t qid, std::size_t count) noexcept {
+    impl_->noteEnqueued(qid, count);
+}
+
+RepeatMode Engine::repeat() const noexcept {
+    return impl_->repeat();
+}
+
+std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
+    return impl_->getStats();
+}
+
+std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
+Engine::listHistory(int limit) {
+    return impl_->listHistory(limit);
+}
+
+std::expected<void, caudio::utils::Error> Engine::clearHistory() {
+    return impl_->clearHistory();
+}
+
+std::string Engine::lastError() const {
+    return impl_->lastError();
+}
+
+Engine::ExpectedVoid Engine::setShuffle(bool on) {
+    return impl_->setShuffle(on);
+}
+
+Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
+    return impl_->setRepeat(m);
+}
+
+int64_t Engine::activeQueueId() const noexcept {
+    return impl_->activeQueueId();
+}
+
+Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
+    return impl_->switchQueue(qid);
+}
+
+Engine::ExpectedVoid Engine::next() {
+    return impl_->next();
+}
+
+Engine::ExpectedVoid Engine::autoNext() {
+    return impl_->autoNext();
+}
+
+Engine::ExpectedVoid Engine::prev() {
+    return impl_->prev();
+}
+
+Engine::ExpectedVoid Engine::setCallbacks(const EngineCallbacks& cbs) {
+    return impl_->setCallbacks(cbs);
+}
+
+std::expected<EngineEvent, caudio::utils::Error> Engine::pollEvent() {
+    return impl_->pollEvent();
+}
+
+Engine::ExpectedVoid Engine::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
+    return impl_->drainEvents(buf, cap, n);
+}
+
+std::vector<EngineEvent> Engine::drainAll() {
+    return impl_->drainAll();
+}
+
 Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
     auto e = std::unique_ptr<Engine>(new Engine(cfg));
-    auto err = e->init();
+    auto err = e->impl_->init();
     if (err)
         return std::unexpected(*err);
     if (cfg.logger)
@@ -64,18 +356,18 @@ Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& c
     if (!dbRes)
         return std::unexpected(dbRes.error());
     auto e = std::unique_ptr<Engine>(new Engine(cfg));
-    e->db_ = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
-    if (auto err = e->init())
+    e->impl_->db_ = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
+    if (auto err = e->impl_->init())
         return std::unexpected(*err);
-    (void)e->loadState();
-    if (e->output_)
-        e->output_->setVolume(e->state_.volume);
+    (void)e->impl_->loadState();
+    if (e->impl_->output_)
+        e->impl_->output_->setVolume(e->impl_->state_.volume);
     if (cfg.logger)
         cfg.logger->info("engine opened database path={}", path);
     return e;
 }
 
-Engine::ExpectedVoid Engine::attachDatabase(std::shared_ptr<caudio::db::Database> db) {
+Engine::ExpectedVoid Engine::Impl::attachDatabase(std::shared_ptr<caudio::db::Database> db) {
     if (!db || !db->handle())
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
@@ -89,7 +381,7 @@ Engine::~Engine() {
     shutdown();
 }
 
-void Engine::shutdown() {
+void Engine::Impl::shutdown() {
     // stop monitor
     monRun_.store(false, std::memory_order_release);
     monCv_.notify_all();
@@ -120,7 +412,7 @@ void Engine::shutdown() {
     ring_.reset();
 }
 
-Engine::ExpectedVoid Engine::play(int64_t queueId) {
+Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (queueId == 0)
@@ -173,7 +465,7 @@ Engine::ExpectedVoid Engine::play(int64_t queueId) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::pause() {
+Engine::ExpectedVoid Engine::Impl::pause() {
     auto s = playbackState_.load(std::memory_order_acquire);
     if (s != PlaybackState::Playing)
         return std::unexpected(
@@ -186,7 +478,7 @@ Engine::ExpectedVoid Engine::pause() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::resume() {
+Engine::ExpectedVoid Engine::Impl::resume() {
     auto s = playbackState_.load(std::memory_order_acquire);
     if (s != PlaybackState::Paused)
         return std::unexpected(
@@ -200,7 +492,7 @@ Engine::ExpectedVoid Engine::resume() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::stop() {
+Engine::ExpectedVoid Engine::Impl::stop() {
     auto s = playbackState_.load(std::memory_order_acquire);
     if (s == PlaybackState::Stopped)
         return {};
@@ -234,7 +526,7 @@ Engine::ExpectedVoid Engine::stop() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::seek(double seconds) {
+Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
     if (!hasCurrent_.load(std::memory_order_acquire))
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::State, "no track"));
@@ -274,10 +566,10 @@ Engine::ExpectedVoid Engine::seek(double seconds) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::suspendCurrentTrack() {
+Engine::ExpectedVoid Engine::Impl::suspendCurrentTrack() {
     if (!hasCurrent_.load(std::memory_order_acquire)) {
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State,
-                                                        "no track"));
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::State, "no track"));
     }
     if (!tryLockQueueFor(kQueueLockWait)) {
         return queueBusy("suspend", "queue busy");
@@ -301,8 +593,8 @@ Engine::ExpectedVoid Engine::suspendCurrentTrack() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
-                                                  bool wasPaused) {
+Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::db::Track& t, double pos,
+                                                       bool wasPaused) {
     if (!tryLockQueueFor(kQueueLockWait)) {
         return queueBusy("resume", "queue busy");
     }
@@ -339,7 +631,7 @@ Engine::ExpectedVoid Engine::resumeAfterTagWrite(const caudio::db::Track& t, dou
     return {};
 }
 
-Engine::ExpectedVoid Engine::setVolume(float g) {
+Engine::ExpectedVoid Engine::Impl::setVolume(float g) {
     g = caudio::utils::clampVolume(g);
     state_.volume = g;
     volume_.store(g, std::memory_order_relaxed);
@@ -361,11 +653,11 @@ Engine::ExpectedVoid Engine::setVolume(float g) {
     return {};
 }
 
-float Engine::volume() const noexcept {
+float Engine::Impl::volume() const noexcept {
     return volume_.load(std::memory_order_relaxed);
 }
 
-Engine::ExpectedVoid Engine::setPreMuteVolume(float g) {
+Engine::ExpectedVoid Engine::Impl::setPreMuteVolume(float g) {
     if (!(g > 0.0f) || g > 1.0f)
         g = 0.5f;
     state_.preMuteVolume = g;
@@ -374,37 +666,37 @@ Engine::ExpectedVoid Engine::setPreMuteVolume(float g) {
     return {};
 }
 
-float Engine::preMuteVolume() const noexcept {
+float Engine::Impl::preMuteVolume() const noexcept {
     return preMute_.load(std::memory_order_relaxed);
 }
 
-PlaybackState Engine::state() const noexcept {
+PlaybackState Engine::Impl::state() const noexcept {
     return playbackState_.load(std::memory_order_acquire);
 }
 
-double Engine::duration() const noexcept {
+double Engine::Impl::duration() const noexcept {
     return duration_;
 }
 
-double Engine::position() const noexcept {
+double Engine::Impl::position() const noexcept {
     return currentPositionLocked();
 }
 
-int64_t Engine::currentTrackId() const noexcept {
+int64_t Engine::Impl::currentTrackId() const noexcept {
     if (hasCurrent_.load(std::memory_order_acquire))
         return currentTrack_.id;
     return state_.currentTrackId;
 }
 
-bool Engine::shuffle() const noexcept {
+bool Engine::Impl::shuffle() const noexcept {
     return queue_.shuffle;
 }
 
-RepeatMode Engine::repeat() const noexcept {
+RepeatMode Engine::Impl::repeat() const noexcept {
     return queue_.repeat;
 }
 
-std::vector<int64_t> Engine::shufflePermFor(int64_t qid) noexcept {
+std::vector<int64_t> Engine::Impl::shufflePermFor(int64_t qid) noexcept {
     if (!tryLockQueue())
         return {};
     std::vector<int64_t> out;
@@ -414,7 +706,7 @@ std::vector<int64_t> Engine::shufflePermFor(int64_t qid) noexcept {
     return out;
 }
 
-void Engine::noteEnqueued(int64_t qid, std::size_t count) noexcept {
+void Engine::Impl::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     if (count == 0 || !hasDb() || !tryLockQueue())
         return;
     if (queue_.queue_id == qid && queue_.shuffle && !queue_.perm.empty()) {
@@ -427,34 +719,34 @@ void Engine::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     unlockQueue();
 }
 
-std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::getStats() {
+std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::Impl::getStats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     return db_->getStats();
 }
 
 std::expected<std::vector<caudio::db::HistoryEntry>, caudio::utils::Error>
-Engine::listHistory(int limit) {
+Engine::Impl::listHistory(int limit) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     caudio::engine::History hist(db_);
     return hist.listHistory(limit);
 }
 
-std::expected<void, caudio::utils::Error> Engine::clearHistory() {
+std::expected<void, caudio::utils::Error> Engine::Impl::clearHistory() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     caudio::engine::History hist(db_);
     return hist.clearHistory();
 }
 
-std::string Engine::lastError() const {
+std::string Engine::Impl::lastError() const {
     if (!lastErr_.empty())
         return lastErr_;
     return "";
 }
 
-Engine::ExpectedVoid Engine::setShuffle(bool on) {
+Engine::ExpectedVoid Engine::Impl::setShuffle(bool on) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueue())
@@ -471,7 +763,7 @@ Engine::ExpectedVoid Engine::setShuffle(bool on) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
+Engine::ExpectedVoid Engine::Impl::setRepeat(RepeatMode m) {
     if (m != RepeatMode::Off && m != RepeatMode::All && m != RepeatMode::One)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
@@ -489,12 +781,12 @@ Engine::ExpectedVoid Engine::setRepeat(RepeatMode m) {
     return {};
 }
 
-int64_t Engine::activeQueueId() const noexcept {
+int64_t Engine::Impl::activeQueueId() const noexcept {
     std::lock_guard<std::timed_mutex> lk(queueMutex_);
     return queue_.queue_id ? queue_.queue_id : state_.activeQueueId ? state_.activeQueueId : 1;
 }
 
-Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
+Engine::ExpectedVoid Engine::Impl::switchQueue(int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!hasDb())
@@ -535,15 +827,15 @@ Engine::ExpectedVoid Engine::switchQueue(int64_t qid) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::next() {
+Engine::ExpectedVoid Engine::Impl::next() {
     return advanceLocked(false, (int)kQueueLockWait.count());
 }
 
-Engine::ExpectedVoid Engine::autoNext() {
+Engine::ExpectedVoid Engine::Impl::autoNext() {
     return advanceLocked(true);
 }
 
-Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd, int lockWaitMs) {
+Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs) {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     // handle repeat one without shuffle without queue lock? match C: if !shuffle && repeat==One
@@ -577,8 +869,8 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd, int lockWaitMs) {
     }
     // Monitor autoNext passes 0 (fail-fast; the next tick retries), user
     // next() passes the wait budget so colliding skips execute.
-    bool locked = lockWaitMs > 0 ? tryLockQueueFor(std::chrono::milliseconds(lockWaitMs))
-                                  : tryLockQueue();
+    bool locked =
+        lockWaitMs > 0 ? tryLockQueueFor(std::chrono::milliseconds(lockWaitMs)) : tryLockQueue();
     if (!locked) {
         // Monitor autoNext fail-fast is routine (next tick retries) — stay
         // silent; only user-wait collisions are diagnostic.
@@ -622,7 +914,7 @@ Engine::ExpectedVoid Engine::advanceLocked(bool stopAtEnd, int lockWaitMs) {
     return {};
 }
 
-Engine::ExpectedVoid Engine::prev() {
+Engine::ExpectedVoid Engine::Impl::prev() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     if (!tryLockQueueFor(kQueueLockWait))
@@ -640,14 +932,14 @@ Engine::ExpectedVoid Engine::prev() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::setCallbacks(const EngineCallbacks& cbs) {
+Engine::ExpectedVoid Engine::Impl::setCallbacks(const EngineCallbacks& cbs) {
     std::lock_guard<std::mutex> lk(cbMutex_);
     callbacks_ = cbs;
     cfg_.callbacks = cbs;
     return {};
 }
 
-std::expected<EngineEvent, caudio::utils::Error> Engine::pollEvent() {
+std::expected<EngineEvent, caudio::utils::Error> Engine::Impl::pollEvent() {
     auto r = eventQueue_.pop();
     if (!r)
         return std::unexpected(
@@ -655,7 +947,7 @@ std::expected<EngineEvent, caudio::utils::Error> Engine::pollEvent() {
     return r.value();
 }
 
-Engine::ExpectedVoid Engine::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
+Engine::ExpectedVoid Engine::Impl::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
     if (!n)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null n"));
@@ -674,7 +966,7 @@ Engine::ExpectedVoid Engine::drainEvents(EngineEvent* buf, size_t cap, size_t* n
     return {};
 }
 
-std::vector<EngineEvent> Engine::drainAll() {
+std::vector<EngineEvent> Engine::Impl::drainAll() {
     std::vector<EngineEvent> out;
     while (true) {
         auto r = eventQueue_.pop();
@@ -685,7 +977,7 @@ std::vector<EngineEvent> Engine::drainAll() {
     return out;
 }
 
-Engine::Engine(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
+Engine::Impl::Impl(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
     cfg_.pollMs = cfg.pollMs ? cfg.pollMs : 10;
     cfg_.gaplessMs = cfg.gaplessMs ? cfg.gaplessMs : 300;
     cfg_.historyThresholdPct = cfg.historyThresholdPct ? cfg.historyThresholdPct : 60;
@@ -704,7 +996,7 @@ Engine::Engine(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
     callbacks_ = cfg.callbacks;
 }
 
-std::optional<caudio::utils::Error> Engine::init() {
+std::optional<caudio::utils::Error> Engine::Impl::init() {
     // start decode thread
     decodeRun_.store(true, std::memory_order_release);
     decodeThread_ = std::jthread([this](std::stop_token st) { decodeLoop(st); });
@@ -716,31 +1008,31 @@ std::optional<caudio::utils::Error> Engine::init() {
     return std::nullopt;
 }
 
-bool Engine::hasDb() const noexcept {
+bool Engine::Impl::hasDb() const noexcept {
     return db_ && db_->handle();
 }
 
-bool Engine::tryLockQueue() noexcept {
+bool Engine::Impl::tryLockQueue() noexcept {
     return queueMutex_.try_lock();
 }
 
-bool Engine::tryLockQueueFor(std::chrono::milliseconds wait) noexcept {
+bool Engine::Impl::tryLockQueueFor(std::chrono::milliseconds wait) noexcept {
     return queueMutex_.try_lock_for(wait);
 }
 
-void Engine::unlockQueue() noexcept {
+void Engine::Impl::unlockQueue() noexcept {
     queueMutex_.unlock();
 }
 
-std::unexpected<caudio::utils::Error> Engine::queueBusy(std::string_view op,
-                                                        std::string_view msg) const {
+std::unexpected<caudio::utils::Error> Engine::Impl::queueBusy(std::string_view op,
+                                                              std::string_view msg) const {
     if (cfg_.logger)
         cfg_.logger->debug("queue busy op={}", op);
-    return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Busy,
-                                                    std::string(msg))};
+    return std::unexpected{
+        caudio::utils::makeError(caudio::utils::StatusCode::Busy, std::string(msg))};
 }
 
-double Engine::currentPositionLocked() const noexcept {
+double Engine::Impl::currentPositionLocked() const noexcept {
     if (!hasCurrent_.load(std::memory_order_acquire))
         return 0.0;
     auto st = playbackState_.load(std::memory_order_acquire);
@@ -758,19 +1050,19 @@ double Engine::currentPositionLocked() const noexcept {
     return pos;
 }
 
-sqlite3* Engine::dbHandle() const noexcept {
+sqlite3* Engine::Impl::dbHandle() const noexcept {
     if (db_)
         return db_->handle();
     return nullptr;
 }
 
-std::shared_mutex* Engine::dbMutex() const noexcept {
+std::shared_mutex* Engine::Impl::dbMutex() const noexcept {
     if (db_)
         return &db_->mutex();
     return nullptr;
 }
 
-std::optional<caudio::utils::Error> Engine::loadState() {
+std::optional<caudio::utils::Error> Engine::Impl::loadState() {
     auto* h = dbHandle();
     auto* m = dbMutex();
     if (!h || !m)
@@ -887,7 +1179,7 @@ std::optional<caudio::utils::Error> Engine::loadState() {
     return caudio::utils::makeError(caudio::utils::StatusCode::Internal, "load failed");
 }
 
-std::expected<void, caudio::utils::Error> Engine::withTransaction(
+std::expected<void, caudio::utils::Error> Engine::Impl::withTransaction(
     std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn) {
     auto* h = dbHandle();
     auto* m = dbMutex();
@@ -918,7 +1210,7 @@ std::expected<void, caudio::utils::Error> Engine::withTransaction(
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::saveState() {
+std::expected<void, caudio::utils::Error> Engine::Impl::saveState() {
     return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
         // Try with active_queue_id column; fallback to old schema if missing
         const char* sqlNew =
@@ -980,7 +1272,7 @@ std::expected<void, caudio::utils::Error> Engine::saveState() {
     });
 }
 
-std::expected<void, caudio::utils::Error> Engine::persistShuffleBlobLocked() {
+std::expected<void, caudio::utils::Error> Engine::Impl::persistShuffleBlobLocked() {
     return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
         const char* sql = "UPDATE engine_state SET shuffle_perm=?, cursor_pos=?, "
                           "shuffle_enabled=? WHERE id=1";
@@ -1014,7 +1306,7 @@ std::expected<void, caudio::utils::Error> Engine::persistShuffleBlobLocked() {
     });
 }
 
-std::expected<void, caudio::utils::Error> Engine::persistCursorLocked() {
+std::expected<void, caudio::utils::Error> Engine::Impl::persistCursorLocked() {
     return withTransaction([&](sqlite3* db) -> std::expected<void, caudio::utils::Error> {
         const char* sql = "UPDATE engine_state SET cursor_pos=? WHERE id=1";
         sqlite3_stmt* raw = nullptr;
@@ -1033,8 +1325,8 @@ std::expected<void, caudio::utils::Error> Engine::persistCursorLocked() {
     });
 }
 
-std::expected<caudio::db::Track, caudio::utils::Error> Engine::fetchTrackByPosLocked(int64_t qid,
-                                                                                     int64_t pos) {
+std::expected<caudio::db::Track, caudio::utils::Error>
+Engine::Impl::fetchTrackByPosLocked(int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;
     auto* h = dbHandle();
@@ -1068,7 +1360,7 @@ std::expected<caudio::db::Track, caudio::utils::Error> Engine::fetchTrackByPosLo
     return tr.value();
 }
 
-std::expected<void, caudio::utils::Error> Engine::setShuffleLocked(bool on) {
+std::expected<void, caudio::utils::Error> Engine::Impl::setShuffleLocked(bool on) {
     // assert: queueMutex_ locked by caller
     bool want = on;
     if (queue_.shuffle == want && !queue_.perm.empty())
@@ -1113,7 +1405,7 @@ std::expected<void, caudio::utils::Error> Engine::setShuffleLocked(bool on) {
     }
 }
 
-std::expected<void, caudio::utils::Error> Engine::queueNextLocked(caudio::db::Track& out) {
+std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::db::Track& out) {
     if (queue_.queue_id == 0)
         queue_.queue_id = 1;
     if (queue_.shuffle) {
@@ -1194,7 +1486,7 @@ std::expected<void, caudio::utils::Error> Engine::queueNextLocked(caudio::db::Tr
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::queuePrevLocked(caudio::db::Track& out) {
+std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::db::Track& out) {
     if (!queue_.shuffle) {
         size_t cnt = db_->queueCountLocked(queue_.queue_id);
         if (cnt == 0)
@@ -1241,7 +1533,7 @@ std::expected<void, caudio::utils::Error> Engine::queuePrevLocked(caudio::db::Tr
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track& t) {
+std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::db::Track& t) {
     // try to open decoder path
     std::string path = t.path;
     // reset previous
@@ -1359,7 +1651,7 @@ std::expected<void, caudio::utils::Error> Engine::doPlayTrack(caudio::db::Track&
     return {};
 }
 
-void Engine::preroll() {
+void Engine::Impl::preroll() {
     if (!decoder_ || !ring_)
         return;
     uint32_t ch = decoder_->channels();
@@ -1389,7 +1681,7 @@ void Engine::preroll() {
     }
 }
 
-void Engine::pushEvent(const EngineEvent& ev) {
+void Engine::Impl::pushEvent(const EngineEvent& ev) {
     // MpscQueue cap 64 drop policy
     auto r = eventQueue_.push(ev);
     if (!r)
@@ -1419,7 +1711,7 @@ void Engine::pushEvent(const EngineEvent& ev) {
     }
 }
 
-void Engine::doHistoryMark() {
+void Engine::Impl::doHistoryMark() {
     if (!hasDb())
         return;
     if (!hasCurrent_.load(std::memory_order_acquire))
@@ -1548,7 +1840,7 @@ void Engine::doHistoryMark() {
     // success keep marked true
 }
 
-void Engine::engineTick() {
+void Engine::Impl::engineTick() {
     doHistoryMark();
     auto st = playbackState_.load(std::memory_order_acquire);
     if (st == PlaybackState::Playing) {
@@ -1585,7 +1877,7 @@ void Engine::engineTick() {
     }
 }
 
-void Engine::monitorLoop(std::stop_token st) {
+void Engine::Impl::monitorLoop(std::stop_token st) {
     // Two-tier waits (C-1): the 10 ms cadence is only needed while playing
     // (300 ms gapless pre-roll window still gets ~12 looks at 25 ms).
     // Idle backs off to 100 ms. An explicit EngineConfig::pollMs override is
@@ -1610,7 +1902,7 @@ void Engine::monitorLoop(std::stop_token st) {
     }
 }
 
-void Engine::decodeLoop(std::stop_token st) {
+void Engine::Impl::decodeLoop(std::stop_token st) {
     constexpr std::size_t kMaxChunkFrames = 1024;
     // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
     std::vector<float> scratch;
