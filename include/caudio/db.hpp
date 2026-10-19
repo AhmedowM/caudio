@@ -9,7 +9,7 @@
  * live in src/db/ and are NOT installed.
  */
 
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/json.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>

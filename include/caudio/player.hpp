@@ -14,7 +14,7 @@
  * - Player with gapless playback, seeking, and state management
  */
 
-#include <caudio/player/core.hpp>
+#include <caudio/player/player.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/reader.hpp>

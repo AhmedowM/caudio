@@ -8,5 +8,5 @@
  * @details Re-exports `:types` and `:core` (the `Engine` class).
  */
 
-#include <caudio/engine/core.hpp>
+#include <caudio/engine/engine.hpp>
 #include <caudio/engine/types.hpp>
