@@ -241,6 +241,24 @@ void IpcServer::Impl::run(std::stop_token st,
 #ifdef _WIN32
             HANDLE listenH = reinterpret_cast<HANDLE>(pipeHandle_.load());
             if (pipeHandle_.load() == -1) {
+                // No listening instance: a follow-up create failed, or a bad
+                // instance was dropped below. Re-create one so the daemon
+                // cannot stay deaf with no listener (D-10).
+                if (!socketPath_.empty()) {
+                    std::string pathStr = socketPath_;
+                    std::wstring w;
+                    w.reserve(pathStr.size());
+                    for (char c : pathStr)
+                        w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
+                    PipeDacl dacl;
+                    HANDLE h =
+                        ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
+                                           kPipeUnlimited, 16384, 16384, 0, dacl.attributes());
+                    if (h != kInvalidHandleValue) {
+                        pipeHandle_.store(reinterpret_cast<std::intptr_t>(h));
+                        continue;
+                    }
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 continue;
             }
@@ -251,6 +269,22 @@ void IpcServer::Impl::run(std::stop_token st,
                 } else {
                     if (st.stop_requested() || stopSource_.get_token().stop_requested())
                         break;
+                    // A client may connect and vanish before we reach
+                    // ConnectNamedPipe; the instance then returns ERROR_NO_DATA
+                    // (or a broken-pipe variant) forever. Retrying the same
+                    // handle spins without ever accepting, leaving a live but
+                    // deaf daemon (D-10). Reset the instance so it is reusable.
+                    if (err == 232 /*ERROR_NO_DATA*/ || err == 109 /*ERROR_BROKEN_PIPE*/ ||
+                        err == 233 /*ERROR_PIPE_NOT_CONNECTED*/) {
+                        if (!::DisconnectNamedPipe(listenH)) {
+                            // Reset failed: drop the instance; the top of the
+                            // loop rebuilds a fresh listening one.
+                            HANDLE stale = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+                            if (stale && stale != kInvalidHandleValue)
+                                ::CloseHandle(stale);
+                        }
+                        continue;
+                    }
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
                     continue;
                 }
@@ -505,22 +539,35 @@ void IpcServer::Impl::shutdown() {
     stopSource_.request_stop();
     cv_.notify_all();
 #ifdef _WIN32
-    // Take-over (see listen()): if the accept loop is mid-handshake it owns
-    // its handle; anything left here is ours to close.
-    HANDLE cur = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-    if (cur && cur != kInvalidHandleValue) {
-        ::CloseHandle(cur);
-    }
+    // Release a synchronous ConnectNamedPipe the accept thread may be blocked
+    // in. CloseHandle from another thread does NOT reliably abort a pending
+    // synchronous ConnectNamedPipe, so we instead satisfy it with a throwaway
+    // client connection while the listen instance is still open. The loop then
+    // re-checks stop_requested and exits. This must run BEFORE the take-over
+    // below: once the listen handle is closed no instance is left to connect
+    // to, which is exactly the race that hung shutdown (D-10). Retry briefly
+    // since the accept loop may be between iterations when we start.
     if (!socketPath_.empty()) {
         std::string pathStr = socketPath_;
         std::wstring w;
         w.reserve(pathStr.size());
         for (char c : pathStr)
             w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
-        HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr, kOpenExisting,
-                                 0, nullptr);
-        if (h != kInvalidHandleValue)
-            ::CloseHandle(h);
+        for (int attempt = 0; attempt < 40; ++attempt) {
+            HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr,
+                                     kOpenExisting, 0, nullptr);
+            if (h != kInvalidHandleValue) {
+                ::CloseHandle(h);
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    }
+    // Take-over (see listen()): if the accept loop is mid-handshake it owns
+    // its handle; anything left here is ours to close.
+    HANDLE cur = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
+    if (cur && cur != kInvalidHandleValue) {
+        ::CloseHandle(cur);
     }
 #else
     int listenCur = static_cast<int>(pipeHandle_.exchange(-1));
