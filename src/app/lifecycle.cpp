@@ -274,6 +274,7 @@ AppResult App::startDaemon(bool foreground) {
     scfg.configPath = config_.configPath;
     scfg.logLevel = config_.logLevel;
     scfg.logToStderr = foreground;
+    scfg.autoResumeOnPlay = config_.autoResumeOnPlay;
     if (foreground) {
         auto svc = caudio::service::Service::create(scfg);
         if (!svc) {

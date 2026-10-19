@@ -145,6 +145,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // create Engine
     caudio::engine::EngineConfig ecfg{};
     ecfg.logger = logger;
+    ecfg.autoResumeOnPlay = cfg.autoResumeOnPlay;
     auto engRes = caudio::engine::Engine::create(ecfg);
     if (!engRes) {
         detail::releaseLock(lockFd);

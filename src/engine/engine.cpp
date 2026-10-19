@@ -455,12 +455,37 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
         decodeCv_.notify_all();
         monCv_.notify_all();
         return {};
-    }
-    // Stopped -> start new track via cursor (not dequeue)
+    } // end if Playing
+
+    // Stopped -> resume persisted track if config enabled, else start new via cursor
     if (!tryLockQueueFor(kQueueLockWait))
         return queueBusy("play", "queue busy");
     queue_.queue_id = queueId;
     caudio::types::Track t;
+    // Resume persisted track if config enabled and track available
+    if (cfg_.autoResumeOnPlay && state_.currentTrackId != 0 && state_.positionMs > 0) {
+        auto idx = db_->queueIndexOf(queue_.queue_id, state_.currentTrackId);
+        if (idx) {
+            queue_.cursor = *idx;
+            auto r = queueNextLocked(t);
+            if (r) {
+                auto pr = doPlayTrack(t);
+                if (pr) {
+                    // Restore persisted position directly
+                    double seekPos = (double)state_.positionMs / 1000.0;
+                    pausePos_ = seekPos;
+                    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::duration<double>(seekPos));
+                    playStart_ = std::chrono::steady_clock::now() - ns;
+                    if (hasDb())
+                        (void)saveState();
+                    unlockQueue();
+                    return {};
+                }
+            }
+        }
+    }
+    // Fall back to next track from cursor
     auto r = queueNextLocked(t);
     if (!r) {
         unlockQueue();

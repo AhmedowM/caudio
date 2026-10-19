@@ -47,6 +47,9 @@ struct Config {
     int logLevel{2};
     /** @brief Optional explicit socket path. If empty, derived from dbPath. */
     std::string socketPath{};
+    /** @brief If true, play() after daemon restart resumes the persisted track/position
+     *  from DB instead of advancing to the next queue track. Default: false. */
+    bool autoResumeOnPlay{false};
 };
 
 /**

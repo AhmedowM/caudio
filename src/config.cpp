@@ -162,6 +162,9 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
             if (!s.empty())
                 cfg.socketPath = s;
         }
+        if (j.contains("autoResumeOnPlay") && j["autoResumeOnPlay"].isBoolean()) {
+            cfg.autoResumeOnPlay = j["autoResumeOnPlay"].get<bool>();
+        }
         // legacy keys: db_path, log_level
         if (j.contains("db_path") && j["db_path"].isString()) {
             std::string s = j["db_path"].get<std::string>();
@@ -192,6 +195,7 @@ caudio::utils::Expected<void> saveConfig(const Config& cfg) {
         j["dbPath"] = cfg.dbPath.generic_string();
         j["device"] = cfg.device;
         j["logLevel"] = cfg.logLevel;
+        j["autoResumeOnPlay"] = cfg.autoResumeOnPlay;
         if (!cfg.socketPath.empty())
             j["socketPath"] = cfg.socketPath;
         std::ofstream out(cfg.configPath);

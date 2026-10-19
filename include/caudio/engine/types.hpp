@@ -123,6 +123,9 @@ struct EngineConfig {
                                         ///< device; wall-clock position). Tests/headless only:
                                         ///< with it off, play/next/prev fail instead of
                                         ///< reporting Playing with zero sound.
+    bool autoResumeOnPlay{false};       ///< If true, play() in Stopped state resumes the
+                                        ///< persisted track/position (from DB) instead of
+                                        ///< advancing to the next queue track.
     EngineCallbacks callbacks{};        ///< Initial callbacks (also via setCallbacks).
     /// Non-owning logger (may be null = silent). Must outlive the Engine;
     /// never emitted from destructors. Threaded through to decode paths.

@@ -35,6 +35,9 @@ struct ServiceConfig {
     int logLevel{2};
     /** @brief Echo log lines to stderr (foreground mode). Default: false. */
     bool logToStderr{false};
+    /** @brief If true, play() after daemon restart resumes the persisted track/position
+     *  from DB instead of advancing to the next queue track. Default: false. */
+    bool autoResumeOnPlay{false};
 };
 
 } // namespace caudio::service
