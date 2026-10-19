@@ -6,6 +6,7 @@
  * @ingroup caudio_client
  */
 
+#include <caudio/config.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
@@ -19,6 +20,11 @@ namespace caudio::client {
 struct Config final {
     std::filesystem::path dbPath{"library.db"};
     std::string socketPath{};
+
+    Config() = default;
+    explicit Config(std::filesystem::path db) : dbPath(std::move(db)) {}
+    Config(std::filesystem::path db, std::string sock) : dbPath(std::move(db)), socketPath(std::move(sock)) {}
+    explicit Config(const caudio::config::Config& cfg) : dbPath(cfg.dbPath), socketPath(cfg.socketPath) {}
 };
 
 class Client {

@@ -10,6 +10,7 @@
  * so this header exposes only the public daemon surface.
  */
 
+#include <caudio/config.hpp>
 #include <caudio/fwd.hpp>
 #include <cstdint>
 #include <expected>
@@ -24,20 +25,9 @@ namespace caudio::service {
  * @brief Configuration for Service creation.
  * @ingroup caudio_service
  */
-struct ServiceConfig {
-    /** @brief Path to SQLite database file. Defaults to "library.db" in current directory. */
-    std::filesystem::path dbPath{"library.db"};
-    /** @brief Optional explicit socket path. If empty, derived from dbPath via socketPathFor(). */
-    std::string socketPath{};
-    /** @brief Optional explicit config file path. If empty, derived from XDG/LOCALAPPDATA. */
-    std::filesystem::path configPath{};
-    /** @brief Log level (0=trace, 1=debug, 2=info, 3=warn, 4=error). Default: 2 (info). */
-    int logLevel{2};
+struct ServiceConfig : public caudio::config::Config {
     /** @brief Echo log lines to stderr (foreground mode). Default: false. */
     bool logToStderr{false};
-    /** @brief If true, play() after daemon restart resumes the persisted track/position
-     *  from DB instead of advancing to the next queue track. Default: false. */
-    bool autoResumeOnPlay{false};
 };
 
 } // namespace caudio::service
