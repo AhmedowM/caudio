@@ -51,6 +51,12 @@ std::filesystem::path defaultDbPath() {
 }
 
 std::filesystem::path defaultConfigPath() {
+#ifdef _WIN32
+    const char* localApp = std::getenv("LOCALAPPDATA");
+    if (localApp && localApp[0] != '\0') {
+        return std::filesystem::path(localApp) / "caudio" / "config.json";
+    }
+#endif
     const char* xdgCfg = std::getenv("XDG_CONFIG_HOME");
     std::filesystem::path base;
     if (xdgCfg && xdgCfg[0] != '\0') {
@@ -69,6 +75,16 @@ std::filesystem::path defaultConfigPath() {
         }
     }
     return base / "config.json";
+}
+
+std::filesystem::path legacyConfigPath() {
+#ifdef _WIN32
+    const char* home = std::getenv("USERPROFILE");
+    if (home && home[0] != '\0') {
+        return std::filesystem::path(home) / ".config" / "caudio" / "config.json";
+    }
+#endif
+    return {};
 }
 
 caudio::utils::Expected<std::string> readFileString(const std::filesystem::path& p) {
@@ -96,6 +112,19 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path) {
 
     std::filesystem::path cfgFile = cfg.configPath;
     std::error_code ec;
+    if (path.empty() && !std::filesystem::exists(cfgFile, ec)) {
+        // Older Windows installs kept the config next to $HOME/.config.
+        // Keep reading it (and keep writing there) rather than silently
+        // starting from defaults; fresh installs use the new default path.
+        auto legacy = detail::legacyConfigPath();
+        if (!legacy.empty()) {
+            std::error_code legacyEc;
+            if (std::filesystem::exists(legacy, legacyEc)) {
+                cfg.configPath = legacy;
+                cfgFile = legacy;
+            }
+        }
+    }
     if (!std::filesystem::exists(cfgFile, ec)) {
         // no config file -> return defaults
         return cfg;

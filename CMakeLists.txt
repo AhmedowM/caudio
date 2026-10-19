@@ -799,6 +799,7 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_player_integration tests/test_player_integration.cpp LIBS caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_TEST_DATA)
 
   caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_ALLOW_MULTIPLE_DEFINITION)
+  caudio_add_catch_test(test_config tests/test_config.cpp LIBS caudio::ipc caudio::utils)
 
   # CLI golden tests: spawn the real executable with hermetic temp configs
   # and assert on stdout/stderr/exit codes (help texts, parse errors,

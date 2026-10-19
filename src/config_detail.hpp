@@ -16,6 +16,8 @@ namespace caudio::config::detail {
  * @brief Get default database path.
  * Windows: %LOCALAPPDATA%\caudio\library.db
  * POSIX: $XDG_DATA_HOME/caudio/library.db or ~/.local/share/caudio/library.db
+ * @details Precedence: explicit `dbPath` in the config file, then this default.
+ * No environment variable overrides `dbPath` directly.
  * @return Default database path.
  */
 std::filesystem::path defaultDbPath();
@@ -27,6 +29,16 @@ std::filesystem::path defaultDbPath();
  * @return Default config file path.
  */
 std::filesystem::path defaultConfigPath();
+
+/**
+ * @brief Get the legacy Windows config path, if any.
+ * Windows: %USERPROFILE%\.config\caudio\config.json
+ * POSIX: empty (defaultConfigPath already used this location).
+ * @details Read-only fallback for configs written before Windows defaulted to
+ * %LOCALAPPDATA%. An explicit --config or configPath always wins.
+ * @return Legacy path, or an empty path on POSIX.
+ */
+std::filesystem::path legacyConfigPath();
 
 /**
  * @brief Read entire file into string.
