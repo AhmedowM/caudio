@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.8.0] - 2026-10-19
+
+### Added
+- Header self-containment target: every public header must compile
+  standalone
+- `-Werror=deprecated-declarations` for in-tree GCC/Clang builds plus a
+  CI guard (`scripts/check_legacy_aliases.py`), so new code cannot adopt
+  the deprecated spellings
+
+### Changed
+- Track <-> JSON codec now lives in `caudio::utils`
+  (`caudio/utils/record_json.hpp` and `record_json.cpp`); `caudio::ipc`
+  no longer links `caudio::db`, so the client side stops pulling sqlite
+  just to serialize protocol payloads
+- Shared records and wire enums are spelled `caudio::types::` across the
+  tree and in the module mirrors
+
+### Deprecated
+- `caudio::db::`/`caudio::engine::` spellings of the moved types (via
+  `legacy_aliases.hpp`) and `caudio::db::trackToJson`/`trackFromJson`
+  emit deprecation warnings; both are removed in v2.0.0
+
 ## [v1.7.0] - 2026-10-18
 
 ### Added
