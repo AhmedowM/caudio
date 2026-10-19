@@ -544,6 +544,31 @@ int Shell::run(int argc, char** argv) {
     auto* historyClear = historyCmd->add_subcommand("clear", "Clear playback history");
     bool historyClearJson = false;
     historyClear->add_flag("--json", historyClearJson, "JSON output");
+    auto* bookmarkCmd = cli_->add_subcommand("bookmark", "Bookmark operations");
+    std::string bmAddTime;
+    std::string bmAddNote;
+    std::int64_t bmAddTrack = 0;
+    bool bmAddJson = false;
+    auto* bmAdd = bookmarkCmd->add_subcommand("add", "Add bookmark at a position");
+    bmAdd->add_option("time", bmAddTime, "mm:ss or seconds (default: current position)");
+    bmAdd->add_option("--note", bmAddNote, "Bookmark note");
+    bmAdd->add_option("--track", bmAddTrack, "Track id (default: current track)");
+    bmAdd->add_flag("--json", bmAddJson, "JSON output");
+    std::int64_t bmListTrack = 0;
+    bool bmListJson = false;
+    auto* bmList = bookmarkCmd->add_subcommand("list", "List bookmarks");
+    bmList->add_option("--track", bmListTrack, "Track id (default: current track)");
+    bmList->add_flag("--json", bmListJson, "JSON output");
+    std::int64_t bmRemoveId = 0;
+    bool bmRemoveJson = false;
+    auto* bmRemove = bookmarkCmd->add_subcommand("remove", "Remove a bookmark");
+    bmRemove->add_option("id", bmRemoveId, "Bookmark id")->required();
+    bmRemove->add_flag("--json", bmRemoveJson, "JSON output");
+    std::int64_t bmGotoId = 0;
+    bool bmGotoJson = false;
+    auto* bmGoto = bookmarkCmd->add_subcommand("goto", "Play and seek to a bookmark");
+    bmGoto->add_option("id", bmGotoId, "Bookmark id")->required();
+    bmGoto->add_flag("--json", bmGotoJson, "JSON output");
     std::string previewFile;
     bool previewKeepPlaying = false;
     auto* previewCmd = cli_->add_subcommand("preview", "Preview file (ephemeral)");
@@ -958,6 +983,37 @@ int Shell::run(int argc, char** argv) {
         if (historyClear->parsed())
             return detail::render(app_.historyClear(), historyClearJson);
         std::cout << historyCmd->help() << "\n";
+        return 0;
+    }
+    if (bookmarkCmd->parsed()) {
+        if (bmAdd->parsed()) {
+            std::optional<double> pos;
+            if (!bmAddTime.empty()) {
+                auto parsed = detail::parseTime(bmAddTime);
+                if (!parsed) {
+                    caudio::println(std::cerr,
+                                    "bookmark add: '{}': {} (expected mm:ss, hh:mm:ss, or seconds)",
+                                    bmAddTime, parsed.error().message);
+                    return 1;
+                }
+                pos = *parsed;
+            }
+            std::optional<std::int64_t> track;
+            if (bmAddTrack > 0)
+                track = bmAddTrack;
+            return detail::render(app_.bookmarkAdd(pos, bmAddNote, track), bmAddJson);
+        }
+        if (bmList->parsed()) {
+            std::optional<std::int64_t> track;
+            if (bmListTrack > 0)
+                track = bmListTrack;
+            return detail::render(app_.bookmarkList(track), bmListJson);
+        }
+        if (bmRemove->parsed())
+            return detail::render(app_.bookmarkRemove(bmRemoveId), bmRemoveJson);
+        if (bmGoto->parsed())
+            return detail::render(app_.bookmarkGoto(bmGotoId), bmGotoJson);
+        std::cout << bookmarkCmd->help() << "\n";
         return 0;
     }
     if (previewCmd->parsed()) {

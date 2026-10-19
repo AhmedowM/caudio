@@ -53,6 +53,14 @@ struct Service::Impl {
 
     // Command handlers (defined in dispatch_*.cpp).
     std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::BookmarkAdd& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::BookmarkGoto& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::BookmarkList& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
+    handle(const caudio::ipc::BookmarkRemove& cmd);
+    std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::ConfigExport& cmd);
     std::expected<caudio::ipc::Result, caudio::utils::Error>
     handle(const caudio::ipc::ConfigGet& cmd);

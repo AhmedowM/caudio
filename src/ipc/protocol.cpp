@@ -416,6 +416,26 @@ Json toJson(const Command& cmd) {
                     j["limit"] = nullptr;
             } else if constexpr (std::is_same_v<T, HistoryClear>) {
                 j["type"] = "HistoryClear";
+            } else if constexpr (std::is_same_v<T, BookmarkList>) {
+                j["type"] = "BookmarkList";
+                if (v.track_id.has_value())
+                    j["track_id"] = *v.track_id;
+                else
+                    j["track_id"] = nullptr;
+            } else if constexpr (std::is_same_v<T, BookmarkAdd>) {
+                j["type"] = "BookmarkAdd";
+                j["position_ms"] = v.position_ms;
+                j["note"] = v.note;
+                if (v.track_id.has_value())
+                    j["track_id"] = *v.track_id;
+                else
+                    j["track_id"] = nullptr;
+            } else if constexpr (std::is_same_v<T, BookmarkRemove>) {
+                j["type"] = "BookmarkRemove";
+                j["id"] = v.id;
+            } else if constexpr (std::is_same_v<T, BookmarkGoto>) {
+                j["type"] = "BookmarkGoto";
+                j["id"] = v.id;
             } else if constexpr (std::is_same_v<T, Shutdown>) {
                 j["type"] = "Shutdown";
             } else if constexpr (std::is_same_v<T, Preview>) {
@@ -764,6 +784,34 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
         if (t == "HistoryClear") {
             return Command{HistoryClear{}};
         }
+        if (t == "BookmarkList") {
+            BookmarkList v{};
+            if (j.contains("track_id") && !j["track_id"].isNull() && j["track_id"].isNumber())
+                v.track_id = j["track_id"].get<int64_t>();
+            return Command{std::move(v)};
+        }
+        if (t == "BookmarkAdd") {
+            BookmarkAdd v{};
+            if (j.contains("position_ms") && j["position_ms"].isNumber())
+                v.position_ms = j["position_ms"].get<int64_t>();
+            if (j.contains("note") && j["note"].isString())
+                v.note = j["note"].get<std::string>();
+            if (j.contains("track_id") && !j["track_id"].isNull() && j["track_id"].isNumber())
+                v.track_id = j["track_id"].get<int64_t>();
+            return Command{std::move(v)};
+        }
+        if (t == "BookmarkRemove") {
+            BookmarkRemove v{};
+            if (j.contains("id") && j["id"].isNumber())
+                v.id = j["id"].get<int64_t>();
+            return Command{std::move(v)};
+        }
+        if (t == "BookmarkGoto") {
+            BookmarkGoto v{};
+            if (j.contains("id") && j["id"].isNumber())
+                v.id = j["id"].get<int64_t>();
+            return Command{std::move(v)};
+        }
         if (t == "Shutdown")
             return Command{Shutdown{}};
         if (t == "Preview") {
@@ -992,6 +1040,20 @@ Json toJson(const Result& r) {
                     ej["artist"] = e.artist;
                     ej["path"] = e.path;
                     ej["duration"] = e.duration;
+                    j["entries"].push_back(ej);
+                }
+                return j;
+            } else if constexpr (std::is_same_v<T, Bookmarks>) {
+                Json j;
+                j["type"] = "Bookmarks";
+                j["entries"] = Json::array();
+                for (const auto& e : v.entries) {
+                    Json ej;
+                    ej["id"] = e.id;
+                    ej["track_id"] = e.track_id;
+                    ej["position_ms"] = e.position_ms;
+                    ej["note"] = e.note;
+                    ej["created"] = e.created;
                     j["entries"].push_back(ej);
                 }
                 return j;
@@ -1384,6 +1446,31 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 }
             }
             return Result{std::move(h)};
+        }
+        if (t == "Bookmarks") {
+            Bookmarks b{};
+            if (j.contains("entries") && j["entries"].isArray()) {
+                const Json entries = j["entries"];
+                for (std::size_t bi = 0, bn = entries.size(); bi < bn; ++bi) {
+                    auto jbExp = entries.at(bi);
+                    if (!jbExp)
+                        return std::unexpected{jbExp.error()};
+                    const Json jb = std::move(*jbExp);
+                    BookmarkEntry e{};
+                    if (jb.contains("id") && jb["id"].isNumber())
+                        e.id = jb["id"].get<int64_t>();
+                    if (jb.contains("track_id") && jb["track_id"].isNumber())
+                        e.track_id = jb["track_id"].get<int64_t>();
+                    if (jb.contains("position_ms") && jb["position_ms"].isNumber())
+                        e.position_ms = jb["position_ms"].get<int64_t>();
+                    if (jb.contains("note") && jb["note"].isString())
+                        e.note = jb["note"].get<std::string>();
+                    if (jb.contains("created") && jb["created"].isNumber())
+                        e.created = jb["created"].get<int64_t>();
+                    b.entries.push_back(std::move(e));
+                }
+            }
+            return Result{std::move(b)};
         }
         if (t == "Devices") {
             Devices d{};

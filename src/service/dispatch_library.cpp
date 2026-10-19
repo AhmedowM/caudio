@@ -230,6 +230,67 @@ Service::Impl::handle(const caudio::ipc::HistoryClear&) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::BookmarkList& cmd) {
+    int64_t tid = cmd.track_id.value_or(engine_->currentTrackId());
+    if (tid == 0)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no current track")};
+    auto list = db_->bookmarkList(tid);
+    if (!list)
+        return std::unexpected{list.error()};
+    std::vector<caudio::ipc::BookmarkEntry> entries;
+    entries.reserve(list->size());
+    for (const auto& b : *list) {
+        caudio::ipc::BookmarkEntry e;
+        e.id = b.id;
+        e.track_id = b.track_id;
+        e.position_ms = b.position_ms;
+        e.note = b.note;
+        e.created = b.created;
+        entries.push_back(std::move(e));
+    }
+    return Result{caudio::ipc::Bookmarks{std::move(entries)}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::BookmarkAdd& cmd) {
+    if (cmd.position_ms < 0)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,
+                                                        "bookmark: negative position")};
+    int64_t tid = cmd.track_id.value_or(engine_->currentTrackId());
+    if (tid == 0)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no current track")};
+    if (auto tr = db_->getTrack(tid); !tr)
+        return std::unexpected{tr.error()};
+    auto r = db_->bookmarkAdd(tid, cmd.position_ms, cmd.note);
+    if (!r)
+        return std::unexpected{r.error()};
+    return Result{Empty{}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::BookmarkRemove& cmd) {
+    auto r = db_->bookmarkRemove(cmd.id);
+    if (!r)
+        return std::unexpected{r.error()};
+    return Result{Empty{}};
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+Service::Impl::handle(const caudio::ipc::BookmarkGoto& cmd) {
+    auto b = db_->bookmarkGet(cmd.id);
+    if (!b)
+        return std::unexpected{b.error()};
+    auto pr = engine_->playTrack(b->track_id);
+    if (!pr)
+        return std::unexpected{pr.error()};
+    if (auto sr = engine_->seek((double)b->position_ms / 1000.0); !sr)
+        return std::unexpected{sr.error()};
+    return statusResult();
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
     if (cmd.path.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg,

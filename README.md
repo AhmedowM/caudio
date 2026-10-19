@@ -141,6 +141,10 @@ Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the d
 | `caudio info [--json]` | Current track info (metadata + play count) |
 | `caudio history list [--limit N] [--json]` | Playback history |
 | `caudio history clear` | Clear history |
+| `caudio bookmark add [time] [--note <text>] [--track <id>] [--json]` | Bookmark a position (default: current position and track) |
+| `caudio bookmark list [--track <id>] [--json]` | List bookmarks (default: current track) |
+| `caudio bookmark remove <id> [--json]` | Remove a bookmark |
+| `caudio bookmark goto <id> [--json]` | Play the bookmarked track at its position |
 | `caudio device list [--json]` | List audio output devices |
 | `caudio device set <id>` | Set default device |
 | `caudio device test [--id <id>]` | Check device is available (enumeration only, no sound) |

@@ -943,6 +943,88 @@ struct HistoryList final {
 struct HistoryClear final {};
 
 // ---------------------------------------------------------------------------
+// Bookmark Commands
+// ---------------------------------------------------------------------------
+
+/**
+ * @struct BookmarkList
+ * @brief List bookmarks for a track (default: current track).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "BookmarkList", "track_id": 123}
+ *
+ * @param track_id Track id. If omitted, uses the current/persisted track.
+ * @return Bookmarks object.
+ */
+struct BookmarkList final {
+    /**
+     * @brief Track id. If omitted, uses the current/persisted track.
+     */
+    std::optional<int64_t> track_id{};
+};
+
+/**
+ * @struct BookmarkAdd
+ * @brief Add a bookmark to a track (default: current track).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "BookmarkAdd", "position_ms": 1234, "note": "intro", "track_id": 123}
+ *
+ * @param position_ms Position in milliseconds.
+ * @param note Optional note.
+ * @param track_id Track id. If omitted, uses the current/persisted track.
+ * @return Empty (success with no data).
+ */
+struct BookmarkAdd final {
+    /**
+     * @brief Position in milliseconds.
+     */
+    int64_t position_ms{};
+    /**
+     * @brief Optional note.
+     */
+    std::string note{};
+    /**
+     * @brief Track id. If omitted, uses the current/persisted track.
+     */
+    std::optional<int64_t> track_id{};
+};
+
+/**
+ * @struct BookmarkRemove
+ * @brief Remove a bookmark by id.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "BookmarkRemove", "id": 7}
+ *
+ * @param id Bookmark id.
+ * @return Empty (success with no data).
+ */
+struct BookmarkRemove final {
+    /**
+     * @brief Bookmark id.
+     */
+    int64_t id{};
+};
+
+/**
+ * @struct BookmarkGoto
+ * @brief Play the bookmarked track and seek to its position.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "BookmarkGoto", "id": 7}
+ *
+ * @param id Bookmark id.
+ * @return Status after the seek.
+ */
+struct BookmarkGoto final {
+    /**
+     * @brief Bookmark id.
+     */
+    int64_t id{};
+};
+
+// ---------------------------------------------------------------------------
 // Info and Utility Commands
 // ---------------------------------------------------------------------------
 
@@ -1047,16 +1129,15 @@ struct DeviceTest final {
  * @see commandFromJson for deserialization
  * @see protocol.cppm for IPC framing
  */
-using Command =
-    std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
-                 QueueList, QueueQueues, QueueCreate, QueueDelete, PlayFiles, QueueSwitch, QueueAdd,
-                 QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList,
-                 PlaylistCreate, PlaylistAdd, PlaylistTracks, PlaylistLoad, PlaylistSave,
-                 PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport, LibraryScan,
-                 LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd, LibraryRemove,
-                 LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport,
-                 ConfigImport, ConfigReset, HistoryList, HistoryClear, Shutdown, Preview,
-                 DeviceList, DeviceSet, DeviceTest, Info>;
+using Command = std::variant<
+    Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet, QueueList,
+    QueueQueues, QueueCreate, QueueDelete, PlayFiles, QueueSwitch, QueueAdd, QueueRemove, QueueMove,
+    QueueClear, QueueShuffle, QueueRepeat, PlaylistList, PlaylistCreate, PlaylistAdd,
+    PlaylistTracks, PlaylistLoad, PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport,
+    PlaylistImport, LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd,
+    LibraryRemove, LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport,
+    ConfigImport, ConfigReset, HistoryList, HistoryClear, BookmarkList, BookmarkAdd, BookmarkRemove,
+    BookmarkGoto, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
 
 // helper concepts
 /**
@@ -1085,8 +1166,10 @@ concept CommandAlternative = requires {
         std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
         std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
         std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
-        std::is_same<T, Shutdown>, std::is_same<T, Preview>, std::is_same<T, DeviceList>,
-        std::is_same<T, DeviceSet>, std::is_same<T, DeviceTest>, std::is_same<T, Info>>;
+        std::is_same<T, BookmarkList>, std::is_same<T, BookmarkAdd>,
+        std::is_same<T, BookmarkRemove>, std::is_same<T, BookmarkGoto>, std::is_same<T, Shutdown>,
+        std::is_same<T, Preview>, std::is_same<T, DeviceList>, std::is_same<T, DeviceSet>,
+        std::is_same<T, DeviceTest>, std::is_same<T, Info>>;
 };
 
 /**

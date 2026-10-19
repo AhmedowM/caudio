@@ -164,6 +164,19 @@ class Engine final {
     ExpectedVoid play(int64_t queueId = 1);
 
     /**
+     * @brief Plays a specific track already present in the active queue.
+     * @ingroup caudio_engine
+     * @param trackId Track id to select (must be in the active queue).
+     * @return Success or Error NotFound/InvalidArg/Busy/Device.
+     * @details Repositions the queue cursor to the track (respecting an
+     * active shuffle permutation) and starts it from the head. Used by
+     * bookmark goto; does not modify the queue itself.
+     * @par Thread safety
+     * Thread-safe; waits boundedly on queueMutex_.
+     */
+    ExpectedVoid playTrack(int64_t trackId);
+
+    /**
      * @brief Pauses playback.
      * @ingroup caudio_engine
      * @return Success or Error State if not playing.

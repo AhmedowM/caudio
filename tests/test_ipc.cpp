@@ -2,9 +2,11 @@
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/core.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
 #include <chrono>
 #include <common.hpp>
 #include <filesystem>
@@ -25,16 +27,13 @@ using namespace caudio::test_helpers;
 
 TEST_CASE("daemon start/stop", "[ipc][cli]") {
     std::string suffix = "roundtrip";
-    std::filesystem::path dbPath = tempDbPath(suffix);
+    std::filesystem::path dir = tempDirPath("ipc_" + suffix);
+    std::filesystem::path dbPath = dir / "library.db";
     std::error_code ec;
-    std::filesystem::remove(dbPath, ec);
-    std::filesystem::remove(dbPath.string() + "-wal", ec);
-    std::filesystem::remove(dbPath.string() + "-shm", ec);
 
     ServiceConfig cfg;
     cfg.dbPath = dbPath;
-    cfg.configPath = dbPath.parent_path() / ("caudio_test_" + suffix + ".json");
-    std::filesystem::remove(cfg.configPath, ec);
+    cfg.configPath = dir / "config.json";
 
     // Start daemon
     auto svcRes = Service::create(cfg);
@@ -75,6 +74,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
 
     svcThread.request_stop();
     svcThread.join();
+    svc.reset();
 
     // Verify cleanup
     std::filesystem::remove(dbPath, ec);
@@ -83,18 +83,50 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
     std::filesystem::remove(cfg.configPath, ec);
 }
 
+TEST_CASE("bookmark protocol roundtrip", "[ipc]") {
+    Command add{BookmarkAdd{83000, "note", 42}};
+    auto addJson = toJson(add);
+    auto addBack = commandFromJson(addJson);
+    REQUIRE(addBack.has_value());
+    auto* addVal = std::get_if<BookmarkAdd>(&*addBack);
+    REQUIRE(addVal != nullptr);
+    CHECK(addVal->position_ms == 83000);
+    CHECK(addVal->note == "note");
+    CHECK(addVal->track_id == 42);
+
+    Command list{BookmarkList{std::nullopt}};
+    auto listJson = toJson(list);
+    auto listBack = commandFromJson(listJson);
+    REQUIRE(listBack.has_value());
+    auto* listVal = std::get_if<BookmarkList>(&*listBack);
+    REQUIRE(listVal != nullptr);
+    CHECK(!listVal->track_id.has_value());
+
+    Result res{Bookmarks{{
+        BookmarkEntry{1, 42, 83000, "note", 1700},
+    }}};
+    auto resJson = toJson(res);
+    auto resBack = resultFromJson(resJson);
+    REQUIRE(resBack.has_value());
+    auto* marks = std::get_if<Bookmarks>(&*resBack);
+    REQUIRE(marks != nullptr);
+    REQUIRE(marks->entries.size() == 1);
+    CHECK(marks->entries[0].id == 1);
+    CHECK(marks->entries[0].track_id == 42);
+    CHECK(marks->entries[0].position_ms == 83000);
+    CHECK(marks->entries[0].note == "note");
+    CHECK(marks->entries[0].created == 1700);
+}
+
 TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
     std::string suffix = "volume";
-    std::filesystem::path dbPath = tempDbPath(suffix);
+    std::filesystem::path dir = tempDirPath("ipc_" + suffix);
+    std::filesystem::path dbPath = dir / "library.db";
     std::error_code ec;
-    std::filesystem::remove(dbPath, ec);
-    std::filesystem::remove(dbPath.string() + "-wal", ec);
-    std::filesystem::remove(dbPath.string() + "-shm", ec);
 
     ServiceConfig cfg;
     cfg.dbPath = dbPath;
-    cfg.configPath = dbPath.parent_path() / ("caudio_test_" + suffix + ".json");
-    std::filesystem::remove(cfg.configPath, ec);
+    cfg.configPath = dir / "config.json";
 
     // Start daemon
     auto svcRes = Service::create(cfg);
@@ -133,6 +165,7 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
 
     svcThread.request_stop();
     svcThread.join();
+    svc.reset();
 
     // Cleanup
     std::filesystem::remove(dbPath, ec);
@@ -143,16 +176,13 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
 
 TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     std::string suffix = "status";
-    std::filesystem::path dbPath = tempDbPath(suffix);
+    std::filesystem::path dir = tempDirPath("ipc_" + suffix);
+    std::filesystem::path dbPath = dir / "library.db";
     std::error_code ec;
-    std::filesystem::remove(dbPath, ec);
-    std::filesystem::remove(dbPath.string() + "-wal", ec);
-    std::filesystem::remove(dbPath.string() + "-shm", ec);
 
     ServiceConfig cfg;
     cfg.dbPath = dbPath;
-    cfg.configPath = dbPath.parent_path() / ("caudio_test_" + suffix + ".json");
-    std::filesystem::remove(cfg.configPath, ec);
+    cfg.configPath = dir / "config.json";
 
     // Start daemon
     auto svcRes = Service::create(cfg);
@@ -191,6 +221,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
 
     svcThread.request_stop();
     svcThread.join();
+    svc.reset();
 
     // Cleanup
     std::filesystem::remove(dbPath, ec);

@@ -346,6 +346,15 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                                     durStr);
                 }
             },
+            [&os](const caudio::ipc::Bookmarks& v) {
+                caudio::println(os, "Bookmarks ({}):", v.entries.size());
+                caudio::println(os, "{:>4}  {:>6}  {:>10}  {}", "ID", "Track", "Pos", "Note");
+                for (const auto& e : v.entries) {
+                    caudio::println(os, "{:4}  {:>6}  {:>10}  {}", e.id, e.track_id,
+                                    formatTime((double)e.position_ms / 1000.0),
+                                    truncateField(e.note, 40));
+                }
+            },
             [&os](const caudio::ipc::Devices& v) {
                 std::span<const caudio::ipc::DeviceInfo> devicesSpan(v.devices.data(),
                                                                      v.devices.size());

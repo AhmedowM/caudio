@@ -687,6 +687,15 @@ class Database final {
     std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
     bookmarkList(int64_t tid);
     /**
+     * @brief Gets a bookmark by id.
+     * @ingroup caudio_db
+     * @param id Bookmark id.
+     * @return Bookmark, InvalidArg, NotFound or Error.
+     * @par Thread safety
+     * Thread-safe: shared_lock.
+     */
+    std::expected<caudio::types::Bookmark, caudio::utils::Error> bookmarkGet(int64_t id);
+    /**
      * @brief Removes a bookmark by id.
      * @ingroup caudio_db
      * @param id Bookmark id.

@@ -1378,6 +1378,31 @@ Database::bookmarkList(int64_t tid) {
     return out;
 }
 
+std::expected<caudio::types::Bookmark, caudio::utils::Error> Database::bookmarkGet(int64_t id) {
+    if (id == 0)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+    std::shared_lock lk{impl_->dbMutex_};
+    if (!impl_->db_)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+    SqliteStatement st;
+    if (auto e = st.prepare(impl_->db_.get(),
+                            "SELECT id, track_id, position_ms, note, "
+                            "CAST(strftime('%s', created) AS INTEGER) FROM bookmarks WHERE id=?");
+        !e)
+        return std::unexpected{e.error()};
+    st.bindInt(1, id);
+    if (!st.step())
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
+    caudio::types::Bookmark b;
+    b.id = st.columnInt(0);
+    b.track_id = st.columnInt(1);
+    b.position_ms = st.columnInt(2);
+    b.note = st.columnText(3);
+    b.created = st.columnInt(4);
+    return b;
+}
+
 std::expected<void, caudio::utils::Error> Database::bookmarkRemove(int64_t id) {
     if (id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};

@@ -72,7 +72,34 @@ RunResult runCli(const std::vector<std::string>& args) {
     for (const auto& a : args)
         cmd += " " + shellQuote(a);
     cmd += " >" + shellQuote(outF.string()) + " 2>" + shellQuote(errF.string());
+    // Redirect the child's temp dir into this run's work dir so default-path
+    // artifacts (e.g. a no-config daemon's caudio.log) are removed with it.
+    std::string oldTemp = [] {
+        const char* v = std::getenv("TEMP");
+        return v ? std::string(v) : std::string{};
+    }();
+    std::string oldTmp = [] {
+        const char* v = std::getenv("TMP");
+        return v ? std::string(v) : std::string{};
+    }();
+    std::string oldTmpDir = [] {
+        const char* v = std::getenv("TMPDIR");
+        return v ? std::string(v) : std::string{};
+    }();
+#ifdef _WIN32
+    _putenv_s("TEMP", work.string().c_str());
+    _putenv_s("TMP", work.string().c_str());
     int rc = std::system(cmd.c_str());
+    _putenv_s("TEMP", oldTemp.c_str());
+    _putenv_s("TMP", oldTmp.c_str());
+#else
+    setenv("TMPDIR", work.string().c_str(), 1);
+    int rc = std::system(cmd.c_str());
+    if (oldTmpDir.empty())
+        unsetenv("TMPDIR");
+    else
+        setenv("TMPDIR", oldTmpDir.c_str(), 1);
+#endif
 #ifdef _WIN32
     int code = rc;
 #else
@@ -855,6 +882,32 @@ TEST_CASE("cli playback one-liners", "[cli]") {
     auto resume = run({"resume"});
     REQUIRE(resume.exitCode == 0);
     REQUIRE(contains(resume.out, "Resuming toneA.wav from "));
+    // Bookmarks: add/list/goto/remove roundtrip on the current track.
+    // Pause first: several CLI spawns would otherwise race the 6 s tone's
+    // natural end / gapless advance under full-suite load.
+    auto bmPause = run({"pause"});
+    REQUIRE(bmPause.exitCode == 0);
+    auto bmAdd = run({"bookmark", "add", "0:01", "--note", "test"});
+    REQUIRE(bmAdd.exitCode == 0);
+    REQUIRE(contains(bmAdd.out, "Bookmark added at 00:01"));
+    auto bmList = run({"bookmark", "list"});
+    REQUIRE(bmList.exitCode == 0);
+    REQUIRE(contains(bmList.out, "Bookmarks (1):"));
+    REQUIRE(contains(bmList.out, "00:01"));
+    REQUIRE(contains(bmList.out, "test"));
+    auto bmJson = run({"bookmark", "list", "--json"});
+    REQUIRE(bmJson.exitCode == 0);
+    REQUIRE(contains(bmJson.out, "\"type\": \"Bookmarks\""));
+    REQUIRE(contains(bmJson.out, "\"position_ms\": 1000"));
+    auto bmGoto = run({"bookmark", "goto", "1"});
+    REQUIRE(bmGoto.exitCode == 0);
+    REQUIRE(contains(bmGoto.out, "Resuming toneA.wav from 00:01"));
+    auto bmRemove = run({"bookmark", "remove", "1"});
+    REQUIRE(bmRemove.exitCode == 0);
+    REQUIRE(contains(bmRemove.out, "Bookmark 1 removed"));
+    auto bmEmpty = run({"bookmark", "list"});
+    REQUIRE(bmEmpty.exitCode == 0);
+    REQUIRE(contains(bmEmpty.out, "Bookmarks (0):"));
     // Seek silence while playing (seek 0 stays at head, so no auto-advance
     // can fire before the assertions below).
     auto seek = run({"seek", "0"});

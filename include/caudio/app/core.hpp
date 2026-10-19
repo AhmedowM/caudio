@@ -449,6 +449,19 @@ class App {
     /** @brief Clears all playback history. @ingroup caudio_app */
     AppResult historyClear();
 
+    /**
+     * @brief Adds a bookmark (position defaults to the current position).
+     * @ingroup caudio_app
+     */
+    AppResult bookmarkAdd(std::optional<double> position, std::string note,
+                          std::optional<int64_t> track);
+    /** @brief Lists bookmarks for a track (default: current track). @ingroup caudio_app */
+    AppResult bookmarkList(std::optional<int64_t> track);
+    /** @brief Removes a bookmark by id. @ingroup caudio_app */
+    AppResult bookmarkRemove(int64_t id);
+    /** @brief Plays the bookmarked track and seeks to its position. @ingroup caudio_app */
+    AppResult bookmarkGoto(int64_t id);
+
     /** @brief Lists audio output devices. @ingroup caudio_app */
     AppResult deviceList();
 

@@ -668,6 +668,63 @@ struct History final {
 };
 
 // ---------------------------------------------------------------------------
+// Bookmark Results
+// ---------------------------------------------------------------------------
+
+/**
+ * @struct BookmarkEntry
+ * @brief Single bookmark entry.
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "BookmarkEntry", "id": 1, "track_id": 123, "position_ms": 1234,
+ * "note": "intro", "created": 1699999999}
+ *
+ * @param id Bookmark id.
+ * @param track_id Bookmarked track id.
+ * @param position_ms Saved position in milliseconds.
+ * @param note Optional note.
+ * @param created Creation timestamp (seconds since epoch).
+ */
+struct BookmarkEntry final {
+    /**
+     * @brief Bookmark id.
+     */
+    int64_t id{};
+    /**
+     * @brief Bookmarked track id.
+     */
+    int64_t track_id{};
+    /**
+     * @brief Saved position in milliseconds.
+     */
+    int64_t position_ms{};
+    /**
+     * @brief Optional note.
+     */
+    std::string note{};
+    /**
+     * @brief Creation timestamp (seconds since epoch).
+     */
+    int64_t created{};
+};
+
+/**
+ * @struct Bookmarks
+ * @brief List of bookmarks (returned by BookmarkList).
+ * @ingroup caudio_ipc
+ *
+ * @json_example {"type": "Bookmarks", "entries": [...]}
+ *
+ * @param entries Vector of bookmark entries.
+ */
+struct Bookmarks final {
+    /**
+     * @brief Vector of bookmark entries.
+     */
+    std::vector<BookmarkEntry> entries{};
+};
+
+// ---------------------------------------------------------------------------
 // Device Results
 // ---------------------------------------------------------------------------
 
@@ -744,11 +801,11 @@ using CliError = caudio::utils::Error;
  * @see resultFromJson for deserialization
  * @see protocol.cppm for IPC framing
  */
-using Result =
-    std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
-                 LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults, Playlists,
-                 PlaylistData, PlaylistCreated, PlaylistImportReport, ScanReport, ConfigValue,
-                 ConfigValues, SingleTrack, TrackInfo, History, Empty, CliError, Devices>;
+using Result = std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
+                            LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults,
+                            Playlists, PlaylistData, PlaylistCreated, PlaylistImportReport,
+                            ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History,
+                            Bookmarks, Empty, CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

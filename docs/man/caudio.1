@@ -39,6 +39,9 @@ caudio \- C++23 headless music player daemon and CLI
 \fBhistory\fR \fISUBCOMMAND\fR
 .br
 .B caudio
+\fBbookmark\fR \fISUBCOMMAND\fR
+.br
+.B caudio
 \fBdevice\fR \fISUBCOMMAND\fR
 .SH DESCRIPTION
 .B caudio
@@ -285,6 +288,20 @@ List playback history. Default limit 50.
 .TP
 .B history clear
 Clear playback history.
+.SS Bookmarks
+.TP
+.B bookmark add [\fITIME\fR] [\-\-note \fITEXT\fR] [\-\-track \fIID\fR] [\-\-json]
+Add a bookmark. \fITIME\fR accepts mm:ss, hh:mm:ss, or seconds and defaults to
+the current playback position. \fB\-\-track\fR defaults to the current track.
+.TP
+.B bookmark list [\-\-track \fIID\fR] [\-\-json]
+List bookmarks for a track. Defaults to the current track.
+.TP
+.B bookmark remove \fIID\fR [\-\-json]
+Remove bookmark \fIID\fR.
+.TP
+.B bookmark goto \fIID\fR [\-\-json]
+Play the bookmarked track and seek to the bookmark position.
 .SS Device
 .TP
 .B device list [\-\-json]

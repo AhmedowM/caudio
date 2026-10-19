@@ -81,6 +81,7 @@ struct Engine::Impl {
 
     // transport
     ExpectedVoid play(int64_t queueId);
+    ExpectedVoid playTrack(int64_t trackId);
     ExpectedVoid pause();
     ExpectedVoid resume();
     ExpectedVoid stop();
@@ -206,6 +207,10 @@ void Engine::shutdown() {
 
 Engine::ExpectedVoid Engine::play(int64_t queueId) {
     return impl_->play(queueId);
+}
+
+Engine::ExpectedVoid Engine::playTrack(int64_t trackId) {
+    return impl_->playTrack(trackId);
 }
 
 Engine::ExpectedVoid Engine::pause() {
@@ -466,6 +471,55 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     if (!pr)
         return std::unexpected(pr.error());
     return {};
+}
+
+Engine::ExpectedVoid Engine::Impl::playTrack(int64_t trackId) {
+    if (!hasDb())
+        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
+    if (trackId <= 0)
+        return std::unexpected(
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad track id"));
+    if (!tryLockQueueFor(kQueueLockWait))
+        return queueBusy("playTrack", "queue busy");
+    auto idx = db_->queueIndexOf(queue_.queue_id, trackId);
+    if (!idx) {
+        unlockQueue();
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                        "track not in active queue")};
+    }
+    size_t cursor = *idx;
+    if (queue_.shuffle) {
+        if (queue_.perm.empty()) {
+            auto sr = setShuffleLocked(true);
+            if (!sr) {
+                unlockQueue();
+                return std::unexpected(sr.error());
+            }
+        }
+        bool found = false;
+        for (size_t i = 0; i < queue_.perm.size(); ++i) {
+            if (queue_.perm[i] == (int64_t)*idx) {
+                cursor = i;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            unlockQueue();
+            return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
+                                                            "track not in shuffle order")};
+        }
+    }
+    queue_.cursor = cursor;
+    caudio::types::Track t;
+    auto r = queueNextLocked(t);
+    if (!r) {
+        unlockQueue();
+        return std::unexpected(r.error());
+    }
+    auto pr = doPlayTrack(t);
+    unlockQueue();
+    return pr;
 }
 
 Engine::ExpectedVoid Engine::Impl::pause() {
