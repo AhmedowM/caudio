@@ -1,11 +1,11 @@
-#include <caudio/db/json.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/record_json.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -116,7 +116,8 @@ resultCodeFromString(std::string_view sv) {
     return std::unexpected{caudio::utils::makeError(R::InvalidArg, "unknown Result code")};
 }
 
-// Track conversion lives in caudio::db (db/json.hpp) -- single definition.
+// Track conversion lives in caudio::utils (utils/record_json.hpp) -- single
+// definition shared by db export/import and the IPC codec.
 // (The former ipc::detail subset is deleted; wire readers tolerate the
 // fuller db field set: all reads are contains-guarded.)
 
@@ -824,7 +825,7 @@ Json toJson(const Result& r) {
                 j["type"] = "QueueTracks";
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
-                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                    j["tracks"].push_back(caudio::utils::trackToJson(t));
                 return j;
             } else if constexpr (std::is_same_v<T, Queues>) {
                 Json j;
@@ -875,14 +876,14 @@ Json toJson(const Result& r) {
                 j["total_play_time_ms"] = v.total_play_time_ms;
                 j["most_played"] = Json::array();
                 for (const auto& t : v.most_played)
-                    j["most_played"].push_back(caudio::db::trackToJson(t));
+                    j["most_played"].push_back(caudio::utils::trackToJson(t));
                 return j;
             } else if constexpr (std::is_same_v<T, Tracks>) {
                 Json j;
                 j["type"] = "Tracks";
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
-                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                    j["tracks"].push_back(caudio::utils::trackToJson(t));
                 return j;
             } else if constexpr (std::is_same_v<T, SearchResults>) {
                 Json j;
@@ -890,7 +891,7 @@ Json toJson(const Result& r) {
                 j["query"] = v.query;
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
-                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                    j["tracks"].push_back(caudio::utils::trackToJson(t));
                 return j;
             } else if constexpr (std::is_same_v<T, ScanReport>) {
                 Json j;
@@ -909,7 +910,7 @@ Json toJson(const Result& r) {
                 j["type"] = "PlaylistData";
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
-                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                    j["tracks"].push_back(caudio::utils::trackToJson(t));
                 j["format"] = v.format;
                 return j;
             } else if constexpr (std::is_same_v<T, PlaylistCreated>) {
@@ -925,7 +926,7 @@ Json toJson(const Result& r) {
                 j["name"] = v.name;
                 j["tracks"] = Json::array();
                 for (const auto& t : v.tracks)
-                    j["tracks"].push_back(caudio::db::trackToJson(t));
+                    j["tracks"].push_back(caudio::utils::trackToJson(t));
                 j["matched"] = v.matched;
                 j["skipped"] = v.skipped;
                 j["duplicates"] = v.duplicates;
@@ -950,12 +951,12 @@ Json toJson(const Result& r) {
             } else if constexpr (std::is_same_v<T, SingleTrack>) {
                 Json j;
                 j["type"] = "SingleTrack";
-                j["track"] = caudio::db::trackToJson(v.track);
+                j["track"] = caudio::utils::trackToJson(v.track);
                 return j;
             } else if constexpr (std::is_same_v<T, TrackInfo>) {
                 Json j;
                 j["type"] = "TrackInfo";
-                j["track"] = caudio::db::trackToJson(v.track);
+                j["track"] = caudio::utils::trackToJson(v.track);
                 j["play_count"] = v.play_count;
                 j["last_played"] = v.last_played;
                 return j;
@@ -1082,7 +1083,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = tracks.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     qt.tracks.push_back(std::move(*tr));
@@ -1174,7 +1175,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = mostPlayed.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     ls.most_played.push_back(std::move(*tr));
@@ -1190,7 +1191,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = tracks.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     trs.tracks.push_back(std::move(*tr));
@@ -1208,7 +1209,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = tracks.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     sr.tracks.push_back(std::move(*tr));
@@ -1246,7 +1247,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = tracks.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     pd.tracks.push_back(std::move(*tr));
@@ -1276,7 +1277,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto jt = tracks.at(ti);
                     if (!jt)
                         return std::unexpected{jt.error()};
-                    auto tr = caudio::db::trackFromJson(*jt);
+                    auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
                     r.tracks.push_back(std::move(*tr));
@@ -1320,13 +1321,13 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
         if (t == "SingleTrack") {
             SingleTrack st{};
             if (j.contains("track")) {
-                auto tr = caudio::db::trackFromJson(j["track"]);
+                auto tr = caudio::utils::trackFromJson(j["track"]);
                 if (!tr)
                     return std::unexpected{tr.error()};
                 st.track = std::move(*tr);
             } else if (j.contains("id")) {
                 // legacy: track fields directly in object
-                auto tr = caudio::db::trackFromJson(j);
+                auto tr = caudio::utils::trackFromJson(j);
                 if (!tr)
                     return std::unexpected{tr.error()};
                 st.track = std::move(*tr);
@@ -1336,7 +1337,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
         if (t == "TrackInfo") {
             TrackInfo ti{};
             if (j.contains("track")) {
-                auto tr = caudio::db::trackFromJson(j["track"]);
+                auto tr = caudio::utils::trackFromJson(j["track"]);
                 if (!tr)
                     return std::unexpected{tr.error()};
                 ti.track = std::move(*tr);

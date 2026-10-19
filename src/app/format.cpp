@@ -6,10 +6,9 @@
  */
 
 #include <caudio/app/format.hpp>
-#include <caudio/db/json.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/record_json.hpp>
 #include <cmath>
 #include <filesystem>
 #include <format>
@@ -100,7 +99,7 @@ void writePlaylistJson(std::ostream& os, const std::vector<caudio::types::Track>
     j["version"] = 1;
     j["tracks"] = caudio::utils::Json::array();
     for (const auto& t : tracks) {
-        j["tracks"].push_back(caudio::db::trackToJson(t));
+        j["tracks"].push_back(caudio::utils::trackToJson(t));
     }
     os << j.dump(2) << "\n";
 }

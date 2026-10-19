@@ -15,6 +15,7 @@
  * - thread: sleepFor, sleepForMs, setThreadName
  * - print: portable print/println facade (see print.hpp)
  * - json: opaque Json/JsonRef value type (nlohmann stays behind src/ walls)
+ * - record_json: Track <-> Json codec shared by db and ipc
  * - function: portable MoveOnlyFunction (libc++ lacks std::move_only_function)
  * - generator: portable Generator (libc++ lacks std::generator)
  */
@@ -27,6 +28,7 @@
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/print.hpp>
+#include <caudio/utils/record_json.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
 #include <caudio/utils/thread.hpp>

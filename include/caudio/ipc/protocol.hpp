@@ -79,8 +79,8 @@
 namespace caudio::ipc {
 
 // JSON vocabulary: the opaque caudio::utils::Json (nlohmann stays in src/).
-// Track conversion lives in caudio::db (db/json.hpp) -- single definition,
-// no ipc::detail duplicate.
+// Track conversion lives in caudio::utils (utils/record_json.hpp) -- single
+// definition, no ipc::detail duplicate.
 using Json = caudio::utils::Json;
 
 /**
@@ -165,7 +165,8 @@ std::string resultCodeToString(caudio::utils::StatusCode r);
 std::expected<caudio::utils::StatusCode, caudio::utils::Error>
 resultCodeFromString(std::string_view sv);
 
-// Track JSON helpers live in caudio::db (db/json.hpp) -- single definition.
+// Track JSON helpers live in caudio::utils (utils/record_json.hpp) -- single
+// definition.
 // Playlist JSON helpers
 /**
  * @brief Convert Playlist struct to JSON object.

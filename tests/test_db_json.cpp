@@ -4,6 +4,7 @@
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
+#include <caudio/utils/record_json.hpp>
 #include <common.hpp>
 #include <cstdint>
 #include <filesystem>
@@ -37,14 +38,14 @@ TEST_CASE("trackToJson and trackFromJson roundtrip ordered", "[db_json]") {
     t.library_id = 1;
     for (int b = 0; b < 32; ++b)
         t.fingerprint[b] = (uint8_t)b;
-    const auto j = trackToJson(t);
+    const auto j = caudio::utils::trackToJson(t);
     REQUIRE(j.contains("title"));
     REQUIRE(j["title"].get<std::string>() == "Title");
     REQUIRE(j["fingerprint"].get<std::string>().size() == 64);
     // Json preserves insertion order; just check all fields present
     REQUIRE(j.contains("path"));
     REQUIRE(j.contains("artist"));
-    auto t2Res = trackFromJson(j);
+    auto t2Res = caudio::utils::trackFromJson(j);
     REQUIRE(t2Res.has_value());
     auto t2 = *t2Res;
     REQUIRE(t2.title == t.title);
@@ -122,7 +123,7 @@ TEST_CASE("trackFromJson invalid fingerprint falls back", "[db_json]") {
     j["title"] = "T";
     j["fingerprint"] = "zzzz"; // invalid hex length
     j["library_id"] = 1;
-    auto r = trackFromJson(j);
+    auto r = caudio::utils::trackFromJson(j);
     REQUIRE(r.has_value());
     // should have generated fallback fingerprint not empty
     bool allZero = true;

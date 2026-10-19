@@ -48,7 +48,7 @@
  * caudio.player  (utils)
  * caudio.db      (utils, player)
  * caudio.engine  (utils, player, db)
- * caudio.ipc     (utils, db)
+ * caudio.ipc     (utils)
  * caudio.client  (utils, ipc)
  * caudio.service (utils, ipc, engine, db)
  * caudio.app     (utils, ipc, client, service, db, player)

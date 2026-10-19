@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""U-6b guard: reject new uses of the deprecated caudio::db:: / caudio::engine::
-type aliases (see include/caudio/legacy_aliases.hpp).
+"""Guard: reject new uses of the deprecated caudio::db:: / caudio::engine::
+spellings (moved types in include/caudio/legacy_aliases.hpp, Track JSON
+helpers in include/caudio/db/json.hpp).
 
-Every moved type has a canonical `caudio::types::` spelling; the old
-qualified spellings only exist as deprecated shims until v2.0.0 (U-6c). New
-code (and new docs examples in headers) must use `caudio::types::` directly.
-Comments and string literals are ignored, and the deprecation declarations
-themselves are excluded, so only real uses are reported.
+Every moved type has a canonical `caudio::types::` spelling and the Track
+codec has `caudio::utils::`; the old qualified spellings only exist as
+deprecated shims until v2.0.0 (U-6c). New code (and new docs examples in
+headers) must use the canonical spelling directly. Comments and string
+literals are ignored, and the deprecation declarations themselves are
+excluded, so only real uses are reported.
 
 Exit 0 when clean, 1 when any offending spelling is found.
 """
@@ -20,11 +22,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 NAMES = {
-    "db": ("Bookmark", "HistoryEntry", "Playlist", "QueueItem", "Track"),
+    "db": (
+        "Bookmark",
+        "HistoryEntry",
+        "Playlist",
+        "QueueItem",
+        "Track",
+        "trackFromJson",
+        "trackToJson",
+    ),
     "engine": ("PlaybackState", "RepeatMode"),
 }
 
-EXCLUDE = {(ROOT / "include/caudio/legacy_aliases.hpp").resolve()}
+EXCLUDE = {
+    (ROOT / "include/caudio/legacy_aliases.hpp").resolve(),
+    # Re-exports the deprecated db:: forwarders so `import caudio.db:json`
+    # keeps working during the deprecation window.
+    (ROOT / "modules/caudio/db/json.cppm").resolve(),
+}
 EXT = {".hpp", ".hh", ".h", ".cpp", ".cc", ".cxx", ".cppm"}
 SCAN_DIRS = ("include", "src", "cli", "tests", "examples", "modules")
 
@@ -125,10 +140,13 @@ def main() -> int:
                 )
 
     if offenders:
-        print("Deprecated alias spellings found (use caudio::types:: instead):")
+        print("Deprecated caudio::db:: / caudio::engine:: spellings found:")
         for o in offenders:
             print(f"  {o}")
-        print(f"\n{len(offenders)} offending use(s).")
+        print(
+            f"\n{len(offenders)} offending use(s); "
+            "use the caudio::types:: / caudio::utils:: spelling instead."
+        )
         return 1
 
     print("check_legacy_aliases: clean")

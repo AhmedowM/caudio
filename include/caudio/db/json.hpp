@@ -5,12 +5,15 @@
  * @brief JSON import/export for tracks.
  * @ingroup caudio_db
  * @details Implements `trackToJson`, `trackFromJson`, `exportJson` and
- * `importJson` for JSON serialization of Track rows. Uses ordered JSON
+ * `importJson` for JSON serialization of Track rows. The Track codec itself
+ * now lives in `caudio::utils` (`utils/record_json.hpp`); the `caudio::db::`
+ * spellings below are deprecated forwarders. Uses ordered JSON
  * (keys in insertion order) to preserve field order across export/import.
  */
 
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
+#include <caudio/utils/record_json.hpp>
 #include <expected>
 #include <filesystem>
 
@@ -19,17 +22,22 @@ namespace caudio::db {
 /**
  * @brief Serializes a Track to JSON.
  * @ingroup caudio_db
+ * @deprecated Use `caudio::utils::trackToJson` instead.
  * @param t Track to serialize.
  * @return JSON object with all Track fields; fingerprint is hex-encoded.
  * Keys keep insertion order (ordered backend behind `caudio::utils::Json`).
  * @par Thread safety
  * Pure function, thread-safe.
  */
-caudio::utils::Json trackToJson(const caudio::types::Track& t);
+[[deprecated("use caudio::utils::trackToJson")]]
+inline caudio::utils::Json trackToJson(const caudio::types::Track& t) {
+    return caudio::utils::trackToJson(t);
+}
 
 /**
  * @brief Deserializes a Track from ordered JSON.
  * @ingroup caudio_db
+ * @deprecated Use `caudio::utils::trackFromJson` instead.
  * @param j JSON object (as produced by `trackToJson`).
  * @return Track on success, or `Error` with `StatusCode::Corrupt` if parsing fails.
  * @details Missing keys use defaults; `library_id == 0` is normalized to 1.
@@ -39,7 +47,11 @@ caudio::utils::Json trackToJson(const caudio::types::Track& t);
  * Pure function, thread-safe.
  * @see trackToJson
  */
-std::expected<caudio::types::Track, caudio::utils::Error> trackFromJson(const caudio::utils::Json& j);
+[[deprecated("use caudio::utils::trackFromJson")]]
+inline std::expected<caudio::types::Track, caudio::utils::Error>
+trackFromJson(const caudio::utils::Json& j) {
+    return caudio::utils::trackFromJson(j);
+}
 
 /**
  * @brief Exports all tracks to a JSON file.

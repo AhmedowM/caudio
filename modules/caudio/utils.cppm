@@ -5,6 +5,7 @@ export import :error;
 export import :log;
 export import :log_sink;
 export import :json;
+export import :record_json;
 export import :math;
 export import :ring;
 export import :mpsc_queue;

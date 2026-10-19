@@ -7,8 +7,8 @@
  * @details Value structs shared across the db, engine, ipc and app layers:
  * Track, Playlist, QueueItem, HistoryEntry and Bookmark. All are trivially
  * copyable aggregates with default-initialised members; no invariants beyond
- * those documented per-field. `caudio::db` re-exports these as aliases (see
- * `db/types.hpp`) so existing `caudio::db::` call sites keep compiling.
+ * those documented per-field. `caudio::db` keeps deprecated aliases for the old
+ * spellings (see `legacy_aliases.hpp`) until v2.0.0.
  */
 
 #include <array>

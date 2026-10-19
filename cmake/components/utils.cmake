@@ -14,6 +14,7 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   modules/caudio/version.cppm
   modules/caudio/utils/function.cppm
   modules/caudio/utils/generator.cppm
+  modules/caudio/utils/record_json.cppm
 )
 
 set(CAUDIO_UTILS_SOURCES
@@ -21,6 +22,9 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/json.cpp
   src/utils/log.cpp
   src/utils/log_sink.cpp
+  # Shared Track <-> Json codec (db export/import + ipc wire). It includes the
+  # header-only caudio::types records, so no extra link dependency is added.
+  src/utils/record_json.cpp
   src/utils/thread.cpp
 )
 caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} MODULE_SOURCES ${CAUDIO_UTILS_MODULE_SOURCES} DEPS Threads::Threads)
