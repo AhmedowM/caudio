@@ -275,8 +275,8 @@ class Engine final {
      * @return Duration (cached from decoder or metadata). */
     double duration() const noexcept;
     /** @brief Returns current playback position in seconds. @ingroup caudio_engine
-     * @return Position (0 if no track; pausePos_ if paused; pausePos_ + elapsed if playing,
-     * clamped). */
+     * @return Position (persisted resume position if stopped with no loaded track;
+     * pausePos_ if paused; pausePos_ + elapsed if playing, clamped). */
     double position() const noexcept;
     /** @brief Returns current track id (or persisted one if no current). @ingroup caudio_engine
      * @return Track id if hasCurrent_, else state_.currentTrackId (persisted). */

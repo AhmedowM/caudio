@@ -185,6 +185,9 @@ struct Engine::Impl {
     // M-3: volume-drag throttle -- setVolume() persists at most 1x/s
     // (crash-window volume loss <= 1 s; shutdown/track-change saves cover it).
     std::atomic<uint64_t> lastVolSaveMs_{0};
+    // Session position persistence: engineTick() writes at most 1x/5s while
+    // playing; pause/seek/shutdown always save (crash window <= 5 s).
+    std::atomic<uint64_t> lastPosSaveMs_{0};
     // gaplessArmed_: 0->1 CAS arms gapless pre-roll ~300ms before track end (gaplessMs).
     // Reset to false on TrackStarted / next() failure. Requires engineTick() single-writer.
     std::atomic<bool> gaplessArmed_{false};
@@ -475,6 +478,8 @@ Engine::ExpectedVoid Engine::Impl::pause() {
     playbackState_.store(caudio::types::PlaybackState::Paused, std::memory_order_release);
     if (output_)
         output_->stop();
+    if (hasDb())
+        (void)saveState();
     return {};
 }
 
@@ -523,6 +528,11 @@ Engine::ExpectedVoid Engine::Impl::stop() {
         }
         unlockQueue();
     }
+    // An explicit stop starts the track from its head next time (including
+    // after a restart), so clear the resume position.
+    state_.positionMs = 0;
+    if (hasDb())
+        (void)saveState();
     return {};
 }
 
@@ -563,6 +573,8 @@ Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
     // Resume decode thread
     playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
     decodeCv_.notify_all();
+    if (hasDb())
+        (void)saveState();
     return {};
 }
 
@@ -1035,7 +1047,7 @@ std::unexpected<caudio::utils::Error> Engine::Impl::queueBusy(std::string_view o
 
 double Engine::Impl::currentPositionLocked() const noexcept {
     if (!hasCurrent_.load(std::memory_order_acquire))
-        return 0.0;
+        return (double)state_.positionMs / 1000.0;
     auto st = playbackState_.load(std::memory_order_acquire);
     if (st == caudio::types::PlaybackState::Paused)
         return pausePos_;
@@ -1146,6 +1158,21 @@ std::optional<caudio::utils::Error> Engine::Impl::loadState() {
                 }
             }
         }
+        // Best-effort resume position (missing on old DBs -> 0).
+        state_.positionMs = 0;
+        {
+            sqlite3_stmt* ps = nullptr;
+            if (sqlite3_prepare_v2(h, "SELECT position_ms FROM engine_state WHERE id=1", -1, &ps,
+                                   nullptr) == SQLITE_OK) {
+                caudio::db::internal::StmtGuard psGuard(ps);
+                ps = psGuard.get();
+                if (sqlite3_step(ps) == SQLITE_ROW) {
+                    state_.positionMs = sqlite3_column_int64(ps, 0);
+                    if (state_.positionMs < 0)
+                        state_.positionMs = 0;
+                }
+            }
+        }
         // validate queue exists; fallback to 1 if not
         {
             sqlite3_stmt* chk = nullptr;
@@ -1169,6 +1196,7 @@ std::optional<caudio::utils::Error> Engine::Impl::loadState() {
         state_.currentTrackId = 0;
         state_.volume = 1.0f;
         state_.activeQueueId = 1;
+        state_.positionMs = 0;
         volume_.store(1.0f, std::memory_order_relaxed);
         queue_.perm.clear();
         queue_.cursor = 0;
@@ -1216,7 +1244,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::saveState() {
         // Try with active_queue_id column; fallback to old schema if missing
         const char* sqlNew =
             "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
-            "cursor_pos=?, current_track_id=?, volume=?, active_queue_id=?, "
+            "cursor_pos=?, current_track_id=?, volume=?, active_queue_id=?, position_ms=?, "
             "updated=CURRENT_TIMESTAMP WHERE id=1";
         const char* sqlOld =
             "UPDATE engine_state SET shuffle_enabled=?, repeat_mode=?, shuffle_perm=?, "
@@ -1253,6 +1281,16 @@ std::expected<void, caudio::utils::Error> Engine::Impl::saveState() {
         if (hasActiveCol) {
             sqlite3_bind_int64(raw, 7,
                                state_.activeQueueId ? state_.activeQueueId : queue_.queue_id);
+            int64_t posMs = hasCurrent_.load(std::memory_order_acquire)
+                                ? (int64_t)(currentPositionLocked() * 1000.0)
+                                : state_.positionMs;
+            if (posMs < 0)
+                posMs = 0;
+            state_.positionMs = posMs;
+            sqlite3_bind_int64(raw, 8, posMs);
+        } else {
+            // No position_ms column on this legacy schema.
+            state_.positionMs = 0;
         }
         rc = sqlite3_step(raw);
         if (rc != SQLITE_DONE)
@@ -1874,6 +1912,15 @@ void Engine::Impl::engineTick() {
                     }
                 }
             }
+        }
+        // Resume-position checkpoint (5 s crash window). Skip when the queue
+        // lock is contended: another thread will save on its own path.
+        uint64_t lastSave = lastPosSaveMs_.load(std::memory_order_acquire);
+        if (now - lastSave >= 5000 && tryLockQueue()) {
+            state_.cursorPos = (int64_t)queue_.cursor;
+            if (saveState())
+                lastPosSaveMs_.store(now, std::memory_order_release);
+            unlockQueue();
         }
     }
 }

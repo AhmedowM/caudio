@@ -142,9 +142,11 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
     }
     // Migration: add active_queue_id column if missing (for existing DBs)
     // Migration: add pre_mute_volume column if missing (for existing DBs)
+    // Migration: add position_ms column if missing (for existing DBs)
     // Migration: add queues.temp column if missing (for existing DBs)
     for (const char* mig : {"ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
                             "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5",
+                            "ALTER TABLE engine_state ADD COLUMN position_ms INTEGER DEFAULT 0",
                             "ALTER TABLE queues ADD COLUMN temp INTEGER DEFAULT 0"}) {
         char* migErr = nullptr;
         int migRc = sqlite3_exec(raw, mig, nullptr, nullptr, &migErr);
@@ -1323,7 +1325,7 @@ std::expected<void, caudio::utils::Error> Database::historyClear() {
 
 std::expected<void, caudio::utils::Error> Database::bookmarkAdd(int64_t tid, int64_t pos,
                                                                 std::string_view note) {
-    if (tid == 0)
+    if (tid == 0 || pos < 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::unique_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
@@ -1357,8 +1359,9 @@ Database::bookmarkList(int64_t tid) {
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
     if (auto e =
-            st.prepare(impl_->db_.get(), "SELECT id, track_id, position_ms, note, created FROM "
-                                         "bookmarks WHERE track_id=? ORDER BY created");
+            st.prepare(impl_->db_.get(), "SELECT id, track_id, position_ms, note, "
+                                         "CAST(strftime('%s', created) AS INTEGER) FROM bookmarks "
+                                         "WHERE track_id=? ORDER BY created, id");
         !e)
         return std::unexpected{e.error()};
     st.bindInt(1, tid);
@@ -1373,6 +1376,26 @@ Database::bookmarkList(int64_t tid) {
         out.push_back(std::move(b));
     }
     return out;
+}
+
+std::expected<void, caudio::utils::Error> Database::bookmarkRemove(int64_t id) {
+    if (id == 0)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
+    std::unique_lock lk{impl_->dbMutex_};
+    if (!impl_->db_)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+    SqliteStatement st;
+    if (auto e = st.prepare(impl_->db_.get(), "DELETE FROM bookmarks WHERE id=?"); !e)
+        return std::unexpected{e.error()};
+    st.bindInt(1, id);
+    int rc = st.stepDone();
+    if (rc != SQLITE_DONE)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Internal,
+                                                        sqlite3_errmsg(impl_->db_.get()))};
+    if (sqlite3_changes(impl_->db_.get()) == 0)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
+    return {};
 }
 
 std::expected<int64_t, caudio::utils::Error> Database::libraryAdd(std::string_view path,

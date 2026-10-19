@@ -201,3 +201,109 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
         std::filesystem::remove(dbPath + "-shm", ec);
     }
 }
+
+TEST_CASE("engine persists resume position across restart", "[engine_state]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
+    std::string dbPath = tempDbPath("eng_state_pos").string();
+    int64_t trackId = 0;
+    {
+        auto dbRes = Database::open(dbPath);
+        REQUIRE(dbRes.has_value());
+        auto db = std::move(dbRes.value());
+        caudio::types::Track t;
+        t.path = "pos.wav";
+        t.duration = 10.0;
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0xC0 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        trackId = *r;
+        REQUIRE(db->queueEnqueue(1, trackId, -1).has_value());
+
+        EngineConfig cfg;
+        cfg.allowSimulatedPlayback = true;
+        cfg.enableMonitorThread = false;
+        auto eRes = Engine::create(cfg);
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(eng->play(1).has_value());
+        REQUIRE(eng->seek(4.0).has_value());
+        REQUIRE(eng->position() > 3.9);
+        eng->shutdown();
+    }
+    {
+        sqlite3* h = nullptr;
+        REQUIRE(sqlite3_open_v2(dbPath.c_str(), &h, SQLITE_OPEN_READONLY, nullptr) == SQLITE_OK);
+        sqlite3_stmt* st = nullptr;
+        REQUIRE(sqlite3_prepare_v2(h, "SELECT position_ms,current_track_id FROM engine_state", -1,
+                                   &st, nullptr) == SQLITE_OK);
+        REQUIRE(sqlite3_step(st) == SQLITE_ROW);
+        int64_t posMs = sqlite3_column_int64(st, 0);
+        REQUIRE(posMs >= 3900);
+        REQUIRE(posMs <= 4500);
+        REQUIRE(sqlite3_column_int64(st, 1) == trackId);
+        sqlite3_finalize(st);
+        sqlite3_close(h);
+    }
+    {
+        auto eRes = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
+        REQUIRE(eng->state() == caudio::types::PlaybackState::Stopped);
+        REQUIRE(eng->currentTrackId() == trackId);
+        REQUIRE(eng->position() > 3.9);
+        REQUIRE(eng->position() <= 4.5);
+    }
+    {
+        std::error_code ec;
+        std::filesystem::remove(dbPath, ec);
+        std::filesystem::remove(dbPath + "-wal", ec);
+        std::filesystem::remove(dbPath + "-shm", ec);
+    }
+}
+
+TEST_CASE("explicit stop clears the resume position", "[engine_state]") {
+    CAUDIO_SKIP_IF_NOAUDIO();
+    std::string dbPath = tempDbPath("eng_state_stop_pos").string();
+    {
+        auto dbRes = Database::open(dbPath);
+        REQUIRE(dbRes.has_value());
+        auto db = std::move(dbRes.value());
+        caudio::types::Track t;
+        t.path = "stop_pos.wav";
+        t.duration = 10.0;
+        for (int b = 0; b < 32; ++b)
+            t.fingerprint[b] = (uint8_t)(0xD0 + b);
+        auto r = db->insertTrack(t);
+        REQUIRE(r.has_value());
+        REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
+
+        EngineConfig cfg;
+        cfg.allowSimulatedPlayback = true;
+        cfg.enableMonitorThread = false;
+        auto eRes = Engine::create(cfg);
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
+        REQUIRE(
+            eng->attachDatabase(std::shared_ptr<caudio::db::Database>(std::move(db))).has_value());
+        REQUIRE(eng->play(1).has_value());
+        REQUIRE(eng->seek(4.0).has_value());
+        REQUIRE(eng->stop().has_value());
+        REQUIRE(eng->position() == 0.0);
+        eng->shutdown();
+    }
+    {
+        auto eRes = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+        REQUIRE(eRes.has_value());
+        auto eng = std::move(eRes.value());
+        REQUIRE(eng->position() == 0.0);
+    }
+    {
+        std::error_code ec;
+        std::filesystem::remove(dbPath, ec);
+        std::filesystem::remove(dbPath + "-wal", ec);
+        std::filesystem::remove(dbPath + "-shm", ec);
+    }
+}

@@ -152,10 +152,10 @@ struct QueueState {
  * @ingroup caudio_engine
  * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
  * current_track_id, volume, shuffle_perm (BLOB), active_queue_id,
- * pre_mute_volume`. `active_queue_id` may be missing on old DBs -- loadState falls back
- * to `1` and saveState tries `sqlNew` then `sqlOld`. `pre_mute_volume` is
- * best-effort both ways (missing column keeps the 0.5 default). `shuffle_perm`
- * is `perm` serialized as `int64_t` blob.
+ * pre_mute_volume, position_ms`. `active_queue_id` may be missing on old DBs -- loadState falls
+ * back to `1` and saveState tries `sqlNew` then `sqlOld`. `pre_mute_volume` and `position_ms` are
+ * best-effort both ways (missing columns keep their defaults). `shuffle_perm` is `perm` serialized
+ * as `int64_t` blob.
  * @see Engine::loadState
  * @see Engine::saveState
  */
@@ -168,6 +168,7 @@ struct EngineState {
     float volume{1.0f};                  ///< Persisted volume [0,1].
     int64_t activeQueueId{1};            ///< Persisted active queue id.
     float preMuteVolume{0.5f};           ///< Restore level for unmute (0,1].
+    int64_t positionMs{0};               ///< Persisted position in the current track.
 };
 
 } // namespace caudio::engine

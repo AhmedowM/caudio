@@ -262,3 +262,35 @@ TEST_CASE("Database open emits lifecycle log", "[db]") {
     REQUIRE(out.size() == 1);
     REQUIRE(out[0].find("database opened path=") != std::string::npos);
 }
+
+TEST_CASE("bookmark add/list/remove", "[db]") {
+    auto dbRes = Database::open(":memory:");
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    caudio::types::Track t = makeTrack(7);
+    auto tr = db->insertTrack(t);
+    REQUIRE(tr.has_value());
+
+    REQUIRE(db->bookmarkAdd(*tr, 1234, "note one").has_value());
+    REQUIRE(db->bookmarkAdd(*tr, 5678, "").has_value());
+    auto list = db->bookmarkList(*tr);
+    REQUIRE(list.has_value());
+    REQUIRE(list->size() == 2);
+    REQUIRE(list->at(0).track_id == *tr);
+    REQUIRE(list->at(0).position_ms == 1234);
+    REQUIRE(list->at(0).note == "note one");
+    REQUIRE(list->at(0).created > 0);
+    REQUIRE(list->at(1).position_ms == 5678);
+
+    REQUIRE(db->bookmarkRemove(list->at(0).id).has_value());
+    auto after = db->bookmarkList(*tr);
+    REQUIRE(after.has_value());
+    REQUIRE(after->size() == 1);
+    REQUIRE(after->at(0).position_ms == 5678);
+
+    auto missing = db->bookmarkRemove(999999);
+    REQUIRE(!missing.has_value());
+    REQUIRE(missing.error().code == StatusCode::NotFound);
+    REQUIRE(!db->bookmarkAdd(0, 0).has_value());
+    REQUIRE(!db->bookmarkAdd(*tr, -1).has_value());
+}

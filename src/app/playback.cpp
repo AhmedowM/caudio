@@ -35,13 +35,17 @@ std::string App::transportWho(const std::expected<caudio::ipc::Result, caudio::u
 AppResult App::doPlay() {
     // Prior state decides the wording (resumed vs fresh); one extra roundtrip.
     bool wasPaused = false;
+    bool wasStopped = false;
     double priorPos = 0;
+    int64_t priorTrack = 0;
     {
         caudio::client::Client probe{config_.dbPath, config_.socketPath};
         if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
             if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
                 wasPaused = (st->state == caudio::types::PlaybackState::Paused);
+                wasStopped = (st->state == caudio::types::PlaybackState::Stopped);
                 priorPos = st->pos;
+                priorTrack = st->track_id;
             }
         }
     }
@@ -49,11 +53,25 @@ AppResult App::doPlay() {
     auto res = sendPlay(cmd);
     if (!res)
         return std::unexpected{res.error()};
-    if (std::get_if<caudio::ipc::Status>(&*res)) {
+    if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
+        // Session restore: after a restart the persisted track/position is
+        // reported while stopped. Seek only when play picked the same track
+        // (a crashed session may have advanced the cursor).
+        bool restored = false;
+        if (wasStopped && priorTrack != 0 && priorPos > 0.0 && st->track_id == priorTrack) {
+            if (auto seekRes = sendRaw(caudio::ipc::Command{caudio::ipc::Seek{priorPos}})) {
+                if (auto fresh = sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+                    if (std::holds_alternative<caudio::ipc::Status>(*fresh))
+                        res = std::move(fresh);
+                }
+                restored = true;
+            }
+        }
         std::string who = transportWho(res);
         std::string line =
-            wasPaused ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
-                      : std::format("Playing {}", who);
+            wasPaused  ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
+            : restored ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
+                       : std::format("Playing {}", who);
         return Outcome{
             .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }
