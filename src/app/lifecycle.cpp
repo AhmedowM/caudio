@@ -27,11 +27,12 @@
 #include <processthreadsapi.h>
 // clang-format on
 #else
-#include <cerrno>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include <cerrno>
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif

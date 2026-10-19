@@ -75,7 +75,7 @@ std::string sanitizeFtsTerm(std::string_view term);
  * Thread-safe (delegates to `searchFts`).
  * @see searchFts
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> search(Database& db, std::string_view query,
-                                                               int limit = 50);
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+search(Database& db, std::string_view query, int limit = 50);
 
 } // namespace caudio::db

@@ -140,8 +140,8 @@ std::string sanitizeFtsTerm(std::string_view term) {
     return internal::sanitizeFtsTerm(term);
 }
 
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> search(Database& db, std::string_view query,
-                                                               int limit) {
+std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+search(Database& db, std::string_view query, int limit) {
     return searchFts(db, query, limit);
 }
 

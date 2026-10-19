@@ -72,12 +72,13 @@ struct DbStats {
  * @details Returned by `Database::libraryStatsDetailed()`.
  */
 struct LibraryStatsDetailedData {
-    std::size_t tracks{0};            ///< Total live tracks.
-    std::size_t queues{0};            ///< Total queue items.
-    std::size_t playlists{0};         ///< Total playlists.
-    int64_t total_duration_ms{0};     ///< Sum of durations (ms).
-    int64_t total_play_time_ms{0};    ///< Sum of play_count * duration (ms).
-    std::vector<caudio::types::Track> most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
+    std::size_t tracks{0};         ///< Total live tracks.
+    std::size_t queues{0};         ///< Total queue items.
+    std::size_t playlists{0};      ///< Total playlists.
+    int64_t total_duration_ms{0};  ///< Sum of durations (ms).
+    int64_t total_play_time_ms{0}; ///< Sum of play_count * duration (ms).
+    std::vector<caudio::types::Track>
+        most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
 };
 
 /**

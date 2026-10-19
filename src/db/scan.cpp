@@ -30,7 +30,8 @@
 
 namespace caudio::db {
 
-caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root, ScanMode mode) {
+caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
+                                                    ScanMode mode) {
     std::error_code ec;
     if (!std::filesystem::exists(root, ec))
         co_return;
@@ -396,8 +397,8 @@ scanLibrary(Database& db, int64_t libraryId,
         }
     }
     if (auto* lg = db.logger())
-        lg->info("scan finished root={} scanned={} added={} updated={} failed={}", libPath,
-                 scanned, added, updated, failed);
+        lg->info("scan finished root={} scanned={} added={} updated={} failed={}", libPath, scanned,
+                 added, updated, failed);
     auto libs2 = db.libraryList();
     if (libs2) {
         for (auto& l : *libs2)

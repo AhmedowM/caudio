@@ -66,8 +66,7 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
  * - `Unsupported` if platform does not support naming this handle.
  * @details Implemented per-platform in `src/utils/thread.cpp`.
  */
-[[nodiscard]] Expected<void> setThreadName(std::jthread& jt,
-                                           std::string_view name) noexcept;
+[[nodiscard]] Expected<void> setThreadName(std::jthread& jt, std::string_view name) noexcept;
 
 /**
  * @brief Sets a `std::thread`'s name by native handle.
@@ -80,7 +79,6 @@ inline void sleepForMs(std::uint32_t ms) noexcept {
  * - `Unsupported` if platform does not support naming this handle.
  * @details Implemented per-platform in `src/utils/thread.cpp`.
  */
-[[nodiscard]] Expected<void> setThreadName(std::thread& t,
-                                           std::string_view name) noexcept;
+[[nodiscard]] Expected<void> setThreadName(std::thread& t, std::string_view name) noexcept;
 
 } // namespace caudio::utils

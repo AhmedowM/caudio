@@ -63,7 +63,8 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
     return {};
 }
 
-std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db, int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(sqlite3* db,
+                                                                                 int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -105,7 +106,8 @@ std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked
     return it;
 }
 
-std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db, int64_t qid) {
+std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db,
+                                                                              int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -179,8 +181,8 @@ std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, int64_t 
     return {};
 }
 
-std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> queueListLocked(sqlite3* db,
-                                                                            int64_t qid) {
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
+queueListLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -392,8 +394,8 @@ std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_
     return {};
 }
 
-std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> getQueueItemsLocked(sqlite3* db,
-                                                                                int64_t qid) {
+std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
+getQueueItemsLocked(sqlite3* db, int64_t qid) {
     return queueListLocked(db, qid);
 }
 

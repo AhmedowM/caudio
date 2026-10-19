@@ -3,11 +3,11 @@
 // extern "C" guards, so including them directly mangles symbols (link
 // failure). All libav declarations come from ffmpeg_impl.hpp's
 // extern "C" block below.
+#include <algorithm>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -76,7 +76,8 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     meta.title = getTag(fmt->metadata, streamMeta, {"title"});
     meta.artist = getTag(fmt->metadata, streamMeta, {"artist"});
     meta.album = getTag(fmt->metadata, streamMeta, {"album"});
-    meta.album_artist = getTag(fmt->metadata, streamMeta, {"album_artist", "albumartist", "album artist"});
+    meta.album_artist =
+        getTag(fmt->metadata, streamMeta, {"album_artist", "albumartist", "album artist"});
     meta.genre = getTag(fmt->metadata, streamMeta, {"genre"});
 
     if (auto dateStr = getTag(fmt->metadata, streamMeta, {"date", "WM/Year", "year"});
@@ -292,8 +293,7 @@ int Decoder::Impl::drainResampler() {
         // one residue per decoded frame.
         int appended = 0;
         int n = 0;
-        while ((n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames), nullptr, 0)) >
-               0) {
+        while ((n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames), nullptr, 0)) > 0) {
             spill_.insert(spill_.end(), convertBuf_.data(),
                           convertBuf_.data() + static_cast<std::size_t>(n) * ch);
             appended += n;

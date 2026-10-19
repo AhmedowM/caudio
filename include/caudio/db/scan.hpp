@@ -68,7 +68,7 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
  * @see scanLibrary
  */
 caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
-                                     ScanMode mode = ScanMode::Sampled);
+                                                    ScanMode mode = ScanMode::Sampled);
 
 /**
  * @brief Scans a directory and collects all tracks into a vector.

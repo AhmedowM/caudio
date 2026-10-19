@@ -271,7 +271,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
             },
             [&os](const caudio::ipc::Playlists& v) {
                 std::span<const caudio::types::Playlist> playlistSpan(v.playlists.data(),
-                                                                   v.playlists.size());
+                                                                      v.playlists.size());
                 caudio::println(os, "Playlists ({}):", playlistSpan.size());
                 caudio::println(os, "{:>3} {:>6}  {:<40}", "#", "ID", "Name");
                 for (std::size_t i = 0; i < playlistSpan.size(); ++i) {

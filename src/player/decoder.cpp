@@ -23,7 +23,7 @@ bool Decoder::probe(std::span<const std::byte> data) noexcept {
 }
 
 caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
-                                                                   caudio::utils::Logger* logger) {
+                                                                caudio::utils::Logger* logger) {
     constexpr std::size_t kProbeBytes = 32;
     std::array<std::byte, kProbeBytes> buf{};
     std::size_t n = 0;

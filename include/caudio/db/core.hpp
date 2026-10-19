@@ -235,7 +235,8 @@ class Database final {
      * Caller must hold dbMutex_ (shared or exclusive); internally locks cacheMutex_.
      * @see findByPath
      */
-    std::expected<caudio::types::Track, caudio::utils::Error> findByPathLocked(std::string_view path);
+    std::expected<caudio::types::Track, caudio::utils::Error>
+    findByPathLocked(std::string_view path);
     /**
      * @brief Finds a track by fingerprint (caller holds dbMutex_).
      * @ingroup caudio_db
@@ -399,7 +400,8 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<caudio::types::Track, caudio::utils::Error> findByFingerprint(const std::array<uint8_t, 32>& fp);
+    std::expected<caudio::types::Track, caudio::utils::Error>
+    findByFingerprint(const std::array<uint8_t, 32>& fp);
     /**
      * @brief Finds a track by path.
      * @ingroup caudio_db
@@ -509,7 +511,8 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<caudio::types::Track>, caudio::utils::Error> playlistGetTracks(int64_t pid);
+    std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+    playlistGetTracks(int64_t pid);
 
     /**
      * @brief Queue operations -- forwarded to queue partition (see queue.cppm).
@@ -586,9 +589,11 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> queueList(int64_t qid);
+    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
+    queueList(int64_t qid);
 
-    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error> getQueueItems(int64_t qid);
+    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
+    getQueueItems(int64_t qid);
 
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
 
@@ -679,7 +684,8 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock.
      */
-    std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error> bookmarkList(int64_t tid);
+    std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
+    bookmarkList(int64_t tid);
 
     // Libraries
     /**

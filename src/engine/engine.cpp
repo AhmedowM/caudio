@@ -70,7 +70,7 @@ struct Engine::Impl {
     std::expected<void, caudio::utils::Error>
     withTransaction(std::function<std::expected<void, caudio::utils::Error>(struct sqlite3*)> fn);
     std::expected<caudio::types::Track, caudio::utils::Error> fetchTrackByPosLocked(int64_t qid,
-                                                                                 int64_t pos);
+                                                                                    int64_t pos);
 
     // queue locking
     bool tryLockQueue() noexcept;
@@ -764,7 +764,8 @@ Engine::ExpectedVoid Engine::Impl::setShuffle(bool on) {
 }
 
 Engine::ExpectedVoid Engine::Impl::setRepeat(caudio::types::RepeatMode m) {
-    if (m != caudio::types::RepeatMode::Off && m != caudio::types::RepeatMode::All && m != caudio::types::RepeatMode::One)
+    if (m != caudio::types::RepeatMode::Off && m != caudio::types::RepeatMode::All &&
+        m != caudio::types::RepeatMode::One)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad repeat"));
     if (!tryLockQueue())
@@ -1914,8 +1915,8 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
             // Idle backoff (C-1): woken immediately by decodeCv_ on
             // play/seek/resume, so the longer timeout costs no latency.
             decodeCv_.wait_for(lk, std::chrono::milliseconds(50), [&st, this] {
-                return st.stop_requested() ||
-                       playbackState_.load(std::memory_order_acquire) == caudio::types::PlaybackState::Playing;
+                return st.stop_requested() || playbackState_.load(std::memory_order_acquire) ==
+                                                  caudio::types::PlaybackState::Playing;
             });
             continue;
         }
@@ -1943,7 +1944,8 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek()
-            if (playbackState_.load(std::memory_order_acquire) != caudio::types::PlaybackState::Playing)
+            if (playbackState_.load(std::memory_order_acquire) !=
+                caudio::types::PlaybackState::Playing)
                 continue;
             frames = decoder_->decode(chunk);
         }
@@ -1957,7 +1959,8 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
         {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek() ring reset
-            if (playbackState_.load(std::memory_order_acquire) != caudio::types::PlaybackState::Playing)
+            if (playbackState_.load(std::memory_order_acquire) !=
+                caudio::types::PlaybackState::Playing)
                 continue;
             writtenFrames = ring_->write(std::span<float>(scratch.data(), samples));
         }

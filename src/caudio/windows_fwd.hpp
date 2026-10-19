@@ -136,10 +136,8 @@ __declspec(dllimport) BOOL __stdcall ConnectNamedPipe(HANDLE, LPVOID);
 __declspec(dllimport) BOOL __stdcall DisconnectNamedPipe(HANDLE);
 __declspec(dllimport) BOOL __stdcall FlushFileBuffers(HANDLE);
 __declspec(dllimport) BOOL __stdcall SetNamedPipeHandleState(HANDLE, LPDWORD, LPDWORD, LPDWORD);
-__declspec(dllimport) BOOL __stdcall ConvertStringSecurityDescriptorToSecurityDescriptorW(LPCWSTR,
-                                                                                          DWORD,
-                                                                                          LPVOID*,
-                                                                                          LPDWORD);
+__declspec(dllimport) BOOL __stdcall
+ConvertStringSecurityDescriptorToSecurityDescriptorW(LPCWSTR, DWORD, LPVOID*, LPDWORD);
 __declspec(dllimport) LPVOID __stdcall LocalFree(LPVOID);
 __declspec(dllimport) HANDLE __stdcall CreateFileMappingW(HANDLE, LPSECURITY_ATTRIBUTES, DWORD,
                                                           DWORD, DWORD, LPCWSTR);

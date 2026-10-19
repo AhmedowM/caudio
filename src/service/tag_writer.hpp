@@ -48,6 +48,6 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
  * lookup is path-keyed, never fingerprint-keyed (the fingerprint changed).
  */
 caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
-                                                              caudio::types::Track t);
+                                                                 caudio::types::Track t);
 
 } // namespace caudio::service::detail
