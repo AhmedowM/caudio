@@ -740,7 +740,7 @@ int Shell::run(int argc, char** argv) {
     // Transport commands print one-line confirmations (no ids, no queue
     // positions -- see `info` / `queue list` for those). JSON dumps raw.
     if (playCmd->parsed())
-        return detail::render(app_.doPlay(), playJson);
+        return detail::render(app_.play(), playJson);
     if (pauseCmd->parsed())
         return detail::render(app_.pause(), pauseJson);
     if (resumeCmd->parsed())
@@ -852,7 +852,7 @@ int Shell::run(int argc, char** argv) {
             return 0;
         }
         if (qSwitch->parsed())
-            return detail::render(app_.queueSwitch(qSwitchId), qSwitchJson);
+            return detail::render(app_.switchQueue(qSwitchId), qSwitchJson);
         if (qCreate->parsed())
             return detail::render(app_.queueCreate(qCreateName), qCreateJson);
         if (qDelete->parsed())

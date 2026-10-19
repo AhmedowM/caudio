@@ -32,7 +32,7 @@ std::string App::transportWho(const std::expected<caudio::ipc::Result, caudio::u
 }
 
 // Shared play flow (used by `play`, and by `resume` when stopped).
-AppResult App::doPlay() {
+AppResult App::play() {
     // Prior state decides the wording (resumed vs fresh); one extra roundtrip.
     bool wasPaused = false;
     bool wasStopped = false;
@@ -135,7 +135,7 @@ AppResult App::resume() {
                 return Outcome::warn("resume: already playing");
             if (!probed)
                 return std::unexpected{e};
-            return doPlay();
+            return play();
         }
         return std::unexpected{e};
     }

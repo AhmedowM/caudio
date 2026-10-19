@@ -54,7 +54,7 @@ std::expected<TrackList, caudio::utils::Error> App::queueTracks(const std::strin
     return TrackList{std::move(*res), curId};
 }
 
-AppResult App::queueSwitch(std::int64_t qid) {
+AppResult App::switchQueue(std::int64_t qid) {
     caudio::ipc::Command cmd{caudio::ipc::QueueSwitch{qid}};
     return confirm(sendRaw(cmd), std::format("Switched to queue {}", qid));
 }

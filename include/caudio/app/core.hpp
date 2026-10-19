@@ -218,7 +218,13 @@ class App {
      * @details Probes paused state first so the wording (resumed vs fresh)
      * matches; autostarts a down daemon via sendPlay().
      */
-    AppResult doPlay();
+    AppResult play();
+
+    /**
+     * @brief Deprecated spelling for play().
+     * @ingroup caudio_app
+     */
+    [[deprecated("use play() instead")]] AppResult doPlay() { return play(); }
 
     /**
      * @brief Plays files immediately in a new queue.
@@ -268,7 +274,10 @@ class App {
     std::expected<TrackList, caudio::utils::Error> queueTracks(const std::string& order);
 
     /** @brief Switches the active queue. @ingroup caudio_app */
-    AppResult queueSwitch(std::int64_t qid);
+    AppResult switchQueue(std::int64_t qid);
+
+    /** @brief Deprecated spelling for switchQueue(). @ingroup caudio_app */
+    [[deprecated("use switchQueue() instead")]] AppResult queueSwitch(std::int64_t qid) { return switchQueue(qid); }
 
     /** @brief Creates a queue container. @ingroup caudio_app */
     AppResult queueCreate(const std::string& name);
