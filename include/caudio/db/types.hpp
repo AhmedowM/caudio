@@ -5,13 +5,14 @@
  * @brief Core value types for the caudio database layer.
  * @ingroup caudio_db
  * @details Defines the db-local plain-data structs (Queue, Library, DbStats,
- * LibraryStatsDetailedData, TrackQuery, HistoryQuery) and re-exports the shared
- * records Track, Playlist, QueueItem, HistoryEntry and Bookmark as aliases to
- * `caudio::types` (see types/record.hpp). All are trivially copyable
- * aggregates with default-initialised members; no invariants beyond those
- * documented per-field.
+ * LibraryStatsDetailedData, TrackQuery, HistoryQuery). The shared records
+ * (Track, Playlist, QueueItem, HistoryEntry, Bookmark) live in `caudio::types`;
+ * their deprecated `caudio::db::` shims are declared in `legacy_aliases.hpp`.
+ * All are trivially copyable aggregates with default-initialised members; no
+ * invariants beyond those documented per-field.
  */
 
+#include <caudio/legacy_aliases.hpp>
 #include <caudio/types/record.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -20,13 +21,6 @@
 #include <vector>
 
 namespace caudio::db {
-
-// Shared records live in caudio::types; keep caudio::db:: spellings working.
-using caudio::types::Bookmark;
-using caudio::types::HistoryEntry;
-using caudio::types::Playlist;
-using caudio::types::QueueItem;
-using caudio::types::Track;
 
 /**
  * @brief Queue container row.

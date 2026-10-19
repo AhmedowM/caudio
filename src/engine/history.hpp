@@ -15,7 +15,7 @@
  * @file history.hpp
  * @brief Engine-internal history helper (NOT installed).
  * @details `History` is constructed by Engine only; the entry type is the
- * shared `caudio::db::HistoryEntry` (12 fields incl. track snapshots).
+ * shared `caudio::types::HistoryEntry` (11 fields incl. track snapshots).
  */
 
 namespace caudio::db {

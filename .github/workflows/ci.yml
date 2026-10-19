@@ -12,6 +12,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  guard:
+    name: deprecated-alias guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: "Reject deprecated caudio::db:: / caudio::engine:: spellings"
+        run: python3 scripts/check_legacy_aliases.py
+
   build:
     name: build (${{ matrix.os }} / ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}

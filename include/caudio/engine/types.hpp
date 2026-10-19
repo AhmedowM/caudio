@@ -41,6 +41,7 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/legacy_aliases.hpp>
 #include <caudio/types/wire.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -50,28 +51,6 @@
 #include <vector>
 
 namespace caudio::engine {
-
-/**
- * @brief Repeat mode for queue advancement.
- * @ingroup caudio_engine
- * @details Alias of the wire enum owned by `caudio::types` (see
- * `caudio/types/wire.hpp`); re-exported here so engine-side code keeps the
- * `caudio::engine::RepeatMode` spelling. Controls wrap behaviour in
- * Engine::queueNextLocked / Engine::queuePrevLocked.
- * @see caudio::types::RepeatMode
- */
-using RepeatMode = caudio::types::RepeatMode;
-
-/**
- * @brief Playback state machine.
- * @ingroup caudio_engine
- * @details Alias of the wire enum owned by `caudio::types` (see
- * `caudio/types/wire.hpp`); re-exported here so engine-side code keeps the
- * `caudio::engine::PlaybackState` spelling. Backed by
- * `std::atomic<PlaybackState>` (`playbackState_`).
- * @see caudio::types::PlaybackState
- */
-using PlaybackState = caudio::types::PlaybackState;
 
 /**
  * @brief Engine event types emitted via MpscQueue.

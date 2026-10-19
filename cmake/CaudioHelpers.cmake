@@ -7,9 +7,14 @@ else()
   set(CAUDIO_MSVC_MP_FLAG "/MP")
 endif()
 
+# U-6b gate: our own targets treat use of the deprecated caudio::db:: /
+# caudio::engine:: aliases as an error -- new internal code must spell
+# caudio::types:: directly. GCC/Clang only: MSVC's C4996 also fires for CRT /
+# secure-CRT deprecations, so /we4996 would be too broad (MSVC is CI-only;
+# shipping compilers are GCC/Clang, where alias-use deprecation is verified).
 set(CAUDIO_WARNING_FLAGS
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 ${CAUDIO_MSVC_MP_FLAG}>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic>)
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror=deprecated-declarations>)
 
 function(ca_set_warnings tgt)
   target_compile_options(${tgt} PRIVATE ${CAUDIO_WARNING_FLAGS})
