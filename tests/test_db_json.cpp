@@ -70,6 +70,7 @@ TEST_CASE("exportJson and importJson roundtrip", "[db_json]") {
     REQUIRE(ins.has_value());
     auto outPath = tempDbPath("json_export");
     outPath.replace_extension(".json");
+    registerTempPath(outPath);
     auto er = exportJson(*db, outPath);
     REQUIRE(er.has_value());
     REQUIRE(std::filesystem::exists(outPath));
@@ -77,6 +78,7 @@ TEST_CASE("exportJson and importJson roundtrip", "[db_json]") {
     std::ifstream f(outPath);
     std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     REQUIRE(content.find("JsonTrack") != std::string::npos);
+    f.close();
     // import into new db
     auto db2Res = Database::open(":memory:");
     REQUIRE(db2Res.has_value());
@@ -105,6 +107,7 @@ TEST_CASE("importJson handles duplicate fingerprint upsert", "[db_json]") {
     REQUIRE(db->insertTrack(t).has_value());
     auto outPath = tempDbPath("json_dup");
     outPath.replace_extension(".json");
+    registerTempPath(outPath);
     REQUIRE(exportJson(*db, outPath).has_value());
     // import same file again should not duplicate
     REQUIRE(importJson(*db, outPath).has_value());

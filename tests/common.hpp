@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <functional>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <thread>
+#include <vector>
 #ifdef _WIN32
 #include <process.h>
 #else
@@ -70,13 +72,51 @@ inline caudio::utils::SpscRing<float> makeDummyRing(uint32_t sampleRate = 48000,
 
 namespace caudio::test_helpers {
 
+/**
+ * @brief Paths created by the test helpers, removed at process exit.
+ * @details Deliberately leaked (function-local `new`) so the registry outlives
+ * static destructors; `std::atexit` cleanup then observes a valid vector.
+ */
+inline std::vector<std::filesystem::path>& tempCleanupPaths() {
+    static auto* paths = new std::vector<std::filesystem::path>{};
+    return *paths;
+}
+
+/**
+ * @brief Removes every registered temp path, retrying briefly.
+ * @details A daemon or SQLite handle may still be closing on Windows; without
+ * the retry a passing test leaks its directory.
+ */
+inline void cleanupTempPaths() noexcept {
+    std::error_code ec;
+    auto& paths = tempCleanupPaths();
+    for (auto it = paths.rbegin(); it != paths.rend(); ++it) {
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            std::filesystem::remove_all(*it, ec);
+            if (!std::filesystem::exists(*it))
+                break;
+            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        }
+    }
+}
+
+inline void registerTempPath(const std::filesystem::path& p) {
+    static std::once_flag once;
+    std::call_once(once, [] { std::atexit(cleanupTempPaths); });
+    tempCleanupPaths().push_back(p);
+}
+
 inline std::filesystem::path tempDbPath(const std::string& prefix) {
     static std::atomic<int> ctr{0};
     auto dir = std::filesystem::temp_directory_path();
     std::string name = prefix + "_" + std::to_string(ctr.fetch_add(1)) + "_" +
                        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
                        ".db";
-    return dir / name;
+    auto p = dir / name;
+    registerTempPath(p);
+    registerTempPath(std::filesystem::path(p.string() + "-wal"));
+    registerTempPath(std::filesystem::path(p.string() + "-shm"));
+    return p;
 }
 
 inline std::filesystem::path tempDirPath(const std::string& prefix) {
@@ -96,6 +136,7 @@ inline std::filesystem::path tempDirPath(const std::string& prefix) {
                        std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
     auto p = dir / name;
     std::filesystem::create_directories(p);
+    registerTempPath(p);
     return p;
 }
 

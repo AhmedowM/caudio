@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/log_sink.hpp>
+#include <common.hpp>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -166,6 +167,7 @@ bool log_sink_rotation() {
     fs::create_directories(dir, ec);
     if (ec)
         return false;
+    caudio::test_helpers::registerTempPath(dir);
     FileSinkOptions opts;
     opts.maxBytes = 128;
     opts.generations = 3;
@@ -193,6 +195,7 @@ bool log_sink_rotation() {
         return false;
     if (content.find("line number") == std::string::npos)
         return false;
+    in.close();
     fs::remove_all(dir, ec);
     return true;
 }
@@ -204,6 +207,7 @@ bool log_sink_open_failure() {
     if (ec)
         return false;
     std::filesystem::create_directories(dir, ec);
+    caudio::test_helpers::registerTempPath(dir);
     auto sink = FileLogSink::open(dir);
     std::filesystem::remove_all(dir, ec);
     return sink == nullptr;

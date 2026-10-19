@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/config.hpp>
+#include <common.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -49,6 +50,7 @@ std::filesystem::path freshTempDir(const char* name) {
     std::filesystem::remove_all(dir, ec);
     std::filesystem::create_directories(dir, ec);
     REQUIRE(!ec);
+    caudio::test_helpers::registerTempPath(dir);
     return dir;
 }
 
