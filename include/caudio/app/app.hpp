@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -136,6 +137,14 @@ class App {
      * spawn; on Windows the module path is used instead.
      */
     void setArgv0(std::string argv0);
+
+    /**
+     * @brief Injects the foreground daemon host (CLI owns service startup).
+     * @ingroup caudio_app
+     * @param host Callable that runs the service in-process and blocks;
+     *             when unset, `startDaemon(true)` returns an error.
+     */
+    void setDaemonHost(std::function<AppResult(bool foreground)> host);
 
     /**
      * @brief Starts the daemon (foreground service or background spawn).
@@ -523,6 +532,7 @@ class App {
   private:
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
     std::string argv0_;             ///< Executable path for POSIX re-spawn.
+    std::function<AppResult(bool foreground)> daemonHost_{}; ///< Injected foreground daemon host.
 };
 
 } // namespace caudio::app

@@ -44,7 +44,6 @@
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <chrono>
 #include <cstdint>
@@ -52,7 +51,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <stop_token>
+#include <functional>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -103,6 +102,10 @@ void App::setConfig(caudio::config::Config cfg) {
 
 void App::setArgv0(std::string argv0) {
     argv0_ = std::move(argv0);
+}
+
+void App::setDaemonHost(std::function<AppResult(bool foreground)> host) {
+    daemonHost_ = std::move(host);
 }
 
 std::filesystem::path App::pidPathForConfig() const {
@@ -268,28 +271,11 @@ AppResult App::startDaemon(bool foreground) {
         if (!parent.empty())
             std::filesystem::create_directories(parent, ec2);
     }
-    caudio::service::ServiceConfig scfg;
-    scfg.dbPath = config_.dbPath;
-    scfg.socketPath = config_.socketPath;
-    scfg.configPath = config_.configPath;
-    scfg.logLevel = config_.logLevel;
-    scfg.logToStderr = foreground;
-    scfg.autoResumeOnPlay = config_.autoResumeOnPlay;
     if (foreground) {
-        auto svc = caudio::service::Service::create(scfg);
-        if (!svc) {
-            return Outcome::fail(std::format("start failed: {} (db: {})", svc.error().message,
-                                             config_.dbPath.generic_string()));
+        if (daemonHost_) {
+            return daemonHost_(foreground);
         }
-        auto starting = std::format("starting daemon foreground at {} db={}", config_.socketPath,
-                                    config_.dbPath.generic_string());
-        std::stop_source ss;
-        auto res = svc.value()->run(ss.get_token());
-        if (!res) {
-            return Outcome::fail(std::format("daemon error: {} (dbPath={})", res.error().message,
-                                             config_.dbPath.generic_string()));
-        }
-        return Outcome{std::nullopt, std::move(starting), false, false};
+        return Outcome::fail("daemon host not configured");
     } else {
         auto spawnRes = spawnDaemon(config_);
         if (!spawnRes) {

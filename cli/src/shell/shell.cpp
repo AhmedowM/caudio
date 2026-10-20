@@ -28,6 +28,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
@@ -44,6 +45,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -688,6 +690,31 @@ int Shell::run(int argc, char** argv) {
     // ctor; sync it now that reload plus socket derivation are final. Every
     // daemon interaction below must observe these paths.
     app_.setConfig(config_);
+    // Inject the foreground daemon host: the CLI (not app) owns service startup.
+    app_.setDaemonHost([this](bool foreground) -> caudio::app::AppResult {
+        caudio::service::ServiceConfig scfg;
+        scfg.dbPath = config_.dbPath;
+        scfg.socketPath = config_.socketPath;
+        scfg.configPath = config_.configPath;
+        scfg.logLevel = config_.logLevel;
+        scfg.logToStderr = foreground;
+        scfg.autoResumeOnPlay = config_.autoResumeOnPlay;
+        auto svc = caudio::service::Service::create(scfg);
+        if (!svc) {
+            return caudio::app::Outcome::fail(std::format(
+                "start failed: {} (db: {})", svc.error().message, config_.dbPath.generic_string()));
+        }
+        auto starting = std::format("starting daemon foreground at {} db={}", config_.socketPath,
+                                    config_.dbPath.generic_string());
+        std::stop_source ss;
+        auto res = svc.value()->run(ss.get_token());
+        if (!res) {
+            return caudio::app::Outcome::fail(std::format("daemon error: {} (dbPath={})",
+                                                          res.error().message,
+                                                          config_.dbPath.generic_string()));
+        }
+        return caudio::app::Outcome{std::nullopt, std::move(starting), false, false};
+    });
     // Internal daemon mode: if --daemon present, run Service foreground immediately (child process)
     if (daemonFlag) {
         return detail::render(app_.startDaemon(true), false);
