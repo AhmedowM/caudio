@@ -4,8 +4,8 @@
 // failure). All libav declarations come from ffmpeg_impl.hpp's
 // extern "C" block below.
 #include <algorithm>
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cmath>
@@ -22,7 +22,7 @@
 
 #include "ffmpeg_impl.hpp"
 
-namespace caudio::player {
+namespace caudio::media {
 
 caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     AVFormatContext* fmt = avformat_alloc_context();
@@ -572,4 +572,4 @@ caudio::utils::Expected<void> Decoder::seek(double seconds) {
     return impl_->seek(seconds);
 }
 
-} // namespace caudio::player
+} // namespace caudio::media

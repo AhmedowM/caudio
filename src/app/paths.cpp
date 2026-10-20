@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <caudio/app/paths.hpp>
-#include <caudio/db/scan.hpp>
+#include <caudio/media/audio_ext.hpp>
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
@@ -67,7 +67,7 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
             if (!it->is_regular_file(e2) || e2)
                 continue;
             std::string fn = it->path().filename().generic_string();
-            if (wildcardMatch(pat, fn) && caudio::db::detail::hasAudioExt(it->path())) {
+            if (wildcardMatch(pat, fn) && caudio::media::hasAudioExt(it->path())) {
                 auto abs = std::filesystem::absolute(it->path(), e2);
                 hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
             }
@@ -90,7 +90,7 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
                 if (ec)
                     break;
                 std::error_code e2;
-                if (it->is_regular_file(e2) && !e2 && caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e2) && !e2 && caudio::media::hasAudioExt(it->path())) {
                     auto abs = std::filesystem::absolute(it->path(), e2);
                     hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
                 }
@@ -101,7 +101,7 @@ void expandAddToken(const std::string& token, bool recursive, std::vector<std::s
                 if (ec)
                     break;
                 std::error_code e2;
-                if (it->is_regular_file(e2) && !e2 && caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e2) && !e2 && caudio::media::hasAudioExt(it->path())) {
                     auto abs = std::filesystem::absolute(it->path(), e2);
                     hits.push_back(e2 ? it->path().generic_string() : abs.generic_string());
                 }

@@ -24,7 +24,7 @@ set(CAUDIO_DB_SOURCES
   src/db/fts.cpp
   src/db/stmt_helpers.cpp
 )
-caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::utils caudio::player Threads::Threads INCLUDES vendor)
+caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::utils caudio::media Threads::Threads INCLUDES vendor)
 target_link_libraries(db PRIVATE caudio::sqlite3 blake3)
 target_include_directories(db SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)

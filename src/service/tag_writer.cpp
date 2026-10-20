@@ -23,7 +23,7 @@
 
 #include <algorithm>
 #include <caudio/db/database.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <cctype>
 #include <cstdint>
@@ -196,7 +196,7 @@ caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Dat
         t.size = static_cast<int64_t>(sz);
     if (auto mt = std::filesystem::last_write_time(t.path, ec); !ec)
         t.mtime = static_cast<int64_t>(mt.time_since_epoch().count());
-    if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+    if (auto meta = caudio::media::extractMetadata(t.path); meta) {
         if (meta->duration > 0)
             t.duration = meta->duration;
         t.sample_rate = static_cast<uint32_t>(meta->sample_rate);

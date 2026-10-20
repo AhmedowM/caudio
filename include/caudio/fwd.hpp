@@ -40,9 +40,14 @@ enum class EngineEventType : int;
 // types/wire.hpp); `caudio::engine` re-exports them as aliases (engine/types.hpp).
 } // namespace caudio::engine
 
-namespace caudio::player {
+namespace caudio::media {
 class Reader;
 class Decoder;
+} // namespace caudio::media
+
+namespace caudio::player {
+using Reader = caudio::media::Reader;
+using Decoder = caudio::media::Decoder;
 class AudioOutput;
 } // namespace caudio::player
 

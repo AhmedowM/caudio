@@ -1,7 +1,7 @@
 /**
  * @file ffmpeg_impl.hpp
- * @brief Private FFmpeg backend for caudio::player::Decoder.
- * @ingroup caudio_player
+ * @brief Private FFmpeg backend for caudio::media::Decoder.
+ * @ingroup caudio_media
  *
  * Defines Decoder::Impl holding all libav state (libavcodec, libavformat,
  * libswresample). Included only by decoder implementation files, never by
@@ -42,11 +42,11 @@ extern "C" {
 #pragma GCC diagnostic pop
 #endif
 
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils.hpp>
 
-namespace caudio::player {
+namespace caudio::media {
 
 struct Decoder::Impl {
     Impl() = default;
@@ -124,4 +124,4 @@ struct Decoder::Impl {
     std::size_t spillPos_{0};
 };
 
-} // namespace caudio::player
+} // namespace caudio::media

@@ -5,10 +5,10 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/engine.hpp>
 #include <caudio/engine/types.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/player.hpp>
-#include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
@@ -160,8 +160,8 @@ struct Engine::Impl {
     std::shared_ptr<caudio::db::Database> db_{};
 
     // player
-    std::unique_ptr<caudio::player::Reader> reader_{};
-    std::unique_ptr<caudio::player::Decoder> decoder_{};
+    std::unique_ptr<caudio::media::Reader> reader_{};
+    std::unique_ptr<caudio::media::Decoder> decoder_{};
     std::unique_ptr<caudio::utils::SpscRing<float>> ring_{};
     std::unique_ptr<caudio::player::AudioOutput> output_{};
 
@@ -1667,10 +1667,10 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
     // unplayable track is an error, never silent timer playback
     bool opened = false;
     if (!path.empty()) {
-        auto rRes = caudio::player::FileReader::open(path);
+        auto rRes = caudio::media::FileReader::open(path);
         if (rRes) {
             reader_ = std::move(rRes.value());
-            auto dRes = caudio::player::Decoder::open(*reader_, cfg_.logger);
+            auto dRes = caudio::media::Decoder::open(*reader_, cfg_.logger);
             if (dRes) {
                 decoder_ = std::move(dRes.value());
                 opened = true;

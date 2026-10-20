@@ -9,10 +9,9 @@
  * Shared with the service layer (playlist/scan imports).
  */
 
-#include <algorithm>
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
-#include <cctype>
+#include <caudio/media/audio_ext.hpp>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -35,20 +34,15 @@ enum class ScanMode {
 namespace detail {
 
 /**
- * @brief Checks if a path has a supported audio extension.
+ * @brief Compatibility forwarder to `caudio::media::hasAudioExt`.
  * @ingroup caudio_db
  * @param p Path to check.
- * @return true if extension is a supported audio extension
- * (decode + tag-write sets: .mp3/.flac/.ogg/.opus/.oga/.wav/.m4a/.mp4/.wma/
- * .asf/.aiff/.aif/.ape/.mpc/.wv, case-insensitive).
+ * @return true if extension is a supported audio extension.
+ * @deprecated Use `caudio::media::hasAudioExt` instead.
  */
+[[deprecated("use caudio::media::hasAudioExt")]]
 inline bool hasAudioExt(const std::filesystem::path& p) {
-    auto ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" || ext == ".oga" ||
-           ext == ".wav" || ext == ".m4a" || ext == ".mp4" || ext == ".wma" || ext == ".asf" ||
-           ext == ".aiff" || ext == ".aif" || ext == ".ape" || ext == ".mpc" || ext == ".wv";
+    return caudio::media::hasAudioExt(p);
 }
 
 } // namespace detail

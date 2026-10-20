@@ -1,9 +1,9 @@
 #include <algorithm>
-#include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/media/audio_ext.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
@@ -135,7 +135,7 @@ Service::Impl::handle(const caudio::ipc::PlayFiles& cmd) {
         if (!std::filesystem::is_regular_file(p, ec) || ec)
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
                                                             "track not found: " + ps)};
-        if (!caudio::db::detail::hasAudioExt(p))
+        if (!caudio::media::hasAudioExt(p))
             return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Unsupported,
                                                             "unsupported file type: " + ps)};
     }
@@ -201,7 +201,7 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
         std::filesystem::path p(qa.query);
         std::error_code ec;
         bool exists = std::filesystem::exists(p, ec);
-        if (!ec && caudio::db::detail::hasAudioExt(p)) {
+        if (!ec && caudio::media::hasAudioExt(p)) {
             if (!exists) {
                 return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound,
                                                                 "track not found: " + qa.query)};

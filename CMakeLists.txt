@@ -353,6 +353,7 @@ list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
 include(cmake/components/types.cmake)
 include(cmake/components/utils.cmake)
+include(cmake/components/media.cmake)
 include(cmake/components/player.cmake)
 include(cmake/components/db.cmake)
 include(cmake/components/engine.cmake)
@@ -365,7 +366,7 @@ if(CAUDIO_ENABLE_MODULES)
   add_library(caudio_umbrella STATIC modules/caudio.cppm)
   target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
+  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
 endif()
@@ -384,8 +385,8 @@ target_include_directories(caudio_cli PRIVATE cli/src/shell)
 target_include_directories(caudio_cli SYSTEM PRIVATE vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
-# FFmpeg is not linked here directly: caudio::player links it PRIVATE (see
-# player.cmake) and that propagates as $<LINK_ONLY:...> through app -> player.
+# FFmpeg is not linked here directly: caudio::media links it PRIVATE (see
+# media.cmake) and that propagates as $<LINK_ONLY:...> through app -> player -> media.
 ca_set_warnings(caudio_cli)
 ca_set_module_warnings(caudio_cli)
 # Needed on MinGW for template instantiation deduplication across executable + static libs.
@@ -418,6 +419,7 @@ endif()
 set(CAUDIO_INSTALL_LIBS
   types
   utils
+  media
   player
   db
   engine
@@ -432,6 +434,7 @@ set(CAUDIO_INSTALL_LIBS
 if(CAUDIO_BUILD_SHARED)
   list(APPEND CAUDIO_INSTALL_LIBS
     utils_shared
+    media_shared
     player_shared
     db_shared
     engine_shared

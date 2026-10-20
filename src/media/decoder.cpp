@@ -1,6 +1,6 @@
 #include <array>
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -13,7 +13,7 @@
 #include <string_view>
 #include <utility>
 
-namespace caudio::player {
+namespace caudio::media {
 
 bool Decoder::probe(std::span<const std::byte> data) noexcept {
     // When FFmpeg is available, be permissive - try to decode anything
@@ -75,4 +75,4 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
     return result;
 }
 
-} // namespace caudio::player
+} // namespace caudio::media

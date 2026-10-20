@@ -5,7 +5,8 @@
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/audio_ext.hpp>
+#include <caudio/media/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/generator.hpp>
 #include <caudio/utils/log.hpp>
@@ -38,7 +39,7 @@ caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path&
     for (auto it = std::filesystem::recursive_directory_iterator(
              root, std::filesystem::directory_options::skip_permission_denied, ec);
          it != std::filesystem::recursive_directory_iterator(); ++it) {
-        if (it->is_regular_file(ec) && detail::hasAudioExt(it->path())) {
+        if (it->is_regular_file(ec) && caudio::media::hasAudioExt(it->path())) {
             caudio::types::Track t;
             t.path = it->path().generic_string();
             std::error_code e2;
@@ -65,7 +66,7 @@ caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path&
                     blake3_hasher_finalize(&hasher, t.fingerprint.data(), t.fingerprint.size());
                 }
             }
-            if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+            if (auto meta = caudio::media::extractMetadata(t.path); meta) {
                 t.title = std::move(meta->title);
                 t.artist = std::move(meta->artist);
                 t.album = std::move(meta->album);
@@ -201,7 +202,7 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.library_id = libraryId;
             upd.deleted_at = 0;
             bool hasMeta = false;
-            auto meta = caudio::player::extractMetadata(trk.path);
+            auto meta = caudio::media::extractMetadata(trk.path);
             if (!meta) {
                 if (auto* lg = db.logger())
                     lg->debug("scan metadata failed file={} err={}", trk.path,
@@ -291,7 +292,7 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.library_id = libraryId;
             upd.deleted_at = 0;
             bool hasMeta = false;
-            auto meta = caudio::player::extractMetadata(trk.path);
+            auto meta = caudio::media::extractMetadata(trk.path);
             if (!meta) {
                 if (auto* lg = db.logger())
                     lg->debug("scan metadata failed file={} err={}", trk.path,

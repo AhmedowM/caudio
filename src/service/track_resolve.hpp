@@ -6,7 +6,7 @@
 
 #include <caudio/db/database.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <db/fingerprint.hpp>
@@ -42,7 +42,7 @@ ensureLibraryTrack(caudio::db::Database& db, const std::filesystem::path& p) {
     if (!ec2)
         t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
     // Extract metadata (title, artist, album, etc.) like library add.
-    if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+    if (auto meta = caudio::media::extractMetadata(t.path); meta) {
         t.title = std::move(meta->title);
         t.artist = std::move(meta->artist);
         t.album = std::move(meta->album);

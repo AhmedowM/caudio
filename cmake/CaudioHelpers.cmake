@@ -70,9 +70,9 @@ function(caudio_add_component NAME)
   # target instead of re-parsed in every TU. Biggest win on MSVC.
   target_precompile_headers(${NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/caudio/pch.hpp)
   # FFmpeg (the decoder backend) is linked PRIVATE by the components that
-  # actually use it (currently only `player`, see player.cmake) -- not blanket-
-  # linked to every component, which forced every target to resolve FFmpeg at
-  # link time and pulled its include dirs into unrelated TUs.
+  # actually use it (currently media; see media.cmake) -- not blanket-linked to
+  # every component, which forced every target to resolve FFmpeg at link time
+  # and pulled its include dirs into unrelated TUs.
   ca_set_warnings(${NAME})
 endfunction()
 

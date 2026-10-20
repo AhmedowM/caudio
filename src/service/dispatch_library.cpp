@@ -6,7 +6,8 @@
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/audio_ext.hpp>
+#include <caudio/media/decoder.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
@@ -268,7 +269,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
                                                         "path not found: " + cmd.path)};
     auto addSingleFile =
         [&](const std::filesystem::path& fp) -> std::expected<void, caudio::utils::Error> {
-        if (!caudio::db::detail::hasAudioExt(fp))
+        if (!caudio::media::hasAudioExt(fp))
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Unsupported, "unsupported file type: " + fp.string())};
         auto fpRes = caudio::db::internal::computeFingerprint(fp);
@@ -286,7 +287,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
         if (!ec2)
             t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
         // Extract metadata (title, artist, album, etc.)
-        if (auto meta = caudio::player::extractMetadata(t.path); meta) {
+        if (auto meta = caudio::media::extractMetadata(t.path); meta) {
             t.title = std::move(meta->title);
             t.artist = std::move(meta->artist);
             t.album = std::move(meta->album);
@@ -330,7 +331,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
                 if (iterEc)
                     break;
                 std::error_code e3;
-                if (it->is_regular_file(e3) && !e3 && caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e3) && !e3 && caudio::media::hasAudioExt(it->path())) {
                     auto r = addSingleFile(it->path());
                     if (r)
                         ++added;
@@ -342,7 +343,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
                 if (iterEc)
                     break;
                 std::error_code e3;
-                if (it->is_regular_file(e3) && !e3 && caudio::db::detail::hasAudioExt(it->path())) {
+                if (it->is_regular_file(e3) && !e3 && caudio::media::hasAudioExt(it->path())) {
                     auto r = addSingleFile(it->path());
                     if (r)
                         ++added;

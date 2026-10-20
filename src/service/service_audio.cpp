@@ -1,7 +1,7 @@
 #include "service_audio.hpp"
 
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <filesystem>
@@ -10,11 +10,11 @@ namespace caudio::service::detail {
 
 double durationFromDecoder(const std::filesystem::path& path) noexcept {
     try {
-        auto readerRes = caudio::player::FileReader::open(path);
+        auto readerRes = caudio::media::FileReader::open(path);
         if (!readerRes)
             return 0.0;
         auto& readerPtr = readerRes.value();
-        auto decRes = caudio::player::Decoder::open(*readerPtr);
+        auto decRes = caudio::media::Decoder::open(*readerPtr);
         if (!decRes)
             return 0.0;
         auto& decPtr = decRes.value();

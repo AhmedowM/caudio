@@ -6,6 +6,7 @@
 #include <caudio/db.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc.hpp>
+#include <caudio/media.hpp>
 #include <caudio/player.hpp>
 #include <caudio/service.hpp>
 #include <caudio/types.hpp>
@@ -27,8 +28,10 @@
  *   Playlist, QueueItem, HistoryEntry, Bookmark) used across all layers.
  * - @ref caudio_utils "caudio.utils" -- Core utilities: error handling (`std::expected`),
  *   lock-free SPSC/MPSC queues, thread helpers, logging, opaque JSON value.
- * - @ref caudio_player "caudio.player" -- Audio playback: reader abstractions,
- *   FFmpeg-based decoder, miniaudio output, gapless playback.
+ * - @ref caudio_media "caudio.media" -- Media input: reader abstractions,
+ *   FFmpeg-based decoder, metadata extraction, audio-extension helpers.
+ * - @ref caudio_player "caudio.player" -- Audio playback: miniaudio output,
+ *   gapless playback. Reader/decoder are re-exported from `caudio.media`.
  * - @ref caudio_db "caudio.db" -- Database layer: SQLite with WAL, track/playlist/queue
  *   management, full-text search (FTS5), JSON import/export, library scanning.
  * - @ref caudio_engine "caudio.engine" -- Playback engine: state machine, shuffle/repeat,
@@ -45,14 +48,15 @@
  * caudio dependencies):
  * @code
  * caudio.types   (no deps)
- * caudio.utils   (no caudio deps)
- * caudio.player  (utils)
- * caudio.db      (utils, player)
- * caudio.engine  (utils, player, db)
+ * caudio.utils   (types)
+ * caudio.media   (types, utils)
+ * caudio.player  (types, utils, media)
+ * caudio.db      (types, utils, media)
+ * caudio.engine  (types, utils, media, player, db)
  * caudio.ipc     (utils)
  * caudio.client  (utils, ipc)
- * caudio.service (utils, ipc, engine, db)
- * caudio.app     (utils, ipc, client, service, db, player)
+ * caudio.service (utils, ipc, engine, db, media, player)
+ * caudio.app     (utils, ipc, client, service, db, media, player)
  * @endcode
  *
  * Threading model:
@@ -75,6 +79,7 @@
  *
  * @see caudio.types
  * @see caudio.utils
+ * @see caudio.media
  * @see caudio.player
  * @see caudio.db
  * @see caudio.engine

@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include <caudio/player/reader.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
@@ -17,7 +17,7 @@
 #include <utility>
 #include <vector>
 
-namespace caudio::player {
+namespace caudio::media {
 
 namespace detail {
 // 64-bit file helpers (TU-local; were inline in reader.hpp).
@@ -250,4 +250,4 @@ int64_t MemoryReader::size() noexcept {
 MemoryReader::MemoryReader(std::span<const std::byte> src)
     : buf_(src.begin(), src.end()), pos_(0) {}
 
-} // namespace caudio::player
+} // namespace caudio::media

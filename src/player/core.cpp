@@ -1,8 +1,8 @@
 #include <atomic>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/player.hpp>
-#include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
@@ -157,7 +157,7 @@ Player::ExpectedVoid Player::Impl::open(std::string_view path) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("empty path")});
     }
-    auto readerResult = FileReader::open(path);
+    auto readerResult = caudio::media::FileReader::open(path);
     if (!readerResult) {
         lastError_ = readerResult.error().message;
         state_.store(State::Error, std::memory_order_release);

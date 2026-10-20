@@ -1,25 +1,18 @@
-# player.cmake -- caudio::player (FFmpeg decoding + miniaudio output).
+# player.cmake -- caudio::player (miniaudio output + gapless playback).
+# The module re-exports caudio.media and keeps reader/decoder aliases in
+# caudio.player; their partition sources are retained for compatibility but
+# are no longer compiled into this target.
 set(CAUDIO_PLAYER_MODULE_SOURCES
   modules/caudio/player.cppm
   modules/caudio/player/core.cppm
-  modules/caudio/player/reader.cppm
   modules/caudio/player/output.cppm
-  modules/caudio/player/decoder.cppm
 )
 set(CAUDIO_PLAYER_SOURCES
   src/player/miniaudio_impl.cpp
-  src/player/reader.cpp
   src/player/output.cpp
-  src/player/decoder.cpp
   src/player/core.cpp
-  src/player/decoders/ffmpeg.cpp
 )
-caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils caudio::types INCLUDES vendor)
-# FFmpeg (sole decoder backend) is used only by src/player/decoders/ffmpeg.cpp
-# (via ffmpeg_impl.hpp), so link it here PRIVATE rather than blanket-linking it
-# onto every component. STATIC private deps propagate as $<LINK_ONLY:...> to the
-# final executables, so consumers of caudio::player still resolve libav symbols.
-target_link_libraries(player PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
+caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils caudio::types caudio::media INCLUDES vendor)
 # GCC cannot parse Apple's ObjC-blocks system headers pulled in by miniaudio's
 # CoreAudio backend; Apple Clang-only. Local mac devs (Xcode Clang) keep full
 # audio; GNU-on-macOS CI builds fall back to the other backends (NOAUDIO anyway).
@@ -46,5 +39,4 @@ endif()
 
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(player EXTRA_DEPS caudio::utils_shared)
-  target_link_libraries(player_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample)
 endif()
