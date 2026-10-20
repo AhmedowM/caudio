@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/client/ipc_client.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -35,6 +36,15 @@ constexpr bool allCommandAlternatives(std::variant<Ts...>*) {
 static_assert(allCommandAlternatives(static_cast<Command*>(nullptr)));
 static_assert(CommandType<const Play&>);
 static_assert(!CommandAlternative<const Play>);
+
+static_assert(std::is_same_v<caudio::ipc::DeviceInfo, caudio::types::DeviceInfo>);
+static_assert(std::is_same_v<caudio::ipc::LibraryStatsData, caudio::types::LibraryStats>);
+static_assert(
+    std::is_same_v<caudio::ipc::LibraryStatsDetailedData, caudio::types::LibraryStatsDetailed>);
+static_assert(
+    std::is_same_v<caudio::db::LibraryStatsDetailedData, caudio::types::LibraryStatsDetailed>);
+static_assert(std::is_same_v<caudio::ipc::HistoryEntry, caudio::types::HistoryEntry>);
+static_assert(std::is_same_v<caudio::ipc::BookmarkEntry, caudio::types::Bookmark>);
 
 } // namespace
 
@@ -129,6 +139,73 @@ TEST_CASE("bookmark protocol roundtrip", "[ipc]") {
     CHECK(marks->entries[0].position_ms == 83000);
     CHECK(marks->entries[0].note == "note");
     CHECK(marks->entries[0].created == 1700);
+}
+
+TEST_CASE("history protocol roundtrip", "[ipc]") {
+    Result res{History{{
+        HistoryEntry{1, 42, 1700000000000, 1700000000240, 240000, 100.0, 1, "Song", "Artist",
+                     "/music/song.mp3", 240.0},
+    }}};
+    auto resJson = toJson(res);
+    auto resBack = resultFromJson(resJson);
+    REQUIRE(resBack.has_value());
+    auto* history = std::get_if<History>(&*resBack);
+    REQUIRE(history != nullptr);
+    REQUIRE(history->entries.size() == 1);
+    const auto& entry = history->entries[0];
+    CHECK(entry.id == 1);
+    CHECK(entry.track_id == 42);
+    CHECK(entry.started_at == 1700000000000);
+    CHECK(entry.completed_at == 1700000000240);
+    CHECK(entry.position_ms == 240000);
+    CHECK(entry.completion_pct == 100.0);
+    CHECK(entry.queue_id == 1);
+    CHECK(entry.title == "Song");
+    CHECK(entry.artist == "Artist");
+    CHECK(entry.path == "/music/song.mp3");
+    CHECK(entry.duration == 240.0);
+}
+
+TEST_CASE("devices protocol roundtrip", "[ipc]") {
+    Result res{Devices{{
+        DeviceInfo{"hw:0,0", "Built-in Audio", true},
+        DeviceInfo{"hw:1,0", "USB Headset", false},
+    }}};
+    auto resJson = toJson(res);
+    REQUIRE(resJson["type"].snapshot().get<std::string>() == "Devices");
+    auto resBack = resultFromJson(resJson);
+    REQUIRE(resBack.has_value());
+    auto* devices = std::get_if<Devices>(&*resBack);
+    REQUIRE(devices != nullptr);
+    REQUIRE(devices->devices.size() == 2);
+    CHECK(devices->devices[0].id == "hw:0,0");
+    CHECK(devices->devices[0].name == "Built-in Audio");
+    CHECK(devices->devices[0].isDefault);
+    CHECK(devices->devices[1].id == "hw:1,0");
+    CHECK_FALSE(devices->devices[1].isDefault);
+}
+
+TEST_CASE("library stats detailed protocol roundtrip", "[ipc]") {
+    caudio::types::Track track{};
+    track.id = 7;
+    track.path = "/music/song.mp3";
+    track.title = "Song";
+    track.duration = 240.0;
+    Result res{LibraryStatsDetailedData{100, 5, 20, 36000000, 7200000, {track}}};
+    auto resJson = toJson(res);
+    REQUIRE(resJson["type"].snapshot().get<std::string>() == "LibraryStatsDetailed");
+    auto resBack = resultFromJson(resJson);
+    REQUIRE(resBack.has_value());
+    auto* stats = std::get_if<LibraryStatsDetailedData>(&*resBack);
+    REQUIRE(stats != nullptr);
+    CHECK(stats->tracks == 100);
+    CHECK(stats->queues == 5);
+    CHECK(stats->playlists == 20);
+    CHECK(stats->total_duration_ms == 36000000);
+    CHECK(stats->total_play_time_ms == 7200000);
+    REQUIRE(stats->most_played.size() == 1);
+    CHECK(stats->most_played[0].id == 7);
+    CHECK(stats->most_played[0].title == "Song");
 }
 
 TEST_CASE("command roundtrip - volume", "[ipc][cli]") {

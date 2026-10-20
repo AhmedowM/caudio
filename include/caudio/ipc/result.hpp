@@ -265,38 +265,27 @@ struct VolumeInfo final {
 
 // Note: Command already defines empty LibraryStats request. Result's stats
 // is named LibraryStatsData to avoid ODR collision when both partitions are
-// imported via caudio.ipc:shared. Alias provided for ergonomic use.
+// imported via caudio.ipc:shared. It aliases the canonical caudio::types type.
 
 /**
- * @struct LibraryStatsData
  * @brief Basic library statistics (returned by LibraryStats and QueueQueues).
  * @ingroup caudio_ipc
+ * @details Same-type alias of `caudio::types::LibraryStats`; kept for IPC
+ * source compatibility. JSON shape is unchanged.
  *
  * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20}
  *
  * @param tracks Total number of tracks in the library.
- * @param queues Total number of queues.
+ * @param queues Total number of queue items.
  * @param playlists Total number of playlists.
  */
-struct LibraryStatsData final {
-    /**
-     * @brief Total number of tracks in the library.
-     */
-    std::size_t tracks{0};
-    /**
-     * @brief Total number of queues.
-     */
-    std::size_t queues{0};
-    /**
-     * @brief Total number of playlists.
-     */
-    std::size_t playlists{0};
-};
+using LibraryStatsData = caudio::types::LibraryStats;
 
 /**
- * @struct LibraryStatsDetailedData
  * @brief Detailed library statistics including play history (returned by LibraryStatsDetailed).
  * @ingroup caudio_ipc
+ * @details Same-type alias of `caudio::types::LibraryStatsDetailed`; kept for
+ * IPC source compatibility. JSON shape is unchanged.
  *
  * @json_example {"type": "LibraryStatsDetailed", "tracks": 1000, "queues": 5, "playlists": 20,
  * "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
@@ -308,32 +297,7 @@ struct LibraryStatsData final {
  * @param total_play_time_ms Total play time across all tracks in milliseconds.
  * @param most_played Most played tracks (up to 10).
  */
-struct LibraryStatsDetailedData final {
-    /**
-     * @brief Total number of tracks in the library.
-     */
-    std::size_t tracks{0};
-    /**
-     * @brief Total number of queues.
-     */
-    std::size_t queues{0};
-    /**
-     * @brief Total number of playlists.
-     */
-    std::size_t playlists{0};
-    /**
-     * @brief Total duration of all tracks in milliseconds.
-     */
-    int64_t total_duration_ms{0};
-    /**
-     * @brief Total play time across all tracks in milliseconds.
-     */
-    int64_t total_play_time_ms{0};
-    /**
-     * @brief Most played tracks (up to 10).
-     */
-    std::vector<caudio::types::Track> most_played{};
-};
+using LibraryStatsDetailedData = caudio::types::LibraryStatsDetailed;
 
 // ---------------------------------------------------------------------------
 // Track and Playlist Results
@@ -584,9 +548,10 @@ struct TrackInfo final {
 // ---------------------------------------------------------------------------
 
 /**
- * @struct HistoryEntry
  * @brief Single playback history entry.
  * @ingroup caudio_ipc
+ * @details Same-type alias of `caudio::types::HistoryEntry`; kept for IPC
+ * source compatibility. JSON shape is unchanged.
  *
  * @json_example {"type": "HistoryEntry", "id": 1, "track_id": 123, "started_at": 1699999999000,
  * "completed_at": 1699999999240, "position_ms": 240000, "completion_pct": 100.0, "queue_id": 1,
@@ -604,52 +569,7 @@ struct TrackInfo final {
  * @param path Track file path (cached for display).
  * @param duration Track duration in seconds.
  */
-struct HistoryEntry final {
-    /**
-     * @brief History entry ID.
-     */
-    int64_t id{};
-    /**
-     * @brief Track ID that was played.
-     */
-    int64_t track_id{};
-    /**
-     * @brief Playback start timestamp (milliseconds since epoch).
-     */
-    int64_t started_at{};
-    /**
-     * @brief Playback completion timestamp (milliseconds since epoch).
-     */
-    int64_t completed_at{};
-    /**
-     * @brief Playback position at completion in milliseconds.
-     */
-    int64_t position_ms{};
-    /**
-     * @brief Completion percentage (0.0 to 100.0).
-     */
-    double completion_pct{};
-    /**
-     * @brief Queue ID the track was played from.
-     */
-    int64_t queue_id{1};
-    /**
-     * @brief Track title (cached for display).
-     */
-    std::string title{};
-    /**
-     * @brief Track artist (cached for display).
-     */
-    std::string artist{};
-    /**
-     * @brief Track file path (cached for display).
-     */
-    std::string path{};
-    /**
-     * @brief Track duration in seconds.
-     */
-    double duration{};
-};
+using HistoryEntry = caudio::types::HistoryEntry;
 
 /**
  * @struct History
@@ -672,9 +592,10 @@ struct History final {
 // ---------------------------------------------------------------------------
 
 /**
- * @struct BookmarkEntry
  * @brief Single bookmark entry.
  * @ingroup caudio_ipc
+ * @details Same-type alias of `caudio::types::Bookmark`; kept for IPC source
+ * compatibility. JSON shape is unchanged.
  *
  * @json_example {"type": "BookmarkEntry", "id": 1, "track_id": 123, "position_ms": 1234,
  * "note": "intro", "created": 1699999999}
@@ -685,28 +606,7 @@ struct History final {
  * @param note Optional note.
  * @param created Creation timestamp (seconds since epoch).
  */
-struct BookmarkEntry final {
-    /**
-     * @brief Bookmark id.
-     */
-    int64_t id{};
-    /**
-     * @brief Bookmarked track id.
-     */
-    int64_t track_id{};
-    /**
-     * @brief Saved position in milliseconds.
-     */
-    int64_t position_ms{};
-    /**
-     * @brief Optional note.
-     */
-    std::string note{};
-    /**
-     * @brief Creation timestamp (seconds since epoch).
-     */
-    int64_t created{};
-};
+using BookmarkEntry = caudio::types::Bookmark;
 
 /**
  * @struct Bookmarks
@@ -729,9 +629,10 @@ struct Bookmarks final {
 // ---------------------------------------------------------------------------
 
 /**
- * @struct DeviceInfo
  * @brief Audio output device information.
  * @ingroup caudio_ipc
+ * @details Same-type alias of `caudio::types::DeviceInfo`; kept for IPC source
+ * compatibility. JSON shape is unchanged.
  *
  * @json_example {"id": "hw:0,0", "name": "Built-in Audio", "isDefault": true}
  *
@@ -739,20 +640,7 @@ struct Bookmarks final {
  * @param name Human-readable device name.
  * @param isDefault Whether this is the default device.
  */
-struct DeviceInfo final {
-    /**
-     * @brief Device identifier.
-     */
-    std::string id{};
-    /**
-     * @brief Human-readable device name.
-     */
-    std::string name{};
-    /**
-     * @brief Whether this is the default device.
-     */
-    bool isDefault{false};
-};
+using DeviceInfo = caudio::types::DeviceInfo;
 
 /**
  * @struct Devices

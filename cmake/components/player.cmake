@@ -14,7 +14,7 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/core.cpp
   src/player/decoders/ffmpeg.cpp
 )
-caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils INCLUDES vendor)
+caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils caudio::types INCLUDES vendor)
 # FFmpeg (sole decoder backend) is used only by src/player/decoders/ffmpeg.cpp
 # (via ffmpeg_impl.hpp), so link it here PRIVATE rather than blanket-linking it
 # onto every component. STATIC private deps propagate as $<LINK_ONLY:...> to the

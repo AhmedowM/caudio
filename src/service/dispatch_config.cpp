@@ -191,10 +191,7 @@ std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::DeviceList&) {
     auto devList = caudio::player::enumerateDevices();
     caudio::ipc::Devices result;
-    result.devices.reserve(devList.devices.size());
-    for (const auto& d : devList.devices) {
-        result.devices.push_back(caudio::ipc::DeviceInfo{d.id, d.name, d.isDefault});
-    }
+    result.devices = std::move(devList.devices);
     return Result{std::move(result)};
 }
 

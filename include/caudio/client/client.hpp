@@ -17,6 +17,14 @@
 
 namespace caudio::client {
 
+/**
+ * @brief Transport view of the daemon location.
+ * @ingroup caudio_client
+ * @details Deliberately narrower than `caudio::config::Config`: only the
+ * database and socket paths are needed to connect, and the `library.db`
+ * default is part of this type's contract. Persisted configuration remains
+ * `caudio::config::Config`.
+ */
 struct Config final {
     std::filesystem::path dbPath{"library.db"};
     std::string socketPath{};

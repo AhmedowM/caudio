@@ -5,8 +5,8 @@
  * @brief Core value types for the caudio database layer.
  * @ingroup caudio_db
  * @details Defines the db-local plain-data structs (Queue, Library, DbStats,
- * LibraryStatsDetailedData, TrackQuery, HistoryQuery). The shared records
- * (Track, Playlist, QueueItem, HistoryEntry, Bookmark) live in `caudio::types`;
+ * TrackQuery, HistoryQuery). The shared records (Track, Playlist, QueueItem,
+ * HistoryEntry, Bookmark, LibraryStatsDetailed) live in `caudio::types`;
  * their deprecated `caudio::db::` shims are declared in `legacy_aliases.hpp`.
  * All are trivially copyable aggregates with default-initialised members; no
  * invariants beyond those documented per-field.
@@ -69,17 +69,11 @@ struct DbStats {
 /**
  * @brief Detailed per-library statistics.
  * @ingroup caudio_db
- * @details Returned by `Database::libraryStatsDetailed()`.
+ * @details Returned by `Database::libraryStatsDetailed()`. Compatibility
+ * alias of `caudio::types::LibraryStatsDetailed`.
+ * @deprecated Spell `caudio::types::LibraryStatsDetailed` directly.
  */
-struct LibraryStatsDetailedData {
-    std::size_t tracks{0};         ///< Total live tracks.
-    std::size_t queues{0};         ///< Total queue items.
-    std::size_t playlists{0};      ///< Total playlists.
-    int64_t total_duration_ms{0};  ///< Sum of durations (ms).
-    int64_t total_play_time_ms{0}; ///< Sum of play_count * duration (ms).
-    std::vector<caudio::types::Track>
-        most_played{}; ///< Top 10 most-played tracks ordered by play_count DESC.
-};
+using LibraryStatsDetailedData = caudio::types::LibraryStatsDetailed;
 
 /**
  * @brief Filter for listing tracks.

@@ -26,7 +26,6 @@ namespace caudio::db {
 class Database;
 struct DbStats;
 class SqliteStatement;
-struct LibraryStatsDetailedData;
 } // namespace caudio::db
 
 namespace caudio::engine {

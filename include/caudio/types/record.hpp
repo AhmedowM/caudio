@@ -5,15 +5,19 @@
  * @brief Plain-data record types for the dependency-free `caudio.types` layer.
  * @ingroup caudio_types
  * @details Value structs shared across the db, engine, ipc and app layers:
- * Track, Playlist, QueueItem, HistoryEntry and Bookmark. All are trivially
+ * Track, Playlist, QueueItem, HistoryEntry, Bookmark, DeviceInfo, DeviceList,
+ * TrackMetadata, LibraryStats and LibraryStatsDetailed. All are trivially
  * copyable aggregates with default-initialised members; no invariants beyond
- * those documented per-field. `caudio::db` keeps deprecated aliases for the old
- * spellings (see `legacy_aliases.hpp`) until v2.0.0.
+ * those documented per-field. `caudio::db`, `caudio::player` and `caudio::ipc`
+ * keep aliases for the old spellings until v2.0.0 (the db shims live in
+ * `legacy_aliases.hpp`).
  */
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace caudio::types {
 
@@ -119,6 +123,75 @@ struct Bookmark {
     int64_t position_ms{}; ///< Saved position in milliseconds.
     std::string note;      ///< Optional user note.
     int64_t created{};     ///< Creation timestamp.
+};
+
+/**
+ * @brief Audio playback device information.
+ * @ingroup caudio_types
+ * @details Canonical definition shared by the player enumeration and the IPC
+ * `Devices` result.
+ */
+struct DeviceInfo {
+    std::string id;        ///< Unique device identifier.
+    std::string name;      ///< Human-readable device name.
+    bool isDefault{false}; ///< True if this is the system default device.
+};
+
+/**
+ * @brief Container for enumerated audio devices.
+ * @ingroup caudio_types
+ */
+struct DeviceList {
+    std::vector<DeviceInfo> devices; ///< Available playback devices.
+};
+
+/**
+ * @brief Audio file metadata tags.
+ * @ingroup caudio_types
+ * @details Canonical definition shared by metadata extraction, scanning and
+ * the db layer. Values mirror the decoded stream/tag data.
+ */
+struct TrackMetadata {
+    std::string title;        ///< Title tag.
+    std::string artist;       ///< Artist tag.
+    std::string album;        ///< Album tag.
+    std::string album_artist; ///< Album-artist tag.
+    std::string genre;        ///< Genre tag.
+    int year = 0;             ///< Year tag.
+    int track_num = 0;        ///< Track number within disc.
+    int disc_num = 0;         ///< Disc number.
+    double duration = 0;      ///< Duration in seconds.
+    int sample_rate = 0;      ///< Sample rate in Hz.
+    int channels = 0;         ///< Channel count.
+    int bitrate = 0;          ///< Bitrate in bps.
+};
+
+/**
+ * @brief Basic library statistics (three-field wire projection).
+ * @ingroup caudio_types
+ * @details Deliberately narrower than `LibraryStatsDetailed`: `queues` means
+ * queue items here, matching the IPC `LibraryStats` result. Produced from
+ * `Database::getStats()`.
+ */
+struct LibraryStats {
+    std::size_t tracks{0};    ///< Total number of tracks in the library.
+    std::size_t queues{0};    ///< Total number of queue items.
+    std::size_t playlists{0}; ///< Total number of playlists.
+};
+
+/**
+ * @brief Detailed library statistics including play history.
+ * @ingroup caudio_types
+ * @details Canonical definition shared by `Database::libraryStatsDetailed()`
+ * and the IPC `LibraryStatsDetailed` result.
+ */
+struct LibraryStatsDetailed {
+    std::size_t tracks{0};            ///< Total live tracks.
+    std::size_t queues{0};            ///< Total queue items.
+    std::size_t playlists{0};         ///< Total playlists.
+    int64_t total_duration_ms{0};     ///< Sum of durations (ms).
+    int64_t total_play_time_ms{0};    ///< Sum of play_count * duration (ms).
+    std::vector<Track> most_played{}; ///< Top most-played tracks (play_count DESC).
 };
 
 } // namespace caudio::types

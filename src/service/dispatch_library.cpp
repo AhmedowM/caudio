@@ -146,14 +146,7 @@ Service::Impl::handle(const caudio::ipc::LibraryStatsDetailed& cmd) {
     auto st = db_->libraryStatsDetailed(cmd.top_n >= 0 ? cmd.top_n : 10);
     if (!st)
         return std::unexpected{st.error()};
-    caudio::ipc::LibraryStatsDetailedData d{};
-    d.tracks = static_cast<std::size_t>(st->tracks);
-    d.queues = static_cast<std::size_t>(st->queues);
-    d.playlists = static_cast<std::size_t>(st->playlists);
-    d.total_duration_ms = st->total_duration_ms;
-    d.total_play_time_ms = st->total_play_time_ms;
-    d.most_played = std::move(st->most_played);
-    return Result{std::move(d)};
+    return Result{std::move(*st)};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -201,24 +194,7 @@ Service::Impl::handle(const caudio::ipc::HistoryList& cmd) {
     auto hist = engine_->listHistory(limit);
     if (!hist)
         return std::unexpected{hist.error()};
-    std::vector<caudio::ipc::HistoryEntry> cliEntries;
-    cliEntries.reserve(hist->size());
-    for (const auto& e : *hist) {
-        caudio::ipc::HistoryEntry cliEntry;
-        cliEntry.id = e.id;
-        cliEntry.track_id = e.track_id;
-        cliEntry.started_at = e.started_at;
-        cliEntry.completed_at = e.completed_at;
-        cliEntry.position_ms = e.position_ms;
-        cliEntry.completion_pct = e.completion_pct;
-        cliEntry.queue_id = e.queue_id;
-        cliEntry.title = e.title;
-        cliEntry.artist = e.artist;
-        cliEntry.path = e.path;
-        cliEntry.duration = e.duration;
-        cliEntries.push_back(std::move(cliEntry));
-    }
-    return Result{caudio::ipc::History{std::move(cliEntries)}};
+    return Result{caudio::ipc::History{std::move(*hist)}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
@@ -238,18 +214,7 @@ Service::Impl::handle(const caudio::ipc::BookmarkList& cmd) {
     auto list = db_->bookmarkList(tid);
     if (!list)
         return std::unexpected{list.error()};
-    std::vector<caudio::ipc::BookmarkEntry> entries;
-    entries.reserve(list->size());
-    for (const auto& b : *list) {
-        caudio::ipc::BookmarkEntry e;
-        e.id = b.id;
-        e.track_id = b.track_id;
-        e.position_ms = b.position_ms;
-        e.note = b.note;
-        e.created = b.created;
-        entries.push_back(std::move(e));
-    }
-    return Result{caudio::ipc::Bookmarks{std::move(entries)}};
+    return Result{caudio::ipc::Bookmarks{std::move(*list)}};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>

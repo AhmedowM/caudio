@@ -28,6 +28,7 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/types/record.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -38,24 +39,12 @@
 namespace caudio::player {
 
 /**
- * @struct TrackMetadata
  * @brief Audio file metadata tags.
  * @ingroup caudio_player
+ * @details Compatibility alias of `caudio::types::TrackMetadata`.
+ * @deprecated Spell `caudio::types::TrackMetadata` directly.
  */
-struct TrackMetadata {
-    std::string title;
-    std::string artist;
-    std::string album;
-    std::string album_artist;
-    std::string genre;
-    int year = 0;
-    int track_num = 0;
-    int disc_num = 0;
-    double duration = 0;
-    int sample_rate = 0;
-    int channels = 0;
-    int bitrate = 0;
-};
+using TrackMetadata = caudio::types::TrackMetadata;
 
 /**
  * @brief Extracts metadata tags from an audio file.

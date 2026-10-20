@@ -30,6 +30,7 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/types/record.hpp>
 #include <cstdint>
 #include <expected>
 #include <memory>
@@ -40,33 +41,22 @@
 namespace caudio::player {
 
 /**
- * @struct DeviceInfo
- * @brief Audio playback device information
+ * @brief Audio playback device information.
  * @ingroup caudio_player
- *
- * Represents a single audio output device as reported by miniaudio.
- * Contains the device identifier, human-readable name, and default status.
+ * @details Compatibility alias of `caudio::types::DeviceInfo`; the canonical
+ * definition contains the device identifier, name and default status.
+ * @deprecated Spell `caudio::types::DeviceInfo` directly.
  */
-struct DeviceInfo {
-    /// Unique device identifier (index-based for CLI friendliness)
-    std::string id;
-    /// Human-readable device name from miniaudio
-    std::string name;
-    /// True if this is the system default playback device
-    bool isDefault = false;
-};
+using DeviceInfo = caudio::types::DeviceInfo;
 
 /**
- * @struct DeviceList
- * @brief Container for enumerated audio devices
+ * @brief Container for enumerated audio devices.
  * @ingroup caudio_player
- *
- * Holds a list of available playback devices returned by enumerateDevices().
+ * @details Compatibility alias of `caudio::types::DeviceList`, returned by
+ * enumerateDevices().
+ * @deprecated Spell `caudio::types::DeviceList` directly.
  */
-struct DeviceList {
-    /// Vector of available playback devices
-    std::vector<DeviceInfo> devices;
-};
+using DeviceList = caudio::types::DeviceList;
 
 /**
  * @brief Enumerate all available audio playback devices

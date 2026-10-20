@@ -7,6 +7,7 @@
 #include <caudio/engine/types.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/player/output.hpp>
+#include <caudio/player/player.hpp>
 #include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
@@ -21,6 +22,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 using namespace caudio::player;
@@ -28,6 +30,22 @@ using namespace caudio::utils;
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::test_helpers;
+
+static_assert(std::is_same_v<caudio::player::DeviceInfo, caudio::types::DeviceInfo>);
+static_assert(std::is_same_v<caudio::player::DeviceList, caudio::types::DeviceList>);
+static_assert(std::is_same_v<caudio::player::TrackMetadata, caudio::types::TrackMetadata>);
+
+// `State` is internal to player; `PlaybackState` is the wire enum. Ready is
+// reserved for wire compatibility and is intentionally not mapped by player.
+static_assert(static_cast<int>(caudio::player::State::Stopped) == 0);
+static_assert(static_cast<int>(caudio::player::State::Playing) == 1);
+static_assert(static_cast<int>(caudio::player::State::Paused) == 2);
+static_assert(static_cast<int>(caudio::player::State::Error) == 3);
+static_assert(static_cast<int>(caudio::types::PlaybackState::Stopped) == 0);
+static_assert(static_cast<int>(caudio::types::PlaybackState::Ready) == 1);
+static_assert(static_cast<int>(caudio::types::PlaybackState::Playing) == 2);
+static_assert(static_cast<int>(caudio::types::PlaybackState::Paused) == 3);
+static_assert(!std::is_same_v<caudio::player::State, caudio::types::PlaybackState>);
 
 static std::string fixturePath(const std::string& name) {
     for (auto c : {std::string("tests/fixtures/") + name, std::string("../tests/fixtures/") + name,
