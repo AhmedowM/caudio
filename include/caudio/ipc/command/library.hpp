@@ -68,7 +68,7 @@ struct LibrarySearch final {
  *
  * @json_example {"type": "LibraryStats"}
  *
- * @return LibraryStatsData object with counts.
+ * @return `caudio::types::LibraryStats` object with counts.
  */
 struct LibraryStats final {};
 
@@ -80,7 +80,8 @@ struct LibraryStats final {};
  * @json_example {"type": "LibraryStatsDetailed", "top_n": 10}
  *
  * @param top_n Maximum most-played entries (0 = totals only).
- * @return LibraryStatsDetailedData object with detailed statistics and most-played tracks.
+ * @return `caudio::types::LibraryStatsDetailed` object with detailed statistics and most-played
+ * tracks.
  */
 struct LibraryStatsDetailed final {
     /**

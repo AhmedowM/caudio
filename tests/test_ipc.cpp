@@ -191,12 +191,12 @@ TEST_CASE("library stats detailed protocol roundtrip", "[ipc]") {
     track.path = "/music/song.mp3";
     track.title = "Song";
     track.duration = 240.0;
-    Result res{LibraryStatsDetailedData{100, 5, 20, 36000000, 7200000, {track}}};
+    Result res{caudio::types::LibraryStatsDetailed{100, 5, 20, 36000000, 7200000, {track}}};
     auto resJson = toJson(res);
     REQUIRE(resJson["type"].snapshot().get<std::string>() == "LibraryStatsDetailed");
     auto resBack = resultFromJson(resJson);
     REQUIRE(resBack.has_value());
-    auto* stats = std::get_if<LibraryStatsDetailedData>(&*resBack);
+    auto* stats = std::get_if<caudio::types::LibraryStatsDetailed>(&*resBack);
     REQUIRE(stats != nullptr);
     CHECK(stats->tracks == 100);
     CHECK(stats->queues == 5);

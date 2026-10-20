@@ -33,10 +33,10 @@ namespace caudio::ipc {
  * @see protocol.cppm for IPC framing
  */
 using Result = std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
-                            LibraryStatsData, LibraryStatsDetailedData, Tracks, SearchResults,
-                            Playlists, PlaylistData, PlaylistCreated, PlaylistImportReport,
-                            ScanReport, ConfigValue, ConfigValues, SingleTrack, TrackInfo, History,
-                            Bookmarks, Empty, CliError, Devices>;
+                            caudio::types::LibraryStats, caudio::types::LibraryStatsDetailed,
+                            Tracks, SearchResults, Playlists, PlaylistData, PlaylistCreated,
+                            PlaylistImportReport, ScanReport, ConfigValue, ConfigValues,
+                            SingleTrack, TrackInfo, History, Bookmarks, Empty, CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

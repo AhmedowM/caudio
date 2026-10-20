@@ -188,11 +188,11 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 else
                     caudio::println(os, "Volume: {}%", pct);
             },
-            [&os](const caudio::ipc::LibraryStatsData& v) {
+            [&os](const caudio::types::LibraryStats& v) {
                 caudio::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
                                 v.playlists);
             },
-            [&os](const caudio::ipc::LibraryStatsDetailedData& v) {
+            [&os](const caudio::types::LibraryStatsDetailed& v) {
                 caudio::println(os, "Library Stats (Detailed):");
                 caudio::println(os, "  Tracks:      {}", v.tracks);
                 caudio::println(os, "  Queues:      {}", v.queues);

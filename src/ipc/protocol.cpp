@@ -907,14 +907,14 @@ Json toJson(const Result& r) {
                 j["vol"] = v.vol;
                 j["muted"] = v.muted;
                 return j;
-            } else if constexpr (std::is_same_v<T, LibraryStatsData>) {
+            } else if constexpr (std::is_same_v<T, caudio::types::LibraryStats>) {
                 Json j;
                 j["type"] = "LibraryStats";
                 j["tracks"] = v.tracks;
                 j["queues"] = v.queues;
                 j["playlists"] = v.playlists;
                 return j;
-            } else if constexpr (std::is_same_v<T, LibraryStatsDetailedData>) {
+            } else if constexpr (std::is_same_v<T, caudio::types::LibraryStatsDetailed>) {
                 Json j;
                 j["type"] = "LibraryStatsDetailed";
                 j["tracks"] = v.tracks;
@@ -1210,7 +1210,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
             return Result{std::move(vi)};
         }
         if (t == "LibraryStats") {
-            LibraryStatsData ls{};
+            caudio::types::LibraryStats ls{};
             if (j.contains("tracks") && j["tracks"].isNumber())
                 ls.tracks = j["tracks"].get<std::size_t>();
             if (j.contains("queues") && j["queues"].isNumber())
@@ -1220,7 +1220,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
             return Result{std::move(ls)};
         }
         if (t == "LibraryStatsDetailed") {
-            LibraryStatsDetailedData ls{};
+            caudio::types::LibraryStatsDetailed ls{};
             if (j.contains("tracks") && j["tracks"].isNumber())
                 ls.tracks = j["tracks"].get<std::size_t>();
             if (j.contains("queues") && j["queues"].isNumber())

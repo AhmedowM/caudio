@@ -1,85 +1,39 @@
-# cli.cmake -- caudio::ipc (IPC command/result/protocol + config) + caudio::service + caudio::client
+# cli.cmake -- the caudio executable (CLI11 shell).
 # The CLI shell itself (cli/src/shell/*) compiles into the caudio executable only; no cli library.
 
-set(CAUDIO_IPC_MODULE_SOURCES
-  modules/caudio/ipc.cppm
-  modules/caudio/ipc/command.cppm
-  modules/caudio/ipc/result.cppm
-  modules/caudio/ipc/protocol.cppm
-  modules/caudio/ipc/shm_status.cppm
-  modules/caudio/config.cppm
+# caudio executable -- App dispatch (CLI11) + main entry (header-source only).
+# Target is caudio_cli (OUTPUT_NAME caudio); the shipped binary is still
+# `caudio`/`caudio.exe`. (No static lib owns the `caudio` target name: the
+# sqlite archive is target sqlite3, like blake3.)
+if(CAUDIO_BUILD_CLI)
+add_executable(caudio_cli
+  cli/src/main.cpp
 )
-set(CAUDIO_IPC_SOURCES
-  src/ipc/protocol.cpp
-  src/ipc/shm_status.cpp
-  src/config.cpp
-)
-caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::utils Threads::Threads INCLUDES vendor)
-target_include_directories(ipc SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
-ca_set_module_warnings(ipc)
-if(CAUDIO_ENABLE_MODULES)
-  target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
+set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
+target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp)
+target_include_directories(caudio_cli PRIVATE cli/src/shell)
+target_include_directories(caudio_cli SYSTEM PRIVATE vendor ${CAUDIO_CLI11_EXTRA_INCLUDE})
+target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc CLI11::CLI11 Threads::Threads)
+# FFmpeg is not linked here directly: caudio::media links it PRIVATE (see
+# media.cmake) and that propagates as $<LINK_ONLY:...> through app -> player -> media.
+ca_set_warnings(caudio_cli)
+ca_set_module_warnings(caudio_cli)
+# Needed on MinGW for template instantiation deduplication across executable + static libs.
+# Scoped to Windows-GNU only: the Linux-GNU links (release presets across
+# the bake-off matrix) succeed without it.
+target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>:-Wl,--allow-multiple-definition>)
+# Static GNU runtime for the shipped executable: kills GLIBCXX-version failures
+# and missing libstdc++/libgcc DLLs on bare machines (all platforms, validated
+# by CI incl. macOS/GCC). libwinpthread stays shared -- a single instance
+# shared with FFmpeg's own DLLs; swresample/av* stay DLL (no static FFmpeg
+# build here). Skipped under sanitizers (ASan runtime interplays badly with
+# static libstdc++). Replaces the old libstdc++exp workaround: no TU uses
+# std::print directly anymore (see utils/print.hpp).
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CAUDIO_ENABLE_SANITIZERS)
+  target_link_options(caudio_cli PRIVATE -static-libgcc -static-libstdc++)
 endif()
-target_link_options(ipc PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
-
-set(CAUDIO_SERVICE_MODULE_SOURCES
-  modules/caudio/service.cppm
-  modules/caudio/service/core.cppm
-  modules/caudio/service/ipc_channel.cppm
-  modules/caudio/service/ipc_server.cppm
-)
-set(CAUDIO_SERVICE_SOURCES
-  src/service/ipc_channel.cpp
-  src/service/ipc_server.cpp
-  src/service/service_paths.cpp
-  src/service/service_status.cpp
-  src/service/service_audio.cpp
-  src/service/service_impl.cpp
-  src/service/dispatch_playback.cpp
-  src/service/dispatch_queue.cpp
-  src/service/dispatch_library.cpp
-  src/service/dispatch_config.cpp
-  src/service/tag_writer.cpp
-)
-caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::ipc caudio::engine caudio::db caudio::media caudio::player caudio::utils Threads::Threads INCLUDES vendor)
-target_link_libraries(service PRIVATE tag)
-target_include_directories(service SYSTEM PRIVATE ${CAUDIO_TAGLIB_BUILD_INCLUDES})
-if(NOT WIN32)
-  find_library(LIBRT rt)
-  if(LIBRT)
-    target_link_libraries(service PUBLIC ${LIBRT})
-  endif()
+if(CAUDIO_ENABLE_SANITIZERS)
+  caudio_apply_sanitizers(caudio_cli)
 endif()
-ca_set_module_warnings(service)
-if(CAUDIO_ENABLE_MODULES)
-  target_compile_options(service PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-endif()
-if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(service EXTRA_DEPS caudio::ipc caudio::engine_shared caudio::db_shared caudio::media_shared caudio::player_shared caudio::utils_shared Threads::Threads)
-  if(NOT WIN32)
-    find_library(LIBRT rt)
-    if(LIBRT)
-      target_link_libraries(service_shared PUBLIC ${LIBRT})
-    endif()
-  endif()
-endif()
-
-set(CAUDIO_CLIENT_MODULE_SOURCES
-  modules/caudio/client.cppm
-  modules/caudio/client/ipc_client.cppm
-  modules/caudio/client/core.cppm
-  modules/caudio/client/output_formatter.cppm
-)
-set(CAUDIO_CLIENT_SOURCES
-  src/client/ipc_client.cpp
-  src/client/client_impl.cpp
-  src/client/output_formatter.cpp
-)
-caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::ipc caudio::utils Threads::Threads INCLUDES vendor)
-ca_set_module_warnings(client)
-if(CAUDIO_ENABLE_MODULES)
-  target_compile_options(client PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-endif()
-if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(client EXTRA_DEPS caudio::ipc caudio::utils_shared Threads::Threads)
 endif()

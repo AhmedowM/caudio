@@ -135,7 +135,7 @@ Service::Impl::handle(const caudio::ipc::LibraryStats&) {
     auto st = db_->getStats();
     if (!st)
         return std::unexpected{st.error()};
-    caudio::ipc::LibraryStatsData d{};
+    caudio::types::LibraryStats d{};
     d.tracks = static_cast<std::size_t>(st->num_tracks);
     d.queues = static_cast<std::size_t>(st->num_queue_items);
     d.playlists = static_cast<std::size_t>(st->num_playlists);

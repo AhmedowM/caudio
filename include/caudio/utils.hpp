@@ -9,6 +9,7 @@
  * - result: StatusCode, toString, formatter
  * - error: Error, Expected, makeError
  * - log: LogLevel, Logger
+ * - log_sink: FileLogSink, bounded rotating file sink (see log_sink.hpp)
  * - math: clampVolume, toHex, fromHex
  * - ring: SpscRing
  * - mpsc_queue: MpscQueue
@@ -25,6 +26,7 @@
 #include <caudio/utils/generator.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
+#include <caudio/utils/log_sink.hpp>
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/print.hpp>
