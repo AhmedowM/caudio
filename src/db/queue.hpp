@@ -210,17 +210,4 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
  */
 std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_t qid, bool temp);
 
-/**
- * @brief Alias for queueListLocked (caller holds DB mutex).
- * @ingroup caudio_db
- * @param db SQLite handle.
- * @param qid Queue id.
- * @return Vector of items or Error.
- * @par Thread safety
- * Caller must hold Database::mutex().
- * @see queueListLocked
- */
-std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-getQueueItemsLocked(sqlite3* db, int64_t qid);
-
 } // namespace caudio::db

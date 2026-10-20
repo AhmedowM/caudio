@@ -1,5 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <common.hpp>

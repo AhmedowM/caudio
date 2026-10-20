@@ -38,7 +38,7 @@ inline std::string versionString() {
 /**
  * @brief Returns short version (PROJECT_VERSION).
  * @ingroup caudio_version
- * @return String view of caudio::shortVersion.
+ * @return String view of caudio::detail::shortVersion.
  */
 inline std::string_view shortVersion() noexcept {
     return caudio::detail::shortVersion;
@@ -47,7 +47,7 @@ inline std::string_view shortVersion() noexcept {
 /**
  * @brief Returns version commit hash (short).
  * @ingroup caudio_version
- * @return String view of caudio::versionCommit.
+ * @return String view of caudio::detail::versionCommit.
  */
 inline std::string_view versionCommit() noexcept {
     return caudio::detail::versionCommit;

@@ -7,14 +7,14 @@
 #include <algorithm>
 #include <atomic>
 #include <caudio/config.hpp>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/ipc/shm_status.hpp>
-#include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/log_sink.hpp>

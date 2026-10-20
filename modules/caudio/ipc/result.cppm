@@ -4,6 +4,8 @@ module;
 export module caudio.ipc:result;
 
 export namespace caudio::ipc {
+using ::caudio::ipc::BookmarkEntry;
+using ::caudio::ipc::Bookmarks;
 using ::caudio::ipc::CliError;
 using ::caudio::ipc::ConfigValue;
 using ::caudio::ipc::ConfigValues;

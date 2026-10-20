@@ -11,10 +11,10 @@
 
 #include <algorithm>
 #include <app/detail.hpp>
-#include <caudio/app/core.hpp>
+#include <caudio/app/app.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
-#include <caudio/client/core.hpp>
+#include <caudio/client/client.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
@@ -54,7 +54,7 @@ std::expected<TrackList, caudio::utils::Error> App::queueTracks(const std::strin
     return TrackList{std::move(*res), curId};
 }
 
-AppResult App::switchQueue(std::int64_t qid) {
+AppResult App::queueSwitch(std::int64_t qid) {
     caudio::ipc::Command cmd{caudio::ipc::QueueSwitch{qid}};
     return confirm(sendRaw(cmd), std::format("Switched to queue {}", qid));
 }

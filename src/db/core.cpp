@@ -1,7 +1,7 @@
 #include <sqlite3.h>
 
 #include <array>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
@@ -1156,14 +1156,6 @@ Database::queueList(int64_t qid) {
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
     return caudio::db::queueListLocked(impl_->db_.get(), qid);
-}
-
-std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-Database::getQueueItems(int64_t qid) {
-    if (qid == 0)
-        qid = 1;
-    std::shared_lock lk{impl_->dbMutex_};
-    return caudio::db::getQueueItemsLocked(impl_->db_.get(), qid);
 }
 
 std::expected<Queue, caudio::utils::Error> Database::getQueue(int64_t qid) {

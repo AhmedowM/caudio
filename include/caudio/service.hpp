@@ -10,6 +10,6 @@
  * @see caudio::service::IpcChannel
  */
 
-#include <caudio/service/service.hpp>
 #include <caudio/service/ipc_channel.hpp>
 #include <caudio/service/ipc_server.hpp>
+#include <caudio/service/service.hpp>

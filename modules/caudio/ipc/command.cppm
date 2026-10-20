@@ -5,6 +5,8 @@ export module caudio.ipc:command;
 
 export namespace caudio::ipc {
 using ::caudio::ipc::Command;
+using ::caudio::ipc::CommandAlternative;
+using ::caudio::ipc::CommandType;
 using ::caudio::ipc::ConfigExport;
 using ::caudio::ipc::ConfigGet;
 using ::caudio::ipc::ConfigImport;

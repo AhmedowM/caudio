@@ -2,7 +2,7 @@
 #include <sqlite3.h>
 
 #include <array>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/player/decoder.hpp>

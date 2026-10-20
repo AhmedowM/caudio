@@ -17,6 +17,8 @@ export import caudio.utils;
 export import caudio.player;
 export import caudio.db;
 export import caudio.engine;
+export import caudio.config;
 export import caudio.ipc;
 export import caudio.service;
 export import caudio.client;
+export import caudio.app;

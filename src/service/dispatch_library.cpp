@@ -1,13 +1,13 @@
 #include <algorithm>
 #include <array>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/player/decoder.hpp>
-#include <caudio/service/core.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>

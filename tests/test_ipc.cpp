@@ -4,7 +4,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/core.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <chrono>
@@ -24,6 +24,19 @@ using namespace caudio::engine;
 using namespace caudio::service;
 using namespace caudio::client;
 using namespace caudio::test_helpers;
+
+namespace {
+
+template <class... Ts>
+constexpr bool allCommandAlternatives(std::variant<Ts...>*) {
+    return (CommandAlternative<Ts> && ...);
+}
+
+static_assert(allCommandAlternatives(static_cast<Command*>(nullptr)));
+static_assert(CommandType<const Play&>);
+static_assert(!CommandAlternative<const Play>);
+
+} // namespace
 
 TEST_CASE("daemon start/stop", "[ipc][cli]") {
     std::string suffix = "roundtrip";

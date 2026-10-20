@@ -2,7 +2,7 @@
 
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
@@ -293,4 +293,32 @@ TEST_CASE("bookmark add/list/remove", "[db]") {
     REQUIRE(missing.error().code == StatusCode::NotFound);
     REQUIRE(!db->bookmarkAdd(0, 0).has_value());
     REQUIRE(!db->bookmarkAdd(*tr, -1).has_value());
+}
+
+TEST_CASE("history completion_pct round-trip 0/50/100", "[db]") {
+    auto dbRes = Database::open(":memory:");
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    caudio::types::Track t = makeTrack(8);
+    auto tr = db->insertTrack(t);
+    REQUIRE(tr.has_value());
+
+    for (int i = 0; i < 3; ++i) {
+        caudio::types::HistoryEntry e;
+        e.track_id = *tr;
+        e.started_at = 100 + i;
+        e.completed_at = 200 + i;
+        e.position_ms = i * 1000;
+        e.completion_pct = i * 50.0;
+        REQUIRE(db->historyAdd(e).has_value());
+    }
+
+    caudio::db::HistoryQuery q;
+    q.track_id = *tr;
+    auto list = db->historyList(&q);
+    REQUIRE(list.has_value());
+    REQUIRE(list->size() == 3);
+    REQUIRE((*list)[0].completion_pct == 100.0);
+    REQUIRE((*list)[1].completion_pct == 50.0);
+    REQUIRE((*list)[2].completion_pct == 0.0);
 }

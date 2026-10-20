@@ -100,7 +100,7 @@ struct HistoryEntry {
     int64_t started_at{};    ///< Start timestamp.
     int64_t completed_at{};  ///< Completion timestamp (0 if not completed).
     int64_t position_ms{};   ///< Position reached in milliseconds.
-    double completion_pct{}; ///< Completion percentage [0,1].
+    double completion_pct{}; ///< Completion percentage [0,100].
     int64_t queue_id{1};     ///< Queue context.
     std::string title{};     ///< Track title snapshot (JOIN queries only).
     std::string artist{};    ///< Track artist snapshot (JOIN queries only).

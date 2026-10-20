@@ -103,36 +103,6 @@ class Database final {
      * @par Lock ordering
      * If both locks are needed, acquire dbMutex_ before cacheMutex_.
      */
-    /**
-     * @brief Inserts a track (caller holds dbMutex_).
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_ where needed.
-     */
-    /**
-     * @brief Updates a track by id (caller holds dbMutex_).
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_ where needed.
-     */
-    /**
-     * @brief Deletes a track by id (caller holds dbMutex_).
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_ where needed.
-     */
-    /**
-     * @brief Lists all libraries (caller holds dbMutex_ if outer lock held, otherwise shared).
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_ where needed.
-     */
-    /**
-     * @brief Updates a library row (caller holds dbMutex_).
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_ where needed.
-     */
     std::expected<SqliteStatement*, caudio::utils::Error>
     getCachedForUse(std::string_view sql) const;
     /**
@@ -216,9 +186,9 @@ class Database final {
      * Thread-safe: unique_lock on dbMutex_.
      */
     std::expected<void, caudio::utils::Error> queueReplaceAll(int64_t qid,
-                                                               std::span<const int64_t> ids);
+                                                              std::span<const int64_t> ids);
     std::expected<void, caudio::utils::Error> queueReplaceAll(int64_t qid,
-                                                               const std::vector<int64_t>& ids);
+                                                              const std::vector<int64_t>& ids);
 
     /**
      * @brief Locked helper section -- caller must hold Database::mutex().
@@ -499,10 +469,10 @@ class Database final {
      */
     std::expected<std::vector<caudio::types::Playlist>, caudio::utils::Error> listPlaylists();
     std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
-                                                                int64_t pos = -1);
+                                                               int64_t pos = -1);
     std::expected<void, caudio::utils::Error> playlistRemoveTrack(int64_t pid, int64_t tid);
     std::expected<void, caudio::utils::Error> playlistReorder(int64_t pid, int64_t from,
-                                                                int64_t to);
+                                                              int64_t to);
     /**
      * @brief Gets all tracks in a playlist ordered by position.
      * @ingroup caudio_db
@@ -534,7 +504,7 @@ class Database final {
                                                            int64_t pos = -1);
 
     std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
-                                                                  int64_t pos = -1);
+                                                                 int64_t pos = -1);
 
     /**
      * @brief Dequeues the head item.
@@ -591,9 +561,6 @@ class Database final {
      */
     std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     queueList(int64_t qid);
-
-    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-    getQueueItems(int64_t qid);
 
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
 

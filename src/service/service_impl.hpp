@@ -10,13 +10,13 @@
  */
 
 #include <atomic>
-#include <caudio/db/core.hpp>
-#include <caudio/engine/core.hpp>
+#include <caudio/db/database.hpp>
+#include <caudio/engine/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/ipc/shm_status.hpp>
-#include <caudio/service/core.hpp>
 #include <caudio/service/ipc_server.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <cstdint>

@@ -394,9 +394,4 @@ std::expected<void, caudio::utils::Error> setQueueTempLocked(sqlite3* db, int64_
     return {};
 }
 
-std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-getQueueItemsLocked(sqlite3* db, int64_t qid) {
-    return queueListLocked(db, qid);
-}
-
 } // namespace caudio::db

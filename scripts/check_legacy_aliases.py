@@ -47,6 +47,12 @@ PATTERNS = [
     re.compile(r"\bcaudio::db::(" + "|".join(NAMES["db"]) + r")\b"),
     re.compile(r"\bcaudio::engine::(" + "|".join(NAMES["engine"]) + r")\b"),
 ]
+# Deprecated caudio/<comp>/core.hpp wrappers. First-party code must include the
+# canonical domain header (app/app.hpp, client/client.hpp, db/database.hpp,
+# engine/engine.hpp, player/player.hpp, service/service.hpp) instead.
+INCLUDE_PATTERN = re.compile(
+    r"#\s*include\s*<caudio/(?:app|client|db|engine|player|service)/core\.hpp>"
+)
 
 
 def mask(text: str) -> str:
@@ -138,14 +144,22 @@ def main() -> int:
                 offenders.append(
                     f"{p.relative_to(ROOT).as_posix()}:{line}:{col}: {m.group(0)}"
                 )
+        for m in INCLUDE_PATTERN.finditer(masked):
+            line = masked.count("\n", 0, m.start()) + 1
+            col = m.start() - masked.rfind("\n", 0, m.start())
+            offenders.append(
+                f"{p.relative_to(ROOT).as_posix()}:{line}:{col}: "
+                f"{m.group(0)} (use the canonical domain header)"
+            )
 
     if offenders:
-        print("Deprecated caudio::db:: / caudio::engine:: spellings found:")
+        print("Deprecated API spellings / core.hpp includes found:")
         for o in offenders:
             print(f"  {o}")
         print(
             f"\n{len(offenders)} offending use(s); "
-            "use the caudio::types:: / caudio::utils:: spelling instead."
+            "use the caudio::types:: / caudio::utils:: spelling and the "
+            "canonical caudio/<comp>/<domain>.hpp header instead."
         )
         return 1
 

@@ -1140,6 +1140,22 @@ using Command = std::variant<
     BookmarkGoto, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
 
 // helper concepts
+namespace detail {
+
+template <typename T, typename Variant>
+struct is_alternative : std::false_type {};
+
+template <typename T, typename... Ts>
+struct is_alternative<T, std::variant<Ts...>> : std::disjunction<std::is_same<T, Ts>...> {};
+
+template <typename T>
+inline constexpr bool is_alternative_v = is_alternative<T, Command>::value;
+
+template <typename T>
+concept is_command_alternative = is_alternative_v<T>;
+
+} // namespace detail
+
 /**
  * @brief Concept matching any valid command alternative type.
  *
@@ -1147,30 +1163,7 @@ using Command = std::variant<
  * @ingroup caudio_ipc
  */
 template <typename T>
-concept CommandAlternative = requires {
-    requires std::disjunction_v<
-        std::is_same<T, Play>, std::is_same<T, Pause>, std::is_same<T, Resume>,
-        std::is_same<T, Restart>, std::is_same<T, Stop>, std::is_same<T, Next>,
-        std::is_same<T, Prev>, std::is_same<T, Seek>, std::is_same<T, StatusReq>,
-        std::is_same<T, VolumeSet>, std::is_same<T, QueueList>, std::is_same<T, QueueQueues>,
-        std::is_same<T, QueueSwitch>, std::is_same<T, QueueAdd>, std::is_same<T, QueueRemove>,
-        std::is_same<T, QueueMove>, std::is_same<T, QueueClear>, std::is_same<T, QueueShuffle>,
-        std::is_same<T, QueueRepeat>, std::is_same<T, PlaylistList>,
-        std::is_same<T, PlaylistTracks>, std::is_same<T, PlaylistLoad>,
-        std::is_same<T, PlaylistSave>, std::is_same<T, PlaylistDelete>,
-        std::is_same<T, PlaylistRename>, std::is_same<T, PlaylistExport>,
-        std::is_same<T, PlaylistImport>, std::is_same<T, LibraryScan>,
-        std::is_same<T, LibrarySearch>, std::is_same<T, LibraryStats>,
-        std::is_same<T, LibraryStatsDetailed>, std::is_same<T, LibraryAdd>,
-        std::is_same<T, LibraryRemove>, std::is_same<T, LibraryList>, std::is_same<T, TagEdit>,
-        std::is_same<T, TagGet>, std::is_same<T, ConfigGet>, std::is_same<T, ConfigSet>,
-        std::is_same<T, ConfigList>, std::is_same<T, ConfigExport>, std::is_same<T, ConfigImport>,
-        std::is_same<T, ConfigReset>, std::is_same<T, HistoryList>, std::is_same<T, HistoryClear>,
-        std::is_same<T, BookmarkList>, std::is_same<T, BookmarkAdd>,
-        std::is_same<T, BookmarkRemove>, std::is_same<T, BookmarkGoto>, std::is_same<T, Shutdown>,
-        std::is_same<T, Preview>, std::is_same<T, DeviceList>, std::is_same<T, DeviceSet>,
-        std::is_same<T, DeviceTest>, std::is_same<T, Info>>;
-};
+concept CommandAlternative = detail::is_alternative_v<T>;
 
 /**
  * @brief Concept matching any valid command type (including cvref-qualified).

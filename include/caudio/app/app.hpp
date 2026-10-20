@@ -224,7 +224,9 @@ class App {
      * @brief Deprecated spelling for play().
      * @ingroup caudio_app
      */
-    [[deprecated("use play() instead")]] AppResult doPlay() { return play(); }
+    [[deprecated("use play() instead")]] AppResult doPlay() {
+        return play();
+    }
 
     /**
      * @brief Plays files immediately in a new queue.
@@ -274,10 +276,12 @@ class App {
     std::expected<TrackList, caudio::utils::Error> queueTracks(const std::string& order);
 
     /** @brief Switches the active queue. @ingroup caudio_app */
-    AppResult switchQueue(std::int64_t qid);
+    AppResult queueSwitch(std::int64_t qid);
 
-    /** @brief Deprecated spelling for switchQueue(). @ingroup caudio_app */
-    [[deprecated("use switchQueue() instead")]] AppResult queueSwitch(std::int64_t qid) { return switchQueue(qid); }
+    /** @brief Deprecated spelling for queueSwitch(). @ingroup caudio_app */
+    [[deprecated("use queueSwitch() instead")]] AppResult switchQueue(std::int64_t qid) {
+        return queueSwitch(qid);
+    }
 
     /** @brief Creates a queue container. @ingroup caudio_app */
     AppResult queueCreate(const std::string& name);

@@ -12,6 +12,7 @@ using ::caudio::config::configResetAllRaw;
 using ::caudio::config::configSetRaw;
 using ::caudio::config::loadConfig;
 using ::caudio::config::lockPathFor;
+using ::caudio::config::logPathFor;
 using ::caudio::config::pidPathFor;
 using ::caudio::config::RawConfigValue;
 using ::caudio::config::saveConfig;

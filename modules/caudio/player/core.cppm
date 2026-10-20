@@ -1,5 +1,5 @@
 module;
-#include <caudio/player/core.hpp>
+#include <caudio/player/player.hpp>
 
 export module caudio.player:core;
 

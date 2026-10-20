@@ -1,5 +1,5 @@
 module;
-#include <caudio/app/core.hpp>
+#include <caudio/app/app.hpp>
 
 export module caudio.app:core;
 

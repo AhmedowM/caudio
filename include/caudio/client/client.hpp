@@ -23,8 +23,10 @@ struct Config final {
 
     Config() = default;
     explicit Config(std::filesystem::path db) : dbPath(std::move(db)) {}
-    Config(std::filesystem::path db, std::string sock) : dbPath(std::move(db)), socketPath(std::move(sock)) {}
-    explicit Config(const caudio::config::Config& cfg) : dbPath(cfg.dbPath), socketPath(cfg.socketPath) {}
+    Config(std::filesystem::path db, std::string sock)
+        : dbPath(std::move(db)), socketPath(std::move(sock)) {}
+    explicit Config(const caudio::config::Config& cfg)
+        : dbPath(cfg.dbPath), socketPath(cfg.socketPath) {}
 };
 
 class Client {

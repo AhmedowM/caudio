@@ -1,4 +1,4 @@
-#include <caudio/player/core.hpp>
+#include <caudio/player/player.hpp>
 #include <caudio/utils/error.hpp>
 #include <chrono>
 #include <expected>

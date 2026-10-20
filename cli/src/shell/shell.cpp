@@ -19,10 +19,10 @@
 
 #include <CLI/CLI.hpp>
 #include <app/detail.hpp>
-#include <caudio/app/core.hpp>
+#include <caudio/app/app.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
-#include <caudio/client/core.hpp>
+#include <caudio/client/client.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
@@ -852,7 +852,7 @@ int Shell::run(int argc, char** argv) {
             return 0;
         }
         if (qSwitch->parsed())
-            return detail::render(app_.switchQueue(qSwitchId), qSwitchJson);
+            return detail::render(app_.queueSwitch(qSwitchId), qSwitchJson);
         if (qCreate->parsed())
             return detail::render(app_.queueCreate(qCreateName), qCreateJson);
         if (qDelete->parsed())

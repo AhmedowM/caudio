@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#include <caudio/db/core.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/player/decoder.hpp>
 #include <caudio/utils/error.hpp>

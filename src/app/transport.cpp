@@ -8,8 +8,8 @@
  * render the returned outcomes.
  */
 
-#include <caudio/app/core.hpp>
-#include <caudio/client/core.hpp>
+#include <caudio/app/app.hpp>
+#include <caudio/client/client.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <caudio/client/core.hpp>
+#include <caudio/client/client.hpp>
 #include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
