@@ -9,9 +9,9 @@
 #include <caudio/media/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
-#include <db/fingerprint.hpp>
 #include <expected>
 #include <filesystem>
+#include <media/fingerprint.hpp>
 #include <utility>
 
 #include "service_audio.hpp"
@@ -27,7 +27,7 @@ namespace caudio::service::detail {
  */
 inline std::expected<caudio::types::Track, caudio::utils::Error>
 ensureLibraryTrack(caudio::db::Database& db, const std::filesystem::path& p) {
-    auto fpRes = caudio::db::internal::computeFingerprint(p);
+    auto fpRes = caudio::media::internal::computeFingerprint(p);
     if (!fpRes)
         return std::unexpected{fpRes.error()};
     caudio::types::Track t;

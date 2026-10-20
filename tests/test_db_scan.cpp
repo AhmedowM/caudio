@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
+#include <caudio/media/scan.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <chrono>
@@ -30,7 +31,7 @@ TEST_CASE("scan generator yields audio files recursively", "[db_scan]") {
     }
     std::ofstream f2(root / "ignore.txt", std::ios::binary);
     f2 << "not audio";
-    auto tracks = scanDirectory(root, ScanMode::Sampled);
+    auto tracks = caudio::media::scanTracksToVector(root, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->size() == 3);
     {
@@ -50,14 +51,14 @@ TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") 
         std::ofstream f(p, std::ios::binary);
         f.write((char*)data.data(), data.size());
     }
-    // Test via public API: scanDirectory returns tracks with fingerprints
-    auto tracks1 = scanDirectory(dir, ScanMode::Sampled);
+    // Test via public API: scanTracksToVector returns tracks with fingerprints
+    auto tracks1 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks1.has_value());
     REQUIRE(tracks1->size() == 1);
     auto fp1 = tracks1->front().fingerprint;
 
     // Re-scan same file -> same fingerprint
-    auto tracks2 = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks2 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks2.has_value());
     REQUIRE(tracks2->size() == 1);
     auto fp2 = tracks2->front().fingerprint;
@@ -73,7 +74,7 @@ TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") 
         std::ofstream f(p2, std::ios::binary);
         f.write((char*)data2.data(), data2.size());
     }
-    auto tracks3 = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks3 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks3.has_value());
     REQUIRE(tracks3->size() == 2);
     bool foundDifferent = false;
@@ -92,7 +93,7 @@ TEST_CASE("scan fingerprint head+tail+size sampled deterministic", "[db_scan]") 
         std::ofstream f(p3, std::ios::binary);
         f.write((char*)data3.data(), data3.size());
     }
-    auto tracks4 = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks4 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks4.has_value());
     REQUIRE(tracks4->size() == 3);
     foundDifferent = false;
@@ -151,15 +152,31 @@ TEST_CASE("scanLibrary inserts and dedup by fingerprint", "[db_scan]") {
     }
 }
 
+TEST_CASE("deprecated db::scanDirectory forwarder matches media scanTracksToVector", "[db_scan]") {
+    auto dir = tempDirPath("scan_compat");
+    std::ofstream(dir / "compat.wav", std::ios::binary) << "compat audio";
+    auto media = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
+    REQUIRE(media.has_value());
+    REQUIRE(media->size() == 1);
+    auto compat = caudio::db::scanDirectory(dir, caudio::db::ScanMode::Sampled);
+    REQUIRE(compat.has_value());
+    REQUIRE(compat->size() == media->size());
+    REQUIRE(compat->front().path == media->front().path);
+    REQUIRE(compat->front().fingerprint == media->front().fingerprint);
+    std::error_code ec;
+    std::filesystem::remove_all(dir, ec);
+}
+
 TEST_CASE("scan non-existent dir returns empty", "[db_scan]") {
-    auto tracks = scanDirectory("/nonexistent_path_xyz_12345", ScanMode::Sampled);
+    auto tracks = caudio::media::scanTracksToVector("/nonexistent_path_xyz_12345",
+                                                    caudio::media::ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->empty());
 }
 
 TEST_CASE("scan empty dir returns empty", "[db_scan]") {
     auto dir = tempDirPath("empty_scan");
-    auto tracks = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->empty());
     // also .txt noise only should be empty
@@ -167,7 +184,7 @@ TEST_CASE("scan empty dir returns empty", "[db_scan]") {
         std::ofstream f(dir / "notes.txt", std::ios::binary);
         f << "hello";
     }
-    auto tracks2 = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks2 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks2.has_value());
     REQUIRE(tracks2->empty());
     std::error_code ec;
@@ -202,7 +219,7 @@ TEST_CASE("scanDirectory filters by audio extensions case-insensitively", "[db_s
     std::ofstream(dir / "i.txt", std::ios::binary) << "not audio";
     std::ofstream(dir / "l", std::ios::binary) << "no ext";
 
-    auto tracks = scanDirectory(dir, ScanMode::Sampled);
+    auto tracks = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     // Only 17 audio files should be found
     REQUIRE(tracks->size() == 17);
@@ -221,18 +238,18 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
         std::ofstream f(p, std::ios::binary);
         f.write((char*)data.data(), data.size());
     }
-    auto sampled = scanDirectory(dir, ScanMode::Sampled);
+    auto sampled = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(sampled.has_value());
     REQUIRE(sampled->size() == 1);
-    auto full = scanDirectory(dir, ScanMode::Full);
+    auto full = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Full);
     REQUIRE(full.has_value());
     REQUIRE(full->size() == 1);
     // Sampled uses head+tail+size, Full uses BLAKE3 of entire file -> should differ for large file
     REQUIRE(sampled->front().fingerprint != full->front().fingerprint);
     // But re-scanning same mode is deterministic
-    auto sampled2 = scanDirectory(dir, ScanMode::Sampled);
+    auto sampled2 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(sampled2->front().fingerprint == sampled->front().fingerprint);
-    auto full2 = scanDirectory(dir, ScanMode::Full);
+    auto full2 = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Full);
     REQUIRE(full2->front().fingerprint == full->front().fingerprint);
     // Modify middle byte only (not in head/tail 64K) -> Sampled should stay same, Full should
     // change For 200K file, head 64K = [0,64K), tail 64K = [136K,200K), middle [64K,136K)
@@ -244,14 +261,14 @@ TEST_CASE("ScanMode Full vs Sampled for file >128 KiB", "[db_scan]") {
         std::ofstream f(p, std::ios::binary | std::ios::trunc);
         f.write((char*)dataMod.data(), dataMod.size());
     }
-    auto sampledMod = scanDirectory(dir, ScanMode::Sampled);
+    auto sampledMod = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(sampledMod.has_value());
     REQUIRE(sampledMod->size() == 1);
     // sampled should be same as before because middle not covered (unless size changed? size same)
     // For this file, change is in middle so sampled stays same, but full changes
     // Note: if sampled differs, still valid test; we check full definitely differs from original
     // full
-    auto fullMod = scanDirectory(dir, ScanMode::Full);
+    auto fullMod = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Full);
     REQUIRE(fullMod.has_value());
     REQUIRE(fullMod->front().fingerprint != full->front().fingerprint);
     std::error_code ec;

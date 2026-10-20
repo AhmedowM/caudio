@@ -5,14 +5,14 @@
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <db/fingerprint.hpp>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <media/fingerprint.hpp>
 #include <system_error>
 
-namespace caudio::db::internal {
+namespace caudio::media::internal {
 
 std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path) {
@@ -51,4 +51,4 @@ computeFingerprint(const std::filesystem::path& path) {
     return out;
 }
 
-} // namespace caudio::db::internal
+} // namespace caudio::media::internal

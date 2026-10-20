@@ -8,6 +8,7 @@
 #include <caudio/ipc/result.hpp>
 #include <caudio/media/audio_ext.hpp>
 #include <caudio/media/decoder.hpp>
+#include <caudio/media/scan.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
@@ -17,13 +18,13 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <db/fingerprint.hpp>
 #include <exception>
 #include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <media/fingerprint.hpp>
 #include <memory>
 #include <optional>
 #include <span>
@@ -77,7 +78,7 @@ Service::Impl::handle(const caudio::ipc::LibraryScan& cmd) {
             pp = std::filesystem::current_path();
         root = pp / "music";
     }
-    auto mode = (cmd.full_hash ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
+    auto mode = (cmd.full_hash ? caudio::media::ScanMode::Full : caudio::media::ScanMode::Sampled);
     // Prefer scanLibrary if a library matches root -- gives dedup + batched
     // transaction
     if (auto libs = db_->listLibraries(); libs) {
@@ -106,7 +107,7 @@ Service::Impl::handle(const caudio::ipc::LibraryScan& cmd) {
                       cmd.full_hash ? "full" : "sampled");
     std::size_t n = 0;
     std::size_t seen = 0;
-    for (auto t : caudio::db::scan(root, mode)) {
+    for (auto t : caudio::media::scanTracks(root, mode)) {
         ++seen;
         if (auto ex = db_->findByPath(t.path); ex && ex->size == t.size && ex->mtime == t.mtime)
             continue;
@@ -272,7 +273,7 @@ Service::Impl::handle(const caudio::ipc::LibraryAdd& cmd) {
         if (!caudio::media::hasAudioExt(fp))
             return std::unexpected{caudio::utils::makeError(
                 caudio::utils::StatusCode::Unsupported, "unsupported file type: " + fp.string())};
-        auto fpRes = caudio::db::internal::computeFingerprint(fp);
+        auto fpRes = caudio::media::internal::computeFingerprint(fp);
         if (!fpRes)
             return std::unexpected{fpRes.error()};
         caudio::types::Track t;

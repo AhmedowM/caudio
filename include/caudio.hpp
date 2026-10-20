@@ -29,11 +29,13 @@
  * - @ref caudio_utils "caudio.utils" -- Core utilities: error handling (`std::expected`),
  *   lock-free SPSC/MPSC queues, thread helpers, logging, opaque JSON value.
  * - @ref caudio_media "caudio.media" -- Media input: reader abstractions,
- *   FFmpeg-based decoder, metadata extraction, audio-extension helpers.
+ *   FFmpeg-based decoder, metadata extraction, audio-extension helpers,
+ *   library scan discovery (filesystem walk, fingerprint, tags).
  * - @ref caudio_player "caudio.player" -- Audio playback: miniaudio output,
  *   gapless playback. Reader/decoder are re-exported from `caudio.media`.
  * - @ref caudio_db "caudio.db" -- Database layer: SQLite with WAL, track/playlist/queue
- *   management, full-text search (FTS5), JSON import/export, library scanning.
+ *   management, full-text search (FTS5), JSON import/export, library scan
+ *   persistence (upsert of the tracks discovered by `caudio.media`).
  * - @ref caudio_engine "caudio.engine" -- Playback engine: state machine, shuffle/repeat,
  *   gapless transition, history marking, persistence, event queue.
  * - @ref caudio_ipc "caudio.ipc" -- Daemon wire protocol: Command/Result

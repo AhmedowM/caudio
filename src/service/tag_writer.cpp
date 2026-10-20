@@ -27,7 +27,7 @@
 #include <caudio/utils/error.hpp>
 #include <cctype>
 #include <cstdint>
-#include <db/fingerprint.hpp>
+#include <media/fingerprint.hpp>
 #include <string>
 #include <system_error>
 
@@ -187,7 +187,7 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
 
 caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
                                                                  caudio::types::Track t) {
-    auto fpRes = caudio::db::internal::computeFingerprint(t.path);
+    auto fpRes = caudio::media::internal::computeFingerprint(t.path);
     if (!fpRes)
         return std::unexpected{fpRes.error()};
     t.fingerprint = *fpRes;

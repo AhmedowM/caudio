@@ -1,6 +1,8 @@
 # db.cmake -- caudio::db (SQLite library/engine-state persistence).
-# NOTE: statement/transaction/queue/schema/detail/fingerprint/fts/stmt_helpers
-# live in src/db/ (NOT installed) and have no module partitions.
+# NOTE: statement/transaction/queue/schema/detail/fts/stmt_helpers live in
+# src/db/ (NOT installed) and have no module partitions. Fingerprinting moved
+# to the media component (src/media/fingerprint.cpp) with the scan discovery
+# half, so db no longer links blake3.
 set(CAUDIO_DB_MODULE_SOURCES
   modules/caudio/db.cppm
   modules/caudio/db/types.cppm
@@ -20,12 +22,11 @@ set(CAUDIO_DB_SOURCES
   src/db/write_thread.cpp
   src/db/statement.cpp
   src/db/transaction.cpp
-  src/db/fingerprint.cpp
   src/db/fts.cpp
   src/db/stmt_helpers.cpp
 )
 caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::utils caudio::media Threads::Threads INCLUDES vendor)
-target_link_libraries(db PRIVATE caudio::sqlite3 blake3)
+target_link_libraries(db PRIVATE caudio::sqlite3)
 target_include_directories(db SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_module_warnings(db)

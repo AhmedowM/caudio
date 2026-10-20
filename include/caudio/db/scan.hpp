@@ -2,16 +2,25 @@
 
 /**
  * @file scan.hpp
- * @brief Filesystem scan helpers for audio tracks.
+ * @brief Database-side scan helpers (persistence half of library scanning).
  * @ingroup caudio_db
- * @details Implements `scanDirectory` and `scanLibrary` for recursive
- * filesystem traversal, fingerprinting and upsert into the database.
- * Shared with the service layer (playlist/scan imports).
+ * @details Library scanning is split at the persistence seam:
+ * - `caudio::media` owns the pure, DB-free half: filesystem walk,
+ *   extension filter, BLAKE3 fingerprinting and metadata extraction
+ *   (`caudio::media::scanTracks`, `caudio::media::scanTracksToVector`).
+ * - `caudio::db` keeps the DB-coupled half: `scanLibrary` (batched upsert
+ *   of the discovered tracks under the database mutex).
+ *
+ * The `caudio::db::scan`, `caudio::db::scanDirectory` and
+ * `caudio::db::ScanMode` spellings remain as compatibility forwarders to the
+ * media spellings and are deprecated (documentation only -- the module
+ * partition re-exports them, so no `[[deprecated]]` attribute is used).
  */
 
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/media/audio_ext.hpp>
+#include <caudio/media/scan.hpp>
 #include <cstdint>
 #include <expected>
 #include <filesystem>
@@ -23,13 +32,12 @@
 namespace caudio::db {
 
 /**
- * @brief Scan fingerprinting mode.
+ * @brief Compatibility alias of `caudio::media::ScanMode`.
  * @ingroup caudio_db
+ * @details Scan fingerprinting mode (Sampled vs Full).
+ * @deprecated Use `caudio::media::ScanMode` instead.
  */
-enum class ScanMode {
-    Sampled, ///< Sampled BLAKE3 (head+tail+size+version) -- fast, default.
-    Full     ///< Full-file BLAKE3 -- slower, more collision-resistant.
-};
+using ScanMode = caudio::media::ScanMode;
 
 namespace detail {
 
@@ -48,33 +56,30 @@ inline bool hasAudioExt(const std::filesystem::path& p) {
 } // namespace detail
 
 /**
- * @brief Lazily scans a directory tree yielding Tracks.
+ * @brief Compatibility forwarder to `caudio::media::scanTracks`.
  * @ingroup caudio_db
  * @param root Root directory to traverse recursively.
  * @param mode Fingerprinting mode (Sampled vs Full).
  * @return Generator yielding one `Track` per audio file.
- * @details Uses `recursive_directory_iterator` with `skip_permission_denied`.
- * Shared with the service layer (playlist/scan imports).
- * @par Thread safety
- * Not thread-safe with concurrent filesystem mutation; otherwise re-entrant.
- * @see ScanMode
- * @see scanDirectory
- * @see scanLibrary
+ * @deprecated Use `caudio::media::scanTracks` instead.
  */
-caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
-                                                    ScanMode mode = ScanMode::Sampled);
+inline caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
+                                                           ScanMode mode = ScanMode::Sampled) {
+    return caudio::media::scanTracks(root, mode);
+}
 
 /**
- * @brief Scans a directory and collects all tracks into a vector.
+ * @brief Compatibility forwarder to `caudio::media::scanTracksToVector`.
  * @ingroup caudio_db
  * @param root Root directory.
  * @param mode Fingerprinting mode.
  * @return Vector of tracks, or `Error` (currently always succeeds, returns empty on missing root).
- * @par Thread safety
- * Re-entrant; not thread-safe with concurrent filesystem mutation.
+ * @deprecated Use `caudio::media::scanTracksToVector` instead.
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
+inline std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled) {
+    return caudio::media::scanTracksToVector(root, mode);
+}
 
 /**
  * @brief Scans a library root and upserts tracks into the database.
@@ -90,6 +95,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
  * concurrent `listQueueItems` never sees partial state and a crash leaves DB
  * consistent per batch. Deduplication: early-exit on `path+size+mtime` match;
  * otherwise fingerprint dedup via `findByFingerprintLocked`/`findByPathLocked`.
+ * Discovery (walk, fingerprint, tags) is done by `caudio::media::scanTracks`.
  * @par Thread safety
  * Thread-safe: internally acquires `db.mutex()` per batch. Caller must not
  * hold `db.mutex()` across the call.
@@ -97,7 +103,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
  * Acquires `db.mutex()` (dbMutex_) exclusively per batch; inside the batch
  * uses `*Locked` helpers that assume the lock is held and additionally take
  * `cacheMutex_` internally.
- * @see scanDirectory
+ * @see caudio::media::scanTracks
  * @see Database::findByPathLocked
  * @see Database::findByFingerprintLocked
  */

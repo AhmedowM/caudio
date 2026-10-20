@@ -17,7 +17,7 @@
 - **Shuffle / Repeat** -- Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|All` (`src/engine/shuffle.cpp`)
 - **Queue & Playlist** -- SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
 - **FTS5 search** -- `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
-- **Fingerprint dedup** -- BLAKE3 64 KiB head+tail fingerprint (`src/db/fingerprint.cpp`), sampled/full scan modes
+- **Fingerprint dedup** -- BLAKE3 64 KiB head+tail fingerprint (`src/media/fingerprint.cpp`), sampled/full scan modes
 - **SHM status at 10 Hz** -- lock-free `AtomicShmStatus` shared-memory block polled by TUIs (`src/ipc/shm_status.cpp`)
 - **Daemon lifecycle** -- single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, live `STATUS` via `--watch`
 
@@ -160,13 +160,14 @@ Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level
 
 ### As a library
 
-Seven components, link only what you use:
+Eight components, link only what you use:
 
 | Target | Covers |
 |---|---|
 | `caudio::utils` | Errors, logging, JSON facade, threads, queues/rings, printing, versioning |
-| `caudio::player` | File reading, FFmpeg decoding, miniaudio output |
-| `caudio::db` | SQLite storage: tracks, library scan, FTS5 search, batched writes |
+| `caudio::media` | File reading, FFmpeg decoding, metadata/tags, library scan discovery |
+| `caudio::player` | Audio output, gapless playback (reader/decoder re-exported from `caudio::media`) |
+| `caudio::db` | SQLite storage: tracks, library scan persistence, FTS5 search, batched writes |
 | `caudio::engine` | Playback state machine: queue, shuffle, history, gapless, events |
 | `caudio::ipc` | Daemon wire protocol: commands, results, framing, config |
 | `caudio::client` | Daemon client + output formatting |
@@ -220,20 +221,20 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 find_package(caudio CONFIG REQUIRED)
 
 add_executable(consumer main.cpp)
-target_link_libraries(consumer PRIVATE caudio::db)
+target_link_libraries(consumer PRIVATE caudio::media)
 ```
 
 ```cpp
-import caudio.db;
+import caudio.media;
 
 int main() {
-    auto tracks = caudio::db::scanDirectory(".");
+    auto tracks = caudio::media::scanTracksToVector(".");
 
     return tracks.has_value() ? 0 : 1;
 }
 ```
 
-Available modules mirror the libraries: `caudio`, `caudio.utils`, `caudio.player`, `caudio.db`, `caudio.engine`, `caudio.ipc`, `caudio.service`, `caudio.client` (plus `:partitions` such as `caudio.db:scan`). An install ships the `*.cppm` sources under `<prefix>/modules/`; your toolchain rebuilds BMIs at consumer-configure time — BMI CRC covers defines/flags, so prebuilt BMIs never travel across compilers. Requires CMake ≥ 3.28 and a compiler with C++23 module support (GCC 14+, Clang 17+, MSVC 2022+).
+Available modules mirror the libraries: `caudio`, `caudio.utils`, `caudio.media`, `caudio.player`, `caudio.db`, `caudio.engine`, `caudio.ipc`, `caudio.service`, `caudio.client` (plus `:partitions` such as `caudio.db:scan`). An install ships the `*.cppm` sources under `<prefix>/modules/`; your toolchain rebuilds BMIs at consumer-configure time — BMI CRC covers defines/flags, so prebuilt BMIs never travel across compilers. Requires CMake ≥ 3.28 and a compiler with C++23 module support (GCC 14+, Clang 17+, MSVC 2022+).
 
 API docs: `cmake --preset docs && cmake --build --preset docs` → `build/docs/docs/html` (`docs/Doxyfile.in`); man page at `docs/man/caudio.1`, installed to `${CMAKE_INSTALL_MANDIR}/man1`.
 

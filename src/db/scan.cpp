@@ -1,101 +1,33 @@
-#include <blake3.h>
 #include <sqlite3.h>
 
-#include <array>
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/media/audio_ext.hpp>
 #include <caudio/media/decoder.hpp>
+#include <caudio/media/scan.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/generator.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <db/fingerprint.hpp>
 #include <db/stmt_helpers.hpp>
 #include <expected>
 #include <filesystem>
-#include <fstream>
 #include <functional>
-#include <ios>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
-#include <vector>
 
 namespace caudio::db {
 
-caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
-                                                    ScanMode mode) {
-    std::error_code ec;
-    if (!std::filesystem::exists(root, ec))
-        co_return;
-    for (auto it = std::filesystem::recursive_directory_iterator(
-             root, std::filesystem::directory_options::skip_permission_denied, ec);
-         it != std::filesystem::recursive_directory_iterator(); ++it) {
-        if (it->is_regular_file(ec) && caudio::media::hasAudioExt(it->path())) {
-            caudio::types::Track t;
-            t.path = it->path().generic_string();
-            std::error_code e2;
-            auto sz = it->file_size(e2);
-            if (!e2)
-                t.size = (int64_t)sz;
-            auto ftime = it->last_write_time(e2);
-            if (!e2)
-                t.mtime = (int64_t)ftime.time_since_epoch().count();
-            if (mode == ScanMode::Sampled) {
-                auto fp = internal::computeFingerprint(it->path());
-                if (fp)
-                    t.fingerprint = *fp;
-            } else {
-                std::ifstream f(it->path(), std::ios::binary);
-                if (f) {
-                    blake3_hasher hasher;
-                    blake3_hasher_init(&hasher);
-                    std::array<std::byte, 8192> buf{};
-                    while (f.read(reinterpret_cast<char*>(buf.data()),
-                                  static_cast<std::streamsize>(buf.size())) ||
-                           f.gcount())
-                        blake3_hasher_update(&hasher, buf.data(), static_cast<size_t>(f.gcount()));
-                    blake3_hasher_finalize(&hasher, t.fingerprint.data(), t.fingerprint.size());
-                }
-            }
-            if (auto meta = caudio::media::extractMetadata(t.path); meta) {
-                t.title = std::move(meta->title);
-                t.artist = std::move(meta->artist);
-                t.album = std::move(meta->album);
-                t.album_artist = std::move(meta->album_artist);
-                t.genre = std::move(meta->genre);
-                t.year = meta->year;
-                t.track_num = meta->track_num;
-                t.disc_num = meta->disc_num;
-                t.duration = meta->duration;
-                t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
-                t.channels = static_cast<uint32_t>(meta->channels);
-                t.bitrate = meta->bitrate;
-            }
-            co_yield t;
-        }
-    }
-}
-
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-scanDirectory(const std::filesystem::path& root, ScanMode mode) {
-    std::vector<caudio::types::Track> out;
-    for (auto t : scan(root, mode))
-        out.push_back(std::move(t));
-    return out;
-}
-
 std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
-            std::function<void(int64_t, int64_t, std::string_view)> progress, ScanMode mode) {
+            std::function<void(int64_t, int64_t, std::string_view)> progress,
+            caudio::media::ScanMode mode) {
     if (libraryId == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     auto libs = db.listLibraries();
@@ -116,7 +48,7 @@ scanLibrary(Database& db, int64_t libraryId,
             caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "path not found")};
     if (auto* lg = db.logger())
         lg->info("scan started root={} mode={}", libPath,
-                 mode == ScanMode::Sampled ? "sampled" : "full");
+                 mode == caudio::media::ScanMode::Sampled ? "sampled" : "full");
     int64_t scanned = 0;
     int64_t added = 0;
     int64_t updated = 0;
@@ -172,7 +104,7 @@ scanLibrary(Database& db, int64_t libraryId,
         batchPending = 0;
     };
 
-    for (auto trk : scan(root, mode)) {
+    for (auto trk : caudio::media::scanTracks(root, mode)) {
         if (!inTx) {
             auto b = beginBatch();
             if (!b)
