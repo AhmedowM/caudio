@@ -15,10 +15,11 @@
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/record.hpp>
+#include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>

@@ -58,7 +58,7 @@
  * caudio.ipc     (utils)
  * caudio.client  (utils, ipc)
  * caudio.service (utils, ipc, engine, db, media, player)
- * caudio.app     (utils, ipc, client, service, db, media, player)
+ * caudio.app     (utils, ipc, client, media)
  * @endcode
  *
  * Threading model:

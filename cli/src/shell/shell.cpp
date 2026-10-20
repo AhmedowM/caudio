@@ -55,6 +55,7 @@
 #include <vector>
 
 #include "parse.hpp"
+#include "preview.hpp"
 #include "shell.hpp"
 
 namespace caudio::app::cli {
@@ -690,6 +691,9 @@ int Shell::run(int argc, char** argv) {
     // ctor; sync it now that reload plus socket derivation are final. Every
     // daemon interaction below must observe these paths.
     app_.setConfig(config_);
+    // Inject the local preview host: the CLI (not app) owns the player-backed
+    // preview, so the app layer stays free of the player dependency.
+    app_.setPreviewHost(detail::runLocalPreview);
     // Inject the foreground daemon host: the CLI (not app) owns service startup.
     app_.setDaemonHost([this](bool foreground) -> caudio::app::AppResult {
         caudio::service::ServiceConfig scfg;

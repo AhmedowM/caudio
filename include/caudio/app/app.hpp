@@ -147,6 +147,16 @@ class App {
     void setDaemonHost(std::function<AppResult(bool foreground)> host);
 
     /**
+     * @brief Injects the local preview implementation (CLI owns the player-backed one).
+     * @ingroup caudio_app
+     * @param host Callable that previews a local file and blocks until it
+     *             finishes; when unset, `previewFile` returns an error.
+     * @details The app layer stays free of the player dependency: the CLI
+     * owns the player-backed preview and injects it here.
+     */
+    void setPreviewHost(std::function<AppResult(const std::string& file)> host);
+
+    /**
      * @brief Starts the daemon (foreground service or background spawn).
      * @ingroup caudio_app
      * @param foreground Run the service in-process and block (child path).
@@ -530,7 +540,8 @@ class App {
     /**
      * @brief Plays a file ephemerally without touching the daemon/queue.
      * @ingroup caudio_app
-     * @details Blocks until playback finishes. Used for quick audition.
+     * @details Delegates to the injected preview host (see
+     * setPreviewHost); returns an error when no host is configured.
      */
     AppResult previewFile(const std::string& file);
 
@@ -538,6 +549,8 @@ class App {
     caudio::config::Config config_; ///< Bound config (db/socket/log paths).
     std::string argv0_;             ///< Executable path for POSIX re-spawn.
     std::function<AppResult(bool foreground)> daemonHost_{}; ///< Injected foreground daemon host.
+    std::function<AppResult(const std::string& file)>
+        previewHost_{}; ///< Injected local preview host.
 };
 
 } // namespace caudio::app

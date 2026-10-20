@@ -1,0 +1,56 @@
+/**
+ * @file preview.cpp
+ * @brief Ephemeral local file preview (no daemon).
+ * @details The CLI owns the player-backed preview (the app layer stays free
+ * of the player dependency): opens a file in a throwaway player and blocks
+ * until it finishes. Frontends reuse this for quick audition without
+ * touching the queue.
+ */
+
+#include "preview.hpp"
+
+#include <caudio/player/player.hpp>
+#include <caudio/utils/error.hpp>
+#include <chrono>
+#include <filesystem>
+#include <format>
+#include <string>
+#include <system_error>
+#include <thread>
+#include <utility>
+
+namespace caudio::app::cli::detail {
+
+caudio::app::AppResult runLocalPreview(const std::string& file) {
+    std::filesystem::path p{file};
+    std::error_code ec;
+    if (!std::filesystem::exists(p, ec)) {
+        return caudio::app::Outcome::fail(std::format("preview: file not found {}", file));
+    }
+    auto playerRes = caudio::player::Player::create();
+    if (!playerRes) {
+        return caudio::app::Outcome::fail(std::format(
+            "preview: player create failed ({}): {}",
+            caudio::utils::toString(playerRes.error().code), playerRes.error().message));
+    }
+    auto& player = *playerRes.value();
+    auto openRes = player.open(file);
+    if (!openRes) {
+        return caudio::app::Outcome::fail(std::format("preview: open failed ({}): {}",
+                                                      caudio::utils::toString(openRes.error().code),
+                                                      openRes.error().message));
+    }
+    auto playRes = player.play();
+    if (!playRes) {
+        return caudio::app::Outcome::fail(std::format("preview: play failed ({}): {}",
+                                                      caudio::utils::toString(playRes.error().code),
+                                                      playRes.error().message));
+    }
+    std::string done = std::format("preview playing {}\npreview done", file);
+    while (player.state() == caudio::player::State::Playing) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    return caudio::app::Outcome{std::nullopt, std::move(done), false, false};
+}
+
+} // namespace caudio::app::cli::detail
