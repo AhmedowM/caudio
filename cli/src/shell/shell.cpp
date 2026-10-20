@@ -866,7 +866,7 @@ int Shell::run(int argc, char** argv) {
     }
     if (queueCmd->parsed()) {
         if (qList->parsed() || qQueuesAlias->parsed())
-            return detail::render(app_.queues(), qList->parsed() ? qJson : qQueuesJson);
+            return detail::render(app_.queueList(), qList->parsed() ? qJson : qQueuesJson);
         if (qTracks->parsed()) {
             auto qr = app_.queueTracks(qTracksOrder);
             if (!qr)

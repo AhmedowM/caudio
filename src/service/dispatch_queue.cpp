@@ -48,7 +48,7 @@ Service::Impl::handle(const caudio::ipc::QueueList& ql) {
         if (!q)
             return std::unexpected{q.error()};
     }
-    auto items = db_->queueList(qid);
+    auto items = db_->listQueueItems(qid);
     if (!items)
         return std::unexpected{items.error()};
     std::vector<caudio::types::Track> tracks;
@@ -91,7 +91,7 @@ Service::Impl::handle(const caudio::ipc::QueueQueues&) {
     int64_t active = engine_->activeQueueId();
     caudio::ipc::Queues out{};
     for (auto& q : *qs) {
-        auto items = db_->queueList(q.id);
+        auto items = db_->listQueueItems(q.id);
         std::size_t n = items ? items->size() : 0;
         out.entries.push_back(caudio::ipc::QueueEntry{q.id, q.name, n, q.id == active, q.temp});
     }
@@ -214,7 +214,7 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
             // Skip the enqueue when already queued: duplicates warn
             // client-side, they must not create rows.
             bool present = false;
-            if (auto items = db_->queueList(qid)) {
+            if (auto items = db_->listQueueItems(qid)) {
                 for (auto& it : *items) {
                     if (it.track_id == newId) {
                         present = true;
@@ -292,13 +292,13 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
             }
         }
     }
-    // Batch enqueue in single transaction: atomic to concurrent queueList, rollback
+    // Batch enqueue in single transaction: atomic to concurrent listQueueItems, rollback
     // on failure. Ids already queued are skipped (warn-only duplicates).
     {
         std::vector<int64_t> fresh;
         fresh.reserve(toAdd.size());
         std::vector<int64_t> have;
-        if (auto items = db_->queueList(qid)) {
+        if (auto items = db_->listQueueItems(qid)) {
             have.reserve(items->size());
             for (auto& it : *items)
                 have.push_back(it.track_id);
@@ -357,7 +357,7 @@ Service::Impl::handle(const caudio::ipc::QueueRemove& qr) {
     if (!rm) {
         // if not found as position, try as track_id lookup
         if (rm.error().code == caudio::utils::StatusCode::NotFound) {
-            auto items = db_->queueList(qid);
+            auto items = db_->listQueueItems(qid);
             if (!items)
                 return std::unexpected{items.error()};
             bool found = false;
@@ -377,7 +377,7 @@ Service::Impl::handle(const caudio::ipc::QueueRemove& qr) {
             return std::unexpected{rm.error()};
         }
     }
-    auto items = db_->queueList(qid);
+    auto items = db_->listQueueItems(qid);
     if (!items)
         return std::unexpected{items.error()};
     std::vector<caudio::types::Track> tracks;
@@ -399,7 +399,7 @@ Service::Impl::handle(const caudio::ipc::QueueMove& qm) {
     auto q = db_->getQueue(qid);
     if (!q)
         return std::unexpected{q.error()};
-    auto items = db_->queueList(qid);
+    auto items = db_->listQueueItems(qid);
     if (!items)
         return std::unexpected{items.error()};
     if (qm.from >= items->size() || qm.to >= items->size()) {
@@ -415,13 +415,13 @@ Service::Impl::handle(const caudio::ipc::QueueMove& qm) {
     ids.erase(ids.begin() + static_cast<std::ptrdiff_t>(qm.from));
     ids.insert(ids.begin() + static_cast<std::ptrdiff_t>(qm.to), mv);
     // Transactional clear+enqueue: single BEGIN IMMEDIATE/COMMIT so concurrent
-    // queueList never sees empty
+    // listQueueItems never sees empty
     {
         auto r = db_->queueReplaceAll(qid, ids);
         if (!r)
             return std::unexpected{r.error()};
     }
-    auto nitems = db_->queueList(qid);
+    auto nitems = db_->listQueueItems(qid);
     if (!nitems)
         return std::unexpected{nitems.error()};
     std::vector<caudio::types::Track> tracks;

@@ -273,7 +273,7 @@ TEST_CASE("bookmark add/list/remove", "[db]") {
 
     REQUIRE(db->bookmarkAdd(*tr, 1234, "note one").has_value());
     REQUIRE(db->bookmarkAdd(*tr, 5678, "").has_value());
-    auto list = db->bookmarkList(*tr);
+    auto list = db->listBookmarks(*tr);
     REQUIRE(list.has_value());
     REQUIRE(list->size() == 2);
     REQUIRE(list->at(0).track_id == *tr);
@@ -283,7 +283,7 @@ TEST_CASE("bookmark add/list/remove", "[db]") {
     REQUIRE(list->at(1).position_ms == 5678);
 
     REQUIRE(db->bookmarkRemove(list->at(0).id).has_value());
-    auto after = db->bookmarkList(*tr);
+    auto after = db->listBookmarks(*tr);
     REQUIRE(after.has_value());
     REQUIRE(after->size() == 1);
     REQUIRE(after->at(0).position_ms == 5678);
@@ -315,7 +315,7 @@ TEST_CASE("history completion_pct round-trip 0/50/100", "[db]") {
 
     caudio::db::HistoryQuery q;
     q.track_id = *tr;
-    auto list = db->historyList(&q);
+    auto list = db->listHistory(&q);
     REQUIRE(list.has_value());
     REQUIRE(list->size() == 3);
     REQUIRE((*list)[0].completion_pct == 100.0);

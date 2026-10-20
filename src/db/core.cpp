@@ -1151,7 +1151,7 @@ std::expected<void, caudio::utils::Error> Database::queueClear(int64_t qid) {
 }
 
 std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-Database::queueList(int64_t qid) {
+Database::listQueueItems(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
@@ -1246,7 +1246,7 @@ Database::historyAdd(const caudio::types::HistoryEntry& e) {
 }
 
 std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
-Database::historyList(const HistoryQuery* q) {
+Database::listHistory(const HistoryQuery* q) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -1342,7 +1342,7 @@ std::expected<void, caudio::utils::Error> Database::bookmarkAdd(int64_t tid, int
 }
 
 std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
-Database::bookmarkList(int64_t tid) {
+Database::listBookmarks(int64_t tid) {
     if (tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     std::shared_lock lk{impl_->dbMutex_};
@@ -1439,7 +1439,7 @@ std::expected<int64_t, caudio::utils::Error> Database::libraryAdd(std::string_vi
     return sqlite3_last_insert_rowid(impl_->db_.get());
 }
 
-std::expected<std::vector<Library>, caudio::utils::Error> Database::libraryList() {
+std::expected<std::vector<Library>, caudio::utils::Error> Database::listLibraries() {
     std::shared_lock lk{impl_->dbMutex_};
     return libraryListLocked();
 }

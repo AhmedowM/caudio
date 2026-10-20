@@ -35,7 +35,7 @@
 
 namespace caudio::app {
 
-AppResult App::queues() {
+AppResult App::queueList() {
     caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
     return confirm(sendRaw(cmd));
 }

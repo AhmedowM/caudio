@@ -348,7 +348,7 @@ void Service::Impl::updateShmStatus() {
             duration = tr->duration;
         }
     }
-    // O(1) queue size via COUNT(*) (C-2): the old queueList() materialized
+    // O(1) queue size via COUNT(*) (C-2): the old listQueueItems() materialized
     // the full vector of items just for .size().
     size_t qSize = 0;
     {

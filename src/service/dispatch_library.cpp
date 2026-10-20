@@ -80,7 +80,7 @@ Service::Impl::handle(const caudio::ipc::LibraryScan& cmd) {
     auto mode = (cmd.full_hash ? caudio::db::ScanMode::Full : caudio::db::ScanMode::Sampled);
     // Prefer scanLibrary if a library matches root -- gives dedup + batched
     // transaction
-    if (auto libs = db_->libraryList(); libs) {
+    if (auto libs = db_->listLibraries(); libs) {
         for (auto& l : *libs) {
             if (std::filesystem::path(l.path) == root) {
                 std::size_t before = 0;
@@ -212,7 +212,7 @@ Service::Impl::handle(const caudio::ipc::BookmarkList& cmd) {
     if (tid == 0)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "no current track")};
-    auto list = db_->bookmarkList(tid);
+    auto list = db_->listBookmarks(tid);
     if (!list)
         return std::unexpected{list.error()};
     return Result{caudio::ipc::Bookmarks{std::move(*list)}};
@@ -635,7 +635,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistSave& cmd) {
         return std::unexpected{pidRes.error()};
     int64_t pid = *pidRes;
     int64_t qid = cmd.queue_id.value_or(1);
-    auto items = db_->queueList(qid);
+    auto items = db_->listQueueItems(qid);
     if (!items)
         return std::unexpected{items.error()};
     // Queues may hold legacy duplicates; playlists forbid them.

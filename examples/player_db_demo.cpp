@@ -73,7 +73,7 @@ std::expected<std::unique_ptr<Database>, Error> openDbWithFallback(const std::st
 
 void ensureQueueHasTracks(Database& db, const std::string& samplePath, const std::string& prefix,
                           uint8_t fpBase) {
-    auto q = db.queueList(1);
+    auto q = db.listQueueItems(1);
     if (q && !q->empty())
         return;
     std::cout << "[demo] queue empty, populating 2 demo tracks sample='" << samplePath << "'\n";
@@ -212,13 +212,13 @@ int main(int argc, char** argv) {
     auto db = std::move(dbRes.value());
     std::cout << "[demo] opening DB: " << usedPath << "\n";
 
-    auto countRes = db->queueList(1);
+    auto countRes = db->listQueueItems(1);
     int count = countRes ? static_cast<int>(countRes->size()) : 0;
     std::cout << "[demo] queue 1 has " << count << " item(s)\n";
 
     if (count == 0) {
         ensureQueueHasTracks(*db, findSample(), "player_db_demo", 0xA0);
-        auto c2 = db->queueList(1);
+        auto c2 = db->listQueueItems(1);
         count = c2 ? static_cast<int>(c2->size()) : 0;
         std::cout << "[demo] after populate queue has " << count << " item(s)\n";
     }
@@ -228,9 +228,9 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    auto itemsRes = db->queueList(1);
+    auto itemsRes = db->listQueueItems(1);
     if (!itemsRes) {
-        std::cerr << "[demo] queueList failed: " << itemsRes.error().message << "\n";
+        std::cerr << "[demo] listQueueItems failed: " << itemsRes.error().message << "\n";
         return 1;
     }
 

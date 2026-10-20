@@ -35,8 +35,10 @@
  * cheap; the public API is unchanged.
  */
 
+#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/fwd.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -329,7 +331,13 @@ class Engine final {
      * @see caudio::db::Database::getStats
      * @see caudio::db::DbStats
      */
-    std::expected<caudio::db::DbStats, caudio::utils::Error> getStats();
+    std::expected<caudio::db::DbStats, caudio::utils::Error> stats();
+
+    /** @brief Deprecated spelling for stats(). @ingroup caudio_engine */
+    [[deprecated("use stats() instead")]] std::expected<caudio::db::DbStats, caudio::utils::Error>
+    getStats() {
+        return stats();
+    }
 
     /**
      * @brief Lists history entries.

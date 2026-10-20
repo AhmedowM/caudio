@@ -13,6 +13,7 @@
 #include <array>
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
+#include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -165,7 +166,7 @@ class Database final {
      * @param tids Track ids to enqueue.
      * @return Success or Error (Internal/Busy/NotFound).
      * @details Holds dbMutex_ exclusively and uses BEGIN IMMEDIATE / COMMIT
-     * so concurrent queueList never sees a partial batch.
+     * so concurrent listQueueItems never sees a partial batch.
      * @par Thread safety
      * Thread-safe: unique_lock on dbMutex_.
      * @see queueReplaceAll
@@ -255,7 +256,7 @@ class Database final {
      * @return Vector of libraries or Error.
      * @par Thread safety
      * Caller must hold dbMutex_ (shared or exclusive).
-     * @see libraryList
+     * @see listLibraries
      */
     std::expected<std::vector<Library>, caudio::utils::Error> libraryListLocked();
     /**
@@ -560,7 +561,14 @@ class Database final {
      * Thread-safe: shared_lock.
      */
     std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-    queueList(int64_t qid);
+    listQueueItems(int64_t qid);
+
+    /** @brief Deprecated spelling for listQueueItems(). @ingroup caudio_db */
+    [[deprecated("use listQueueItems() instead")]]
+    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
+    queueList(int64_t qid) {
+        return listQueueItems(qid);
+    }
 
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
 
@@ -594,7 +602,7 @@ class Database final {
      * @return Index into the ORDER BY position listing, or std::nullopt if
      * the track is not in the queue.
      * @details O(log n) via the queue position index (see
-     * queueIndexOfLocked); O(1) extra memory vs queueList().
+     * queueIndexOfLocked); O(1) extra memory vs listQueueItems().
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
@@ -619,7 +627,14 @@ class Database final {
      * Thread-safe: shared_lock.
      */
     std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
-    historyList(const HistoryQuery* q = nullptr);
+    listHistory(const HistoryQuery* q = nullptr);
+
+    /** @brief Deprecated spelling for listHistory(). @ingroup caudio_db */
+    [[deprecated("use listHistory() instead")]]
+    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
+    historyList(const HistoryQuery* q = nullptr) {
+        return listHistory(q);
+    }
 
     /**
      * @brief Clears all history.
@@ -652,7 +667,14 @@ class Database final {
      * Thread-safe: shared_lock.
      */
     std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
-    bookmarkList(int64_t tid);
+    listBookmarks(int64_t tid);
+
+    /** @brief Deprecated spelling for listBookmarks(). @ingroup caudio_db */
+    [[deprecated("use listBookmarks() instead")]]
+    std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
+    bookmarkList(int64_t tid) {
+        return listBookmarks(tid);
+    }
     /**
      * @brief Gets a bookmark by id.
      * @ingroup caudio_db
@@ -691,7 +713,13 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock (delegates to libraryListLocked).
      */
-    std::expected<std::vector<Library>, caudio::utils::Error> libraryList();
+    std::expected<std::vector<Library>, caudio::utils::Error> listLibraries();
+
+    /** @brief Deprecated spelling for listLibraries(). @ingroup caudio_db */
+    [[deprecated("use listLibraries() instead")]]
+    std::expected<std::vector<Library>, caudio::utils::Error> libraryList() {
+        return listLibraries();
+    }
     std::expected<void, caudio::utils::Error> libraryUpdate(const Library& l);
     std::expected<void, caudio::utils::Error> libraryDelete(int64_t id);
 

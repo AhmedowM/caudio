@@ -275,7 +275,12 @@ class App {
      * @brief Lists queues (id, name, track counts, active/temp markers).
      * @ingroup caudio_app
      */
-    AppResult queues();
+    AppResult queueList();
+
+    /** @brief Deprecated spelling for queueList(). @ingroup caudio_app */
+    [[deprecated("use queueList() instead")]] AppResult queues() {
+        return queueList();
+    }
 
     /**
      * @brief Lists tracks in the active queue (added or playback order).

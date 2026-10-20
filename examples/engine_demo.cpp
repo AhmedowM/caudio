@@ -69,7 +69,7 @@ openDbWithFallback(const std::string& path, std::string& used) {
 }
 
 void ensureQueueHasTracks(Database& db, const std::string& samplePath) {
-    auto q = db.queueList(1);
+    auto q = db.listQueueItems(1);
     if (q && !q->empty())
         return;
     std::cout << "[engine_demo] queue empty, populating 2 demo tracks sample='" << samplePath
@@ -135,12 +135,12 @@ int main(int argc, char** argv) {
     auto dbShared = std::shared_ptr<Database>(std::move(dbRes.value()));
     std::cout << "[engine_demo] opening DB: " << used << "\n";
 
-    auto q1 = dbShared->queueList(1);
+    auto q1 = dbShared->listQueueItems(1);
     int count = q1 ? static_cast<int>(q1->size()) : 0;
     std::cout << "[engine_demo] queue 1 has " << count << " item(s)\n";
     if (count == 0) {
         ensureQueueHasTracks(*dbShared, findSample());
-        auto q2 = dbShared->queueList(1);
+        auto q2 = dbShared->listQueueItems(1);
         count = q2 ? static_cast<int>(q2->size()) : 0;
         std::cout << "[engine_demo] after populate queue has " << count << " item(s)\n";
     }

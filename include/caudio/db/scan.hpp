@@ -87,7 +87,7 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
  * `BEGIN IMMEDIATE` fails, or `StatusCode::Internal` on commit failure.
  * @details Batching: holds `Database::mutex()` as `unique_lock<shared_mutex>`
  * for `kBatchSize` (500) files, wrapped in `BEGIN IMMEDIATE / COMMIT`, so
- * concurrent `queueList` never sees partial state and a crash leaves DB
+ * concurrent `listQueueItems` never sees partial state and a crash leaves DB
  * consistent per batch. Deduplication: early-exit on `path+size+mtime` match;
  * otherwise fingerprint dedup via `findByFingerprintLocked`/`findByPathLocked`.
  * @par Thread safety

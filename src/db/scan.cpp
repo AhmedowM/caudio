@@ -98,7 +98,7 @@ scanLibrary(Database& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress, ScanMode mode) {
     if (libraryId == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
-    auto libs = db.libraryList();
+    auto libs = db.listLibraries();
     if (!libs)
         return std::unexpected{libs.error()};
     std::string libPath;
@@ -400,7 +400,7 @@ scanLibrary(Database& db, int64_t libraryId,
     if (auto* lg = db.logger())
         lg->info("scan finished root={} scanned={} added={} updated={} failed={}", libPath, scanned,
                  added, updated, failed);
-    auto libs2 = db.libraryList();
+    auto libs2 = db.listLibraries();
     if (libs2) {
         for (auto& l : *libs2)
             if (l.id == libraryId) {
