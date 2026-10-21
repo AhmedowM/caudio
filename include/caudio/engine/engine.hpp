@@ -367,9 +367,10 @@ class Engine final {
      * @return Error message or empty string if none.
      * @par Thread safety
      * Thread-safe; reads lastErr_ (written from doPlayTrack, not atomic but single-writer).
+     * @deprecated Use the returned Error instead.
      * @see doPlayTrack
      */
-    std::string lastError() const;
+    [[deprecated("use the returned Error instead")]] std::string lastError() const;
 
     /**
      * @brief Enables or disables shuffle.

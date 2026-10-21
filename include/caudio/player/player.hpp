@@ -287,8 +287,10 @@ class Player {
      * Cleared on successful open().
      *
      * Thread Safety: Thread-safe (atomic state + string access from control thread)
+     *
+     * @deprecated Use the returned Error instead.
      */
-    std::string_view lastError() const noexcept;
+    [[deprecated("use the returned Error instead")]] std::string_view lastError() const noexcept;
 
   private:
     /** @brief Private default ctor; use create() factory. */
