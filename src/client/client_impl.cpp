@@ -4,7 +4,6 @@
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/ipc/shm_status.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
@@ -19,8 +18,6 @@
 #include <thread>
 #include <utility>
 #include <vector>
-
-#include "config_detail.hpp"
 
 namespace caudio::client {
 
@@ -120,33 +117,6 @@ caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Com
         }
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, "timeout")};
     }
-}
-
-// Snapshot status via shared memory (event-driven snapshot) or fallback to IPC
-caudio::utils::Expected<caudio::ipc::Result> Client::snapshotStatus() {
-    // Try to connect to shared memory status block
-    // Derive shm name via canonical hex8 (consistent with service)
-    std::string shmName = caudio::config::detail_paths::hex8ForDb(config_.dbPath);
-
-    auto shmRes = caudio::ipc::ShmStatusHandle::openReadOnly(shmName);
-    if (shmRes) {
-        auto snapshot = shmRes->snapshot();
-        caudio::ipc::Status s{};
-        s.state = static_cast<caudio::types::PlaybackState>(snapshot.state);
-        s.pos = snapshot.position;
-        s.dur = snapshot.duration;
-        s.vol = snapshot.volume;
-        s.muted = snapshot.muted;
-        s.track_id = snapshot.track_id;
-        s.q_size = snapshot.queueSize;
-        s.title = snapshot.title;
-        s.artist = snapshot.artist;
-        // shuffle/repeat not in shm, would need to query via IPC if needed
-        return caudio::ipc::Result{s};
-    }
-
-    // Fallback to IPC
-    return send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
 }
 
 } // namespace caudio::client

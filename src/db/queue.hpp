@@ -64,18 +64,6 @@ std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked
                                                                                  int64_t qid);
 
 /**
- * @brief Peeks the head item without removing (caller holds DB mutex).
- * @ingroup caudio_db
- * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
- * @return QueueItem or Error NotFound/Internal.
- * @par Thread safety
- * Caller must hold Database::mutex() (shared or exclusive).
- */
-std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db,
-                                                                              int64_t qid);
-
-/**
  * @brief Removes item at position (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.

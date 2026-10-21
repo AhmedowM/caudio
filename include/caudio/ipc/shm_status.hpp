@@ -4,7 +4,7 @@
  * @file shm_status.hpp
  * @brief Seqlock shared-memory playback snapshot (daemon writes, clients poll).
  * @ingroup caudio_ipc
- * @details Lets `Client::snapshotStatus()` read the latest event-driven
+ * @details Lets clients read the latest event-driven
  * position/state snapshot without an IPC round-trip. The daemon publishes
  * on dispatch only (no periodic writer), so position can go stale between
  * commands -- use the IPC status path when freshness matters. Writers publish

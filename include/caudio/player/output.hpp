@@ -95,15 +95,14 @@ DeviceList enumerateDevices();
  *
  * Thread Safety:
  * - create()/init()/shutdown(): Thread-safe, called from control thread
- * - start()/stop()/setVolume()/volume()/isPlaying(): Thread-safe (atomic)
+ * - start()/stop()/setVolume()/volume(): Thread-safe (atomic)
  * - audio callback: runs on the audio thread (real-time), lock-free
- * - fillFromRing(): Thread-safe (no shared mutable state)
  *
  * Audio Pipeline:
  * 1. Decode thread writes float samples to SPSC ring buffer
  * 2. the backend invokes the audio callback on the audio thread
- * 3. the callback calls fillFromRing() to read from ring + apply volume
- * 4. Zero-fills any remaining buffer space (silence on underrun)
+ * 3. The callback reads from the ring, applies volume and zero-fills any
+ *    remaining buffer space (silence on underrun)
  *
  * Volume Control:
  * - Volume is applied in the audio callback via atomic load (lock-free)
@@ -175,31 +174,6 @@ class AudioOutput {
      * Thread Safety: Thread-safe (atomic load with relaxed ordering)
      */
     float volume() const noexcept;
-
-    /**
-     * @brief Fill output buffer from ring buffer with volume scaling
-     * @param out Output buffer to fill (interleaved float samples)
-     * @param ring SPSC ring buffer to read from (may be null)
-     * @param channels Number of channels in output
-     * @param vol Volume multiplier (0.0 to 1.0)
-     *
-     * Lock-free helper that reads available samples from the ring buffer,
-     * zero-fills any remainder, and applies volume scaling. No allocations.
-     * Used by the audio callback.
-     *
-     * Thread Safety: Thread-safe when ring is the SPSC ring (single producer,
-     * single consumer). No internal locking.
-     */
-    static void fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
-                             uint32_t channels, float vol) noexcept;
-
-    /**
-     * @brief Check if audio output is currently playing
-     * @return true if device is running, false otherwise
-     *
-     * Thread Safety: Thread-safe (atomic load with acquire ordering)
-     */
-    bool isPlaying() const noexcept;
 
     /**
      * @brief Start audio playback

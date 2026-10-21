@@ -1,6 +1,5 @@
 #include <miniaudio.h>
 
-#include <algorithm>
 #include <atomic>
 #include <caudio/player/output.hpp>
 #include <caudio/utils/error.hpp>
@@ -16,6 +15,8 @@
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include "ring_fill.hpp"
 
 namespace caudio::player {
 
@@ -90,29 +91,6 @@ float AudioOutput::volume() const noexcept {
     return impl_->volume.load(std::memory_order_relaxed);
 }
 
-void AudioOutput::fillFromRing(std::span<float> out, caudio::utils::SpscRing<float>* ring,
-                               uint32_t channels, float vol) noexcept {
-    if (out.empty())
-        return;
-    std::size_t totalSamples = out.size();
-    std::size_t generatedFrames = 0;
-    if (ring) {
-        generatedFrames = ring->read(std::span<float>(out.data(), totalSamples));
-    }
-    std::size_t generatedSamples = generatedFrames * channels;
-    if (generatedSamples < totalSamples) {
-        std::ranges::fill(out.subspan(generatedSamples), 0.0f);
-    }
-    if (vol != 1.0f) {
-        for (std::size_t i = 0; i < totalSamples; ++i)
-            out[i] *= vol;
-    }
-}
-
-bool AudioOutput::isPlaying() const noexcept {
-    return impl_->running.load(std::memory_order_acquire);
-}
-
 void AudioOutput::start() {
     if (!impl_->initialized.load(std::memory_order_acquire))
         return;
@@ -174,8 +152,7 @@ void AudioOutput::Impl::dataCallback(ma_device* pDevice, void* pOutput, const vo
     ma_uint32 totalSamples = frameCount * channels;
     float vol = self->volume.load(std::memory_order_relaxed);
     // lock-free, no allocation
-    AudioOutput::fillFromRing(std::span<float>(output, totalSamples), self->cfg.ring, channels,
-                              vol);
+    detail::fillFromRing(std::span<float>(output, totalSamples), self->cfg.ring, channels, vol);
 }
 
 } // namespace caudio::player

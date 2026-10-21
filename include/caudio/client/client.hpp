@@ -56,9 +56,6 @@ class Client {
     caudio::utils::Expected<caudio::ipc::Result>
     send(const caudio::ipc::Command& cmd,
          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
-
-    // Snapshot status via shared memory (event-driven snapshot) or fallback to IPC
-    caudio::utils::Expected<caudio::ipc::Result> snapshotStatus();
 };
 
 } // namespace caudio::client

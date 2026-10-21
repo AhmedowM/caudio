@@ -106,32 +106,6 @@ std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked
     return it;
 }
 
-std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(sqlite3* db,
-                                                                              int64_t qid) {
-    if (qid == 0)
-        qid = 1;
-    if (!db)
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    SqliteStatement st;
-    auto e = st.prepare(db, "SELECT id, queue_id, track_id, position, added FROM queue "
-                            "WHERE queue_id=? ORDER BY position LIMIT 1");
-    if (!e)
-        return std::unexpected{e.error()};
-    st.bindInt(1, qid);
-    bool hasRow = st.step();
-    if (!hasRow) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
-    }
-    caudio::types::QueueItem it;
-    it.id = st.columnInt(0);
-    it.queue_id = st.columnInt(1);
-    it.track_id = st.columnInt(2);
-    it.position = st.columnInt(3);
-    it.added = st.columnInt(4);
-    return it;
-}
-
 std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;

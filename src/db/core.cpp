@@ -1124,18 +1124,6 @@ Database::queueDequeueLocked(int64_t qid) {
     return caudio::db::queueDequeueLocked(impl_->db_.get(), qid);
 }
 
-std::expected<caudio::types::QueueItem, caudio::utils::Error>
-Database::queuePeekLocked(int64_t qid) {
-    return caudio::db::queuePeekLocked(impl_->db_.get(), qid);
-}
-
-std::expected<caudio::types::QueueItem, caudio::utils::Error> Database::queuePeek(int64_t qid) {
-    if (qid == 0)
-        qid = 1;
-    std::shared_lock lk{impl_->dbMutex_};
-    return caudio::db::queuePeekLocked(impl_->db_.get(), qid);
-}
-
 std::expected<void, caudio::utils::Error> Database::queueRemove(int64_t qid, int64_t pos) {
     if (qid == 0)
         qid = 1;

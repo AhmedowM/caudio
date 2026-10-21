@@ -7,13 +7,15 @@
 #include <common.hpp>
 #include <cstddef>
 #include <span>
+#include <support/ring_fill.hpp>
+
 TEST_CASE("output callback no alloc") {
     CAUDIO_SKIP_IF_NOAUDIO();
     caudio::utils::SpscRing<float> ring{8192, 2};
     auto out = caudio::player::AudioOutput::create({48000, 2, &ring, 1.0f});
     REQUIRE(out);
     std::array<float, 512> buf{};
-    caudio::player::AudioOutput::fillFromRing(buf, nullptr, 1, 1.0f);
+    caudio::player::detail::fillFromRing(buf, nullptr, 1, 1.0f);
     REQUIRE(buf[0] == 0.0f);
     REQUIRE(buf[511] == 0.0f);
 }
@@ -36,7 +38,7 @@ TEST_CASE("output fillFromRing pattern * volume and tail zero", "[output]") {
     // fill with sentinel
     for (auto& v : buf)
         v = 99.0f;
-    caudio::player::AudioOutput::fillFromRing(buf, &ring, 2, out.volume());
+    caudio::player::detail::fillFromRing(buf, &ring, 2, out.volume());
 
     // first 8 samples should be pattern * 0.5
     for (size_t i = 0; i < pattern.size(); ++i) {
@@ -52,7 +54,7 @@ TEST_CASE("output fillFromRing pattern * volume and tail zero", "[output]") {
     std::array<float, 8> buf2{};
     for (auto& v : buf2)
         v = 5.0f;
-    caudio::player::AudioOutput::fillFromRing(buf2, &ring, 2, out.volume());
+    caudio::player::detail::fillFromRing(buf2, &ring, 2, out.volume());
     for (auto v : buf2)
         REQUIRE(v == 0.0f);
 }
@@ -84,7 +86,7 @@ TEST_CASE("output fillFromRing volume 1.0 passthrough", "[output]") {
     std::array<float, 4> pat{0.1f, 0.2f, 0.3f, 0.4f};
     ring.write(pat);
     std::array<float, 8> buf{};
-    caudio::player::AudioOutput::fillFromRing(buf, &ring, 1, out.volume());
+    caudio::player::detail::fillFromRing(buf, &ring, 1, out.volume());
     for (size_t i = 0; i < 4; ++i)
         REQUIRE(std::abs(buf[i] - pat[i]) < 1e-6f);
     for (size_t i = 4; i < 8; ++i)

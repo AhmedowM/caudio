@@ -519,18 +519,6 @@ class Database final {
 
     std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid);
 
-    std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeekLocked(int64_t qid);
-
-    /**
-     * @brief Peeks the head item without removing.
-     * @ingroup caudio_db
-     * @param qid Queue id (0 -> 1).
-     * @return QueueItem or Error NotFound.
-     * @par Thread safety
-     * Thread-safe: shared_lock.
-     */
-    std::expected<caudio::types::QueueItem, caudio::utils::Error> queuePeek(int64_t qid);
-
     /**
      * @brief Removes item at position.
      * @ingroup caudio_db

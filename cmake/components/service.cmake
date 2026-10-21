@@ -3,11 +3,9 @@
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/caudio/service.cppm
   modules/caudio/service/core.cppm
-  modules/caudio/service/ipc_channel.cppm
   modules/caudio/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
-  src/service/ipc_channel.cpp
   src/service/ipc_server.cpp
   src/service/service_paths.cpp
   src/service/service_status.cpp
