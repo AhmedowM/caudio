@@ -17,6 +17,18 @@
 
 namespace caudio::app {
 
+AppResult App::status() {
+    return confirm(sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}}));
+}
+
+AppResult App::info() {
+    return confirm(sendRaw(caudio::ipc::Command{caudio::ipc::Info{}}));
+}
+
+AppResult App::setVolume(const caudio::ipc::VolumeSet& volume) {
+    return confirm(sendRaw(caudio::ipc::Command{volume}));
+}
+
 AppResult App::historyList(int limit) {
     caudio::ipc::Command cmd{caudio::ipc::HistoryList{limit}};
     return confirm(sendRaw(cmd));

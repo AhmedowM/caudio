@@ -855,8 +855,7 @@ int Shell::run(int argc, char** argv) {
                 std::this_thread::sleep_for(milliseconds{statusInterval});
             }
         }
-        caudio::ipc::Command cmd{caudio::ipc::StatusReq{}};
-        return detail::render(app_.confirm(app_.sendRaw(cmd)), jsonFlag);
+        return detail::render(app_.status(), jsonFlag);
     }
     if (volumeCmd->parsed()) {
         auto pv = detail::parseVolume(volumeArg);
@@ -865,8 +864,7 @@ int Shell::run(int argc, char** argv) {
                             volumeArg, pv.error().message);
             return 1;
         }
-        caudio::ipc::Command cmd{*pv};
-        return detail::render(app_.confirm(app_.sendRaw(cmd)), volumeJson);
+        return detail::render(app_.setVolume(*pv), volumeJson);
     }
     if (queueCmd->parsed()) {
         if (qList->parsed() || qQueuesAlias->parsed())
@@ -1113,8 +1111,7 @@ int Shell::run(int argc, char** argv) {
         return 0;
     }
     if (infoCmd->parsed()) {
-        caudio::ipc::Command cmd{caudio::ipc::Info{}};
-        return detail::render(app_.confirm(app_.sendRaw(cmd)), infoJson);
+        return detail::render(app_.info(), infoJson);
     }
     std::cout << cli_->help() << "\n";
     return 0;

@@ -53,6 +53,12 @@ class Client {
     const Config& config() const noexcept;
     std::filesystem::path dbPath() const noexcept;
 
+    /**
+     * @brief One-shot liveness check for the daemon at the configured paths.
+     * @return True when a connection can be established; no command is sent.
+     */
+    bool probe() const;
+
     caudio::utils::Expected<caudio::ipc::Result>
     send(const caudio::ipc::Command& cmd,
          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});

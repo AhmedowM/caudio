@@ -72,7 +72,6 @@ struct Bookmark;
 } // namespace caudio::types
 
 namespace caudio::client {
-class IpcClient;
 class OutputFormatter;
 } // namespace caudio::client
 

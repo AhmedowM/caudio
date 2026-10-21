@@ -40,7 +40,6 @@
 
 #include <caudio/app/app.hpp>
 #include <caudio/client/client.hpp>
-#include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
@@ -237,8 +236,8 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 }
 
 AppResult App::startDaemon(bool foreground) {
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
-    if (conn) {
+    caudio::client::Client client{config_.dbPath, config_.socketPath};
+    if (client.probe()) {
         return Outcome{std::nullopt,
                        std::format("daemon already running at {}", config_.socketPath), false,
                        false};
@@ -252,7 +251,7 @@ AppResult App::startDaemon(bool foreground) {
     {
         auto pidPath = pidPathForConfig();
         for (int i = 0; i < 20; ++i) {
-            auto c = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
+            bool c = client.probe();
             std::error_code ec;
             bool pidExists = std::filesystem::exists(pidPath, ec);
             bool live = pidExists && pidFileAlive(pidPath);
@@ -335,7 +334,7 @@ AppResult App::shutdownDaemon() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::error_code ec;
         bool pidExists = std::filesystem::exists(pidPath, ec);
-        auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
+        bool conn = client.probe();
         if (!conn && !pidExists)
             break;
         if (!conn) {
@@ -344,7 +343,7 @@ AppResult App::shutdownDaemon() {
                 break;
         }
     }
-    auto conn = caudio::client::IpcClient::connect(config_.dbPath, config_.socketPath);
+    bool conn = client.probe();
     if (conn) {
         return Outcome::fail(
             std::format("shutdown: daemon still running at {}", config_.socketPath));

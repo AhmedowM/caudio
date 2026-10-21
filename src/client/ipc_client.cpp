@@ -10,7 +10,6 @@
 
 #include <array>
 #include <atomic>
-#include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/utils/error.hpp>
@@ -22,6 +21,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "ipc_client.hpp"
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <sys/un.h>

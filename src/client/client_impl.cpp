@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <caudio/client/client.hpp>
-#include <caudio/client/ipc_client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
@@ -19,6 +18,8 @@
 #include <utility>
 #include <vector>
 
+#include "ipc_client.hpp"
+
 namespace caudio::client {
 
 Client::Client(Config cfg) : config_(std::move(cfg)) {}
@@ -36,6 +37,10 @@ const Config& Client::config() const noexcept {
 
 std::filesystem::path Client::dbPath() const noexcept {
     return config_.dbPath;
+}
+
+bool Client::probe() const {
+    return IpcClient::connect(config_.dbPath, config_.socketPath).has_value();
 }
 
 caudio::utils::Expected<caudio::ipc::Result> Client::send(const caudio::ipc::Command& cmd,

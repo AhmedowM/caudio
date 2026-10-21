@@ -1,5 +1,4 @@
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/client/ipc_client.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
@@ -18,6 +17,8 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+
+#include "../src/client/ipc_client.hpp"
 using namespace caudio::ipc;
 using namespace caudio::utils;
 using namespace caudio::db;

@@ -2,7 +2,6 @@
 
 set(CAUDIO_CLIENT_MODULE_SOURCES
   modules/caudio/client.cppm
-  modules/caudio/client/ipc_client.cppm
   modules/caudio/client/core.cppm
   modules/caudio/client/output_formatter.cppm
 )
