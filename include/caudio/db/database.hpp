@@ -85,28 +85,6 @@ class Database final {
     Database(Database&& o) noexcept;
     Database& operator=(Database&& o) noexcept;
     /**
-     * @brief Clears the prepared-statement cache.
-     * @ingroup caudio_db
-     * @par Thread safety
-     * Thread-safe: locks cacheMutex_.
-     */
-    void clearCache() const;
-    // Per-connection prepared-statement cache. getCachedForUse is the only
-    // accessor: it returns expected (nullptr only inside an Error state).
-    /**
-     * @brief Gets or prepares a cached statement (caller must hold cacheMutex_).
-     * @ingroup caudio_db
-     * @param sql SQL text used as cache key.
-     * @return Prepared statement pointer, or Error (Internal) if prepare fails.
-     * @details Cache is per-connection; caller must hold cacheMutex_ (e.g. via
-     * unique_lock<mutex> on cacheMutex_) before calling. Resets the statement
-     * before returning. Thread safety: requires external lock on cacheMutex_.
-     * @par Lock ordering
-     * If both locks are needed, acquire dbMutex_ before cacheMutex_.
-     */
-    std::expected<SqliteStatement*, caudio::utils::Error>
-    getCachedForUse(std::string_view sql) const;
-    /**
      * @brief Opens (or creates) a database.
      * @ingroup caudio_db
      * @param path Filesystem path (empty => :memory:).
@@ -120,28 +98,6 @@ class Database final {
      */
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
     open(std::string_view path, const DbOpts& opts = {});
-    /**
-     * @brief Returns the raw sqlite3 handle (no lock).
-     * @ingroup caudio_db
-     * @return Borrowed handle, may be null if not open.
-     * @warning Not thread-safe; prefer handleLocked() when holding dbMutex_.
-     */
-    sqlite3* handle() const;
-    /**
-     * @brief Returns the database mutex (dbMutex_).
-     * @ingroup caudio_db
-     * @return Reference to the shared_mutex guarding the handle and tables.
-     * @details Shared for reads, exclusive for writes/transactions.
-     */
-    std::shared_mutex& mutex() const;
-    /**
-     * @brief Returns the handle assuming the caller holds dbMutex_.
-     * @ingroup caudio_db
-     * @return Borrowed handle.
-     * @par Thread safety
-     * Caller must hold dbMutex_ (shared or exclusive).
-     */
-    sqlite3* handleLocked() const noexcept;
     /**
      * @brief Returns the non-owning logger from DbOpts (may be null).
      * @ingroup caudio_db
@@ -191,12 +147,89 @@ class Database final {
     std::expected<void, caudio::utils::Error> queueReplaceAll(int64_t qid,
                                                               const std::vector<int64_t>& ids);
 
+  private:
+    friend struct DatabaseAccess;
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+
+  private:
+    // Inline helpers -- reduce duplication between insert/update binds
     /**
-     * @brief Locked helper section -- caller must hold Database::mutex().
+     * @brief Binds all Track fields for INSERT statement (24 parameters).
      * @ingroup caudio_db
-     * @details These avoid re-locking dbMutex_ and are intended for use inside
-     * outer transactions/batches (e.g., scanLibrary).
+     * @param st Prepared statement (kInsertTrackSql).
+     * @param t Track to bind.
+     * @details Parameter order matches kInsertTrackSql: fingerprint, path, size, mtime,
+     * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
+     * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
+     * last_played, date_added, last_scanned, dirty, library_id.
+     * NULL binds for optional date_added.
      */
+    static void bindTrackForInsert(SqliteStatement& st, const caudio::types::Track& t);
+    /**
+     * @brief Binds all Track fields for UPDATE statement (26 parameters).
+     * @ingroup caudio_db
+     * @param st Prepared statement (kUpdateTrackSql).
+     * @param t Track to bind (id must be non-zero).
+     * @details Parameter order matches kUpdateTrackSql: fingerprint, path, size, mtime,
+     * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
+     * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
+     * last_played, date_added, last_scanned, dirty, library_id, deleted_at, id.
+     * NULL binds for optional deleted_at.
+     */
+    static void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t);
+    static constexpr std::string_view kInsertTrackSql =
+        "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
+        "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
+        "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
+        "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    static constexpr std::string_view kUpdateTrackSql =
+        "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
+        "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
+        "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
+        "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
+
+  private:
+    // Raw locking surface -- private; reached from outside the class through
+    // the single friend struct DatabaseAccess (src/db/database_access.hpp).
+    /**
+     * @brief Gets or prepares a cached statement (caller must hold cacheMutex_).
+     * @ingroup caudio_db
+     * @param sql SQL text used as cache key.
+     * @return Prepared statement pointer, or Error (Internal) if prepare fails.
+     * @details Cache is per-connection; caller must hold cacheMutex_ (e.g. via
+     * unique_lock<mutex> on cacheMutex_) before calling. Resets the statement
+     * before returning. Thread safety: requires external lock on cacheMutex_.
+     * @par Lock ordering
+     * If both locks are needed, acquire dbMutex_ before cacheMutex_.
+     */
+    std::expected<SqliteStatement*, caudio::utils::Error>
+    getCachedForUse(std::string_view sql) const;
+    /**
+     * @brief Returns the raw sqlite3 handle (no lock).
+     * @ingroup caudio_db
+     * @return Borrowed handle, may be null if not open.
+     * @warning Not thread-safe; prefer handleLocked() when holding dbMutex_.
+     */
+    sqlite3* handle() const noexcept;
+    /**
+     * @brief Returns the handle assuming the caller holds dbMutex_.
+     * @ingroup caudio_db
+     * @return Borrowed handle.
+     * @par Thread safety
+     * Caller must hold dbMutex_ (shared or exclusive).
+     */
+    sqlite3* handleLocked() const noexcept;
+    /**
+     * @brief Returns the database mutex (dbMutex_).
+     * @ingroup caudio_db
+     * @return Reference to the shared_mutex guarding the handle and tables.
+     * @details Shared for reads, exclusive for writes/transactions.
+     */
+    std::shared_mutex& mutex() const noexcept;
+
+    // Track / library locked helpers -- caller must hold dbMutex_; reached from
+    // outside the class through DatabaseAccess.
     /**
      * @brief Finds a track by path (caller holds dbMutex_).
      * @ingroup caudio_db
@@ -251,6 +284,15 @@ class Database final {
      */
     std::expected<void, caudio::utils::Error> deleteTrackLocked(int64_t id);
     /**
+     * @brief Gets a track by id (caller holds dbMutex_).
+     * @ingroup caudio_db
+     * @param id Track id.
+     * @return Track or Error.
+     * @par Thread safety
+     * Caller must hold dbMutex_; locks cacheMutex_.
+     */
+    std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(int64_t id);
+    /**
      * @brief Lists all libraries (caller holds dbMutex_).
      * @ingroup caudio_db
      * @return Vector of libraries or Error.
@@ -270,46 +312,67 @@ class Database final {
      */
     std::expected<void, caudio::utils::Error> libraryUpdateLocked(const Library& l);
 
-  private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
-
-  private:
-    // Inline helpers -- reduce duplication between insert/update binds
+    // Playlist / queue locked helpers -- caller must hold dbMutex_; reached from
+    // outside the class through DatabaseAccess.
     /**
-     * @brief Binds all Track fields for INSERT statement (24 parameters).
+     * @brief Creates a playlist (caller holds dbMutex_).
      * @ingroup caudio_db
-     * @param st Prepared statement (kInsertTrackSql).
-     * @param t Track to bind.
-     * @details Parameter order matches kInsertTrackSql: fingerprint, path, size, mtime,
-     * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
-     * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
-     * last_played, date_added, last_scanned, dirty, library_id.
-     * NULL binds for optional date_added.
+     * @param name Playlist name.
+     * @param type Playlist type (0 = manual).
+     * @param smart_query Smart filter (empty for manual).
+     * @return New id or Error InvalidArg/Internal.
+     * @par Thread safety
+     * Caller must hold dbMutex_ exclusively.
+     * @see createPlaylist
      */
-    static void bindTrackForInsert(SqliteStatement& st, const caudio::types::Track& t);
+    std::expected<int64_t, caudio::utils::Error>
+    createPlaylistLocked(std::string_view name, int type = 0, std::string_view smart_query = {});
     /**
-     * @brief Binds all Track fields for UPDATE statement (26 parameters).
+     * @brief Adds a track to a playlist (caller holds dbMutex_).
      * @ingroup caudio_db
-     * @param st Prepared statement (kUpdateTrackSql).
-     * @param t Track to bind (id must be non-zero).
-     * @details Parameter order matches kUpdateTrackSql: fingerprint, path, size, mtime,
-     * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
-     * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
-     * last_played, date_added, last_scanned, dirty, library_id, deleted_at, id.
-     * NULL binds for optional deleted_at.
+     * @param pid Playlist id.
+     * @param tid Track id.
+     * @param pos Position (-1 = append).
+     * @return Success or Error.
+     * @par Thread safety
+     * Caller must hold dbMutex_ exclusively.
+     * @see playlistAddTrack
      */
-    static void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t);
-    static constexpr std::string_view kInsertTrackSql =
-        "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
-        "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
-        "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
-        "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    static constexpr std::string_view kUpdateTrackSql =
-        "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
-        "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
-        "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
-        "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
+    std::expected<void, caudio::utils::Error> playlistAddTrackLocked(int64_t pid, int64_t tid,
+                                                                     int64_t pos = -1);
+    /**
+     * @brief Enqueues a track (caller holds dbMutex_).
+     * @ingroup caudio_db
+     * @param qid Queue id (0 -> 1).
+     * @param tid Track id.
+     * @param pos Position (-1 = append).
+     * @return Success or Error.
+     * @par Thread safety
+     * Caller must hold dbMutex_ exclusively.
+     * @see queueEnqueue
+     */
+    std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
+                                                                 int64_t pos = -1);
+    /**
+     * @brief Dequeues the head item (caller holds dbMutex_).
+     * @ingroup caudio_db
+     * @param qid Queue id.
+     * @return QueueItem or Error NotFound.
+     * @par Thread safety
+     * Caller must hold dbMutex_ exclusively.
+     * @see queueDequeue
+     */
+    std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid);
+    /**
+     * @brief Counts the items in a queue (caller holds dbMutex_).
+     * @ingroup caudio_db
+     * @param qid Queue id (0 -> 1).
+     * @return Item count.
+     * @par Thread safety
+     * Caller must hold dbMutex_ (shared or exclusive).
+     * @see queueCount
+     */
+    std::size_t queueCountLocked(int64_t qid);
 
   public:
     /**
@@ -354,15 +417,6 @@ class Database final {
      */
     std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id);
 
-    /**
-     * @brief Gets a track by id (caller holds dbMutex_).
-     * @ingroup caudio_db
-     * @param id Track id.
-     * @return Track or Error.
-     * @par Thread safety
-     * Caller must hold dbMutex_; locks cacheMutex_.
-     */
-    std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(int64_t id);
     /**
      * @brief Finds a track by fingerprint.
      * @ingroup caudio_db
@@ -457,10 +511,6 @@ class Database final {
     std::expected<void, caudio::utils::Error> renamePlaylist(int64_t id, std::string_view newName);
     std::expected<int64_t, caudio::utils::Error>
     createPlaylistFromTracks(std::string_view name, std::span<const int64_t> trackIds);
-    std::expected<int64_t, caudio::utils::Error>
-    createPlaylistLocked(std::string_view name, int type = 0, std::string_view smart_query = {});
-    std::expected<void, caudio::utils::Error> playlistAddTrackLocked(int64_t pid, int64_t tid,
-                                                                     int64_t pos = -1);
     /**
      * @brief Lists all playlists ordered by id.
      * @ingroup caudio_db
@@ -504,9 +554,6 @@ class Database final {
     std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
                                                            int64_t pos = -1);
 
-    std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
-                                                                 int64_t pos = -1);
-
     /**
      * @brief Dequeues the head item.
      * @ingroup caudio_db
@@ -516,8 +563,6 @@ class Database final {
      * Thread-safe: unique_lock.
      */
     std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeue(int64_t qid);
-
-    std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked(int64_t qid);
 
     /**
      * @brief Removes item at position.
@@ -580,7 +625,15 @@ class Database final {
      */
     std::expected<void, caudio::utils::Error> setQueueTemp(int64_t qid, bool temp);
 
-    size_t queueCountLocked(int64_t qid);
+    /**
+     * @brief Returns the number of items in a queue.
+     * @ingroup caudio_db
+     * @param qid Queue id (0 -> 1).
+     * @return Item count.
+     * @par Thread safety
+     * Thread-safe: shared_lock on dbMutex_; delegates to queueCountLocked().
+     */
+    std::size_t queueCount(int64_t qid);
 
     /**
      * @brief Finds the 0-based index of a track in a queue.

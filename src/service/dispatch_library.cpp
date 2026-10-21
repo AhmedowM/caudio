@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <engine/engine_access.hpp>
 #include <exception>
 #include <expected>
 #include <filesystem>
@@ -42,6 +43,7 @@
 
 namespace caudio::service {
 
+using caudio::engine::detail::ServiceAccess;
 using namespace caudio::ipc;
 using caudio::ipc::HistoryClear;
 using caudio::ipc::HistoryList;
@@ -515,7 +517,7 @@ Service::Impl::handle(const caudio::ipc::TagEdit& cmd) {
     if (loaded) {
         resumePos = eng.position();
         wasPaused = (eng.state() == caudio::types::PlaybackState::Paused);
-        if (auto s = eng.suspendCurrentTrack(); !s)
+        if (auto s = ServiceAccess::suspendCurrentTrack(eng); !s)
             return std::unexpected{s.error()};
     }
     auto wr = detail::writeFileTags(t.path, t);
@@ -526,17 +528,17 @@ Service::Impl::handle(const caudio::ipc::TagEdit& cmd) {
             logger_->warn("tag write failed file={} field={} err={}", t.path, cmd.field,
                           wr.error().message);
         if (loaded)
-            (void)eng.resumeAfterTagWrite(t, resumePos, wasPaused);
+            (void)ServiceAccess::resumeAfterTagWrite(eng, t, resumePos, wasPaused);
         return std::unexpected{wr.error()};
     }
     auto reg = detail::reregisterTrackRow(*db_, t);
     if (!reg) {
         if (loaded)
-            (void)eng.resumeAfterTagWrite(t, resumePos, wasPaused);
+            (void)ServiceAccess::resumeAfterTagWrite(eng, t, resumePos, wasPaused);
         return std::unexpected{reg.error()};
     }
     if (loaded) {
-        if (auto r = eng.resumeAfterTagWrite(*reg, resumePos, wasPaused); !r)
+        if (auto r = ServiceAccess::resumeAfterTagWrite(eng, *reg, resumePos, wasPaused); !r)
             return std::unexpected{r.error()};
     }
     if (logger_)
@@ -610,7 +612,7 @@ Service::Impl::handle(const caudio::ipc::PlaylistLoad& cmd) {
         if (!er)
             return std::unexpected{er.error()};
     }
-    engine_->noteEnqueued(qid, ids.size());
+    ServiceAccess::noteEnqueued(*engine_, qid, ids.size());
     if (cmd.play) {
         auto sw = engine_->switchQueue(qid);
         if (!sw)

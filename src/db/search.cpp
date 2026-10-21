@@ -5,6 +5,7 @@
 #include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <db/database_access.hpp>
 #include <db/fts.hpp>
 #include <db/statement.hpp>
 #include <db/stmt_helpers.hpp>
@@ -55,8 +56,8 @@ searchFts(Database& db, std::string_view query, int limit) {
     if (sanitized.empty())
         return std::vector<caudio::types::Track>{};
     std::string ftsQ = sanitized;
-    std::shared_lock lock(db.mutex());
-    sqlite3* h = db.handle();
+    std::shared_lock lock(DatabaseAccess::mutex(db));
+    sqlite3* h = DatabaseAccess::handle(db);
     if (!h)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -103,8 +104,8 @@ searchLike(Database& db, std::string_view query, int limit) {
         return std::vector<caudio::types::Track>{};
     std::string esc = internal::escapeLike(query);
     std::string pat = "%" + esc + "%";
-    std::shared_lock lock(db.mutex());
-    sqlite3* h = db.handle();
+    std::shared_lock lock(DatabaseAccess::mutex(db));
+    sqlite3* h = DatabaseAccess::handle(db);
     if (!h)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};

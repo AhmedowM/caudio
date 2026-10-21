@@ -8,6 +8,7 @@
 #include <caudio/utils/result.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <db/database_access.hpp>
 #include <db/statement.hpp>
 #include <db/transaction.hpp>
 #include <exception>
@@ -71,8 +72,8 @@ std::expected<void, caudio::utils::Error> importJson(Database& db,
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Corrupt, "missing tracks array")};
     }
-    std::unique_lock lk{db.mutex()};
-    sqlite3* h = db.handleLocked();
+    std::unique_lock lk{DatabaseAccess::mutex(db)};
+    sqlite3* h = DatabaseAccess::handleLocked(db);
     if (!h)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};

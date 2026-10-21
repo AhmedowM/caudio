@@ -353,7 +353,7 @@ void Service::Impl::updateShmStatus() {
     size_t qSize = 0;
     {
         int64_t aq = eng.activeQueueId();
-        qSize = db_->queueCountLocked(aq);
+        qSize = db_->queueCount(aq);
     }
     caudio::ipc::ShmStatusUpdate u{};
     u.position = eng.position();

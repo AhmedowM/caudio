@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <engine/engine_access.hpp>
 #include <expected>
 #include <filesystem>
 #include <memory>
@@ -25,6 +26,7 @@
 
 namespace caudio::service {
 
+using caudio::engine::detail::ServiceAccess;
 using namespace caudio::ipc;
 using caudio::ipc::QueueAdd;
 using caudio::ipc::QueueClear;
@@ -62,7 +64,7 @@ Service::Impl::handle(const caudio::ipc::QueueList& ql) {
         // Playback (shuffle) order: perm holds queue positions. A stale perm
         // (queue mutated after shuffle) contributes its valid entries first;
         // anything missing follows in insertion order.
-        auto perm = engine_->shufflePermFor(qid);
+        auto perm = ServiceAccess::shufflePermFor(*engine_, qid);
         if (!perm.empty()) {
             std::vector<caudio::types::Track> ordered;
             ordered.reserve(tracks.size());
@@ -159,7 +161,7 @@ Service::Impl::handle(const caudio::ipc::PlayFiles& cmd) {
     auto er = db_->queueEnqueueBatch(*qid, ids);
     if (!er)
         return std::unexpected{er.error()};
-    engine_->noteEnqueued(*qid, ids.size());
+    ServiceAccess::noteEnqueued(*engine_, *qid, ids.size());
     // Stop first: play() while playing restarts the current track instead
     // of starting the new queue.
     auto stp = engine_->stop();
@@ -226,7 +228,7 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
                 auto eq = db_->queueEnqueue(qid, newId);
                 if (!eq)
                     return std::unexpected{eq.error()};
-                engine_->noteEnqueued(qid, 1);
+                ServiceAccess::noteEnqueued(*engine_, qid, 1);
             }
             updateShmStatus();
             std::vector<caudio::types::Track> single;
@@ -313,7 +315,7 @@ Service::Impl::handle(const caudio::ipc::QueueAdd& qa) {
             auto er = db_->queueEnqueueBatch(qid, fresh);
             if (!er)
                 return std::unexpected{er.error()};
-            engine_->noteEnqueued(qid, fresh.size());
+            ServiceAccess::noteEnqueued(*engine_, qid, fresh.size());
         }
     }
     updateShmStatus();

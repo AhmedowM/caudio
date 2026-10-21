@@ -49,6 +49,17 @@
 
 namespace caudio::engine {
 
+namespace detail {
+/**
+ * @brief Service-only access to `Engine`'s private members.
+ * @ingroup caudio_engine
+ * @details Declared here so `Engine` can name it as its single friend; the
+ * definition lives in the internal header `src/engine/engine_access.hpp` and
+ * is never installed.
+ */
+struct ServiceAccess;
+} // namespace detail
+
 /**
  * @brief Main playback engine -- queue, decoding, gapless, history and persistence.
  * @ingroup caudio_engine
@@ -223,41 +234,6 @@ class Engine final {
     ExpectedVoid seek(double seconds);
 
     /**
-     * @brief Suspends the loaded track and releases its file handles.
-     * @ingroup caudio_engine
-     * @return Success or Error State/Busy.
-     * @retval StatusCode::State if no track is loaded.
-     * @retval StatusCode::Busy if the queue stays contended past the wait budget.
-     * @details Closes reader/decoder (releasing the audio file) without
-     * touching queue cursor, current track, or history mark. The file is
-     * free for out-of-band modification (tag write) until
-     * resumeAfterTagWrite(). State becomes Paused; output stopped.
-     * @par Thread safety
-     * Thread-safe; holds the queue lock across teardown (queue to
-     * decodeMtx_ order, matching the rest of the engine).
-     * @see resumeAfterTagWrite
-     */
-    ExpectedVoid suspendCurrentTrack();
-
-    /**
-     * @brief Reopens the suspended track at a captured position.
-     * @ingroup caudio_engine
-     * @param t Track row to open (usually re-registered after a tag write).
-     * @param pos Seconds to resume from (clamped to duration).
-     * @param wasPaused Restore Paused instead of Playing when true.
-     * @return Success or Error Busy/NotFound/Device/Internal.
-     * @details No-op success when the current track id no longer matches
-     * (the user moved on while suspended; the tag/db update already
-225:      * landed). Otherwise replays via doPlayTrack, restores position with
-     * seek, preserves the history mark (a tag edit is not a new listen),
-     * and restores the prior paused/playing state.
-     * @par Thread safety
-     * Thread-safe; holds the queue lock across reopen (same order as above).
-     * @see suspendCurrentTrack
-     */
-    ExpectedVoid resumeAfterTagWrite(const caudio::types::Track& t, double pos, bool wasPaused);
-
-    /**
      * @brief Sets playback volume and persists it.
      * @ingroup caudio_engine
      * @param g Volume in [0,1] (clamped; NaN/inf -> 0).
@@ -272,17 +248,6 @@ class Engine final {
     /** @brief Returns current volume [0,1]. @ingroup caudio_engine
      * @return Volume level (atomic load, relaxed). */
     float volume() const noexcept;
-    /** @brief Returns the unmute restore level (0,1]. @ingroup caudio_engine
-     * @details Last non-zero level before mute (persisted pre_mute_volume).
-     * @return Restore level (atomic load, relaxed). */
-    float preMuteVolume() const noexcept;
-    /** @brief Sets the unmute restore level (sanitized, persisted on next save).
-     * @ingroup caudio_engine
-     * @param g Level in (0,1]; anything else becomes 0.5.
-     * @details Callers follow with setVolume(), which persists via saveState().
-     * @par Thread safety
-     * Thread-safe; atomic store. */
-    ExpectedVoid setPreMuteVolume(float g);
     /** @brief Returns current playback state. @ingroup caudio_engine
      * @return PlaybackState (atomic load, acquire). */
     caudio::types::PlaybackState state() const noexcept;
@@ -300,23 +265,6 @@ class Engine final {
     /** @brief Returns whether shuffle is enabled. @ingroup caudio_engine
      * @return True if shuffle mode active. */
     bool shuffle() const noexcept;
-    /** @brief Returns the shuffle permutation (positions) for a queue.
-     * @ingroup caudio_engine
-     * @param qid Queue id.
-     * @return Perm copy when shuffle applies to qid, else empty (insertion order).
-     * Empty on lock contention too (callers fall back to insertion order).
-     * @par Thread safety
-     * Thread-safe; try_lock on queueMutex_. */
-    std::vector<int64_t> shufflePermFor(int64_t qid) noexcept;
-    /** @brief Extends the shuffle permutation after tracks were appended.
-     * @ingroup caudio_engine
-     * @param qid Queue id the tracks were appended to.
-     * @param count Number of appended tracks (at the queue end).
-     * @details Best-effort: no-op unless shuffle applies to qid or the queue
-     * lock is contended (stale-perm fallbacks cover display and playback).
-     * @par Thread safety
-     * Thread-safe; try_lock on queueMutex_. */
-    void noteEnqueued(int64_t qid, std::size_t count) noexcept;
 
     /** @brief Returns current repeat mode. @ingroup caudio_engine
      * @return RepeatMode (Off/All/One). */
@@ -507,6 +455,78 @@ class Engine final {
     std::vector<EngineEvent> drainAll();
 
   private:
+    // The members below are service-only: they are not part of the public
+    // playback API. `detail::ServiceAccess` (src/engine/engine_access.hpp) is
+    // the single friend that lets `src/service` reach them.
+    friend struct engine::detail::ServiceAccess;
+
+    /**
+     * @brief Suspends the loaded track and releases its file handles.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy.
+     * @retval StatusCode::State if no track is loaded.
+     * @retval StatusCode::Busy if the queue stays contended past the wait budget.
+     * @details Closes reader/decoder (releasing the audio file) without
+     * touching queue cursor, current track, or history mark. The file is
+     * free for out-of-band modification (tag write) until
+     * resumeAfterTagWrite(). State becomes Paused; output stopped.
+     * @par Thread safety
+     * Thread-safe; holds the queue lock across teardown (queue to
+     * decodeMtx_ order, matching the rest of the engine).
+     * @see resumeAfterTagWrite
+     */
+    ExpectedVoid suspendCurrentTrack();
+
+    /**
+     * @brief Reopens the suspended track at a captured position.
+     * @ingroup caudio_engine
+     * @param t Track row to open (usually re-registered after a tag write).
+     * @param pos Seconds to resume from (clamped to duration).
+     * @param wasPaused Restore Paused instead of Playing when true.
+     * @return Success or Error Busy/NotFound/Device/Internal.
+     * @details No-op success when the current track id no longer matches
+     * (the user moved on while suspended; the tag/db update already
+     * landed). Otherwise replays via doPlayTrack, restores position with
+     * seek, preserves the history mark (a tag edit is not a new listen),
+     * and restores the prior paused/playing state.
+     * @par Thread safety
+     * Thread-safe; holds the queue lock across reopen (same order as above).
+     * @see suspendCurrentTrack
+     */
+    ExpectedVoid resumeAfterTagWrite(const caudio::types::Track& t, double pos, bool wasPaused);
+
+    /** @brief Returns the unmute restore level (0,1]. @ingroup caudio_engine
+     * @details Last non-zero level before mute (persisted pre_mute_volume).
+     * @return Restore level (atomic load, relaxed). */
+    float preMuteVolume() const noexcept;
+
+    /** @brief Sets the unmute restore level (sanitized, persisted on next save).
+     * @ingroup caudio_engine
+     * @param g Level in (0,1]; anything else becomes 0.5.
+     * @details Callers follow with setVolume(), which persists via saveState().
+     * @par Thread safety
+     * Thread-safe; atomic store. */
+    ExpectedVoid setPreMuteVolume(float g);
+
+    /** @brief Returns the shuffle permutation (positions) for a queue.
+     * @ingroup caudio_engine
+     * @param qid Queue id.
+     * @return Perm copy when shuffle applies to qid, else empty (insertion order).
+     * Empty on lock contention too (callers fall back to insertion order).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_. */
+    std::vector<int64_t> shufflePermFor(int64_t qid) noexcept;
+
+    /** @brief Extends the shuffle permutation after tracks were appended.
+     * @ingroup caudio_engine
+     * @param qid Queue id the tracks were appended to.
+     * @param count Number of appended tracks (at the queue end).
+     * @details Best-effort: no-op unless shuffle applies to qid or the queue
+     * lock is contended (stale-perm fallbacks cover display and playback).
+     * @par Thread safety
+     * Thread-safe; try_lock on queueMutex_. */
+    void noteEnqueued(int64_t qid, std::size_t count) noexcept;
+
     /**
      * @brief Monitor auto-advance: like next(), but halts at queue end.
      * @ingroup caudio_engine

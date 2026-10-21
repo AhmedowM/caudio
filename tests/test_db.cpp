@@ -8,6 +8,7 @@
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstdint>
+#include <db/database_access.hpp>
 #include <expected>
 #include <string>
 #include <string_view>
@@ -175,7 +176,7 @@ TEST_CASE("findByFingerprint and findByPath", "[db]") {
 TEST_CASE("SQLite open in-memory via Database", "[db_sqlite]") {
     auto dbRes = Database::open(":memory:");
     REQUIRE(dbRes.has_value());
-    REQUIRE(dbRes.value()->handle() != nullptr);
+    REQUIRE(DatabaseAccess::handle(*dbRes.value()) != nullptr);
 }
 
 // From test_db_impl.cpp - SQLite direct tests

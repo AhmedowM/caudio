@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <db/database_access.hpp>
 #include <db/stmt_helpers.hpp>
 #include <expected>
 #include <filesystem>
@@ -60,13 +61,14 @@ scanLibrary(Database& db, int64_t libraryId,
     auto beginBatch = [&]() -> std::expected<void, caudio::utils::Error> {
         if (inTx)
             return {};
-        batchLock = std::unique_lock<std::shared_mutex>(db.mutex());
-        if (!db.handleLocked())
+        batchLock = std::unique_lock<std::shared_mutex>(DatabaseAccess::mutex(db));
+        if (!DatabaseAccess::handleLocked(db))
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
-        int rc = sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+        int rc = sqlite3_exec(DatabaseAccess::handleLocked(db), "BEGIN IMMEDIATE", nullptr, nullptr,
+                              &err);
         if (rc != SQLITE_OK) {
             batchLock.unlock();
             return std::unexpected{caudio::utils::makeError(
@@ -81,9 +83,9 @@ scanLibrary(Database& db, int64_t libraryId,
             return {};
         char* err = nullptr;
         internal::SqliteErrGuard guard{err};
-        int rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &err);
+        int rc = sqlite3_exec(DatabaseAccess::handleLocked(db), "COMMIT", nullptr, nullptr, &err);
         if (rc != SQLITE_OK) {
-            sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+            sqlite3_exec(DatabaseAccess::handleLocked(db), "ROLLBACK", nullptr, nullptr, nullptr);
             batchLock.unlock();
             inTx = false;
             batchPending = 0;
@@ -98,7 +100,7 @@ scanLibrary(Database& db, int64_t libraryId,
     auto rollbackBatch = [&]() {
         if (!inTx)
             return;
-        sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+        sqlite3_exec(DatabaseAccess::handleLocked(db), "ROLLBACK", nullptr, nullptr, nullptr);
         batchLock.unlock();
         inTx = false;
         batchPending = 0;
@@ -110,7 +112,7 @@ scanLibrary(Database& db, int64_t libraryId,
             if (!b)
                 return std::unexpected{b.error()};
         }
-        auto existingPath = db.findByPathLocked(trk.path);
+        auto existingPath = DatabaseAccess::findByPathLocked(db, trk.path);
         if (existingPath && existingPath->size == trk.size && existingPath->mtime == trk.mtime) {
             scanned++;
             batchPending++;
@@ -125,7 +127,7 @@ scanLibrary(Database& db, int64_t libraryId,
             }
             continue;
         }
-        auto byFp = db.findByFingerprintLocked(trk.fingerprint);
+        auto byFp = DatabaseAccess::findByFingerprintLocked(db, trk.fingerprint);
         if (byFp) {
             caudio::types::Track upd = *byFp;
             upd.path = trk.path;
@@ -205,13 +207,13 @@ scanLibrary(Database& db, int64_t libraryId,
                 upd.channels = 0;
                 upd.bitrate = 0;
             }
-            if (db.updateTrackLocked(upd))
+            if (DatabaseAccess::updateTrackLocked(db, upd))
                 updated++;
             else
                 failed++;
             if (existingPath && existingPath->id != byFp->id) {
                 if (existingPath->fingerprint == trk.fingerprint)
-                    (void)db.deleteTrackLocked(existingPath->id);
+                    (void)DatabaseAccess::deleteTrackLocked(db, existingPath->id);
             }
         } else if (existingPath) {
             caudio::types::Track upd = *existingPath;
@@ -299,13 +301,13 @@ scanLibrary(Database& db, int64_t libraryId,
             upd.play_count = keepPlay;
             upd.rating = keepRating;
             upd.date_added = keepAdded;
-            if (db.updateTrackLocked(upd))
+            if (DatabaseAccess::updateTrackLocked(db, upd))
                 updated++;
             else
                 failed++;
         } else {
             trk.library_id = libraryId;
-            if (db.insertTrackLocked(trk))
+            if (DatabaseAccess::insertTrackLocked(db, trk))
                 added++;
             else
                 failed++;
@@ -340,18 +342,20 @@ scanLibrary(Database& db, int64_t libraryId,
                                      std::chrono::system_clock::now().time_since_epoch())
                                      .count();
                 {
-                    std::unique_lock<std::shared_mutex> lk(db.mutex());
+                    std::unique_lock<std::shared_mutex> lk(DatabaseAccess::mutex(db));
                     char* err = nullptr;
                     internal::SqliteErrGuard guard{err};
-                    int rc =
-                        sqlite3_exec(db.handleLocked(), "BEGIN IMMEDIATE", nullptr, nullptr, &err);
+                    int rc = sqlite3_exec(DatabaseAccess::handleLocked(db), "BEGIN IMMEDIATE",
+                                          nullptr, nullptr, &err);
                     if (rc == SQLITE_OK) {
-                        (void)db.libraryUpdateLocked(l);
+                        (void)DatabaseAccess::libraryUpdateLocked(db, l);
                         char* cErr = nullptr;
                         internal::SqliteErrGuard cGuard{cErr};
-                        rc = sqlite3_exec(db.handleLocked(), "COMMIT", nullptr, nullptr, &cErr);
+                        rc = sqlite3_exec(DatabaseAccess::handleLocked(db), "COMMIT", nullptr,
+                                          nullptr, &cErr);
                         if (rc != SQLITE_OK)
-                            sqlite3_exec(db.handleLocked(), "ROLLBACK", nullptr, nullptr, nullptr);
+                            sqlite3_exec(DatabaseAccess::handleLocked(db), "ROLLBACK", nullptr,
+                                         nullptr, nullptr);
                     } else {
                         (void)db.libraryUpdate(l);
                     }

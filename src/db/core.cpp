@@ -73,11 +73,6 @@ caudio::utils::Logger* Database::logger() const noexcept {
     return impl_ ? impl_->logger_ : nullptr;
 }
 
-void Database::clearCache() const {
-    std::lock_guard lk{impl_->cacheMutex_};
-    impl_->stmtCache_.clear();
-}
-
 std::expected<SqliteStatement*, caudio::utils::Error>
 Database::getCachedForUse(std::string_view sql) const {
     // Caller must hold cacheMutex_; see method docs.
@@ -164,11 +159,11 @@ std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(st
     return db;
 }
 
-sqlite3* Database::handle() const {
+sqlite3* Database::handle() const noexcept {
     return impl_->db_.get();
 }
 
-std::shared_mutex& Database::mutex() const {
+std::shared_mutex& Database::mutex() const noexcept {
     return impl_->dbMutex_;
 }
 
@@ -1187,10 +1182,14 @@ std::expected<void, caudio::utils::Error> Database::setQueueTemp(int64_t qid, bo
     return caudio::db::setQueueTempLocked(impl_->db_.get(), qid, temp);
 }
 
-size_t Database::queueCountLocked(int64_t qid) {
+std::size_t Database::queueCount(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
+    return queueCountLocked(qid);
+}
+
+std::size_t Database::queueCountLocked(int64_t qid) {
     return caudio::db::queueCountLocked(impl_->db_.get(), qid);
 }
 

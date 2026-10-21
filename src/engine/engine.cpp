@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <db/database_access.hpp>
 #include <db/stmt_helpers.hpp>
 #include <engine/history.hpp>
 #include <engine/shuffle.hpp>
@@ -41,6 +42,10 @@
 #include <vector>
 
 namespace caudio::engine {
+
+// Database's raw locking surface and *Locked helpers are private; the single
+// friend struct DatabaseAccess is the sanctioned way in.
+using caudio::db::DatabaseAccess;
 
 // Transport-command wait budget: device setup under the queue lock routinely
 // takes tens of ms (device open + preroll), so a colliding skip waits
@@ -376,7 +381,7 @@ Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& c
 }
 
 Engine::ExpectedVoid Engine::Impl::attachDatabase(std::shared_ptr<caudio::db::Database> db) {
-    if (!db || !db->handle())
+    if (!db || !DatabaseAccess::handle(*db))
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db"));
     db_ = std::move(db);
@@ -407,7 +412,7 @@ void Engine::Impl::shutdown() {
         decodeThread_.join();
     }
     // persist state
-    if (db_ && db_->handle()) {
+    if (db_ && DatabaseAccess::handle(*db_)) {
         state_.cursorPos = (int64_t)queue_.cursor;
         (void)saveState();
     }
@@ -801,7 +806,7 @@ void Engine::Impl::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     if (count == 0 || !hasDb() || !tryLockQueue())
         return;
     if (queue_.queue_id == qid && queue_.shuffle && !queue_.perm.empty()) {
-        std::size_t n = db_->queueCountLocked(qid);
+        std::size_t n = db_->queueCount(qid);
         std::size_t start = (n >= count) ? n - count : 0;
         for (std::size_t i = start; i < n; ++i)
             queue_.perm.push_back((int64_t)i);
@@ -978,7 +983,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         if (queue_.shuffle) {
             atEnd = queue_.cursor >= queue_.perm.size();
         } else {
-            size_t cnt = db_->queueCountLocked(queue_.queue_id);
+            size_t cnt = db_->queueCount(queue_.queue_id);
             atEnd = queue_.cursor >= cnt;
         }
         if (atEnd) {
@@ -1101,7 +1106,7 @@ std::optional<caudio::utils::Error> Engine::Impl::init() {
 }
 
 bool Engine::Impl::hasDb() const noexcept {
-    return db_ && db_->handle();
+    return db_ && DatabaseAccess::handle(*db_);
 }
 
 bool Engine::Impl::tryLockQueue() noexcept {
@@ -1144,13 +1149,13 @@ double Engine::Impl::currentPositionLocked() const noexcept {
 
 sqlite3* Engine::Impl::dbHandle() const noexcept {
     if (db_)
-        return db_->handle();
+        return DatabaseAccess::handle(*db_);
     return nullptr;
 }
 
 std::shared_mutex* Engine::Impl::dbMutex() const noexcept {
     if (db_)
-        return &db_->mutex();
+        return &DatabaseAccess::mutex(*db_);
     return nullptr;
 }
 
@@ -1486,7 +1491,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::setShuffleLocked(bool on
     if (want) {
         queue_.perm.clear();
         queue_.cursor = 0;
-        size_t cnt = db_->queueCountLocked(queue_.queue_id);
+        size_t cnt = db_->queueCount(queue_.queue_id);
         if (cnt == 0) {
             queue_.shuffle = true;
             queue_.perm.clear();
@@ -1528,7 +1533,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
         queue_.queue_id = 1;
     if (queue_.shuffle) {
         if (queue_.perm.empty()) {
-            size_t cnt = db_->queueCountLocked(queue_.queue_id);
+            size_t cnt = db_->queueCount(queue_.queue_id);
             if (cnt == 0)
                 return std::unexpected(
                     caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
@@ -1568,7 +1573,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
         out = tr.value();
         return {};
     }
-    size_t cnt = db_->queueCountLocked(queue_.queue_id);
+    size_t cnt = db_->queueCount(queue_.queue_id);
     if (cnt == 0)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));
@@ -1606,7 +1611,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queueNextLocked(caudio::
 
 std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::types::Track& out) {
     if (!queue_.shuffle) {
-        size_t cnt = db_->queueCountLocked(queue_.queue_id);
+        size_t cnt = db_->queueCount(queue_.queue_id);
         if (cnt == 0)
             return std::unexpected(
                 caudio::utils::makeError(caudio::utils::StatusCode::NotFound, "empty queue"));

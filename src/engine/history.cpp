@@ -6,6 +6,7 @@
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstdint>
+#include <db/database_access.hpp>
 #include <engine/history.hpp>
 #include <expected>
 #include <memory>
@@ -43,10 +44,12 @@ bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int 
 
 namespace caudio::engine {
 
+using caudio::db::DatabaseAccess;
+
 History::History(std::shared_ptr<caudio::db::Database> db) : db_(std::move(db)) {}
 
 History::ExpectedEntries History::listHistory(int limit) {
-    if (!db_ || !db_->handle())
+    if (!db_ || !DatabaseAccess::handle(*db_))
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
 
     std::string sql = "SELECT h.id, h.track_id, h.started_at, h.completed_at, h.position_ms, "
@@ -59,8 +62,8 @@ History::ExpectedEntries History::listHistory(int limit) {
     if (hasLimit)
         sql += " LIMIT ?";
 
-    sqlite3* h = db_->handle();
-    std::shared_lock lk(db_->mutex());
+    sqlite3* h = DatabaseAccess::handle(*db_);
+    std::shared_lock lk(DatabaseAccess::mutex(*db_));
 
     sqlite3_stmt* raw = nullptr;
     int rc = sqlite3_prepare_v2(h, sql.c_str(), -1, &raw, nullptr);
@@ -106,11 +109,11 @@ History::ExpectedEntries History::listHistory(int limit) {
 }
 
 History::ExpectedVoid History::clearHistory() {
-    if (!db_ || !db_->handle())
+    if (!db_ || !DatabaseAccess::handle(*db_))
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
 
-    std::unique_lock lk(db_->mutex());
-    sqlite3* h = db_->handle();
+    std::unique_lock lk(DatabaseAccess::mutex(*db_));
+    sqlite3* h = DatabaseAccess::handle(*db_);
     char* err = nullptr;
     int rc = sqlite3_exec(h, "DELETE FROM history", nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {

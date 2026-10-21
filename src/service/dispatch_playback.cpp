@@ -6,6 +6,7 @@
 #include <caudio/utils/result.hpp>
 #include <cmath>
 #include <cstdint>
+#include <engine/engine_access.hpp>
 #include <expected>
 #include <memory>
 #include <optional>
@@ -15,6 +16,7 @@
 
 namespace caudio::service {
 
+using caudio::engine::detail::ServiceAccess;
 using namespace caudio::ipc;
 using caudio::ipc::Next;
 using caudio::ipc::Pause;
@@ -143,12 +145,12 @@ Service::Impl::handle(const caudio::ipc::VolumeSet& v) {
         target = lvl / 100.0f;
         if (target <= 0.0f) {
             if (cur > 0.0f) {
-                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                if (auto pr = ServiceAccess::setPreMuteVolume(*engine_, cur); !pr)
                     return std::unexpected{pr.error()};
             }
             target = 0.0f;
         } else {
-            if (auto pr = engine_->setPreMuteVolume(target); !pr)
+            if (auto pr = ServiceAccess::setPreMuteVolume(*engine_, target); !pr)
                 return std::unexpected{pr.error()};
         }
         hasTarget = true;
@@ -164,12 +166,12 @@ Service::Impl::handle(const caudio::ipc::VolumeSet& v) {
         target = np / 100.0f;
         if (target <= 0.0f) {
             if (cur > 0.0f) {
-                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                if (auto pr = ServiceAccess::setPreMuteVolume(*engine_, cur); !pr)
                     return std::unexpected{pr.error()};
             }
             target = 0.0f;
         } else {
-            if (auto pr = engine_->setPreMuteVolume(target); !pr)
+            if (auto pr = ServiceAccess::setPreMuteVolume(*engine_, target); !pr)
                 return std::unexpected{pr.error()};
         }
         hasTarget = true;
@@ -177,14 +179,14 @@ Service::Impl::handle(const caudio::ipc::VolumeSet& v) {
     if (v.mute.has_value()) {
         if (*v.mute) {
             if (cur > 0.0f) {
-                if (auto pr = engine_->setPreMuteVolume(cur); !pr)
+                if (auto pr = ServiceAccess::setPreMuteVolume(*engine_, cur); !pr)
                     return std::unexpected{pr.error()};
             }
             target = 0.0f;
             hasTarget = true;
         } else {
             if (cur == 0.0f && !hasTarget) {
-                target = engine_->preMuteVolume();
+                target = ServiceAccess::preMuteVolume(*engine_);
                 hasTarget = true;
             }
         }
