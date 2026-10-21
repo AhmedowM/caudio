@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
 #include <caudio/utils/error.hpp>
 #include <common.hpp>
 #include <cstdint>
@@ -45,7 +45,7 @@ void requireRoundTrip(const std::string& fixture) {
     caudio::types::Track t = taggedRow(p);
     auto w = writeFileTags(p, t);
     REQUIRE(w.has_value());
-    auto meta = caudio::player::extractMetadata(p.generic_string());
+    auto meta = caudio::media::extractMetadata(p.generic_string());
     REQUIRE(meta.has_value());
     REQUIRE(meta->title == "TagTitle");
     REQUIRE(meta->artist == "TagArtist");

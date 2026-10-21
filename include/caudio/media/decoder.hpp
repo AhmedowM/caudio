@@ -52,7 +52,7 @@ using TrackMetadata = caudio::types::TrackMetadata;
  * @param path Filesystem path to probe.
  * @return Metadata on success, Error on failure.
  */
-caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path);
+caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path);
 
 /**
  * @class Decoder

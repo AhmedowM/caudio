@@ -39,7 +39,7 @@ AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
             return std::unexpected{ps.error()};
         auto* st = std::get_if<caudio::ipc::Status>(&*ps);
         if (!st) {
-            if (auto* e = std::get_if<caudio::ipc::CliError>(&*ps))
+            if (auto* e = std::get_if<caudio::utils::Error>(&*ps))
                 return std::unexpected{*e};
             return std::unexpected{
                 caudio::utils::makeError(caudio::utils::StatusCode::State, "status unavailable")};

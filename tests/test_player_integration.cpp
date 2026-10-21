@@ -31,9 +31,12 @@ using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::test_helpers;
 
-static_assert(std::is_same_v<caudio::player::DeviceInfo, caudio::types::DeviceInfo>);
-static_assert(std::is_same_v<caudio::player::DeviceList, caudio::types::DeviceList>);
-static_assert(std::is_same_v<caudio::player::TrackMetadata, caudio::types::TrackMetadata>);
+static_assert(
+    std::is_same_v<caudio::player::DeviceInfo, caudio::types::DeviceInfo>); // legacy-shim-ok
+static_assert(
+    std::is_same_v<caudio::player::DeviceList, caudio::types::DeviceList>); // legacy-shim-ok
+static_assert(
+    std::is_same_v<caudio::player::TrackMetadata, caudio::types::TrackMetadata>); // legacy-shim-ok
 
 // `State` is internal to player; `PlaybackState` is the wire enum. Ready is
 // reserved for wire compatibility and is intentionally not mapped by player.

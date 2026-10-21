@@ -1,7 +1,7 @@
 #include <caudio/client/output_formatter.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/record.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/print.hpp>
@@ -322,8 +322,8 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os](const caudio::ipc::History& v) {
-                std::span<const caudio::ipc::HistoryEntry> entriesSpan(v.entries.data(),
-                                                                       v.entries.size());
+                std::span<const caudio::types::HistoryEntry> entriesSpan(v.entries.data(),
+                                                                         v.entries.size());
                 caudio::println(os, "History ({} entries):", entriesSpan.size());
                 caudio::println(os, "{:>3}  {:<20}  {:<40} {:<40} {:>10} {:>8}", "#", "Date",
                                 "Artist", "Title", "Pos", "Dur");
@@ -356,8 +356,8 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 }
             },
             [&os](const caudio::ipc::Devices& v) {
-                std::span<const caudio::ipc::DeviceInfo> devicesSpan(v.devices.data(),
-                                                                     v.devices.size());
+                std::span<const caudio::types::DeviceInfo> devicesSpan(v.devices.data(),
+                                                                       v.devices.size());
                 caudio::println(os, "Devices ({}):", devicesSpan.size());
                 caudio::println(os, "{:>3}  {:<20}  {:<40}  {}", "#", "ID", "Name", "Default");
                 for (std::size_t i = 0; i < devicesSpan.size(); ++i) {
@@ -366,7 +366,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                                     truncateField(d.name, 40), d.isDefault ? "yes" : "no");
                 }
             },
-            [&os](const caudio::ipc::Empty&) { caudio::println(os, "OK"); },
+            [&os](const std::monostate&) { caudio::println(os, "OK"); },
             [&os](const caudio::utils::Error& v) {
                 // Error variant - print to given stream (caller may pass cerr)
                 caudio::println(os, "Error: {} {}", caudio::utils::toString(v.code), v.message);

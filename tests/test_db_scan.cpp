@@ -158,6 +158,7 @@ TEST_CASE("deprecated db::scanDirectory forwarder matches media scanTracksToVect
     auto media = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
     REQUIRE(media.has_value());
     REQUIRE(media->size() == 1);
+    // legacy-shim-ok
     auto compat = caudio::db::scanDirectory(dir, caudio::db::ScanMode::Sampled);
     REQUIRE(compat.has_value());
     REQUIRE(compat->size() == media->size());

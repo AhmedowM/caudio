@@ -1502,13 +1502,13 @@ std::expected<DbStats, caudio::utils::Error> Database::getStats() {
     return s;
 }
 
-std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error>
+std::expected<caudio::types::LibraryStatsDetailed, caudio::utils::Error>
 Database::libraryStatsDetailed(int topN) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    LibraryStatsDetailedData d{};
+    caudio::types::LibraryStatsDetailed d{};
     std::unique_lock cacheLk{impl_->cacheMutex_};
 
     // Total tracks, queues, playlists

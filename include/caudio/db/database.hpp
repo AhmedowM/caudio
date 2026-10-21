@@ -740,7 +740,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock + cacheMutex_.
      */
-    std::expected<caudio::db::LibraryStatsDetailedData, caudio::utils::Error>
+    std::expected<caudio::types::LibraryStatsDetailed, caudio::utils::Error>
     libraryStatsDetailed(int topN = 10);
 
 }; // class Database

@@ -37,14 +37,17 @@ static_assert(allCommandAlternatives(static_cast<Command*>(nullptr)));
 static_assert(CommandType<const Play&>);
 static_assert(!CommandAlternative<const Play>);
 
-static_assert(std::is_same_v<caudio::ipc::DeviceInfo, caudio::types::DeviceInfo>);
-static_assert(std::is_same_v<caudio::ipc::LibraryStatsData, caudio::types::LibraryStats>);
+static_assert(std::is_same_v<caudio::ipc::DeviceInfo, caudio::types::DeviceInfo>); // legacy-shim-ok
 static_assert(
-    std::is_same_v<caudio::ipc::LibraryStatsDetailedData, caudio::types::LibraryStatsDetailed>);
+    std::is_same_v<caudio::ipc::LibraryStatsData, caudio::types::LibraryStats>); // legacy-shim-ok
+static_assert(std::is_same_v<caudio::ipc::LibraryStatsDetailedData,
+                             caudio::types::LibraryStatsDetailed>); // legacy-shim-ok
+static_assert(std::is_same_v<caudio::db::LibraryStatsDetailedData,
+                             caudio::types::LibraryStatsDetailed>); // legacy-shim-ok
 static_assert(
-    std::is_same_v<caudio::db::LibraryStatsDetailedData, caudio::types::LibraryStatsDetailed>);
-static_assert(std::is_same_v<caudio::ipc::HistoryEntry, caudio::types::HistoryEntry>);
-static_assert(std::is_same_v<caudio::ipc::BookmarkEntry, caudio::types::Bookmark>);
+    std::is_same_v<caudio::ipc::HistoryEntry, caudio::types::HistoryEntry>); // legacy-shim-ok
+static_assert(
+    std::is_same_v<caudio::ipc::BookmarkEntry, caudio::types::Bookmark>); // legacy-shim-ok
 
 } // namespace
 
