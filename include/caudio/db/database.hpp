@@ -5,7 +5,7 @@
  * @brief Main SQLite database handle with thread-safe CRUD.
  * @ingroup caudio_db
  * @details Implements `Database` with a shared_mutex for the SQLite handle,
- * a mutex for the prepared-statement cache, and a background `WriterThread`
+ * a mutex for the prepared-statement cache, and a background writer thread
  * for batching writes. All public methods are thread-safe; see each method
  * for locking requirements. Move operations are not thread-safe after open.
  */
@@ -33,7 +33,7 @@ namespace caudio::db {
  */
 struct DbOpts {
     std::size_t writeBatchSize =
-        256; ///< Queue capacity / batch size for WriterThread (default 256).
+        256; ///< Queue capacity / batch size for the background writer (default 256).
     /// Non-owning logger (may be null = silent). Must outlive the Database;
     /// never emitted from destructors. Set from opts at open().
     caudio::utils::Logger* logger{nullptr};
@@ -56,7 +56,6 @@ struct SqliteCloser {
  * take unique_lock. getCachedForUse() requires the caller to already hold
  * cacheMutex_. Move operations are not thread-safe after open.
  * @see DbOpts
- * @see WriterThread
  * @see SqliteStatement
  */
 class Database final {
@@ -67,9 +66,9 @@ class Database final {
      */
     Database();
     /**
-     * @brief Constructs with options (sets WriterThread batch size).
+     * @brief Constructs with options (sets the writer batch size).
      * @ingroup caudio_db
-     * @param opts Options; writeBatchSize forwarded to WriterThread.
+     * @param opts Options; writeBatchSize forwarded to the background writer.
      */
     // Out-of-line (core.cpp): Impl is defined there.
     explicit Database(const DbOpts& opts);
@@ -92,7 +91,8 @@ class Database final {
      * @return Owning Database pointer or Error Io/Corrupt.
      * @details Executes kSchema, handles the queue UNIQUE migration gracefully
      * (ignores duplicate-position errors), ensures the default library row and
-     * migrates engine_state.active_queue_id if missing. Starts the WriterThread.
+     * migrates engine_state.active_queue_id if missing. Starts the background
+     * writer thread.
      * @par Thread safety
      * Thread-safe for distinct paths; the returned Database is not shared until open returns.
      */
@@ -106,12 +106,11 @@ class Database final {
      */
     caudio::utils::Logger* logger() const noexcept;
     /**
-     * @brief Flushes the background WriterThread queue.
+     * @brief Flushes the background writer queue.
      * @ingroup caudio_db
      * @return Success or Error with StatusCode::Busy on 200 ms timeout.
      * @par Thread safety
-     * Thread-safe; delegates to WriterThread::flush().
-     * @see WriterThread::flush
+     * Thread-safe; delegates to the writer's flush().
      */
     std::expected<void, caudio::utils::Error> flush();
 

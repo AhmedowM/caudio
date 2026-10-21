@@ -1,16 +1,14 @@
 #include <sqlite3.h>
 
 #include <atomic>
-#include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/function.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <db/statement.hpp>
 #include <db/stmt_helpers.hpp>
+#include <db/write_thread.hpp>
 #include <expected>
 #include <memory>
 #include <mutex>
@@ -18,19 +16,21 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <utils/function.hpp>
+#include <utils/mpsc_queue.hpp>
 
 namespace caudio::db {
 
 // Private implementation: all heavyweight members (queue, worker thread,
-// synchronization) live here so the public header stays include-light.
+// synchronization) live here so the internal header stays include-light.
 struct WriterThread::Impl {
     explicit Impl(std::size_t writeBatchSize)
-        : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOp>>(
+        : queue_(std::make_unique<caudio::utils::MpscQueue<WriteOperation>>(
               writeBatchSize > 0 ? writeBatchSize : 256)) {}
 
     void worker(std::stop_token st);
 
-    std::unique_ptr<caudio::utils::MpscQueue<WriteOp>> queue_;
+    std::unique_ptr<caudio::utils::MpscQueue<WriteOperation>> queue_;
     sqlite3* db_{nullptr};
     std::jthread thread_{};
     std::mutex mtx_;
@@ -39,15 +39,16 @@ struct WriterThread::Impl {
 };
 
 // Out-of-line: the header only forward-declares SqliteStatement.
-WriteOp::WriteOp() = default;
+WriteOperation::WriteOperation() = default;
 
-WriteOp::WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
-                 caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c)
+WriteOperation::WriteOperation(
+    std::string s, std::unique_ptr<SqliteStatement> st,
+    caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c)
     : sql(std::move(s)), stmt(std::move(st)), cb(std::move(c)) {}
 
-WriteOp::WriteOp(WriteOp&&) noexcept = default;
-WriteOp& WriteOp::operator=(WriteOp&&) noexcept = default;
-WriteOp::~WriteOp() = default;
+WriteOperation::WriteOperation(WriteOperation&&) noexcept = default;
+WriteOperation& WriteOperation::operator=(WriteOperation&&) noexcept = default;
+WriteOperation::~WriteOperation() = default;
 
 WriterThread::WriterThread(std::size_t writeBatchSize)
     : impl_(std::make_unique<Impl>(writeBatchSize)) {}
@@ -90,7 +91,7 @@ void WriterThread::close() {
 std::expected<void, caudio::utils::Error> WriterThread::push(
     std::string sql, std::unique_ptr<SqliteStatement> stmt,
     caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> cb) {
-    WriteOp op{std::move(sql), std::move(stmt), std::move(cb)};
+    WriteOperation op{std::move(sql), std::move(stmt), std::move(cb)};
     auto r = impl_->queue_->push(std::move(op));
     if (!r)
         return std::unexpected{r.error()};
@@ -139,7 +140,7 @@ void WriterThread::Impl::worker(std::stop_token st) {
                 break;
             continue;
         }
-        WriteOp op = std::move(popped.value());
+        WriteOperation op = std::move(popped.value());
         in_flight_.fetch_add(1, std::memory_order_acq_rel);
         caudio::utils::Error err{};
         bool ok = true;

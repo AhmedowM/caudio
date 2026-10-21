@@ -5,7 +5,6 @@
 #include <caudio/engine/engine.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <common.hpp>
 #include <cstddef>
@@ -15,6 +14,9 @@
 #include <string>
 #include <system_error>
 #include <utility>
+
+#include "../src/utils/mpsc_queue.hpp"
+
 using namespace caudio::utils;
 using namespace caudio::engine;
 using namespace caudio::db;

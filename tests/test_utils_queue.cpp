@@ -1,12 +1,14 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <stop_token>
 #include <thread>
 #include <vector>
+
+#include "../src/utils/mpsc_queue.hpp"
+
 namespace caudio::utils::test {
 
 bool queue_busy_on_full() {

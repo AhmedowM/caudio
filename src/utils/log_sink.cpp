@@ -1,4 +1,3 @@
-#include <caudio/utils/log_sink.hpp>
 #include <caudio/utils/print.hpp>
 #include <chrono>
 #include <cstddef>
@@ -13,6 +12,7 @@
 #include <string_view>
 #include <system_error>
 #include <thread>
+#include <utils/log_sink.hpp>
 
 namespace caudio::utils {
 

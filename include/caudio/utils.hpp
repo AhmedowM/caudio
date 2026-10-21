@@ -9,26 +9,23 @@
  * - result: StatusCode, toString, formatter
  * - error: Error, Expected, makeError
  * - log: LogLevel, Logger
- * - log_sink: FileLogSink, bounded rotating file sink (see log_sink.hpp)
  * - math: clampVolume, toHex, fromHex
  * - ring: SpscRing
- * - mpsc_queue: MpscQueue
  * - thread: sleepFor, sleepForMs, setThreadName
  * - print: portable print/println facade (see print.hpp)
  * - json: opaque Json/JsonRef value type (nlohmann stays behind src/ walls)
  * - record_json: Track <-> Json codec shared by db and ipc
- * - function: portable MoveOnlyFunction (libc++ lacks std::move_only_function)
  * - generator: portable Generator (libc++ lacks std::generator)
+ *
+ * Internal-only helpers (MpscQueue, MoveOnlyFunction, the rotating file
+ * sink) live in src/utils/ and are NOT installed.
  */
 
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/function.hpp>
 #include <caudio/utils/generator.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
-#include <caudio/utils/log_sink.hpp>
 #include <caudio/utils/math.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/print.hpp>
 #include <caudio/utils/record_json.hpp>
 #include <caudio/utils/result.hpp>

@@ -18,8 +18,8 @@
  * / saveState) with fallback for missing `active_queue_id`.
  *
  * State machine: `Stopped -> Playing -> Paused -> Playing`, with
- * `next()`/`prev()` advancing `QueueState::cursor` subject to
- * `RepeatMode` and `QueueState::shuffle`/`perm` (see
+ * `next()`/`prev()` advancing the internal queue cursor subject to
+ * `RepeatMode` and the internal shuffle permutation (see
  * Engine::queueNextLocked / queuePrevLocked).
  *
  * Gapless: `Engine::engineTick` arms `gaplessArmed_` when
@@ -27,10 +27,10 @@
  * single-writer CAS; `decodeLoop` fills the `SpscRing<float>` and
  * `preroll()` pre-fills half the ring before `AudioOutput::start()`.
  *
- * Shuffle: `QueueState::perm` holds a permutation of `[0, queueCount)`;
- * `detail::shufflePerm` shuffles via `std::mt19937` seeded by
- * `random_device` (production) or caller-supplied `mt19937` (seed 42
- * for deterministic tests); persisted as BLOB `shuffle_perm`.
+ * Shuffle: the internal queue state holds a permutation of
+ * `[0, queueCount)`; `detail::shufflePerm` shuffles via `std::mt19937`
+ * seeded by `random_device` (production) or caller-supplied `mt19937`
+ * (seed 42 for deterministic tests); persisted as BLOB `shuffle_perm`.
  *
  * History: `EngineConfig::historyThresholdPct` (default 60) and
  * `historyThresholdSecs` (default 90) feed
@@ -43,17 +43,15 @@
 #include <caudio/fwd.hpp>
 #include <caudio/legacy_aliases.hpp>
 #include <caudio/types/wire.hpp>
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace caudio::engine {
 
 /**
- * @brief Engine event types emitted via MpscQueue.
+ * @brief Engine event types emitted via the internal event queue.
  * @ingroup caudio_engine
  * @see EngineEvent
  * @see Engine::pollEvent
@@ -132,48 +130,6 @@ struct EngineConfig {
     /// Non-owning logger (may be null = silent). Must outlive the Engine;
     /// never emitted from destructors. Threaded through to decode paths.
     caudio::utils::Logger* logger{nullptr};
-};
-
-/**
- * @brief In-memory queue cursor and shuffle state.
- * @ingroup caudio_engine
- * @details `perm` is empty when shuffle is off; when on it holds a
- * permutation of `[0, queueCount)` shuffled via detail::shufflePerm.
- * `cursor` is the next index to consume (persisted as `cursor_pos`).
- * `queue_id` is the active queue (persisted as `active_queue_id`).
- * Protected by `Engine::queueMutex_` for writers; readers use atomics
- * or hold the mutex.
- */
-struct QueueState {
-    bool shuffle{false}; ///< Whether shuffle is enabled.
-    caudio::types::RepeatMode repeat{caudio::types::RepeatMode::Off}; ///< Repeat mode.
-    std::vector<int64_t> perm{}; ///< Shuffle permutation (positions, not track_ids).
-    size_t cursor{0};            ///< Next position index in perm or linear queue.
-    int64_t queue_id{1};         ///< Active queue id.
-};
-
-/**
- * @brief Persisted engine state (row `engine_state.id=1`).
- * @ingroup caudio_engine
- * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
- * current_track_id, volume, shuffle_perm (BLOB), active_queue_id,
- * pre_mute_volume, position_ms`. `active_queue_id` may be missing on old DBs -- loadState falls
- * back to `1` and saveState tries `sqlNew` then `sqlOld`. `pre_mute_volume` and `position_ms` are
- * best-effort both ways (missing columns keep their defaults). `shuffle_perm` is `perm` serialized
- * as `int64_t` blob.
- * @see Engine::loadState
- * @see Engine::saveState
- */
-struct EngineState {
-    int shuffleEnabled{0}; ///< Persisted shuffle flag (0/1).
-    caudio::types::RepeatMode repeatMode{
-        caudio::types::RepeatMode::Off}; ///< Persisted repeat mode.
-    int64_t cursorPos{0};                ///< Persisted cursor (QueueState::cursor).
-    int64_t currentTrackId{0};           ///< Last current track id.
-    float volume{1.0f};                  ///< Persisted volume [0,1].
-    int64_t activeQueueId{1};            ///< Persisted active queue id.
-    float preMuteVolume{0.5f};           ///< Restore level for unmute (0,1].
-    int64_t positionMs{0};               ///< Persisted position in the current track.
 };
 
 } // namespace caudio::engine

@@ -24,11 +24,11 @@
  *   and persistCursorLocked update the blob/cursor transactionally.
  * - History: doHistoryMark uses shouldMarkPlayed(historyThresholdPct/Secs)
  *   with atomic CAS on markedPlayed_ and a BEGIN IMMEDIATE transaction.
- * Locking: queueMutex_ (timed mutex) for QueueState -- try_lock on fast
+ * Locking: queueMutex_ (timed mutex) for the queue state -- try_lock on fast
  * and monitor paths, bounded wait for transport commands (play/next/prev);
  * decodeMtx_ (mutex) for decoder_/ring_ vs seek/decodeLoop; queue/state DB
  * writes go through Database::mutex() (shared_mutex) + withTransaction.
- * Events: MpscQueue<EngineEvent,64> with drop-on-full, dispatched via
+ * Events: a bounded event queue (64 slots) with drop-on-full, dispatched via
  * pushEvent to callbacks under cbMutex_.
  * Implementation details (atomics, threads, mpsc queue, ring, DB rows) live
  * in src/engine/engine.cpp behind Engine::Impl (pimpl) so this header stays
@@ -64,7 +64,7 @@ struct ServiceAccess;
  * @brief Main playback engine -- queue, decoding, gapless, history and persistence.
  * @ingroup caudio_engine
  * @details See file-level docs for state machine, threading and persistence.
- * Public mutators that touch QueueState use `tryLockQueue()` (non-blocking,
+ * Public mutators that touch the queue state use `tryLockQueue()` (non-blocking,
  * `Busy` on contention); transport commands (play/next/prev) instead wait up
  * to 500 ms via `tryLockQueueFor()` so a colliding skip executes instead of
  * failing. Decode/ring access is serialized by `decodeMtx_`. State (`playbackState_`,
@@ -81,7 +81,6 @@ struct ServiceAccess;
  * bounded-wait on transport commands, so callers must still handle Busy
  * (budget exceeded).
  * @see PlaybackState
- * @see QueueState
  * @see EngineConfig
  */
 class Engine final {
@@ -419,7 +418,7 @@ class Engine final {
      * @ingroup caudio_engine
      * @return `std::expected<EngineEvent, Error>` -- event on success, NotFound if queue empty.
      * @par Thread safety
-     * Thread-safe; MpscQueue is lock-free MPSC.
+     * Thread-safe; the event queue is a bounded MPSC.
      * @see drainEvents
      * @see drainAll
      * @see EngineEvent
@@ -435,7 +434,7 @@ class Engine final {
      * @return `std::expected<void, Error>` -- success or InvalidArg if n is null or buf is null
      * with cap>0.
      * @par Thread safety
-     * Thread-safe; pops from MpscQueue (lock-free).
+     * Thread-safe; pops from the event queue (bounded MPSC).
      * @see pollEvent
      * @see drainAll
      * @see EngineEvent
@@ -447,7 +446,7 @@ class Engine final {
      * @ingroup caudio_engine
      * @return Vector of events (may be empty).
      * @par Thread safety
-     * Thread-safe; pops from MpscQueue (lock-free).
+     * Thread-safe; pops from the event queue (bounded MPSC).
      * @see pollEvent
      * @see drainEvents
      * @see EngineEvent

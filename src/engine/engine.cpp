@@ -12,7 +12,6 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/math.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
 #include <chrono>
@@ -23,6 +22,7 @@
 #include <cstring>
 #include <db/database_access.hpp>
 #include <db/stmt_helpers.hpp>
+#include <engine/engine_types.hpp>
 #include <engine/history.hpp>
 #include <engine/shuffle.hpp>
 #include <expected>
@@ -39,6 +39,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <utils/mpsc_queue.hpp>
 #include <vector>
 
 namespace caudio::engine {

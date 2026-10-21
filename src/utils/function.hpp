@@ -10,6 +10,8 @@
  * provides `caudio::utils::MoveOnlyFunction<R(Args...)>` with the subset
  * used here (default/empty construct, move-only, call, bool check).
  * Always use this type instead of `std::move_only_function` directly.
+ *
+ * Internal header: lives in `src/`, not installed.
  */
 
 #include <concepts>

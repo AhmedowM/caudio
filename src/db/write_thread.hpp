@@ -4,19 +4,21 @@
  * @file write_thread.hpp
  * @brief Background write batching for SQLite.
  * @ingroup caudio_db
- * @details Single-consumer background thread that serializes `WriteOp`s
- * queued via an `MpscQueue<WriteOp>`. Batch size is set at construction
- * (`writeBatchSize`, default 256) and forwarded to the queue capacity.
- * The queue is bounded: `push()` returns `Busy` when full.
+ * @details Single-consumer background thread that serializes
+ * `WriteOperation`s queued via an `MpscQueue<WriteOperation>`. Batch size
+ * is set at construction (`writeBatchSize`, default 256) and forwarded to the
+ * queue capacity. The queue is bounded: `push()` returns `Busy` when full.
+ *
+ * Internal header: lives in `src/`, not installed.
  */
 
 #include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/function.hpp>
 #include <cstddef>
 #include <expected>
 #include <memory>
 #include <string>
+#include <utils/function.hpp>
 
 namespace caudio::db {
 
@@ -26,7 +28,7 @@ namespace caudio::db {
  * @details Either `stmt` or `sql` is executed; `cb` is invoked outside
  * the worker lock after execution with success or `Corrupt` on failure.
  */
-struct WriteOp {
+struct WriteOperation {
     std::string sql;                       ///< Raw SQL (used when `stmt` is null).
     std::unique_ptr<SqliteStatement> stmt; ///< Prepared statement to step.
     caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)>
@@ -35,7 +37,7 @@ struct WriteOp {
     // All special members are out-of-line (write_thread.cpp): the header only
     // forward-declares SqliteStatement, which is insufficient for inline
     // construction/destruction of the unique_ptr member.
-    WriteOp();
+    WriteOperation();
     /**
      * @brief Constructs a write operation.
      * @ingroup caudio_db
@@ -43,21 +45,23 @@ struct WriteOp {
      * @param st Prepared statement (may be null if using `s`).
      * @param c Completion callback (may be empty).
      */
-    WriteOp(std::string s, std::unique_ptr<SqliteStatement> st,
-            caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c);
-    WriteOp(const WriteOp&) = delete;
-    WriteOp& operator=(const WriteOp&) = delete;
-    WriteOp(WriteOp&&) noexcept;
-    WriteOp& operator=(WriteOp&&) noexcept;
-    ~WriteOp();
+    WriteOperation(
+        std::string s, std::unique_ptr<SqliteStatement> st,
+        caudio::utils::MoveOnlyFunction<void(std::expected<void, caudio::utils::Error>)> c);
+    WriteOperation(const WriteOperation&) = delete;
+    WriteOperation& operator=(const WriteOperation&) = delete;
+    WriteOperation(WriteOperation&&) noexcept;
+    WriteOperation& operator=(WriteOperation&&) noexcept;
+    ~WriteOperation();
 };
 
 /**
  * @brief Background writer that serializes SQLite writes off the hot path.
  * @ingroup caudio_db
  * @details Thread-safety and batching:
- * - `queue_` is a bounded `MpscQueue<WriteOp>` with capacity `writeBatchSize`
- *   (default 256, clamped to >=1). `push()` fails with `Busy` when full.
+ * - `queue_` is a bounded `MpscQueue<WriteOperation>` with capacity
+ *   `writeBatchSize` (default 256, clamped to >=1). `push()` fails with
+ *   `Busy` when full.
  * - `db_` is a raw `sqlite3*` borrowed from `Database`; set in `open()` and
  *   cleared on move/close. No ownership.
  * - `thread_` is a `std::jthread` running `worker()` with a `stop_token`.

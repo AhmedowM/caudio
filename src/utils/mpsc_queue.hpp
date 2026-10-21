@@ -4,6 +4,8 @@
  * @file mpsc_queue.hpp
  * @brief Multi-producer single-consumer bounded queue.
  * @ingroup caudio_utils
+ * @details Internal header: lives in `src/`, not installed. Used by the
+ * engine event queue and the database writer thread.
  */
 
 #include <caudio/utils/error.hpp>

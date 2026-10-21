@@ -3,7 +3,6 @@
 #include <array>
 #include <caudio/db/database.hpp>
 #include <caudio/db/types.hpp>
-#include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -15,6 +14,7 @@
 #include <db/schema.hpp>
 #include <db/statement.hpp>
 #include <db/stmt_helpers.hpp>
+#include <db/write_thread.hpp>
 #include <expected>
 #include <memory>
 #include <mutex>

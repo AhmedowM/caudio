@@ -4,15 +4,12 @@ set(CAUDIO_UTILS_MODULE_SOURCES
   modules/caudio/utils/result.cppm
   modules/caudio/utils/error.cppm
   modules/caudio/utils/log.cppm
-  modules/caudio/utils/log_sink.cppm
   modules/caudio/utils/json.cppm
   modules/caudio/utils/math.cppm
   modules/caudio/utils/ring.cppm
-  modules/caudio/utils/mpsc_queue.cppm
   modules/caudio/utils/print.cppm
   modules/caudio/utils/thread.cppm
   modules/caudio/version.cppm
-  modules/caudio/utils/function.cppm
   modules/caudio/utils/generator.cppm
   modules/caudio/utils/record_json.cppm
 )

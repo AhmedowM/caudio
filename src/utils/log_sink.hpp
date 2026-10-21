@@ -18,6 +18,8 @@
  * daemon. Open failure returns nullptr — the caller falls back to silence.
  *
  * Thread safety: thread-safe; all state under an internal mutex.
+ *
+ * Internal header: lives in `src/`, not installed.
  */
 
 #include <caudio/utils/log.hpp>

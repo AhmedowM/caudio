@@ -33,8 +33,6 @@ class Engine;
 struct EngineConfig;
 struct EngineCallbacks;
 struct EngineEvent;
-struct EngineState;
-struct QueueState;
 enum class EngineEventType : int;
 // PlaybackState / RepeatMode are wire enums owned by `caudio::types` (see
 // types/wire.hpp); `caudio::engine` re-exports them as aliases (engine/types.hpp).
@@ -77,14 +75,10 @@ class OutputFormatter;
 
 namespace caudio::utils {
 template <typename T>
-class MpscQueue;
-template <typename T>
     requires std::is_trivially_copyable_v<T>
 class SpscRing;
 template <typename T>
 class Generator;
-template <typename Sig>
-class MoveOnlyFunction;
 class Logger;
 class Json;
 class JsonRef;

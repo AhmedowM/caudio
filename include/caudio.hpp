@@ -27,7 +27,7 @@
  *   wire enums (RepeatMode, PlaybackState) and plain-data records (Track,
  *   Playlist, QueueItem, HistoryEntry, Bookmark) used across all layers.
  * - @ref caudio_utils "caudio.utils" -- Core utilities: error handling (`std::expected`),
- *   lock-free SPSC/MPSC queues, thread helpers, logging, opaque JSON value.
+ *   lock-free SPSC ring, thread helpers, logging, opaque JSON value.
  * - @ref caudio_media "caudio.media" -- Media input: reader abstractions,
  *   FFmpeg-based decoder, metadata extraction, audio-extension helpers,
  *   library scan discovery (filesystem walk, fingerprint, tags).
@@ -63,13 +63,13 @@
  *
  * Threading model:
  * - `utils::SpscRing` -- lock-free SPSC (decode thread ->' audio callback)
- * - `utils::MpscQueue` -- bounded MPSC (event queue, writer thread)
  * - `Engine` -- `queueMutex_` (try_lock) for queue state, `decodeMtx_` for
  *   decoder/ring vs seek, `dbMutex_` (shared_mutex) for DB, `cbMutex_` for callbacks.
  * - `Database` -- `dbMutex_` (shared_mutex) serializes all SQLite access;
  *   `cacheMutex_` protects prepared-statement cache.
  *   Lock order: `dbMutex_` ->' `cacheMutex_`.
- * - `WriterThread` -- single consumer, MPSC queue, `condition_variable` + `stop_token`.
+ * - Background writer -- single consumer, bounded MPSC queue,
+ *   `condition_variable` + `stop_token`.
  *
  * Error handling: All fallible public APIs return `std::expected<T, Error>`
  * with `StatusCode` enum (Ok, InvalidArg, NotFound, Unsupported, Io, Device,

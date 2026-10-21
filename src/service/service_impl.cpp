@@ -17,7 +17,6 @@
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
-#include <caudio/utils/log_sink.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>
 #include <chrono>
@@ -35,6 +34,7 @@
 #include <system_error>
 #include <thread>
 #include <utility>
+#include <utils/log_sink.hpp>
 #include <variant>
 
 #include "config_detail.hpp"

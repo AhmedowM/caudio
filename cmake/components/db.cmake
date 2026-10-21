@@ -1,8 +1,9 @@
 # db.cmake -- caudio::db (SQLite library/engine-state persistence).
-# NOTE: statement/transaction/queue/schema/detail/fts/stmt_helpers live in
-# src/db/ (NOT installed) and have no module partitions. Fingerprinting moved
-# to the media component (src/media/fingerprint.cpp) with the scan discovery
-# half, so db no longer links blake3.
+# NOTE: statement/transaction/queue/schema/detail/fts/stmt_helpers and the
+# background writer (src/db/write_thread.hpp) live in src/db/ (NOT installed)
+# and have no module partitions. Fingerprinting moved to the media component
+# (src/media/fingerprint.cpp) with the scan discovery half, so db no longer
+# links blake3.
 set(CAUDIO_DB_MODULE_SOURCES
   modules/caudio/db.cppm
   modules/caudio/db/types.cppm
@@ -10,7 +11,6 @@ set(CAUDIO_DB_MODULE_SOURCES
   modules/caudio/db/scan.cppm
   modules/caudio/db/search.cppm
   modules/caudio/db/json.cppm
-  modules/caudio/db/write_thread.cppm
 )
 
 set(CAUDIO_DB_SOURCES

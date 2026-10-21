@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/utils/log.hpp>
-#include <caudio/utils/log_sink.hpp>
 #include <common.hpp>
 #include <filesystem>
 #include <fstream>
@@ -9,6 +8,9 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include "../src/utils/log_sink.hpp"
+
 namespace caudio::utils::test {
 
 bool log_injected() {

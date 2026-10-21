@@ -8,6 +8,4 @@ using ::caudio::engine::EngineCallbacks;
 using ::caudio::engine::EngineConfig;
 using ::caudio::engine::EngineEvent;
 using ::caudio::engine::EngineEventType;
-using ::caudio::engine::EngineState;
-using ::caudio::engine::QueueState;
 } // namespace caudio::engine

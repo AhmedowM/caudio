@@ -2,14 +2,16 @@
 
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/db/write_thread.hpp>
 #include <caudio/utils/error.hpp>
-#include <caudio/utils/mpsc_queue.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <expected>
 #include <string>
 #include <thread>
+
+#include "../src/db/write_thread.hpp"
+#include "../src/utils/mpsc_queue.hpp"
+
 using namespace caudio::utils;
 
 TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer_thread]") {
@@ -26,7 +28,7 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
     {
         caudio::db::WriterThread wt(2);
         // push two ops without opening thread -> queue stays full
-        // need to construct WriteOp-like pushes via WriterThread::push
+        // need to construct WriteOperation-like pushes via WriterThread::push
         // Use sql strings; stmt nullptr
         auto pr1 = wt.push("SELECT 1;", {});
         REQUIRE(pr1.has_value());
