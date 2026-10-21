@@ -91,6 +91,7 @@ class Service final {
      */
     void shutdown();
 
+  private:
     /**
      * @brief Access the database instance.
      * @return Reference to the Database.
@@ -121,7 +122,6 @@ class Service final {
      */
     caudio::ipc::ShmStatusHandle* shmHandle() noexcept;
 
-  private:
     /**
      * @brief Private constructor used by create().
      */

@@ -443,19 +443,6 @@ class Engine final {
     ExpectedVoid next();
 
     /**
-     * @brief Monitor auto-advance: like next(), but halts at queue end.
-     * @ingroup caudio_engine
-     * @return Success or Error State/Busy/NotFound/Device.
-     * @details With repeat Off and the cursor past the end, stops playback
-     * (cursor stays parked so a later play wraps to the head) instead of
-     * wrapping like next(). Repeat One/All behave like next().
-     * @par Thread safety
-     * Thread-safe; same locking as next().
-     * @see next
-     */
-    ExpectedVoid autoNext();
-
-    /**
      * @brief Moves to the previous track.
      * @ingroup caudio_engine
      * @return Success or Error State/Busy/NotFound/Device ("at start"/"no perm").
@@ -520,6 +507,19 @@ class Engine final {
     std::vector<EngineEvent> drainAll();
 
   private:
+    /**
+     * @brief Monitor auto-advance: like next(), but halts at queue end.
+     * @ingroup caudio_engine
+     * @return Success or Error State/Busy/NotFound/Device.
+     * @details With repeat Off and the cursor past the end, stops playback
+     * (cursor stays parked so a later play wraps to the head) instead of
+     * wrapping like next(). Repeat One/All behave like next().
+     * @par Thread safety
+     * Thread-safe; same locking as next().
+     * @see next
+     */
+    ExpectedVoid autoNext();
+
     /**
      * @brief Constructs Engine with config defaults applied.
      * @ingroup caudio_engine
