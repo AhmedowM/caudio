@@ -6,8 +6,8 @@
  */
 
 #include <app/detail.hpp>
+#include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <caudio/app/format.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

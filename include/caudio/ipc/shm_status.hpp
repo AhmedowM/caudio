@@ -13,8 +13,9 @@
  *
  * This is the shared set of types; the writer takes plain data via
  * `ShmStatusUpdate` so `ipc` never depends on `engine::Engine` (the daemon
- * extracts the fields). Windows pattern as in `ipc_server.hpp`: local API
- * declarations unless `windows.h` is already included.
+ * extracts the fields). Windows pattern as in the internal
+ * `service/ipc_server.hpp`: local API declarations unless `windows.h` is
+ * already included.
  */
 
 #include <atomic>

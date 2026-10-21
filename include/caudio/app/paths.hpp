@@ -5,9 +5,9 @@
  * @brief File/glob/path utilities shared by all frontends.
  * @ingroup caudio_app
  * @details Moved out of the CLI shell: glob expansion for queue-add style
- * inputs, comparable path keys (separator-insensitive, like the daemon
- * matching in dispatch), and numeric-token checks. Frontends expand user
- * tokens with these, then hand file lists to App methods.
+ * inputs. Frontends expand user tokens with these, then hand file lists to
+ * App methods. The comparable path key and the numeric-token check are
+ * app-internal (`src/app/paths_internal.hpp`).
  */
 
 #include <string>
@@ -35,19 +35,5 @@ bool hasGlobChars(std::string_view s);
  */
 void expandAddToken(const std::string& token, bool recursive, std::vector<std::string>& files,
                     std::vector<std::string>& unmatched);
-
-/**
- * @brief Comparable path key: absolute + normalized (+ lowercase on Windows).
- * @ingroup caudio_app
- * @details Queued rows stored as relative paths resolve against the working
- * directory, matching rows the tooling itself added.
- */
-std::string pathKey(const std::string& p);
-
-/**
- * @brief Checks for an all-digit token (library id / position selectors).
- * @ingroup caudio_app
- */
-bool isNumeric(const std::string& s);
 
 } // namespace caudio::app

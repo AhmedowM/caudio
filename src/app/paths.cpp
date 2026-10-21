@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <app/paths_internal.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/media/audio_ext.hpp>
 #include <cctype>

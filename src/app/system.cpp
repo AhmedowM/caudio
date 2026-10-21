@@ -4,6 +4,7 @@
  * @ingroup caudio_app
  */
 
+#include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/client/client.hpp>

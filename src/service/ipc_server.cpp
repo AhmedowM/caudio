@@ -3,7 +3,6 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
-#include <caudio/service/ipc_server.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/windows_fwd.hpp>
@@ -33,6 +32,8 @@
 #endif
 
 #include <caudio/config.hpp>
+
+#include "ipc_server.hpp"
 
 #ifdef _WIN32
 namespace {

@@ -11,8 +11,9 @@
 
 #include <algorithm>
 #include <app/detail.hpp>
+#include <app/format_internal.hpp>
+#include <app/paths_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/engine/types.hpp>

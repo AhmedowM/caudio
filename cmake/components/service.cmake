@@ -3,7 +3,6 @@
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/caudio/service.cppm
   modules/caudio/service/core.cppm
-  modules/caudio/service/ipc_server.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_server.cpp

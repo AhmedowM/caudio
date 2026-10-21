@@ -5,7 +5,7 @@
  */
 
 #include <app/detail.hpp>
-#include <caudio/app/format.hpp>
+#include <app/format_internal.hpp>
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

@@ -10,6 +10,9 @@
  * not included yet, so including this header never forces `windows.h`
  * (and its `min`/`max` macros) on consumers; see `shm_status.hpp` and
  * `utils/thread.hpp` for the same pattern.
+ *
+ * Internal header: lives in `src/`, not installed. `Service` owns the
+ * server; the public surface never names it.
  */
 
 #include <caudio/fwd.hpp>

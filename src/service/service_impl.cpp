@@ -13,7 +13,6 @@
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/ipc/shm_status.hpp>
-#include <caudio/service/ipc_server.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
@@ -28,6 +27,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <service/ipc_server.hpp>
 #include <stop_token>
 #include <string>
 #include <string_view>

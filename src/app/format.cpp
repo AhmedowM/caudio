@@ -5,6 +5,7 @@
  * @details Moved verbatim out of the CLI shell (Phase 0).
  */
 
+#include <app/format_internal.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/json.hpp>
