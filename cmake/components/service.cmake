@@ -16,7 +16,7 @@ set(CAUDIO_SERVICE_SOURCES
   src/service/dispatch_config.cpp
   src/service/tag_writer.cpp
 )
-caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::ipc caudio::engine caudio::db caudio::media caudio::player caudio::utils Threads::Threads INCLUDES vendor)
+caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::config caudio::ipc caudio::engine caudio::db caudio::media caudio::player caudio::utils Threads::Threads INCLUDES vendor)
 target_link_libraries(service PRIVATE tag)
 target_include_directories(service SYSTEM PRIVATE ${CAUDIO_TAGLIB_BUILD_INCLUDES})
 if(NOT WIN32)

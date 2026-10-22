@@ -16,11 +16,13 @@
 #include <optional>
 #include <string>
 
+#include "config/raw.hpp"
+
 namespace caudio::app {
 
 AppResult App::configGet(const std::string& key) {
     // Answered from the local file: no daemon needed.
-    auto v = caudio::config::configGetRaw(config_.configPath, key);
+    auto v = caudio::config::detail::configGetRaw(config_.configPath, key);
     if (!v)
         return std::unexpected{v.error()};
     return confirm(caudio::ipc::Result{caudio::ipc::ConfigValue{key, *v}});

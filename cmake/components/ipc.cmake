@@ -1,4 +1,4 @@
-# ipc.cmake -- caudio::ipc (IPC command/result/protocol + config)
+# ipc.cmake -- caudio::ipc (IPC command/result/protocol)
 
 set(CAUDIO_IPC_MODULE_SOURCES
   modules/caudio/ipc.cppm
@@ -6,12 +6,10 @@ set(CAUDIO_IPC_MODULE_SOURCES
   modules/caudio/ipc/result.cppm
   modules/caudio/ipc/protocol.cppm
   modules/caudio/ipc/shm_status.cppm
-  modules/caudio/config.cppm
 )
 set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
   src/ipc/shm_status.cpp
-  src/config.cpp
 )
 caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::utils Threads::Threads INCLUDES vendor)
 target_include_directories(ipc SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})

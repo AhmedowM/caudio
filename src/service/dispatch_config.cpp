@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "config/raw.hpp"
 #include "service_impl.hpp"
 #include "service_paths.hpp"
 
@@ -41,7 +42,7 @@ using caudio::ipc::Shutdown;
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::ConfigGet& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-    auto vRes = caudio::config::configGetRaw(p, cmd.key);
+    auto vRes = caudio::config::detail::configGetRaw(p, cmd.key);
     if (!vRes)
         return std::unexpected{vRes.error()};
     return Result{ConfigValue{cmd.key, *vRes}};
@@ -65,7 +66,7 @@ Service::Impl::handle(const caudio::ipc::ConfigSet& cmd) {
         newLevel = *lvl;
         storedValue = std::to_string(std::to_underlying(newLevel));
     }
-    auto sRes = caudio::config::configSetRaw(p, cmd.key, storedValue);
+    auto sRes = caudio::config::detail::configSetRaw(p, cmd.key, storedValue);
     if (!sRes)
         return std::unexpected{sRes.error()};
     if (isLevel && logger_) {
@@ -78,7 +79,7 @@ Service::Impl::handle(const caudio::ipc::ConfigSet& cmd) {
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::ConfigList&) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-    auto lRes = caudio::config::configListRaw(p);
+    auto lRes = caudio::config::detail::configListRaw(p);
     if (!lRes)
         return std::unexpected{lRes.error()};
     ConfigValues cvs{};
@@ -166,14 +167,14 @@ std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::ConfigReset& cmd) {
     auto p = detail::resolveConfigPath(config_.configPath, config_.dbPath);
     if (cmd.key.has_value() && !cmd.key->empty()) {
-        auto r = caudio::config::configDeleteRaw(p, *cmd.key);
+        auto r = caudio::config::detail::configDeleteRaw(p, *cmd.key);
         if (!r)
             return std::unexpected{r.error()};
     } else if (cmd.key.has_value() && cmd.key->empty()) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty key")};
     } else {
-        auto r = caudio::config::configResetAllRaw(p);
+        auto r = caudio::config::detail::configResetAllRaw(p);
         if (!r)
             return std::unexpected{r.error()};
     }
@@ -212,7 +213,7 @@ Service::Impl::handle(const caudio::ipc::DeviceSet& cmd) {
     }
     // Save to config
     auto cfgPath = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-    auto res = caudio::config::configSetRaw(cfgPath, "device", cmd.id);
+    auto res = caudio::config::detail::configSetRaw(cfgPath, "device", cmd.id);
     if (!res) {
         return std::unexpected{res.error()};
     }
@@ -230,7 +231,7 @@ Service::Impl::handle(const caudio::ipc::DeviceTest& cmd) {
     } else {
         // Use current config device
         auto cfgPath = detail::resolveConfigPath(config_.configPath, config_.dbPath);
-        auto devRes = caudio::config::configGetRaw(cfgPath, "device");
+        auto devRes = caudio::config::detail::configGetRaw(cfgPath, "device");
         if (devRes) {
             testId = *devRes;
         } else {
