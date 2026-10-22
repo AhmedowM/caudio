@@ -1,4 +1,5 @@
-#include <caudio/client/output_formatter.hpp>
+#include "output_formatter.hpp"
+
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/types/format.hpp>
@@ -16,7 +17,7 @@
 #include <string_view>
 #include <variant>
 
-namespace caudio::client {
+namespace caudio::app::cli {
 
 std::string OutputFormatter::formatTime(double secs) {
     if (secs < 0)
@@ -386,4 +387,4 @@ int OutputFormatter::printWithStatus(const caudio::ipc::Result& r, std::ostream&
     return 0;
 }
 
-} // namespace caudio::client
+} // namespace caudio::app::cli

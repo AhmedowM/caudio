@@ -3,7 +3,7 @@
 /**
  * @file output_formatter.hpp
  * @brief Output formatting for CLI results: table and JSON output.
- * @ingroup caudio_client
+ * @ingroup caudio_app
  */
 
 #include <caudio/ipc/result.hpp>
@@ -13,7 +13,7 @@
 #include <string>
 #include <utility>
 
-namespace caudio::client {
+namespace caudio::app::cli {
 
 /**
  * @brief Formats CLI results for human-readable table output or JSON.
@@ -83,4 +83,4 @@ class OutputFormatter {
     int printWithStatus(const caudio::ipc::Result& r, std::ostream& out, std::ostream& err) const;
 };
 
-} // namespace caudio::client
+} // namespace caudio::app::cli

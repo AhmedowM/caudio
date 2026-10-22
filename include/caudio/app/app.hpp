@@ -40,9 +40,10 @@ namespace caudio::app {
 /**
  * @brief Command outcome data for frontends to render.
  * @ingroup caudio_app
- * @details handlers return this instead of printing. Frontends
- * render via OutputFormatter (bare/JSON), print `line`, or stay silent:
- * result plus line is a confirmation, result alone bare-renders, line
+ * @details handlers return this instead of printing. Frontends render the
+ * result themselves (bare/JSON), print `line`, or stay silent:
+ * result plus line is a confirmation, result alone is rendered by the
+ * frontend, line
  * alone with toStderr is a warning (exit still 0), failed lines go to
  * stderr with exit 1, quiet skips human rendering of a carried result,
  * neither is silent success.

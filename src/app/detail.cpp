@@ -1,14 +1,21 @@
 /**
  * @file detail.cpp
  * @brief App-internal reporting helpers (NOT public API).
- * @details Phase 1: builders return text instead of printing.
+ * @details Builds the human-readable text for CLI reports directly from
+ * IPC results. The CLI renderer (cli/src/shell/output_formatter.cpp) uses the
+ * same spelling for every variant so app and CLI output stay identical.
  */
 
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
-#include <caudio/client/output_formatter.hpp>
+#include <caudio/ipc/command.hpp>
+#include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/format.hpp>
+#include <caudio/types/record.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/json.hpp>
+#include <caudio/utils/print.hpp>
 #include <cstdint>
 #include <format>
 #include <set>
@@ -17,6 +24,38 @@
 #include <variant>
 
 namespace caudio::app::detail {
+
+namespace {
+
+std::string formatTime(double secs) {
+    if (secs < 0)
+        secs = 0;
+    int total = static_cast<int>(secs);
+    int h = total / 3600;
+    int m = (total % 3600) / 60;
+    int s = total % 60;
+    if (h > 0)
+        return std::format("{:02}:{:02}:{:02}", h, m, s);
+    return std::format("{:02}:{:02}", m, s);
+}
+
+std::string truncateField(const std::string& s, std::size_t maxLen = 40) {
+    if (s.empty())
+        return "---";
+    if (s.size() <= maxLen)
+        return s;
+    if (maxLen <= 3)
+        return s.substr(0, maxLen);
+    return s.substr(0, maxLen - 3) + "...";
+}
+
+template <class... Ts>
+struct Overloaded : Ts... {
+    using Ts::operator()...;
+    Overloaded(Ts... ts) : Ts(std::move(ts))... {}
+};
+
+} // namespace
 
 void emitLine(std::string& blob, const std::string& line) {
     if (!blob.empty())
@@ -44,9 +83,110 @@ void appendBlock(std::string& blob, const std::string& text) {
 }
 
 void renderInto(std::string& blob, const caudio::ipc::Result& res) {
-    caudio::client::OutputFormatter fmt{false};
     std::ostringstream os;
-    fmt.print(res, os);
+    std::visit(
+        Overloaded{
+            [&os](const caudio::ipc::Status& v) {
+                std::string stateStr(caudio::types::toString(v.state));
+                std::string posStr = formatTime(v.pos);
+                std::string durStr = formatTime(v.dur);
+                int volPct = static_cast<int>(v.vol * 100.0f);
+                caudio::println(os, "State: {}", stateStr);
+                caudio::println(os, "Pos: {} / {}", posStr, durStr);
+                if (v.muted)
+                    caudio::println(os, "Volume: muted");
+                else
+                    caudio::println(os, "Volume: {}%", volPct);
+                caudio::println(os, "Shuffle: {} Repeat: {}", v.shuffle ? "on" : "off",
+                                caudio::types::toString(v.repeat));
+                if (!v.artist.empty() && !v.title.empty()) {
+                    caudio::println(os, "Track: {} - {} [id: {}]", truncateField(v.artist, 40),
+                                    truncateField(v.title, 40), v.track_id);
+                } else if (!v.artist.empty() || !v.title.empty()) {
+                    caudio::println(os, "Track: {} [id: {}]", truncateField(v.artist + v.title, 40),
+                                    v.track_id);
+                } else if (v.track_id != 0) {
+                    caudio::println(os, "Track: [id: {}]", v.track_id);
+                }
+                if (!v.path.empty()) {
+                    caudio::println(os, "Path: {}", v.path);
+                }
+                if (v.track_id != 0 && v.q_size > 0) {
+                    caudio::println(os, "Queue: track {} of {}", v.q_idx + 1, v.q_size);
+                } else {
+                    caudio::println(os, "Queue: {} tracks", v.q_size);
+                }
+                if (!v.version.empty()) {
+                    caudio::println(os, "Version: {}", v.version);
+                }
+            },
+            [&os](const caudio::ipc::QueueTracks& v) {
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                caudio::println(os, "Queue ({} tracks):", tracksSpan.size());
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
+                                "Title", "Dur");
+                for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
+                    const auto& t = tracksSpan[i];
+                    caudio::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                    truncateField(t.artist, 40), truncateField(t.title, 40),
+                                    formatTime(t.duration));
+                }
+            },
+            [&os](const caudio::ipc::Queues& v) {
+                caudio::println(os, "Queues ({}):", v.entries.size());
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:>8} {:>6} {:>4}", "#", "ID", "Name",
+                                "Tracks", "Active", "Temp");
+                for (std::size_t i = 0; i < v.entries.size(); ++i) {
+                    const auto& q = v.entries[i];
+                    caudio::println(os, "{:3} {:6}  {:<40} {:>8} {:>6} {:>4}", i, q.id,
+                                    truncateField(q.name.empty() ? "(unnamed)" : q.name, 40),
+                                    q.tracks, q.active ? "*" : "", q.temp ? "yes" : "");
+                }
+            },
+            [&os](const caudio::ipc::PlaylistData& v) {
+                std::span<const caudio::types::Track> tracksSpan(v.tracks.data(), v.tracks.size());
+                caudio::println(os, "Playlist ({} tracks):", tracksSpan.size());
+                caudio::println(os, "{:>3} {:>6}  {:<40} {:<40} {:>8}", "#", "ID", "Artist",
+                                "Title", "Dur");
+                for (std::size_t i = 0; i < tracksSpan.size(); ++i) {
+                    const auto& t = tracksSpan[i];
+                    caudio::println(os, "{:3} {:6}  {:<40} {:<40} {:>8}", i, t.id,
+                                    truncateField(t.artist, 40), truncateField(t.title, 40),
+                                    formatTime(t.duration));
+                }
+            },
+            [&os](const caudio::types::LibraryStats& v) {
+                caudio::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
+                                v.playlists);
+            },
+            [&os](const caudio::types::LibraryStatsDetailed& v) {
+                caudio::println(os, "Library Stats (Detailed):");
+                caudio::println(os, "  Tracks:      {}", v.tracks);
+                caudio::println(os, "  Queues:      {}", v.queues);
+                caudio::println(os, "  Playlists:   {}", v.playlists);
+                double totalDurSec = v.total_duration_ms / 1000.0;
+                double totalPlaySec = v.total_play_time_ms / 1000.0;
+                caudio::println(os, "  Total Duration:  {}", formatTime(totalDurSec));
+                caudio::println(os, "  Total Play Time: {}", formatTime(totalPlaySec));
+                if (!v.most_played.empty()) {
+                    caudio::println(os, "\n  Most Played Tracks:");
+                    caudio::println(os, "  {:>3} {:>6}  {:<40} {:<40} {:>8} {:>10}", "#", "ID",
+                                    "Artist", "Title", "Dur", "Plays");
+                    for (std::size_t i = 0; i < v.most_played.size(); ++i) {
+                        const auto& t = v.most_played[i];
+                        caudio::println(os, "  {:3} {:6}  {:<40} {:<40} {:>8} {:>10}", i + 1, t.id,
+                                        truncateField(t.artist, 40), truncateField(t.title, 40),
+                                        formatTime(t.duration), t.play_count);
+                    }
+                }
+            },
+            [&os](const caudio::utils::Error& v) {
+                caudio::println(os, "Error: {} {}", caudio::utils::toString(v.code), v.message);
+            },
+            [&os, &res](const auto&) {
+                caudio::println(os, "{}", caudio::ipc::toJson(res).dump(2));
+            }},
+        res);
     appendBlock(blob, os.str());
 }
 
@@ -79,10 +219,8 @@ void countLineText(int added, std::string& out) {
 }
 
 void renderErrorInto(std::string& err, const caudio::utils::Error& e) {
-    caudio::ipc::Result errRes{e};
-    caudio::client::OutputFormatter fmt{false};
     std::ostringstream os;
-    fmt.print(errRes, os);
+    caudio::println(os, "Error: {} {}", caudio::utils::toString(e.code), e.message);
     appendBlock(err, os.str());
     if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running")
         emitLine(err, "hint: run `caudio start` to start the daemon");

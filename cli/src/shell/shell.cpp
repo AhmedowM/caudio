@@ -23,7 +23,6 @@
 #include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
-#include <caudio/client/output_formatter.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -55,6 +54,7 @@
 #include <variant>
 #include <vector>
 
+#include "output_formatter.hpp"
 #include "parse.hpp"
 #include "preview.hpp"
 #include "shell.hpp"
@@ -120,7 +120,7 @@ int renderError(const caudio::utils::Error& e) {
 }
 
 int renderJson(const caudio::ipc::Result& r) {
-    caudio::client::OutputFormatter fmt{true};
+    OutputFormatter fmt{true};
     fmt.print(r, std::cout);
     return 0;
 }
@@ -159,7 +159,7 @@ int render(caudio::app::AppResult res, bool asJson) {
         return 0;
     }
     if (outcome.result) {
-        caudio::client::OutputFormatter fmt{false};
+        OutputFormatter fmt{false};
         fmt.print(*outcome.result, std::cout);
     }
     return 0;
@@ -813,7 +813,7 @@ int Shell::run(int argc, char** argv) {
                 return 1;
             }
             using namespace std::chrono;
-            caudio::client::OutputFormatter fmt{jsonFlag};
+            OutputFormatter fmt{jsonFlag};
             while (true) {
                 caudio::client::Client client{config_.dbPath, config_.socketPath};
                 auto res =
@@ -876,7 +876,7 @@ int Shell::run(int argc, char** argv) {
                 return detail::renderError(qr.error());
             if (qTracksJson)
                 return detail::renderJson(qr->result);
-            caudio::client::OutputFormatter fmt{false, detail::useColor()};
+            OutputFormatter fmt{false, detail::useColor()};
             fmt.setHighlightTrackId(qr->highlightId);
             fmt.print(qr->result, std::cout);
             return 0;
@@ -956,7 +956,7 @@ int Shell::run(int argc, char** argv) {
                 return 0;
             if (libSearchJson)
                 return detail::renderJson(*sr->result);
-            caudio::client::OutputFormatter fmt{false, detail::useColor()};
+            OutputFormatter fmt{false, detail::useColor()};
             fmt.setHighlightNeedle(libSearchQuery);
             fmt.print(*sr->result, std::cout);
             return 0;

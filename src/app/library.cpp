@@ -8,7 +8,6 @@
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
@@ -18,7 +17,6 @@
 #include <filesystem>
 #include <format>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -56,12 +54,7 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
         table = std::move(*res);
     }
     rep.json = std::move(table);
-    {
-        caudio::client::OutputFormatter fmt{false};
-        std::ostringstream os;
-        fmt.print(*rep.json, os);
-        detail::appendBlock(rep.out, os.str());
-    }
+    detail::renderInto(rep.out, *rep.json);
     if (!queues.empty() || !playlists.empty())
         rep.out += '\n';
     if (!queues.empty()) {

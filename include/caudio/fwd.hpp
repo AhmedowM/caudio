@@ -72,10 +72,6 @@ struct HistoryEntry;
 struct Bookmark;
 } // namespace caudio::types
 
-namespace caudio::client {
-class OutputFormatter;
-} // namespace caudio::client
-
 namespace caudio::utils {
 template <typename T>
     requires std::is_trivially_copyable_v<T>
