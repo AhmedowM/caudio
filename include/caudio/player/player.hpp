@@ -60,11 +60,11 @@ namespace caudio::player {
 enum class State : uint8_t { Stopped = 0, Playing = 1, Paused = 2, Error = 3 };
 
 /**
- * @struct PlayerOpts
+ * @struct PlayerOptions
  * @brief Player configuration options
  * @ingroup caudio_player
  */
-struct PlayerOpts {
+struct PlayerOptions {
     /// Output sample rate in Hz (default: 48000)
     uint32_t sampleRate = 48000;
     /// Output channel count (default: 2)
@@ -73,6 +73,13 @@ struct PlayerOpts {
     /// threaded through to decoder/output, never from destructors.
     caudio::utils::Logger* logger{nullptr};
 };
+
+/**
+ * @brief Deprecated spelling of PlayerOptions.
+ * @ingroup caudio_player
+ * @deprecated Use `PlayerOptions` instead (kept until v2.0.0).
+ */
+using PlayerOpts [[deprecated("use PlayerOptions instead")]] = PlayerOptions; // legacy-shim-ok
 
 /**
  * @class Player
@@ -120,7 +127,7 @@ class Player {
      *
      * Thread Safety: Thread-safe. Can be called from any thread.
      */
-    static ExpectedPlayer create(const PlayerOpts& opts = {});
+    static ExpectedPlayer create(const PlayerOptions& opts = {});
 
     /**
      * @brief Destructor - stops playback and joins decode thread

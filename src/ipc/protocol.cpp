@@ -1,6 +1,8 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/format.hpp>
+#include <caudio/types/parse.hpp>
 #include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
@@ -11,6 +13,7 @@
 #include <cstdint>
 #include <exception>
 #include <expected>
+#include <format>
 #include <optional>
 #include <span>
 #include <string>
@@ -21,64 +24,6 @@
 #include <vector>
 
 namespace caudio::ipc::detail {
-
-std::string playbackStateToString(caudio::types::PlaybackState s) {
-    using PS = caudio::types::PlaybackState;
-    switch (s) {
-    case PS::Stopped:
-        return "Stopped";
-    case PS::Ready:
-        return "Ready";
-    case PS::Playing:
-        return "Playing";
-    case PS::Paused:
-        return "Paused";
-    default:
-        return "Unknown";
-    }
-}
-
-std::expected<caudio::types::PlaybackState, caudio::utils::Error>
-playbackStateFromString(std::string_view sv) {
-    using PS = caudio::types::PlaybackState;
-    if (sv == "Stopped")
-        return PS::Stopped;
-    if (sv == "Ready")
-        return PS::Ready;
-    if (sv == "Playing")
-        return PS::Playing;
-    if (sv == "Paused")
-        return PS::Paused;
-    return std::unexpected{
-        caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown PlaybackState")};
-}
-
-std::string repeatModeToString(caudio::types::RepeatMode m) {
-    using RM = caudio::types::RepeatMode;
-    switch (m) {
-    case RM::Off:
-        return "Off";
-    case RM::All:
-        return "All";
-    case RM::One:
-        return "One";
-    default:
-        return "Unknown";
-    }
-}
-
-std::expected<caudio::types::RepeatMode, caudio::utils::Error>
-repeatModeFromString(std::string_view sv) {
-    using RM = caudio::types::RepeatMode;
-    if (sv == "Off")
-        return RM::Off;
-    if (sv == "All")
-        return RM::All;
-    if (sv == "One")
-        return RM::One;
-    return std::unexpected{
-        caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "unknown RepeatMode")};
-}
 
 std::string resultCodeToString(caudio::utils::StatusCode r) {
     return std::string(caudio::utils::toString(r));
@@ -290,7 +235,7 @@ Json toJson(const Command& cmd) {
             } else if constexpr (std::is_same_v<T, QueueRepeat>) {
                 j["type"] = "QueueRepeat";
                 if (v.mode.has_value())
-                    j["mode"] = detail::repeatModeToString(*v.mode);
+                    j["mode"] = std::format("{}", *v.mode);
                 else
                     j["mode"] = nullptr;
             } else if constexpr (std::is_same_v<T, PlaylistList>) {
@@ -575,9 +520,10 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
         if (t == "QueueRepeat") {
             QueueRepeat v{};
             if (j.contains("mode") && !j["mode"].isNull() && j["mode"].isString()) {
-                auto m = detail::repeatModeFromString(j["mode"].get<std::string>());
+                auto m = caudio::types::parseRepeatMode(j["mode"].get<std::string>());
                 if (!m)
-                    return std::unexpected{m.error()};
+                    return std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::InvalidArg, "unknown RepeatMode")};
                 v.mode = *m;
             }
             return Command{std::move(v)};
@@ -851,14 +797,14 @@ Json toJson(const Result& r) {
             if constexpr (std::is_same_v<T, Status>) {
                 Json j;
                 j["type"] = "Status";
-                j["state"] = detail::playbackStateToString(v.state);
+                j["state"] = std::format("{}", v.state);
                 j["state_value"] = std::to_underlying(v.state);
                 j["pos"] = v.pos;
                 j["dur"] = v.dur;
                 j["vol"] = v.vol;
                 j["muted"] = v.muted;
                 j["shuffle"] = v.shuffle;
-                j["repeat"] = detail::repeatModeToString(v.repeat);
+                j["repeat"] = std::format("{}", v.repeat);
                 j["repeat_value"] = std::to_underlying(v.repeat);
                 j["track_id"] = v.track_id;
                 j["title"] = v.title;
@@ -1094,9 +1040,10 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
         if (t == "Status") {
             Status s{};
             if (j.contains("state") && j["state"].isString()) {
-                auto ps = detail::playbackStateFromString(j["state"].get<std::string>());
+                auto ps = caudio::types::parsePlaybackState(j["state"].get<std::string>());
                 if (!ps)
-                    return std::unexpected{ps.error()};
+                    return std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::InvalidArg, "unknown PlaybackState")};
                 s.state = *ps;
             } else if (j.contains("state_value") && j["state_value"].isNumber()) {
                 int v = j["state_value"].get<int>();
@@ -1113,9 +1060,10 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
             if (j.contains("shuffle") && j["shuffle"].isBoolean())
                 s.shuffle = j["shuffle"].get<bool>();
             if (j.contains("repeat") && j["repeat"].isString()) {
-                auto rm = detail::repeatModeFromString(j["repeat"].get<std::string>());
+                auto rm = caudio::types::parseRepeatMode(j["repeat"].get<std::string>());
                 if (!rm)
-                    return std::unexpected{rm.error()};
+                    return std::unexpected{caudio::utils::makeError(
+                        caudio::utils::StatusCode::InvalidArg, "unknown RepeatMode")};
                 s.repeat = *rm;
             } else if (j.contains("repeat_value") && j["repeat_value"].isNumber()) {
                 int v = j["repeat_value"].get<int>();

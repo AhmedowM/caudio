@@ -1,6 +1,7 @@
 #include <caudio/client/output_formatter.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/types/format.hpp>
 #include <caudio/types/record.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
@@ -115,7 +116,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
     std::visit(
         Overloaded{
             [&os](const caudio::ipc::Status& v) {
-                std::string stateStr = caudio::ipc::detail::playbackStateToString(v.state);
+                std::string stateStr = std::format("{}", v.state);
                 std::string posStr = formatTime(v.pos);
                 std::string durStr = formatTime(v.dur);
                 int volPct = static_cast<int>(v.vol * 100.0f);
@@ -126,7 +127,7 @@ void OutputFormatter::print(const caudio::ipc::Result& r, std::ostream& os) cons
                 else
                     caudio::println(os, "Volume: {}%", volPct);
                 caudio::println(os, "Shuffle: {} Repeat: {}", v.shuffle ? "on" : "off",
-                                caudio::ipc::detail::repeatModeToString(v.repeat));
+                                std::format("{}", v.repeat));
                 if (!v.artist.empty() && !v.title.empty()) {
                     caudio::println(os, "Track: {} - {} [id: {}]", truncateField(v.artist, 40),
                                     truncateField(v.title, 40), v.track_id);

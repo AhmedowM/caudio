@@ -115,40 +115,6 @@ struct IpcReply final {
 namespace detail {
 
 /**
- * @brief Convert PlaybackState enum to string representation.
- * @ingroup caudio_ipc
- * @param s Playback state to convert.
- * @return String representation ("Stopped", "Ready", "Playing", "Paused", "Unknown").
- */
-std::string playbackStateToString(caudio::types::PlaybackState s);
-
-/**
- * @brief Convert string to PlaybackState enum.
- * @ingroup caudio_ipc
- * @param sv String to parse ("Stopped", "Ready", "Playing", "Paused").
- * @return PlaybackState enum value, or error if unknown.
- */
-std::expected<caudio::types::PlaybackState, caudio::utils::Error>
-playbackStateFromString(std::string_view sv);
-
-/**
- * @brief Convert RepeatMode enum to string representation.
- * @ingroup caudio_ipc
- * @param m Repeat mode to convert.
- * @return String representation ("Off", "Queue", "One", "Unknown").
- */
-std::string repeatModeToString(caudio::types::RepeatMode m);
-
-/**
- * @brief Convert string to RepeatMode enum.
- * @ingroup caudio_ipc
- * @param sv String to parse ("Off", "Queue", "One").
- * @return RepeatMode enum value, or error if unknown.
- */
-std::expected<caudio::types::RepeatMode, caudio::utils::Error>
-repeatModeFromString(std::string_view sv);
-
-/**
  * @brief Convert StatusCode enum to string representation.
  * @ingroup caudio_ipc
  * @param r Status code to convert.

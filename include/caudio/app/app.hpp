@@ -78,8 +78,16 @@ struct BatchReport {
 using BatchResult = std::expected<BatchReport, caudio::utils::Error>;
 
 /** @brief Known tag fields accepted by tagValue. @ingroup caudio_app */
-inline constexpr std::array<std::string_view, 8> kTagFields{
+inline constexpr std::array<std::string_view, 8> tagFields{
     "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
+
+/**
+ * @brief Deprecated spelling of tagFields.
+ * @ingroup caudio_app
+ * @deprecated Use `tagFields` instead (kept until v2.0.0).
+ */
+[[deprecated("use tagFields instead")]] inline constexpr auto kTagFields =
+    tagFields; // legacy-shim-ok
 
 /** @brief True when field names a known tag field. @ingroup caudio_app */
 bool isTagField(std::string_view field);

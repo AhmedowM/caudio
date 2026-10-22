@@ -9,7 +9,8 @@
  * has to include the other. `RepeatMode` and `PlaybackState` cross the
  * daemon/client boundary (fields of `caudio::ipc::Status` and of several
  * commands) and have a fixed `int` underlying type matching the JSON wire
- * encoding (`playbackStateToString`/`repeatModeToString` in `ipc/protocol.hpp`).
+ * encoding (the wire text lives in `types/format.hpp`, its inverse in
+ * `types/parse.hpp`).
  *
  * `caudio::engine` re-exports these as aliases (see `engine/types.hpp`). This
  * layer is deliberately dependency-free (no `fwd.hpp`, no std headers) so it

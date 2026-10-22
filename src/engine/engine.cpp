@@ -364,7 +364,7 @@ Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
 }
 
 Engine::ExpectedEngine Engine::open(std::string_view path, const EngineConfig& cfg) {
-    caudio::db::DbOpts dbOpts;
+    caudio::db::DatabaseOptions dbOpts;
     dbOpts.logger = cfg.logger;
     auto dbRes = caudio::db::Database::open(path, dbOpts);
     if (!dbRes)

@@ -11,6 +11,7 @@ Covered:
     codec forwarders (include/caudio/db/json.hpp);
   * deprecated caudio/<comp>/core.hpp wrappers;
   * renamed App / Database / Engine members;
+  * renamed option structs and constants (DbOpts, PlayerOpts, kTagFields);
   * caudio::player::* / caudio::media::TrackMetadata aliases;
   * caudio::ipc::* result aliases;
   * caudio::db::* scan forwarders and LibraryStatsDetailedData.
@@ -68,6 +69,9 @@ SHIMS = [
     (r"\bcaudio::player::extractMetadata\b", "caudio::media::extractMetadata"),
     (r"\bcaudio::(?:player|media)::TrackMetadata\b", "caudio::types::TrackMetadata"),
     (r"\bcaudio::player::(DeviceInfo|DeviceList)\b", "caudio::types::\\1"),
+    # include/caudio/player/player.hpp -- unqualified on purpose: the
+    # deprecated alias is also spelled bare inside namespace caudio::player.
+    (r"\bPlayerOpts\b", "caudio::player::PlayerOptions"),
     # include/caudio/ipc/result/*.hpp
     (r"\bcaudio::ipc::CliError\b", "caudio::utils::Error"),
     (r"\bcaudio::ipc::Empty\b", "std::monostate"),
@@ -89,6 +93,9 @@ SHIMS = [
      "play(), queueList(), queueSwitch()"),
     (r"\bapp_?\s*(?:\.|->)\s*(doPlay|queues|switchQueue)\s*\(",
      "play(), queueList(), queueSwitch()"),
+    # include/caudio/app/app.hpp -- unqualified on purpose: the deprecated
+    # constant is also spelled bare inside namespace caudio::app.
+    (r"\bkTagFields\b", "caudio::app::tagFields"),
     # include/caudio/db/database.hpp
     (r"\b(?:Database|caudio::db::Database)::"
      r"(queueList|historyList|bookmarkList|libraryList)\b",
@@ -96,6 +103,9 @@ SHIMS = [
     (r"\b(?:db|db_|database|database_)\s*(?:\.|->)\s*"
      r"(queueList|historyList|bookmarkList|libraryList)\s*\(",
      "listQueueItems(), listHistory(), listBookmarks(), listLibraries()"),
+    # include/caudio/db/database.hpp -- unqualified on purpose: the deprecated
+    # alias is also spelled bare inside namespace caudio::db.
+    (r"\bDbOpts\b", "caudio::db::DatabaseOptions"),
     # include/caudio/engine/engine.hpp
     (r"\b(?:Engine|caudio::engine::Engine)::getStats\b", "stats()"),
     (r"\b(?:engine|engine_|eng)\s*(?:\.|->)\s*getStats\s*\(", "stats()"),
@@ -224,7 +234,8 @@ def main() -> int:
         print(
             f"\n{len(offenders)} offending use(s); "
             "use the canonical caudio::types:: / caudio::media:: / "
-            "caudio::utils:: spelling and the canonical "
+            "caudio::utils:: / caudio::db:: / caudio::player:: / "
+            "caudio::app:: spelling and the canonical "
             "caudio/<comp>/<domain>.hpp header instead. If the line is a "
             f"compatibility test, mark it with `// {SUPPRESS}`."
         )

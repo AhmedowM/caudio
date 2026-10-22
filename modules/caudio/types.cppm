@@ -2,4 +2,6 @@
 export module caudio.types;
 
 export import :wire;
+export import :format;
+export import :parse;
 export import :record;

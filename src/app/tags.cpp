@@ -21,7 +21,7 @@
 namespace caudio::app {
 
 bool isTagField(std::string_view field) {
-    return std::find(kTagFields.begin(), kTagFields.end(), field) != kTagFields.end();
+    return std::find(tagFields.begin(), tagFields.end(), field) != tagFields.end();
 }
 
 AppResult App::tagEdit(std::int64_t id, const std::string& field, const std::string& value) {

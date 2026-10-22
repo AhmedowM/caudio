@@ -31,13 +31,20 @@ namespace caudio::db {
  * @brief Options for opening a Database.
  * @ingroup caudio_db
  */
-struct DbOpts {
+struct DatabaseOptions {
     std::size_t writeBatchSize =
         256; ///< Queue capacity / batch size for the background writer (default 256).
     /// Non-owning logger (may be null = silent). Must outlive the Database;
     /// never emitted from destructors. Set from opts at open().
     caudio::utils::Logger* logger{nullptr};
 };
+
+/**
+ * @brief Deprecated spelling of DatabaseOptions.
+ * @ingroup caudio_db
+ * @deprecated Use `DatabaseOptions` instead (kept until v2.0.0).
+ */
+using DbOpts [[deprecated("use DatabaseOptions instead")]] = DatabaseOptions; // legacy-shim-ok
 
 /**
  * @brief Closes an owned SQLite handle (defined in core.cpp).
@@ -55,7 +62,7 @@ struct SqliteCloser {
  * dbMutex_ -> cacheMutex_. Readers take shared_lock on dbMutex_, writers
  * take unique_lock. getCachedForUse() requires the caller to already hold
  * cacheMutex_. Move operations are not thread-safe after open.
- * @see DbOpts
+ * @see DatabaseOptions
  * @see SqliteStatement
  */
 class Database final {
@@ -71,7 +78,7 @@ class Database final {
      * @param opts Options; writeBatchSize forwarded to the background writer.
      */
     // Out-of-line (core.cpp): Impl is defined there.
-    explicit Database(const DbOpts& opts);
+    explicit Database(const DatabaseOptions& opts);
     /**
      * @brief Closes the writer, clears the statement cache and resets the handle.
      * @ingroup caudio_db
@@ -97,9 +104,9 @@ class Database final {
      * Thread-safe for distinct paths; the returned Database is not shared until open returns.
      */
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
-    open(std::string_view path, const DbOpts& opts = {});
+    open(std::string_view path, const DatabaseOptions& opts = {});
     /**
-     * @brief Returns the non-owning logger from DbOpts (may be null).
+     * @brief Returns the non-owning logger from DatabaseOptions (may be null).
      * @ingroup caudio_db
      * @details For free functions (scan) that act on the database but take
      * no logger of their own. Never null-dereference; check before use.

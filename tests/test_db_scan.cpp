@@ -337,7 +337,7 @@ TEST_CASE("scanLibrary reports start/finish summary", "[db_scan]") {
     }
     std::vector<std::string> out;
     Logger logger([&](LogLevel, std::string_view msg) { out.emplace_back(msg); }, LogLevel::Trace);
-    DbOpts opts;
+    DatabaseOptions opts;
     opts.logger = &logger;
     auto dbRes = Database::open(":memory:", opts);
     REQUIRE(dbRes.has_value());

@@ -37,7 +37,7 @@ struct Database::Impl {
     explicit Impl(std::size_t batchSize = 256) : writer_(batchSize) {}
 
     std::unique_ptr<sqlite3, SqliteCloser> db_;
-    /// Non-owning log sink from DbOpts (null = silent). See DbOpts::logger.
+    /// Non-owning log sink from DatabaseOptions (null = silent). See DatabaseOptions::logger.
     caudio::utils::Logger* logger_{nullptr};
     // Lock order: dbMutex_ -> cacheMutex_.
     mutable std::shared_mutex dbMutex_;
@@ -53,7 +53,8 @@ void SqliteCloser::operator()(sqlite3* db) const noexcept {
 
 Database::Database() : impl_(std::make_unique<Impl>()) {}
 
-Database::Database(const DbOpts& opts) : impl_(std::make_unique<Impl>(opts.writeBatchSize)) {
+Database::Database(const DatabaseOptions& opts)
+    : impl_(std::make_unique<Impl>(opts.writeBatchSize)) {
     impl_->logger_ = opts.logger;
 }
 
@@ -90,8 +91,8 @@ Database::getCachedForUse(std::string_view sql) const {
     return raw;
 }
 
-std::expected<std::unique_ptr<Database>, caudio::utils::Error> Database::open(std::string_view path,
-                                                                              const DbOpts& opts) {
+std::expected<std::unique_ptr<Database>, caudio::utils::Error>
+Database::open(std::string_view path, const DatabaseOptions& opts) {
     std::string dbPath = path.empty() ? ":memory:" : std::string(path);
     sqlite3* raw = nullptr;
     int rc = sqlite3_open_v2(dbPath.c_str(), &raw,

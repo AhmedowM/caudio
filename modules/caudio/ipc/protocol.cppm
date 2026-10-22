@@ -23,12 +23,8 @@ using ::caudio::ipc::toJsonString;
 export namespace caudio::ipc::detail {
 using ::caudio::ipc::detail::errorFromJson;
 using ::caudio::ipc::detail::errorToJson;
-using ::caudio::ipc::detail::playbackStateFromString;
-using ::caudio::ipc::detail::playbackStateToString;
 using ::caudio::ipc::detail::playlistFromJson;
 using ::caudio::ipc::detail::playlistToJson;
-using ::caudio::ipc::detail::repeatModeFromString;
-using ::caudio::ipc::detail::repeatModeToString;
 using ::caudio::ipc::detail::resultCodeFromString;
 using ::caudio::ipc::detail::resultCodeToString;
 } // namespace caudio::ipc::detail

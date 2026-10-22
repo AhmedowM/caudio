@@ -256,7 +256,7 @@ TEST_CASE("Database open emits lifecycle log", "[db]") {
     using namespace caudio::utils;
     std::vector<std::string> out;
     Logger logger([&](LogLevel, std::string_view msg) { out.emplace_back(msg); }, LogLevel::Trace);
-    caudio::db::DbOpts opts;
+    caudio::db::DatabaseOptions opts;
     opts.logger = &logger;
     auto dbRes = caudio::db::Database::open(":memory:", opts);
     REQUIRE(dbRes.has_value());

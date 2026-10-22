@@ -131,7 +131,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     caudio::utils::Logger* logger = loggerPtr.get();
 
     // open DB
-    caudio::db::DbOpts dbOpts;
+    caudio::db::DatabaseOptions dbOpts;
     dbOpts.logger = logger;
     auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string(), dbOpts);
     if (!dbRes) {

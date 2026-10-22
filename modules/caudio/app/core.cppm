@@ -9,8 +9,8 @@ using ::caudio::app::AppResult;
 using ::caudio::app::BatchReport;
 using ::caudio::app::BatchResult;
 using ::caudio::app::isTagField;
-using ::caudio::app::kTagFields;
 using ::caudio::app::Outcome;
+using ::caudio::app::tagFields;
 using ::caudio::app::TagValue;
 using ::caudio::app::TrackList;
 } // namespace caudio::app

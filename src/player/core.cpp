@@ -56,7 +56,7 @@ struct Player::Impl {
     std::string lastError_;
     caudio::utils::Logger* logger_{nullptr};
 
-    bool init(const PlayerOpts& opts);
+    bool init(const PlayerOptions& opts);
     Player::ExpectedVoid open(std::string_view path);
     Player::ExpectedVoid openReader(std::unique_ptr<Reader> reader);
     Player::ExpectedVoid play();
@@ -77,7 +77,7 @@ struct Player::Impl {
 
 Player::Player() : impl_(std::make_unique<Impl>()) {}
 
-Player::ExpectedPlayer Player::create(const PlayerOpts& opts) {
+Player::ExpectedPlayer Player::create(const PlayerOptions& opts) {
     auto p = std::unique_ptr<Player>(new Player());
     if (!p->impl_->init(opts)) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Device,
@@ -139,7 +139,7 @@ std::string_view Player::lastError() const noexcept {
     return impl_->lastError();
 }
 
-bool Player::Impl::init(const PlayerOpts& opts) {
+bool Player::Impl::init(const PlayerOptions& opts) {
     sampleRate_ = opts.sampleRate ? opts.sampleRate : 48000;
     channels_ = opts.channels ? opts.channels : 2;
     logger_ = opts.logger;

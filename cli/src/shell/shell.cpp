@@ -29,6 +29,7 @@
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/service/service.hpp>
+#include <caudio/types/format.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
@@ -99,7 +100,7 @@ std::chrono::duration<double> parseDuration(std::string_view s) {
 }
 
 std::string statusLine(const caudio::ipc::Status& st) {
-    std::string s{caudio::ipc::detail::playbackStateToString(st.state)};
+    std::string s{std::format("{}", st.state)};
     std::string who;
     if (!st.artist.empty() && !st.title.empty())
         who = st.artist + " - " + st.title;

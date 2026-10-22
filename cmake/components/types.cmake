@@ -5,6 +5,8 @@
 set(CAUDIO_TYPES_MODULE_SOURCES
   modules/caudio/types.cppm
   modules/caudio/types/wire.cppm
+  modules/caudio/types/format.cppm
+  modules/caudio/types/parse.cppm
   modules/caudio/types/record.cppm
 )
 if(CAUDIO_ENABLE_MODULES)
