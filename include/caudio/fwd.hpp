@@ -60,6 +60,8 @@ class Service;
 namespace caudio::ipc {
 struct Status;
 class ShmStatusHandle;
+class ShmStatusReader;
+class ShmStatusWriter;
 } // namespace caudio::ipc
 
 namespace caudio::types {

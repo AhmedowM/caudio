@@ -12,5 +12,7 @@ using ::caudio::ipc::atomicStoreFloat;
 using ::caudio::ipc::createShmStatus;
 using ::caudio::ipc::ShmStatus;
 using ::caudio::ipc::ShmStatusHandle;
+using ::caudio::ipc::ShmStatusReader;
 using ::caudio::ipc::ShmStatusUpdate;
+using ::caudio::ipc::ShmStatusWriter;
 } // namespace caudio::ipc

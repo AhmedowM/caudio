@@ -117,10 +117,15 @@ class Service final {
     const std::string& shmName() const noexcept;
 
     /**
-     * @brief Get the shared memory status handle (if available).
-     * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
+     * @brief Get the shared memory status writer (if available).
+     * @return Pointer to ShmStatusWriter or nullptr if SHM creation failed.
      */
-    caudio::ipc::ShmStatusHandle* shmHandle() noexcept;
+    caudio::ipc::ShmStatusWriter* shmWriter() noexcept;
+
+    /** @brief Deprecated spelling for shmWriter(). @ingroup caudio_service */
+    caudio::ipc::ShmStatusWriter* shmHandle() noexcept {
+        return shmWriter();
+    }
 
     /**
      * @brief Private constructor used by create().
@@ -129,7 +134,7 @@ class Service final {
             std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
             std::string socketPath, std::intptr_t lockFd,
-            std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName);
+            std::unique_ptr<caudio::ipc::ShmStatusWriter> shmWriter, std::string shmName);
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

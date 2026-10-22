@@ -100,6 +100,8 @@ inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept;
 /**
  * @brief RAII owner of the shared-memory segment (creator or reader side).
  * @ingroup caudio_ipc
+ * @deprecated Use `ShmStatusReader` or `ShmStatusWriter`; this type exposes
+ * both sides and remains until v2.0.0.
  */
 class ShmStatusHandle {
   public:
@@ -163,6 +165,97 @@ class ShmStatusHandle {
     std::string name_;
     bool create_{false};
     std::intptr_t handle_{-1};
+};
+
+/**
+ * @brief Client-side read view of the shared-memory status segment.
+ * @ingroup caudio_ipc
+ * @details Split from `ShmStatusHandle`; exposes only snapshot reads.
+ */
+class ShmStatusReader {
+  public:
+    /** @brief Result of opening a segment. */
+    using ExpectedShm = std::expected<ShmStatusReader, caudio::utils::Error>;
+
+    /**
+     * @brief Opens an existing segment read-only.
+     * @ingroup caudio_ipc
+     * @param name Platform segment name (derived from the database path).
+     */
+    static ExpectedShm openReadOnly(const std::string& name);
+
+    /** @brief Unmaps and closes (idempotent). */
+    ~ShmStatusReader();
+
+    ShmStatusReader(const ShmStatusReader&) = delete;
+    ShmStatusReader& operator=(const ShmStatusReader&) = delete;
+
+    /** @brief Move-constructs, transferring the mapping. */
+    ShmStatusReader(ShmStatusReader&& other) noexcept;
+    /** @brief Move-assigns, transferring the mapping. */
+    ShmStatusReader& operator=(ShmStatusReader&& other) noexcept;
+
+    /** @brief True when the mapping is live. */
+    bool valid() const noexcept;
+    /** @brief Segment name. */
+    const std::string& name() const noexcept;
+    /** @brief Seqlock reader: returns a snapshot copy of the status. */
+    ShmStatus snapshot() const;
+
+  private:
+    explicit ShmStatusReader(ShmStatusHandle handle) noexcept;
+
+    ShmStatusHandle handle_;
+};
+
+/**
+ * @brief Daemon-side write view of the shared-memory status segment.
+ * @ingroup caudio_ipc
+ * @details Split from `ShmStatusHandle`; exposes only publishing.
+ */
+class ShmStatusWriter {
+  public:
+    /** @brief Result of creating a segment. */
+    using ExpectedShm = std::expected<ShmStatusWriter, caudio::utils::Error>;
+
+    /**
+     * @brief Creates the segment by name.
+     * @ingroup caudio_ipc
+     * @param name Platform segment name (derived from the database path).
+     */
+    static ExpectedShm create(const std::string& name);
+
+    /** @brief Unmaps and closes (idempotent). */
+    ~ShmStatusWriter();
+
+    ShmStatusWriter(const ShmStatusWriter&) = delete;
+    ShmStatusWriter& operator=(const ShmStatusWriter&) = delete;
+
+    /** @brief Move-constructs, transferring the mapping. */
+    ShmStatusWriter(ShmStatusWriter&& other) noexcept;
+    /** @brief Move-assigns, transferring the mapping. */
+    ShmStatusWriter& operator=(ShmStatusWriter&& other) noexcept;
+
+    /** @brief True when the mapping is live. */
+    bool valid() const noexcept;
+    /** @brief Segment name. */
+    const std::string& name() const noexcept;
+
+    /**
+     * @brief Seqlock writer: publishes position/volume/state/track/title/artist.
+     * @param u Plain data; no `engine::Engine` needed at this layer.
+     */
+    void publish(const ShmStatusUpdate& u) noexcept;
+
+    /** @brief Publishes the track duration. */
+    void setDuration(double dur) noexcept;
+    /** @brief Publishes the queue size. */
+    void setQueueSize(size_t sz) noexcept;
+
+  private:
+    explicit ShmStatusWriter(ShmStatusHandle handle) noexcept;
+
+    ShmStatusHandle handle_;
 };
 
 /**

@@ -4,6 +4,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/ipc/shm_status.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
@@ -252,6 +253,41 @@ TEST_CASE("library stats command roundtrip", "[ipc]") {
     REQUIRE(legacyCmd != nullptr);
     REQUIRE(legacyCmd->top_n.has_value());
     CHECK(*legacyCmd->top_n == 3);
+}
+
+TEST_CASE("shm status reader/writer roundtrip", "[ipc][shm]") {
+    const std::string name =
+        "test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    auto writerRes = caudio::ipc::ShmStatusWriter::create(name);
+    REQUIRE(writerRes.has_value());
+    auto& writer = *writerRes;
+
+    caudio::ipc::ShmStatusUpdate update{};
+    update.position = 12.5;
+    update.volume = 0.5f;
+    update.muted = true;
+    update.state = 2;
+    update.track_id = 42;
+    update.title = "Song";
+    update.artist = "Artist";
+    writer.publish(update);
+    writer.setDuration(180.0);
+    writer.setQueueSize(3);
+
+    auto readerRes = caudio::ipc::ShmStatusReader::openReadOnly(name);
+    REQUIRE(readerRes.has_value());
+    const auto snapshot = readerRes->snapshot();
+    CHECK(snapshot.position == 12.5);
+    CHECK(snapshot.duration == 180.0);
+    CHECK(snapshot.volume == 0.5f);
+    CHECK(snapshot.muted);
+    CHECK(snapshot.state == 2);
+    CHECK(snapshot.track_id == 42);
+    CHECK(snapshot.queueSize == 3);
+    CHECK(std::string{snapshot.title} == "Song");
+    CHECK(std::string{snapshot.artist} == "Artist");
+    CHECK(writer.valid());
+    CHECK(readerRes->valid());
 }
 
 TEST_CASE("command roundtrip - volume", "[ipc][cli]") {

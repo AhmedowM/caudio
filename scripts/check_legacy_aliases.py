@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Guard: reject new uses of the deprecated caudio spellings.
 
-Every entry below has a canonical spelling (see the deprecation inventory in
-.dev/public_api_audit_v2.md) and the old spelling only exists as a
+Every entry below has a canonical spelling (see the shim roster below and
+`include/caudio/legacy_aliases.hpp`) and the old spelling only exists as a
 compatibility shim until v2.0.0. New first-party code -- sources, headers,
 tests, modules, examples -- must use the canonical spelling directly.
 

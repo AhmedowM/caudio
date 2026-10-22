@@ -188,19 +188,19 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     // Create shared memory status block for event-driven status snapshots
     // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
     std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
-    auto shmRes = caudio::ipc::createShmStatus(shmName, true);
+    auto shmRes = caudio::ipc::ShmStatusWriter::create(shmName);
     if (!shmRes) {
         // Non-fatal: continue without shm (clients fall back to IPC status).
         loggerPtr->warn("shm status unavailable: {} (falling back to IPC status)",
                         shmRes.error().message);
     }
-    std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle;
+    std::unique_ptr<caudio::ipc::ShmStatusWriter> shmWriter;
     if (shmRes)
-        shmHandle = std::make_unique<caudio::ipc::ShmStatusHandle>(std::move(*shmRes));
+        shmWriter = std::make_unique<caudio::ipc::ShmStatusWriter>(std::move(*shmRes));
 
     auto svc = std::unique_ptr<Service>(
         new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath,
-                    spStr, lockFd, std::move(shmHandle), shmName));
+                    spStr, lockFd, std::move(shmWriter), shmName));
     svc->impl_->logger_->info("daemon started version={} pid={} db={} socket={}",
                               caudio::version::version(), pidStr, cfg.dbPath.generic_string(),
                               spStr);
@@ -211,19 +211,19 @@ Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database>
                  std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                  std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                  std::string socketPath, std::intptr_t lockFd,
-                 std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName)
+                 std::unique_ptr<caudio::ipc::ShmStatusWriter> shmWriter, std::string shmName)
     : impl_(std::make_unique<Impl>(cfg, std::move(db), std::move(eng), std::move(srv),
                                    std::move(logger), std::move(pidPath), std::move(socketPath),
-                                   lockFd, std::move(shmHandle), std::move(shmName))) {}
+                                   lockFd, std::move(shmWriter), std::move(shmName))) {}
 
 Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
                     std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                     std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                     std::string socketPath, std::intptr_t lockFd,
-                    std::unique_ptr<caudio::ipc::ShmStatusHandle> shmHandle, std::string shmName)
+                    std::unique_ptr<caudio::ipc::ShmStatusWriter> shmWriter, std::string shmName)
     : config_(cfg), db_(std::move(db)), engine_(std::move(eng)), server_(std::move(srv)),
       logger_(std::move(logger)), pidPath_(std::move(pidPath)), socketPath_(std::move(socketPath)),
-      lockFd_(lockFd), shmHandle_(std::move(shmHandle)), shmName_(std::move(shmName)) {}
+      lockFd_(lockFd), shmWriter_(std::move(shmWriter)), shmName_(std::move(shmName)) {}
 
 caudio::utils::Expected<void> Service::run(std::stop_token st) {
     return impl_->run(st);
@@ -326,15 +326,15 @@ const std::string& Service::shmName() const noexcept {
     return impl_->shmName_;
 }
 /**
- * @brief Get the shared memory status handle (if available).
- * @return Pointer to ShmStatusHandle or nullptr if SHM creation failed.
+ * @brief Get the shared memory status writer (if available).
+ * @return Pointer to ShmStatusWriter or nullptr if SHM creation failed.
  */
-caudio::ipc::ShmStatusHandle* Service::shmHandle() noexcept {
-    return impl_->shmHandle_.get();
+caudio::ipc::ShmStatusWriter* Service::shmWriter() noexcept {
+    return impl_->shmWriter_.get();
 }
 
 void Service::Impl::updateShmStatus() {
-    if (!shmHandle_ || !shmHandle_->valid())
+    if (!shmWriter_ || !shmWriter_->valid())
         return;
     auto& eng = *engine_;
     int64_t track_id = eng.currentTrackId();
@@ -363,10 +363,10 @@ void Service::Impl::updateShmStatus() {
     u.track_id = track_id;
     u.title = title;
     u.artist = artist;
-    shmHandle_->publish(u);
-    shmHandle_->setQueueSize(qSize);
+    shmWriter_->publish(u);
+    shmWriter_->setQueueSize(qSize);
     if (track_id != 0) {
-        shmHandle_->setDuration(duration);
+        shmWriter_->setDuration(duration);
     }
 }
 
