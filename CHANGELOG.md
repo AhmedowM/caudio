@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `caudio bookmark add|list|remove|goto` for per-track position bookmarks,
+  with optional notes and `--json` output (`52f3dbe`)
+- Cross-session resume: the engine persists its resume position and the new
+  `autoResumeOnPlay` config key restores it on the next play (`7891ef8`,
+  `ae70457`)
+- `caudio::config` component for the shared config model and path helpers;
+  `app`, `client`, `service` and the CLI link it directly (`030901c`)
+- `ipc::ShmStatusReader` and `ipc::ShmStatusWriter`, splitting the shared
+  status block into read and write surfaces (`92e6b4f`)
+- `types/format.hpp` and `types/parse.hpp` for `PlaybackState`/`RepeatMode`
+  formatting and parsing (`693f4a9`)
+- `Database::libraryStats()` with optional most-played tracks, and
+  `types::LibraryStats` as the single stats shape (`38e68e3`)
+- `App::status`, `App::info`, `App::setVolume`, and `Client::probe` (`f76f6cf`)
+
+### Changed
+- Public headers grouped by domain (`types/`, `media/`, `ipc/command/`,
+  `ipc/result/`, `engine/`, `db/`) and CMake targets split per component;
+  `ipc` now depends only on `config` and `utils` (`071074a`, `135c327`,
+  `030901c`)
+- Canonical spellings: `App::play`, `App::queueList`, `App::queueSwitch`,
+  `Engine::stats`, and `Database::listQueueItems`/`listHistory`/
+  `listBookmarks`/`listLibraries`; option structs renamed to
+  `DatabaseOptions`, `PlayerOptions` and `tagFields` (`63bfc03`, `d9f11cb`,
+  `693f4a9`, `5cbc4ec`)
+- `libraryStats` is one IPC `LibraryStats` command with optional `top_n`;
+  totals are always computed, `most_played` is optional, and the detailed
+  JSON `"type"` is now `"LibraryStats"` (`38e68e3`)
+- `App` owns status/info/volume and preview/daemon-host seams; the `app`
+  target no longer links `player`, `db` or `service`, and `OutputFormatter`
+  moved to the CLI shell (`f76f6cf`, `76ac406`, `be4fab5`, `636283e`)
+- Raw locking/handle access on `Database`/`Engine` is private behind
+  `db::DatabaseAccess` / `engine::detail::ServiceAccess`; media scanning is
+  split at the `media`/`db` seam (`7348165`, `6eedbf8`)
+- `IpcServer`, the file log sink, write thread, MPSC queue, move-only
+  function and engine runtime state are internal (`cda41ff`, `0902275`)
+
+### Deprecated
+- Old member spellings (`App::doPlay`, `App::queues`, `App::switchQueue`,
+  `Database::{queueList,historyList,bookmarkList,libraryList}`,
+  `Engine::getStats`, `Engine::lastError`, `Player::lastError`), option
+  aliases (`DbOpts`, `PlayerOpts`, `kTagFields`), `caudio/<comp>/core.hpp`
+  wrappers, newly moved `player`/`ipc`/`db` record aliases (`DeviceInfo`,
+  `DeviceList`, `TrackMetadata`, `LibraryStatsData`,
+  `LibraryStatsDetailedData`, `ScanMode` and scan forwarders),
+  `LibraryStatsDetailed`, and `ShmStatusHandle`/`createShmStatus`. All are
+  removed in v2.0.0.
+
+### Removed
+- Dead public API: `Client::snapshotStatus`, `AudioOutput::isPlaying`,
+  `Database::queuePeek*`, and the `IpcChannel`/`frameMessage`/
+  `deframeMessage` framing layer; `fillFromRing` moved to an internal
+  helper (`d8e4b48`)
+
+### Fixed
+- The IPC accept loop recovers from a broken pipe instead of terminating
+  (`71c704d`)
+- Windows config-directory resolution now matches the other platforms
+  (`120a928`)
+
 ## [v1.8.0] - 2026-10-19
 
 ### Added
