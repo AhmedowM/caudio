@@ -1490,13 +1490,13 @@ std::expected<DbStats, caudio::utils::Error> Database::getStats() {
     return s;
 }
 
-std::expected<caudio::types::LibraryStatsDetailed, caudio::utils::Error>
-Database::libraryStatsDetailed(int topN) {
+std::expected<caudio::types::LibraryStats, caudio::utils::Error>
+Database::libraryStats(std::optional<int> mostPlayed) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    caudio::types::LibraryStatsDetailed d{};
+    caudio::types::LibraryStats d{};
     std::unique_lock cacheLk{impl_->cacheMutex_};
 
     // Total tracks, queues, playlists
@@ -1534,21 +1534,24 @@ Database::libraryStatsDetailed(int topN) {
         st.reset();
     }
 
-    // Most played tracks (top N; none when N is 0).
-    if (topN > 0) {
-        std::string sql =
-            std::string(internal::kSelectTracksCols) +
-            " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT " +
-            std::to_string(topN);
-        auto sRes = getCachedForUse(sql);
-        if (sRes) {
-            SqliteStatement& st = *(*sRes);
-            while (st.step()) {
-                caudio::types::Track t;
-                internal::fillTrackFromStmt(st.get(), t);
-                d.most_played.push_back(std::move(t));
+    // Most played tracks: engaged only when requested (empty when N is 0).
+    if (mostPlayed) {
+        d.most_played.emplace();
+        if (*mostPlayed > 0) {
+            std::string sql =
+                std::string(internal::kSelectTracksCols) +
+                " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT " +
+                std::to_string(*mostPlayed);
+            auto sRes = getCachedForUse(sql);
+            if (sRes) {
+                SqliteStatement& st = *(*sRes);
+                while (st.step()) {
+                    caudio::types::Track t;
+                    internal::fillTrackFromStmt(st.get(), t);
+                    d.most_played->push_back(std::move(t));
+                }
+                st.reset();
             }
-            st.reset();
         }
     }
 

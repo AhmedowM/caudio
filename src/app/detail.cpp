@@ -156,10 +156,11 @@ void renderInto(std::string& blob, const caudio::ipc::Result& res) {
                 }
             },
             [&os](const caudio::types::LibraryStats& v) {
-                caudio::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
-                                v.playlists);
-            },
-            [&os](const caudio::types::LibraryStatsDetailed& v) {
+                if (!v.most_played) {
+                    caudio::println(os, "Tracks: {} Queues: {} Playlists: {}", v.tracks, v.queues,
+                                    v.playlists);
+                    return;
+                }
                 caudio::println(os, "Library Stats (Detailed):");
                 caudio::println(os, "  Tracks:      {}", v.tracks);
                 caudio::println(os, "  Queues:      {}", v.queues);
@@ -168,12 +169,12 @@ void renderInto(std::string& blob, const caudio::ipc::Result& res) {
                 double totalPlaySec = v.total_play_time_ms / 1000.0;
                 caudio::println(os, "  Total Duration:  {}", formatTime(totalDurSec));
                 caudio::println(os, "  Total Play Time: {}", formatTime(totalPlaySec));
-                if (!v.most_played.empty()) {
+                if (!v.most_played->empty()) {
                     caudio::println(os, "\n  Most Played Tracks:");
                     caudio::println(os, "  {:>3} {:>6}  {:<40} {:<40} {:>8} {:>10}", "#", "ID",
                                     "Artist", "Title", "Dur", "Plays");
-                    for (std::size_t i = 0; i < v.most_played.size(); ++i) {
-                        const auto& t = v.most_played[i];
+                    for (std::size_t i = 0; i < v.most_played->size(); ++i) {
+                        const auto& t = (*v.most_played)[i];
                         caudio::println(os, "  {:3} {:6}  {:<40} {:<40} {:>8} {:>10}", i + 1, t.id,
                                         truncateField(t.artist, 40), truncateField(t.title, 40),
                                         formatTime(t.duration), t.play_count);

@@ -32,11 +32,11 @@ namespace caudio::ipc {
  * @see resultFromJson for deserialization
  * @see protocol.cppm for IPC framing
  */
-using Result = std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
-                            caudio::types::LibraryStats, caudio::types::LibraryStatsDetailed,
-                            Tracks, SearchResults, Playlists, PlaylistData, PlaylistCreated,
-                            PlaylistImportReport, ScanReport, ConfigValue, ConfigValues,
-                            SingleTrack, TrackInfo, History, Bookmarks, Empty, CliError, Devices>;
+using Result =
+    std::variant<Status, QueueTracks, Queues, QueueCreated, PlaylistLoaded, VolumeInfo,
+                 caudio::types::LibraryStats, Tracks, SearchResults, Playlists, PlaylistData,
+                 PlaylistCreated, PlaylistImportReport, ScanReport, ConfigValue, ConfigValues,
+                 SingleTrack, TrackInfo, History, Bookmarks, Empty, CliError, Devices>;
 
 /**
  * @brief Expected type for results that can fail with a CLI error.

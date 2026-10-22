@@ -294,9 +294,8 @@ Json toJson(const Command& cmd) {
                 j["limit"] = v.limit;
             } else if constexpr (std::is_same_v<T, LibraryStats>) {
                 j["type"] = "LibraryStats";
-            } else if constexpr (std::is_same_v<T, LibraryStatsDetailed>) {
-                j["type"] = "LibraryStatsDetailed";
-                j["top_n"] = v.top_n;
+                if (v.top_n)
+                    j["top_n"] = *v.top_n;
             } else if constexpr (std::is_same_v<T, LibraryAdd>) {
                 j["type"] = "LibraryAdd";
                 j["path"] = v.path;
@@ -627,12 +626,12 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j) {
                 lim = j["limit"].get<int>();
             return Command{LibrarySearch{std::move(q), lim}};
         }
-        if (t == "LibraryStats")
-            return Command{LibraryStats{}};
-        if (t == "LibraryStatsDetailed") {
-            LibraryStatsDetailed v{};
+        if (t == "LibraryStats" || t == "LibraryStatsDetailed") {
+            LibraryStats v{};
             if (j.contains("top_n") && j["top_n"].isNumber())
                 v.top_n = j["top_n"].get<int>();
+            else if (t == "LibraryStatsDetailed")
+                v.top_n = 10;
             return Command{std::move(v)};
         }
         if (t == "LibraryAdd") {
@@ -859,18 +858,13 @@ Json toJson(const Result& r) {
                 j["tracks"] = v.tracks;
                 j["queues"] = v.queues;
                 j["playlists"] = v.playlists;
-                return j;
-            } else if constexpr (std::is_same_v<T, caudio::types::LibraryStatsDetailed>) {
-                Json j;
-                j["type"] = "LibraryStatsDetailed";
-                j["tracks"] = v.tracks;
-                j["queues"] = v.queues;
-                j["playlists"] = v.playlists;
                 j["total_duration_ms"] = v.total_duration_ms;
                 j["total_play_time_ms"] = v.total_play_time_ms;
-                j["most_played"] = Json::array();
-                for (const auto& t : v.most_played)
-                    j["most_played"].push_back(caudio::utils::trackToJson(t));
+                if (v.most_played) {
+                    j["most_played"] = Json::array();
+                    for (const auto& t : *v.most_played)
+                        j["most_played"].push_back(caudio::utils::trackToJson(t));
+                }
                 return j;
             } else if constexpr (std::is_same_v<T, Tracks>) {
                 Json j;
@@ -1157,18 +1151,8 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                 vi.muted = j["muted"].get<bool>();
             return Result{std::move(vi)};
         }
-        if (t == "LibraryStats") {
+        if (t == "LibraryStats" || t == "LibraryStatsDetailed") {
             caudio::types::LibraryStats ls{};
-            if (j.contains("tracks") && j["tracks"].isNumber())
-                ls.tracks = j["tracks"].get<std::size_t>();
-            if (j.contains("queues") && j["queues"].isNumber())
-                ls.queues = j["queues"].get<std::size_t>();
-            if (j.contains("playlists") && j["playlists"].isNumber())
-                ls.playlists = j["playlists"].get<std::size_t>();
-            return Result{std::move(ls)};
-        }
-        if (t == "LibraryStatsDetailed") {
-            caudio::types::LibraryStatsDetailed ls{};
             if (j.contains("tracks") && j["tracks"].isNumber())
                 ls.tracks = j["tracks"].get<std::size_t>();
             if (j.contains("queues") && j["queues"].isNumber())
@@ -1180,6 +1164,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
             if (j.contains("total_play_time_ms") && j["total_play_time_ms"].isNumber())
                 ls.total_play_time_ms = j["total_play_time_ms"].get<int64_t>();
             if (j.contains("most_played") && j["most_played"].isArray()) {
+                ls.most_played.emplace();
                 const Json mostPlayed = j["most_played"];
                 for (std::size_t ti = 0, tn = mostPlayed.size(); ti < tn; ++ti) {
                     auto jt = mostPlayed.at(ti);
@@ -1188,8 +1173,10 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     auto tr = caudio::utils::trackFromJson(*jt);
                     if (!tr)
                         return std::unexpected{tr.error()};
-                    ls.most_played.push_back(std::move(*tr));
+                    ls.most_played->push_back(std::move(*tr));
                 }
+            } else if (t == "LibraryStatsDetailed") {
+                ls.most_played.emplace();
             }
             return Result{std::move(ls)};
         }

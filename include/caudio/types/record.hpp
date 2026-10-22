@@ -6,16 +6,16 @@
  * @ingroup caudio_types
  * @details Value structs shared across the db, engine, ipc and app layers:
  * Track, Playlist, QueueItem, HistoryEntry, Bookmark, DeviceInfo, DeviceList,
- * TrackMetadata, LibraryStats and LibraryStatsDetailed. All are trivially
- * copyable aggregates with default-initialised members; no invariants beyond
- * those documented per-field. `caudio::db`, `caudio::player` and `caudio::ipc`
- * keep aliases for the old spellings until v2.0.0 (the db shims live in
- * `legacy_aliases.hpp`).
+ * TrackMetadata and LibraryStats. All are default-initialised aggregates; no
+ * invariants beyond those documented per-field. `caudio::db`, `caudio::player`
+ * and `caudio::ipc` keep aliases for the old spellings until v2.0.0 (the db
+ * shims live in `legacy_aliases.hpp`).
  */
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -167,31 +167,29 @@ struct TrackMetadata {
 };
 
 /**
- * @brief Basic library statistics (three-field wire projection).
+ * @brief Library statistics with always-computed totals and optional top-N history.
  * @ingroup caudio_types
- * @details Deliberately narrower than `LibraryStatsDetailed`: `queues` means
- * queue items here, matching the IPC `LibraryStats` result. Produced from
- * `Database::getStats()`.
+ * @details Canonical stats shape for `Database::libraryStats()` and the IPC
+ * `LibraryStats` result. Totals are always populated; `most_played` is engaged
+ * only when the caller asked for the top-N list, and an engaged empty vector
+ * means "totals only" (top_n == 0). `queues` counts queue items.
  */
 struct LibraryStats {
-    std::size_t tracks{0};    ///< Total number of tracks in the library.
-    std::size_t queues{0};    ///< Total number of queue items.
-    std::size_t playlists{0}; ///< Total number of playlists.
+    std::size_t tracks{0};              ///< Total live tracks.
+    std::size_t queues{0};              ///< Total queue items.
+    std::size_t playlists{0};           ///< Total playlists.
+    std::int64_t total_duration_ms{0};  ///< Sum of durations (ms).
+    std::int64_t total_play_time_ms{0}; ///< Sum of play_count * duration (ms).
+    /// Top most-played tracks (play_count DESC); nullopt when not requested.
+    std::optional<std::vector<Track>> most_played{};
 };
 
 /**
- * @brief Detailed library statistics including play history.
+ * @brief Compatibility spelling of `LibraryStats`.
  * @ingroup caudio_types
- * @details Canonical definition shared by `Database::libraryStatsDetailed()`
- * and the IPC `LibraryStatsDetailed` result.
+ * @deprecated Use `LibraryStats` and check `most_played` for the detailed
+ * projection. Kept until v2.0.0.
  */
-struct LibraryStatsDetailed {
-    std::size_t tracks{0};            ///< Total live tracks.
-    std::size_t queues{0};            ///< Total queue items.
-    std::size_t playlists{0};         ///< Total playlists.
-    int64_t total_duration_ms{0};     ///< Sum of durations (ms).
-    int64_t total_play_time_ms{0};    ///< Sum of play_count * duration (ms).
-    std::vector<Track> most_played{}; ///< Top most-played tracks (play_count DESC).
-};
+using LibraryStatsDetailed = LibraryStats;
 
 } // namespace caudio::types

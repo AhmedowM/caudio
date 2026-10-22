@@ -39,20 +39,13 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
         return BatchReport::fail("library stats: --most-played needs N >= 0");
     BatchReport rep;
     std::optional<caudio::ipc::Result> table;
-    bool detailed = mostPlayed >= 0;
-    if (detailed) {
-        caudio::ipc::Command cmd{caudio::ipc::LibraryStatsDetailed{mostPlayed}};
-        auto res = sendRaw(cmd);
-        if (!res)
-            return std::unexpected{res.error()};
-        table = std::move(*res);
-    } else {
-        caudio::ipc::Command cmd{caudio::ipc::LibraryStats{}};
-        auto res = sendRaw(cmd);
-        if (!res)
-            return std::unexpected{res.error()};
-        table = std::move(*res);
-    }
+    caudio::ipc::Command cmd{caudio::ipc::LibraryStats{}};
+    if (mostPlayed >= 0)
+        cmd = caudio::ipc::Command{caudio::ipc::LibraryStats{mostPlayed}};
+    auto statsRes = sendRaw(cmd);
+    if (!statsRes)
+        return std::unexpected{statsRes.error()};
+    table = std::move(*statsRes);
     rep.json = std::move(table);
     detail::renderInto(rep.out, *rep.json);
     if (!queues.empty() || !playlists.empty())

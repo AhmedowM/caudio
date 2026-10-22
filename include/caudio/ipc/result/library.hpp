@@ -18,48 +18,36 @@ namespace caudio::ipc {
 // Library Statistics Results
 // ---------------------------------------------------------------------------
 
-// Note: the canonical types are `caudio::types::LibraryStats` and
-// `caudio::types::LibraryStatsDetailed`. The IPC spellings below are
-// compatibility aliases kept until v2.0.0 -- the IPC `LibraryStats` command
-// owns the bare name, so the result types cannot use it.
+// The canonical type is `caudio::types::LibraryStats`; the IPC spellings
+// below are compatibility aliases kept until v2.0.0.
 
 /**
- * @brief Basic library statistics (returned by LibraryStats and QueueQueues).
+ * @brief Library statistics (returned by LibraryStats).
  * @ingroup caudio_ipc
  * @details Same-type alias of `caudio::types::LibraryStats`; kept for IPC
- * source compatibility. JSON shape is unchanged.
+ * source compatibility.
  *
  * @deprecated Use `caudio::types::LibraryStats` instead. The IPC spelling is a
  * compatibility alias kept until v2.0.0.
  *
- * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20}
- *
- * @param tracks Total number of tracks in the library.
- * @param queues Total number of queue items.
- * @param playlists Total number of playlists.
+ * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20,
+ * "total_duration_ms": 36000000, "total_play_time_ms": 7200000}
  */
 using LibraryStatsData = caudio::types::LibraryStats;
 
 /**
- * @brief Detailed library statistics including play history (returned by LibraryStatsDetailed).
+ * @brief Compatibility spelling of `LibraryStats` for the detailed projection.
  * @ingroup caudio_ipc
- * @details Same-type alias of `caudio::types::LibraryStatsDetailed`; kept for
- * IPC source compatibility. JSON shape is unchanged.
+ * @details Same-type alias of `caudio::types::LibraryStats`; kept for IPC
+ * source compatibility.
  *
- * @deprecated Use `caudio::types::LibraryStatsDetailed` instead. The IPC
- * spelling is a compatibility alias kept until v2.0.0.
+ * @deprecated Use `caudio::types::LibraryStats` instead. The IPC spelling is a
+ * compatibility alias kept until v2.0.0.
  *
- * @json_example {"type": "LibraryStatsDetailed", "tracks": 1000, "queues": 5, "playlists": 20,
+ * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20,
  * "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
- *
- * @param tracks Total number of tracks in the library.
- * @param queues Total number of queues.
- * @param playlists Total number of playlists.
- * @param total_duration_ms Total duration of all tracks in milliseconds.
- * @param total_play_time_ms Total play time across all tracks in milliseconds.
- * @param most_played Most played tracks (up to 10).
  */
-using LibraryStatsDetailedData = caudio::types::LibraryStatsDetailed;
+using LibraryStatsDetailedData = caudio::types::LibraryStats;
 
 // ---------------------------------------------------------------------------
 // Track and Playlist Results

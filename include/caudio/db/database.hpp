@@ -780,15 +780,23 @@ class Database final {
     std::expected<DbStats, caudio::utils::Error> getStats();
 
     /**
-     * @brief Returns detailed library stats (counts, durations, most-played).
+     * @brief Returns library stats (counts and totals, optionally most-played).
      * @ingroup caudio_db
-     * @param topN Maximum most-played entries (0 = totals only).
-     * @return Detailed stats or Error.
+     * @param mostPlayed Omitted for the summary projection (totals only); a
+     * value requests that many most-played entries (0 = totals only).
+     * @return Stats or Error.
      * @par Thread safety
      * Thread-safe: shared_lock + cacheMutex_.
      */
-    std::expected<caudio::types::LibraryStatsDetailed, caudio::utils::Error>
-    libraryStatsDetailed(int topN = 10);
+    std::expected<caudio::types::LibraryStats, caudio::utils::Error>
+    libraryStats(std::optional<int> mostPlayed = std::nullopt);
+
+    /** @brief Deprecated spelling for libraryStats(topN). @ingroup caudio_db */
+    [[deprecated("use libraryStats(std::optional<int>) instead")]]
+    std::expected<caudio::types::LibraryStats, caudio::utils::Error>
+    libraryStatsDetailed(int topN = 10) {
+        return libraryStats(topN);
+    }
 
 }; // class Database
 

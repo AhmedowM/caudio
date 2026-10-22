@@ -54,7 +54,6 @@ using caudio::ipc::LibraryRemove;
 using caudio::ipc::LibraryScan;
 using caudio::ipc::LibrarySearch;
 using caudio::ipc::LibraryStats;
-using caudio::ipc::LibraryStatsDetailed;
 using caudio::ipc::PlaylistAdd;
 using caudio::ipc::PlaylistCreate;
 using caudio::ipc::PlaylistDelete;
@@ -134,20 +133,11 @@ Service::Impl::handle(const caudio::ipc::LibrarySearch& cmd) {
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::Impl::handle(const caudio::ipc::LibraryStats&) {
-    auto st = db_->getStats();
-    if (!st)
-        return std::unexpected{st.error()};
-    caudio::types::LibraryStats d{};
-    d.tracks = static_cast<std::size_t>(st->num_tracks);
-    d.queues = static_cast<std::size_t>(st->num_queue_items);
-    d.playlists = static_cast<std::size_t>(st->num_playlists);
-    return Result{d};
-}
-
-std::expected<caudio::ipc::Result, caudio::utils::Error>
-Service::Impl::handle(const caudio::ipc::LibraryStatsDetailed& cmd) {
-    auto st = db_->libraryStatsDetailed(cmd.top_n >= 0 ? cmd.top_n : 10);
+Service::Impl::handle(const caudio::ipc::LibraryStats& cmd) {
+    auto topN = cmd.top_n;
+    if (topN && *topN < 0)
+        topN = 10;
+    auto st = db_->libraryStats(topN);
     if (!st)
         return std::unexpected{st.error()};
     return Result{std::move(*st)};

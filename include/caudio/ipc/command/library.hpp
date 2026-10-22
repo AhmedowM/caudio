@@ -63,32 +63,29 @@ struct LibrarySearch final {
 
 /**
  * @struct LibraryStats
- * @brief Get basic library statistics (track/queue/playlist counts).
+ * @brief Get library statistics, optionally with the most-played tracks.
  * @ingroup caudio_ipc
  *
- * @json_example {"type": "LibraryStats"}
+ * @json_example {"type": "LibraryStats", "top_n": 10}
  *
- * @return `caudio::types::LibraryStats` object with counts.
+ * @param top_n Omitted for the summary projection; a value (0 = totals only)
+ * requests the detailed projection with that many most-played entries.
+ * @return `caudio::types::LibraryStats` object with counts, totals, and
+ * `most_played` engaged exactly when `top_n` was supplied.
  */
-struct LibraryStats final {};
+struct LibraryStats final {
+    /**
+     * @brief Optional most-played entries (0 = totals only).
+     */
+    std::optional<int> top_n{};
+};
 
 /**
- * @struct LibraryStatsDetailed
- * @brief Get detailed library statistics including play history.
+ * @brief Compatibility spelling of `LibraryStats`.
  * @ingroup caudio_ipc
- *
- * @json_example {"type": "LibraryStatsDetailed", "top_n": 10}
- *
- * @param top_n Maximum most-played entries (0 = totals only).
- * @return `caudio::types::LibraryStatsDetailed` object with detailed statistics and most-played
- * tracks.
+ * @deprecated Set `LibraryStats::top_n` instead. Kept until v2.0.0.
  */
-struct LibraryStatsDetailed final {
-    /**
-     * @brief Maximum most-played entries (0 = totals only).
-     */
-    int top_n{10};
-};
+using LibraryStatsDetailed = LibraryStats;
 
 /**
  * @struct LibraryAdd

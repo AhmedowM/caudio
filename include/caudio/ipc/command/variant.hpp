@@ -32,15 +32,16 @@ namespace caudio::ipc {
  * @see commandFromJson for deserialization
  * @see protocol.cppm for IPC framing
  */
-using Command = std::variant<
-    Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet, QueueList,
-    QueueQueues, QueueCreate, QueueDelete, PlayFiles, QueueSwitch, QueueAdd, QueueRemove, QueueMove,
-    QueueClear, QueueShuffle, QueueRepeat, PlaylistList, PlaylistCreate, PlaylistAdd,
-    PlaylistTracks, PlaylistLoad, PlaylistSave, PlaylistDelete, PlaylistRename, PlaylistExport,
-    PlaylistImport, LibraryScan, LibrarySearch, LibraryStats, LibraryStatsDetailed, LibraryAdd,
-    LibraryRemove, LibraryList, TagEdit, TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport,
-    ConfigImport, ConfigReset, HistoryList, HistoryClear, BookmarkList, BookmarkAdd, BookmarkRemove,
-    BookmarkGoto, Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
+using Command =
+    std::variant<Play, Pause, Resume, Restart, Stop, Next, Prev, Seek, StatusReq, VolumeSet,
+                 QueueList, QueueQueues, QueueCreate, QueueDelete, PlayFiles, QueueSwitch, QueueAdd,
+                 QueueRemove, QueueMove, QueueClear, QueueShuffle, QueueRepeat, PlaylistList,
+                 PlaylistCreate, PlaylistAdd, PlaylistTracks, PlaylistLoad, PlaylistSave,
+                 PlaylistDelete, PlaylistRename, PlaylistExport, PlaylistImport, LibraryScan,
+                 LibrarySearch, LibraryStats, LibraryAdd, LibraryRemove, LibraryList, TagEdit,
+                 TagGet, ConfigGet, ConfigSet, ConfigList, ConfigExport, ConfigImport, ConfigReset,
+                 HistoryList, HistoryClear, BookmarkList, BookmarkAdd, BookmarkRemove, BookmarkGoto,
+                 Shutdown, Preview, DeviceList, DeviceSet, DeviceTest, Info>;
 
 // helper concepts
 namespace detail {
