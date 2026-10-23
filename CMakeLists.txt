@@ -521,6 +521,10 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
     endif()
   endif()
 endif()
+unset(_ff_libdir)
+unset(_ff_dlls)
+unset(_mingw_bin)
+unset(_mingw_rt_dlls)
 
 # Linux distributability: ship the versioned .so files (SONAME links
 # included -- the loader asks for libavcodec.so.62 by exact name) in lib/
@@ -549,6 +553,10 @@ if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
     set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_cli_rpath}")
   endif()
 endif()
+unset(_ff_libdir)
+unset(_ff_sos)
+unset(_cand)
+unset(_cli_rpath)
 
 # macOS distributability (UNVERIFIED -- no macOS host as of 2026-10-09; keep
 # CAUDIO_BUNDLE_FFMPEG_MACOS=OFF until validated on a Mac or the macOS
@@ -632,6 +640,13 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
     " COMPONENT runtime)
   endif()
 endif()
+unset(_ff_libdir)
+unset(_ff_dylibs)
+unset(_cand)
+unset(_cli_rpath)
+unset(_ff_dylib_names)
+unset(_f)
+unset(_n)
 
 # C++23 module sources for BMI rebuild (shipped always, built on demand).
 # Installed at <prefix>/modules/ (same level as include/). These are pure
