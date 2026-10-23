@@ -51,8 +51,8 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
     if (!queues.empty() || !playlists.empty())
         rep.out += '\n';
     if (!queues.empty()) {
-        caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
-        auto res = sendRaw(cmd);
+        caudio::ipc::Command queueCmd{caudio::ipc::QueueQueues{}};
+        auto res = sendRaw(queueCmd);
         if (!res)
             return std::unexpected{res.error()};
         auto* qs = std::get_if<caudio::ipc::Queues>(&*res);
@@ -94,8 +94,8 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
         }
     }
     for (auto pid : playlists) {
-        caudio::ipc::Command cmd{caudio::ipc::PlaylistTracks{pid}};
-        auto res = sendRaw(cmd);
+        caudio::ipc::Command listCmd{caudio::ipc::PlaylistTracks{pid}};
+        auto res = sendRaw(listCmd);
         if (!res)
             return std::unexpected{res.error()};
         auto* pd = std::get_if<caudio::ipc::PlaylistData>(&*res);
