@@ -403,39 +403,14 @@ endif()
 
 # Install / Export / Packaging like C CMakeLists.txt:334-382
 # (GNUInstallDirs included once, right after project() above.)
-set(CAUDIO_INSTALL_LIBS
-  types
-  utils
-  config
-  media
-  player
-  db
-  engine
-  ipc
-  client
-  service
-  app
-  sqlite3
-  blake3
-  tag
-)
+# Component targets register via caudio_add_component / caudio_add_shared_variant
+get_directory_property(CAUDIO_INSTALL_LIBS DIRECTORY ${CMAKE_SOURCE_DIR} CAUDIO_TARGETS)
+list(APPEND CAUDIO_INSTALL_LIBS sqlite3 blake3 tag types)
+if(CAUDIO_BUILD_SHARED)
+  list(APPEND CAUDIO_INSTALL_LIBS combined)
+endif()
 if(CAUDIO_ENABLE_MODULES)
   list(APPEND CAUDIO_INSTALL_LIBS caudio_umbrella)
-endif()
-if(CAUDIO_BUILD_SHARED)
-  list(APPEND CAUDIO_INSTALL_LIBS
-    utils_shared
-    media_shared
-    player_shared
-    db_shared
-    engine_shared
-    client_shared
-    service_shared
-    app_shared
-    combined
-  )
-endif()
-if(CAUDIO_ENABLE_MODULES)
   install(
     TARGETS ${CAUDIO_INSTALL_LIBS}
     EXPORT caudioTargets
