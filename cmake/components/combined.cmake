@@ -3,6 +3,7 @@
 # sources compile into ipc. Gated on CAUDIO_BUILD_SHARED (OFF by default).
 if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
+  add_library(caudio::combined ALIAS combined)
   set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
   target_sources(combined PRIVATE src/_stub/shared_stub.cpp)
   target_link_libraries(combined PRIVATE

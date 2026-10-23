@@ -95,6 +95,19 @@ function(caudio_add_component NAME)
   # ship CXX_MODULES interface units -- consumers (incl. module synth targets)
   # must compile at C++23 or newer.
   target_compile_features(${NAME} PUBLIC cxx_std_23)
+  # PUBLIC_HEADER: one source of truth for installed headers per target.
+  # Component root header (include/caudio/<NAME>.hpp) plus subdirectory
+  # headers (include/caudio/<NAME>/*.hpp). Complements the directory install
+  # which still covers headers not tied to a component (fwd.hpp, etc.).
+  set(_pub_hdrs "")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include/caudio/${NAME}.hpp")
+    list(APPEND _pub_hdrs "${CMAKE_CURRENT_SOURCE_DIR}/include/caudio/${NAME}.hpp")
+  endif()
+  file(GLOB _sub_hdrs "${CMAKE_CURRENT_SOURCE_DIR}/include/caudio/${NAME}/*.hpp")
+  list(APPEND _pub_hdrs ${_sub_hdrs})
+  if(_pub_hdrs)
+    set_target_properties(${NAME} PROPERTIES PUBLIC_HEADER "${_pub_hdrs}")
+  endif()
   # Precompiled-header preamble: stable system headers compiled once per
   # target instead of re-parsed in every TU. Biggest win on MSVC.
   target_precompile_headers(${NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/caudio/pch.hpp)

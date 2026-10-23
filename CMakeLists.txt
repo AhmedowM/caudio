@@ -355,6 +355,7 @@ message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
+add_library(caudio::tag ALIAS tag)
 # TagLib's `tag` target exports install includes only; consumers use flat
 # per-subdir includes (`#include <apetag.h>`). Derive every header dir
 # from the pinned source so all subdirectory includes resolve.
@@ -418,6 +419,9 @@ set(CAUDIO_INSTALL_LIBS
   blake3
   tag
 )
+if(CAUDIO_ENABLE_MODULES)
+  list(APPEND CAUDIO_INSTALL_LIBS caudio_umbrella)
+endif()
 if(CAUDIO_BUILD_SHARED)
   list(APPEND CAUDIO_INSTALL_LIBS
     utils_shared
@@ -438,6 +442,7 @@ if(CAUDIO_ENABLE_MODULES)
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     # Module sources live at <prefix>/modules/ (NOT under include/):
     # they are build inputs for BMI consumers, not C++ headers.
     FILE_SET CXX_MODULES DESTINATION modules COMPONENT dev
@@ -449,6 +454,7 @@ else()
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   )
 endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio COMPONENT dev)
