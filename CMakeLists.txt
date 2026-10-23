@@ -340,16 +340,16 @@ FetchContent_Declare(
   GIT_TAG v2.3.2
   GIT_SHALLOW TRUE
 )
-  set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
-  set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(BUILD_BINDINGS OFF CACHE BOOL "" FORCE)
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE CACHE BOOL "" FORCE)
+  set(BUILD_TESTS OFF)
+  set(BUILD_EXAMPLES OFF)
+  set(BUILD_BINDINGS OFF)
+set(BUILD_TESTING OFF)
+set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE)
 # No zlib: TagLib would otherwise pick up platform SDK headers (macOS),
 # poisoning brew-libc++ resolution under our -nostdinc++ toolchain, and
 # silently vary by host. Compressed ID3v2 frames are rare; builds without
 # them read such frames as absent. Deterministic everywhere.
-set(WITH_ZLIB OFF CACHE BOOL "" FORCE)
+set(WITH_ZLIB OFF)
 FetchContent_MakeAvailable(TagLib)
 message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
