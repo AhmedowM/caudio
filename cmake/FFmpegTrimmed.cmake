@@ -36,8 +36,7 @@ set(CAUDIO_FFMPEG_TRIM_VERSION "8.1.2" CACHE STRING "pinned FFmpeg version for t
 set(CAUDIO_FFMPEG_TRIM_URL "https://ffmpeg.org/releases/ffmpeg-${CAUDIO_FFMPEG_TRIM_VERSION}.tar.xz"
     CACHE STRING "source tarball for trimmed FFmpeg builds")
 
-# Where the trimmed tree installs (one-shot build target or cache restore).
-set(CAUDIO_FFMPEG_TRIM_PREFIX "${CMAKE_BINARY_DIR}/ffmpeg-trimmed"
+set(CAUDIO_FFMPEG_TRIM_PREFIX "${CMAKE_BINARY_DIR}/ffmpeg"
     CACHE PATH "install prefix for the trimmed FFmpeg build")
 
 # Decode-only whitelist: --disable-all base, then re-enable exactly what the

@@ -1,6 +1,6 @@
 name: Build & Upload Trimmed FFmpeg (deps-private)
 
-# One matrix job drives scripts/build-trimmed.py on every OS/arch. Stable
+# One matrix job drives scripts/build-ffmpeg.py on every OS/arch. Stable
 # legs gate the release; experimental legs run too but never block it
 # (continue-on-error). Asset names encode OS+arch.
 
@@ -72,11 +72,11 @@ jobs:
 
       - name: Validate flags parse
         if: matrix.os != 'windows'
-        run: python3 scripts/build-trimmed.py --print-flags > /dev/null
+        run: python3 scripts/build-ffmpeg.py --print-flags > /dev/null
 
       - name: Validate flags parse (Windows)
         if: matrix.os == 'windows'
-        run: python3 scripts/build-trimmed.py --print-flags > /dev/null
+        run: python3 scripts/build-ffmpeg.py --print-flags > /dev/null
         shell: msys2 {0}
 
       - name: Build trimmed FFmpeg
@@ -84,14 +84,14 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
         run: |
-          python3 scripts/build-trimmed.py --extra-configure-args="${{ matrix.extra_args }}" --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
+          python3 scripts/build-ffmpeg.py --extra-configure-args="${{ matrix.extra_args }}" --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
 
       - name: Build trimmed FFmpeg (Windows)
         if: matrix.os == 'windows'
         env:
           CC: ${{ matrix.cc }}
         run: |
-          python3 scripts/build-trimmed.py --bash "$(cygpath -w "$(command -v bash)")" --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
+          python3 scripts/build-ffmpeg.py --bash "$(cygpath -w "$(command -v bash)")" --prefix "$PWD/ffmpeg-trimmed" --ffmpeg-version "${{ env.FFMPEG_VERSION }}" --pack "$PWD/${{ env.ARTIFACT_NAME }}"
         shell: msys2 {0}
 
       - name: Assert output arch

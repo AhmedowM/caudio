@@ -126,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Release archives for every GitHub x64+arm64 runner: Linux (x86_64,
   arm64), macOS (arm64, x86_64), Windows (x86_64, arm64)
-- `scripts/build-trimmed.py` and a deps workflow build the trimmed
+- `scripts/build-ffmpeg.py` and a deps workflow build the trimmed
   decode-only FFmpeg on all six OS/arch legs, published to the
   deps-private release used at build time
 

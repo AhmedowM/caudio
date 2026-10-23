@@ -2,8 +2,13 @@
 """Build a trimmed decode-only FFmpeg prefix from source.
 
 Usage:
-    python3 scripts/build-trimmed.py --prefix <dir> [--source-tarball URL | --source-dir DIR]
-    python3 scripts/build-trimmed.py --print-flags
+    python3 scripts/build-ffmpeg.py [--prefix <dir>] [--source-tarball URL | --source-dir DIR] [--force] [--help]
+    python3 scripts/build-ffmpeg.py --print-flags
+
+Default prefix is ./build/ffmpeg. If the prefix directory already exists,
+the build is skipped unless --force is specified. The script defaults to
+building the trimmed FFmpeg (always) unless the prefix directory exists,
+in which case it falls back to the default system FFmpeg provider.
 
 Configure flags and the pinned version are parsed from
 cmake/FFmpegTrimmed.cmake (single source of truth -- the module's list
@@ -155,7 +160,7 @@ def fetch_tarball(url: str, dest: Path, dry_run: bool) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Build trimmed decode-only FFmpeg.")
     ap.add_argument("--prefix", type=Path,
-                    help="install prefix (becomes CAUDIO_TRIMMED_ROOT)")
+                    help="install prefix (becomes CAUDIO_TRIMMED_ROOT). Default: ./build/ffmpeg")
     ap.add_argument("--source-tarball", default=None,
                     help="FFmpeg source tarball URL (default: ffmpeg.org release for pinned version)")
     ap.add_argument("--source-dir", type=Path, default=None,
@@ -180,6 +185,8 @@ def main() -> None:
                     help="print the extracted configure flags, build nothing")
     ap.add_argument("--dry-run", action="store_true",
                     help="print commands without running them")
+    ap.add_argument("--force", action="store_true",
+                    help="force rebuild even if prefix directory exists")
     args = ap.parse_args()
 
     text = cmake_module().read_text(encoding="utf-8")
@@ -189,9 +196,16 @@ def main() -> None:
     if args.print_flags:
         print("\n".join(flags))
         return
+
+    # Set default prefix
     if not args.prefix:
-        print("[ERROR] --prefix is required (or use --print-flags)", file=sys.stderr)
-        sys.exit(2)
+        args.prefix = Path("./build/ffmpeg").resolve()
+
+    # Skip rebuild if directory exists and --force is not specified
+    if args.prefix.exists() and not args.force:
+        print(f"[INFO] prefix directory {args.prefix} already exists. Skipping rebuild.")
+        print(f"[INFO] Use --force to rebuild even if the prefix directory exists.")
+        return
 
     if not args.dry_run:
         # Dry runs print commands without touching the machine, so tool
