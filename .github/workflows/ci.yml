@@ -31,23 +31,23 @@ jobs:
       matrix:
         # NOTE: ubuntu-latest is 24.04 today but migrates to 26.04 in Nov 2026
         # (new kernel/CMake/FFmpeg, PPA gcc-16 support TBD) -- re-validate then.
-        # Compiler lives in the preset (ci-gcc/ci-clang/ci-msvc); `compiler`
-        # below is display + artifact naming only. macOS is LLVM Clang --
+        # Compiler lives in the matrix (`toolchain`); `compiler` below is
+        # display + artifact naming only. macOS is LLVM Clang --
         # GCC builds miniaudio with the dummy backend (no audio).
         os: [ubuntu-latest, macos-latest, windows-latest]
         include:
           - os: ubuntu-latest
             compiler: gcc-16
-            preset: ci-gcc
+            toolchain: gcc
           - os: macos-latest
             compiler: clang
-            preset: ci-clang
+            toolchain: clang
           - os: windows-latest
             compiler: windows-gcc
-            preset: ci-gcc
+            toolchain: gcc
           - os: windows-latest
             compiler: msvc
-            preset: ci-msvc
+            toolchain: msvc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -150,7 +150,9 @@ jobs:
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
 
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: |
+          python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --print
+          python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }}
 
       - name: Expose DLLs (Windows)
         if: runner.os == 'Windows'
@@ -163,7 +165,7 @@ jobs:
           # Relative entries resolve against each process CWD (useless) and
           # Git-Bash POSIX paths (/d/...) are unreadable to it -- always
           # convert with cygpath -w.
-          dll=$(find build/${{ matrix.preset }}/_deps -name 'avcodec-*.dll' | head -n 1)
+          dll=$(find build/ci-${{ matrix.toolchain }}/_deps -name 'avcodec-*.dll' | head -n 1)
           if [ -z "$dll" ]; then
             # System FFmpeg (e.g. choco): DLLs sit next to ffmpeg.exe itself.
             fdir="$(dirname "$(command -v ffmpeg)")"
@@ -178,39 +180,64 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ${{ matrix.preset }}
+        run: python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --build
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ${{ matrix.preset }}
+        run: python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --test
 
-      - name: Package (TGZ)
-        if: matrix.compiler != 'msvc'
+      - name: Package (TGZ/ZIP)
         run: |
-          cpack --config build/${{ matrix.preset }}/CPackConfig.cmake -G "TGZ;ZIP" || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP") || echo "CPack TGZ failed"
-        shell: bash
-
-      - name: Package (TGZ, MSVC config)
-        if: matrix.compiler == 'msvc'
-        run: |
-          # Multi-config generator: -C selects which built config to package.
-          cpack -C Debug --config build/${{ matrix.preset }}/CPackConfig.cmake -G "TGZ;ZIP" || (cd build/${{ matrix.preset }} && cpack -G "TGZ;ZIP" -C Debug) || echo "CPack TGZ failed"
+          # `cmake --build --target package` runs CPack with CWD in the build
+          # tree, so the archives land there. Packaging is a gate here: no
+          # swallowed failures.
+          python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --package
         shell: bash
 
       - name: Upload artifact - package
         uses: actions/upload-artifact@v4
         with:
           name: caudio-package-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/${{ matrix.preset }}/*.tar.gz
-          if-no-files-found: warn
+          path: build/ci-${{ matrix.toolchain }}/*.tar.gz
+          if-no-files-found: error
+
+  docs:
+    name: docs (ubuntu-24.04)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC 16
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
+          gcc --version; g++ --version
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev doxygen graphviz
+          cmake --version
+          ninja --version
+
+      - name: Configure + build docs
+        run: |
+          python scripts/configure.py ci --toolchain gcc --docs --no-tests --build-dir build/docs
+          cmake --build build/docs --target doc
 
       - name: Upload artifact - docs
         uses: actions/upload-artifact@v4
         with:
-          name: caudio-docs-${{ matrix.os }}-${{ matrix.compiler }}
-          path: build/${{ matrix.preset }}/docs/html
-          if-no-files-found: warn
+          name: caudio-docs
+          path: build/docs/docs/html
+          if-no-files-found: error
 
   ffmpeg-trimmed:
     name: ffmpeg-trimmed (windows-latest / MinGW, decode-only whitelist)
@@ -284,12 +311,14 @@ jobs:
         # C:\mingw64 15.2 chokes on the fattest TUs). Build/Test stay on
         # default shells so DLL staging (below) governs loader resolution.
         run: |
-          if cmake --preset ci-trimmed-gcc; then
-            echo "preset=ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
+          if python scripts/configure.py ci --toolchain gcc --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir build/ci-trimmed-gcc; then
+            echo "build_dir=build/ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            cmake --preset ci-gcc
-            echo "preset=ci-gcc" >> "$GITHUB_OUTPUT"
+            python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc
+            echo "build_dir=build/ci-gcc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=false" >> "$GITHUB_OUTPUT"
           fi
         shell: msys2 {0}
 
@@ -304,13 +333,12 @@ jobs:
           # `command -v g++`: in Git-Bash steps that resolves to the
           # runner's C:\mingw64 gcc 15.2. No zlib1: objdump shows the
           # trimmed avcodec imports only UCRT/system + sibling DLLs.
-          preset="${{ steps.pick.outputs.preset }}"
-          dest="build/$preset"
+          dest="${{ steps.pick.outputs.build_dir }}"
           troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          if [ "$preset" = "ci-trimmed-gcc" ]; then
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then
             src="$troot/bin"
           else
-            src="build/$preset/_deps/ffmpeg_prebuilt-src/bin"
+            src="$dest/_deps/ffmpeg_prebuilt-src/bin"
           fi
           for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
             test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
@@ -325,12 +353,20 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --build
+        shell: bash
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --test
+        shell: bash
 
   ffmpeg-trimmed-msvc:
     name: ffmpeg-trimmed (windows-latest / MSVC, decode-only whitelist)
@@ -378,12 +414,14 @@ jobs:
         # one (module FATALS without a complete FFmpeg_ROOT). Same fallback
         # contract as the other trim jobs.
         run: |
-          if cmake --preset ci-trimmed-msvc; then
-            echo "preset=ci-trimmed-msvc" >> "$GITHUB_OUTPUT"
+          if python scripts/configure.py ci --toolchain msvc --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir build/ci-trimmed-msvc; then
+            echo "build_dir=build/ci-trimmed-msvc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            cmake --preset ci-msvc
-            echo "preset=ci-msvc" >> "$GITHUB_OUTPUT"
+            python scripts/configure.py ci --toolchain msvc --build-dir build/ci-msvc
+            echo "build_dir=build/ci-msvc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=false" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -391,13 +429,12 @@ jobs:
         run: |
           # Same hermeticity rationale as the MinGW job; MSVC needs no
           # extra runtime DLLs (UCRT/vcruntime are system components).
-          preset="${{ steps.pick.outputs.preset }}"
-          dest="build/$preset"
+          dest="${{ steps.pick.outputs.build_dir }}"
           troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          if [ "$preset" = "ci-trimmed-msvc" ]; then
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then
             src="$troot/bin"
           else
-            src="build/$preset/_deps/ffmpeg_prebuilt-src/bin"
+            src="$dest/_deps/ffmpeg_prebuilt-src/bin"
           fi
           for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
             test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
@@ -407,12 +444,20 @@ jobs:
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain msvc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --build
+        shell: bash
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain msvc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --test
+        shell: bash
 
   ffmpeg-trimmed-linux:
     name: ffmpeg-trimmed (ubuntu-24.04 / gcc-16, decode-only whitelist)
@@ -465,21 +510,29 @@ jobs:
       - name: Configure (trimmed, fallback to default provider)
         id: pick
         run: |
-          if cmake --preset ci-trimmed-gcc; then
-            echo "preset=ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
+          if python scripts/configure.py ci --toolchain gcc --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir build/ci-trimmed-gcc; then
+            echo "build_dir=build/ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            cmake --preset ci-gcc
-            echo "preset=ci-gcc" >> "$GITHUB_OUTPUT"
+            python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc
+            echo "build_dir=build/ci-gcc" >> "$GITHUB_OUTPUT"
+            echo "trimmed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build
-        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --build
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --test
 
   ffmpeg-trimmed-macos:
     name: ffmpeg-trimmed (macos-latest / LLVM Clang, decode-only whitelist)
@@ -528,21 +581,29 @@ jobs:
       - name: Configure (trimmed, fallback to default provider)
         id: pick
         run: |
-          if cmake --preset ci-trimmed-clang; then
-            echo "preset=ci-trimmed-clang" >> "$GITHUB_OUTPUT"
+          if python scripts/configure.py ci --toolchain clang --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir build/ci-trimmed-clang; then
+            echo "build_dir=build/ci-trimmed-clang" >> "$GITHUB_OUTPUT"
+            echo "trimmed=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            cmake --preset ci-clang
-            echo "preset=ci-clang" >> "$GITHUB_OUTPUT"
+            python scripts/configure.py ci --toolchain clang --build-dir build/ci-clang
+            echo "build_dir=build/ci-clang" >> "$GITHUB_OUTPUT"
+            echo "trimmed=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build
-        run: cmake --build --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain clang --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --build
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ${{ steps.pick.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
+          python scripts/configure.py ci --toolchain clang --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --test
 
   sanitizers:
     name: sanitizers (ubuntu-24.04 / gcc-16)
@@ -575,10 +636,10 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake --preset ci-sanitizers
+        run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers
 
       - name: Build
-        run: cmake --build --preset ci-sanitizers
+        run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers --build
 
       - name: Test
         env:
@@ -587,7 +648,7 @@ jobs:
           # leaks, UBSan and ASan reports stay fatal. NOTE: env blocks need
           # ${{ }} context syntax -- $VAR is NOT expanded here.
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/sanitizers/lsan.supp:report_objects=1
-        run: ctest --preset ci-sanitizers
+        run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers --test
 
   install-smoke:
     name: install-smoke (ubuntu-24.04 / gcc-16)
@@ -619,15 +680,15 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake --preset ci-gcc
+        run: python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc
 
       - name: Build
-        run: cmake --build --preset ci-gcc
+        run: python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc --build
 
       - name: Test
         env:
           CAUDIO_TEST_NOAUDIO: 1
-        run: ctest --preset ci-gcc
+        run: python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc --test
 
       - name: Install to /tmp/caudio-install
         run: cmake --install build/ci-gcc --prefix /tmp/caudio-install
@@ -704,10 +765,10 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: cmake --preset modules-gcc
+        run: python scripts/configure.py modules --toolchain gcc --build-dir build/modules-gcc
 
       - name: Build
-        run: cmake --build --preset modules-gcc
+        run: python scripts/configure.py modules --toolchain gcc --build-dir build/modules-gcc --build
 
       - name: Install to /tmp/caudio-install-mod
         run: cmake --install build/modules-gcc --prefix /tmp/caudio-install-mod

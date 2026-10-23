@@ -1,22 +1,30 @@
 # Portability gate (MANUAL release gate): runs the linux runtime tree on a
 # bare ubuntu:24.04 container image with no FFmpeg installed.
-# Requires a git tag (release presets set CAUDIO_REQUIRE_GIT_VERSION=ON).
+# Requires a git tag (release intents set CAUDIO_REQUIRE_GIT_VERSION=ON).
 
 name: Portability gate (manual)
 
 "on":
   workflow_dispatch:
     inputs:
-      preset:
+      family:
         required: false
-        description: 'Preset under test (shipping: minsize-lto-clang)'
+        description: 'Intent family under test (shipping: minsize-lto)'
         type: choice
         options:
-          - minsize-lto-clang
-          - release-lto-clang
-          - minsize-clang
-          - release-clang
-        default: minsize-lto-clang
+          - minsize-lto
+          - release-lto
+          - minsize
+          - release
+        default: minsize-lto
+      toolchain:
+        required: false
+        description: 'Toolchain under test (shipping: clang)'
+        type: choice
+        options:
+          - clang
+          - gcc
+        default: clang
       deps_tag:
         required: false
         description: 'deps-private trimmed FFmpeg release tag'
@@ -28,7 +36,7 @@ concurrency:
 
 jobs:
   linux-bare:
-    name: bare ubuntu-24.04 / ${{ inputs.preset }}
+    name: bare ubuntu-24.04 / ${{ inputs.family }} / ${{ inputs.toolchain }}
     runs-on: ubuntu-24.04
     env:
       CAUDIO_TEST_NOAUDIO: 1
@@ -71,9 +79,10 @@ jobs:
       - name: Configure + build + install
         run: |
           set -o pipefail
-          cmake --preset "${{ inputs.preset }}" 2>&1 | tee configure.log
-          cmake --build --preset "${{ inputs.preset }}" 2>&1 | tee build.log
-          cmake --install "build/${{ inputs.preset }}" --prefix "$PWD/stage" 2>&1 | tee install.log
+          BUILD_DIR="build/${{ inputs.family }}-${{ inputs.toolchain }}"
+          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --build-dir "$BUILD_DIR" 2>&1 | tee configure.log
+          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --build-dir "$BUILD_DIR" --build 2>&1 | tee build.log
+          cmake --install "$BUILD_DIR" --prefix "$PWD/stage" 2>&1 | tee install.log
 
       - name: Bare-metal run (no FFmpeg in the container)
         run: |
@@ -85,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: portability-${{ inputs.preset }}
+          name: portability-${{ inputs.family }}-${{ inputs.toolchain }}
           path: |
             configure.log
             build.log

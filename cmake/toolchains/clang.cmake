@@ -10,14 +10,5 @@ else()
   set(CMAKE_CXX_COMPILER clang++)
 endif()
 
-# Strip release installs (smaller shipped binaries); dev installs keep
-# symbols. Guarded on a strip tool existing (MSVC-ABI builds may have
-# none -- those exes are lean already).
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-  if(NOT CMAKE_STRIP)
-    find_program(CMAKE_STRIP NAMES strip llvm-strip)
-  endif()
-  if(CMAKE_STRIP)
-    set(CMAKE_INSTALL_DO_STRIP ON CACHE BOOL "Strip binaries on install (release)")
-  endif()
-endif()
+# MSVC-ABI builds may have no strip tool; the shared helper guards on that.
+include("${CMAKE_CURRENT_LIST_DIR}/detail/strip.cmake")

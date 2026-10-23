@@ -19,8 +19,9 @@ target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::cli
 # media.cmake) and that propagates as $<LINK_ONLY:...> through cli -> player -> media.
 ca_set_warnings(caudio_cli)
 ca_set_module_warnings(caudio_cli)
+caudio_apply_extra_flags(caudio_cli)
 # Needed on MinGW for template instantiation deduplication across executable + static libs.
-# Scoped to Windows-GNU only: the Linux-GNU links (release presets across
+# Scoped to Windows-GNU only: the Linux-GNU links (release intents across
 # the bake-off matrix) succeed without it.
 target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>:-Wl,--allow-multiple-definition>)
 # Static GNU runtime for the shipped executable: kills GLIBCXX-version failures

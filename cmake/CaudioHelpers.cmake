@@ -26,6 +26,29 @@ function(ca_set_module_warnings tgt)
   endif()
 endfunction()
 
+# Append the CAUDIO_EXTRA_* cache strings to one of our own targets. Never
+# call this on vendor targets, and never fold these into CMAKE_CXX_FLAGS /
+# CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS: the cache defaults stay untouched
+# and an empty value is a no-op.
+function(caudio_apply_extra_flags tgt)
+  if(CAUDIO_EXTRA_CXX_FLAGS)
+    separate_arguments(_caudio_extra_cxx NATIVE_COMMAND "${CAUDIO_EXTRA_CXX_FLAGS}")
+    foreach(_flag IN LISTS _caudio_extra_cxx)
+      target_compile_options(${tgt} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${_flag}>)
+    endforeach()
+  endif()
+  if(CAUDIO_EXTRA_C_FLAGS)
+    separate_arguments(_caudio_extra_c NATIVE_COMMAND "${CAUDIO_EXTRA_C_FLAGS}")
+    foreach(_flag IN LISTS _caudio_extra_c)
+      target_compile_options(${tgt} PRIVATE $<$<COMPILE_LANGUAGE:C>:${_flag}>)
+    endforeach()
+  endif()
+  if(CAUDIO_EXTRA_LINK_FLAGS)
+    separate_arguments(_caudio_extra_link NATIVE_COMMAND "${CAUDIO_EXTRA_LINK_FLAGS}")
+    target_link_options(${tgt} PRIVATE ${_caudio_extra_link})
+  endif()
+endfunction()
+
 function(caudio_add_component NAME)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "SOURCES;MODULE_SOURCES;DEPS;INCLUDES")
   if(NOT ARG_SOURCES AND NOT ARG_MODULE_SOURCES)
@@ -59,6 +82,12 @@ function(caudio_add_component NAME)
     # Clang's -Wlanguage-extension-token in sqlite3.h).
     target_include_directories(${NAME} SYSTEM PRIVATE ${ARG_INCLUDES})
   endif()
+  # nlohmann is the opaque Json backend (vendor/, private include only). Every
+  # component gets the same SYSTEM -I here so no component has to restate it;
+  # linking it as a target would force it into install(EXPORT).
+  if(CAUDIO_NLOHMANN_PRIVATE_INCLUDE)
+    target_include_directories(${NAME} SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
+  endif()
   if(ARG_DEPS)
     target_link_libraries(${NAME} PUBLIC ${ARG_DEPS})
   endif()
@@ -74,6 +103,10 @@ function(caudio_add_component NAME)
   # every component, which forced every target to resolve FFmpeg at link time
   # and pulled its include dirs into unrelated TUs.
   ca_set_warnings(${NAME})
+  caudio_apply_extra_flags(${NAME})
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(${NAME})
+  endif()
 endfunction()
 
 # D-4: header self-containment. Every public header is compiled as its own
@@ -83,6 +116,16 @@ endfunction()
 # of leaking the requirement downstream. Compile-only: the objects are never
 # linked. Policy: every include/caudio/**.hpp (and the caudio.hpp umbrella)
 # must stand alone.
+function(_caudio_write_if_different path content)
+  set(_existing "")
+  if(EXISTS "${path}")
+    file(READ "${path}" _existing)
+  endif()
+  if(NOT "${_existing}" STREQUAL "${content}")
+    file(WRITE "${path}" "${content}")
+  endif()
+endfunction()
+
 function(caudio_add_header_self_containment)
   set(_hsc_inc "${CMAKE_CURRENT_SOURCE_DIR}/include")
   file(GLOB_RECURSE _hsc_headers CONFIGURE_DEPENDS "${_hsc_inc}/caudio/*.hpp")
@@ -103,7 +146,8 @@ function(caudio_add_header_self_containment)
     string(REPLACE "/" "_" _stem "${_rel}")
     string(REPLACE ".hpp" ".cpp" _stem "${_stem}")
     set(_tu "${_hsc_gen}/${_stem}")
-    file(WRITE "${_tu}" "// D-4: standalone TU for <${_rel}> (generated).\n#include <${_rel}>\n")
+    _caudio_write_if_different("${_tu}"
+      "// D-4: standalone TU for <${_rel}> (generated).\n#include <${_rel}>\n")
     target_sources(caudio_header_self_containment PRIVATE "${_tu}")
   endforeach()
 endfunction()
@@ -117,4 +161,7 @@ function(caudio_add_shared_variant NAME)
   target_link_libraries(${NAME}_shared PUBLIC caudio::${NAME} ${ARG_EXTRA_DEPS})
   target_link_libraries(${NAME}_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::${NAME}>)
   target_link_options(${NAME}_shared PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(${NAME}_shared)
+  endif()
 endfunction()

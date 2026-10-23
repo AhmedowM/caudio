@@ -27,7 +27,6 @@ set(CAUDIO_DB_SOURCES
 )
 caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::utils caudio::media Threads::Threads INCLUDES vendor)
 target_link_libraries(db PRIVATE caudio::sqlite3)
-target_include_directories(db SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
 target_compile_definitions(db PUBLIC SQLITE_ENABLE_FTS5=1)
 ca_set_module_warnings(db)
 

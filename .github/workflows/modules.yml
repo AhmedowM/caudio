@@ -1,11 +1,11 @@
 # Modules version matrix (MANUAL observatory, not a gate).
 #
-# Same setup as compilers.yml, but every leg configures a modules-*
-# preset (CAUDIO_ENABLE_MODULES=ON, CLI off) to map the modules floor
-# separately from the default-build floor.
+# Same setup as compilers.yml, but every leg configures the modules intent
+# (CAUDIO_ENABLE_MODULES=ON, CLI off) to map the modules floor separately
+# from the default-build floor.
 #
-# Tests are OFF in modules presets; `run_tests` adds -DCAUDIO_ENABLE_TESTS=ON
-# and runs ctest (there are no modules-* test presets).
+# Tests are OFF in the modules intent; `run_tests` adds
+# --define CAUDIO_ENABLE_TESTS=ON and runs ctest.
 #
 # - Version selection works through PATH (toolchains hard-set bare names).
 # - Legs are informational (continue-on-error) with a summary in `report`.
@@ -28,11 +28,11 @@ name: Modules (manual)
         type: boolean
         default: true
       run_winclang:
-        description: 'Run LLVM clang++ on Windows leg (MSVC ABI, modules preset)'
+        description: 'Run LLVM clang++ on Windows leg (MSVC ABI, modules intent)'
         type: boolean
         default: true
       run_tests:
-        description: 'Also build tests (-DCAUDIO_ENABLE_TESTS=ON) and run ctest --test-dir'
+        description: 'Also build tests (CAUDIO_ENABLE_TESTS=ON) and run ctest'
         type: boolean
         default: false
       strict:
@@ -77,22 +77,24 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Configure (modules-gcc)
+      - name: Configure (modules, GCC)
         run: |
           TESTS=""
-          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
-          cmake --preset modules-gcc $TESTS
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-gcc $TESTS
 
       - name: Build
         run: |
           set -o pipefail
-          cmake --build --preset modules-gcc 2>&1 | tee build-mgcc-${{ matrix.version }}.log
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-gcc $TESTS --build 2>&1 | tee build-mgcc-${{ matrix.version }}.log
 
       - name: Test
         if: inputs.run_tests
         run: |
           set -o pipefail
-          ctest --test-dir build/modules-gcc --output-on-failure 2>&1 | tee test-mgcc-${{ matrix.version }}.log
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-gcc --define CAUDIO_ENABLE_TESTS=ON --test 2>&1 | tee test-mgcc-${{ matrix.version }}.log
 
       - name: Upload logs
         if: always()
@@ -143,22 +145,24 @@ jobs:
           cmake --version
           ninja --version
 
-      - name: Configure (modules-clang)
+      - name: Configure (modules, Clang)
         run: |
           TESTS=""
-          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
-          cmake --preset modules-clang $TESTS
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang $TESTS
 
       - name: Build
         run: |
           set -o pipefail
-          cmake --build --preset modules-clang 2>&1 | tee build-mclang-${{ matrix.version }}.log
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang $TESTS --build 2>&1 | tee build-mclang-${{ matrix.version }}.log
 
       - name: Test
         if: inputs.run_tests
         run: |
           set -o pipefail
-          ctest --test-dir build/modules-clang --output-on-failure 2>&1 | tee test-mclang-${{ matrix.version }}.log
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang --define CAUDIO_ENABLE_TESTS=ON --test 2>&1 | tee test-mclang-${{ matrix.version }}.log
 
       - name: Upload logs
         if: always()
@@ -202,15 +206,12 @@ jobs:
           ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
         shell: bash
 
-      - name: Configure (modules-msvc)
-        # modules-msvc pins the VS 2026 generator like ci-msvc -- same VS17
-        # fallback on windows-2022 (array form: quotes don't re-expand).
+      - name: Configure (modules, MSVC)
+        # Ninja + vcvars handles both images; no VS-generator fallback.
         run: |
-          GEN_ARGS=()
-          if [ "${{ matrix.os }}" = "windows-2022" ]; then GEN_ARGS=(-G "Visual Studio 17 2022"); fi
           TESTS=""
-          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
-          cmake --preset modules-msvc "${GEN_ARGS[@]}" $TESTS
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain msvc --build-dir build/modules-msvc $TESTS
         shell: bash
 
       - name: Expose DLLs
@@ -227,14 +228,16 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
-          cmake --build --preset modules-msvc 2>&1 | tee build-msvc-${{ matrix.os }}.log
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain msvc --build-dir build/modules-msvc $TESTS --build 2>&1 | tee build-msvc-${{ matrix.os }}.log
         shell: bash
 
       - name: Test
         if: inputs.run_tests
         run: |
           set -o pipefail
-          ctest --test-dir build/modules-msvc -C Debug --output-on-failure 2>&1 | tee test-msvc-${{ matrix.os }}.log
+          python scripts/configure.py modules --toolchain msvc --build-dir build/modules-msvc --define CAUDIO_ENABLE_TESTS=ON --test 2>&1 | tee test-msvc-${{ matrix.os }}.log
         shell: bash
 
       - name: Upload logs
@@ -276,16 +279,16 @@ jobs:
           ninja --version
         shell: bash
 
-      - name: Configure (modules preset, auto toolchain finds clang++)
+      - name: Configure (modules, Windows Clang)
         run: |
           TESTS=""
-          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="-DCAUDIO_ENABLE_TESTS=ON"; fi
-          cmake --preset modules $TESTS
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang $TESTS
         shell: bash
 
       - name: Expose DLLs
         run: |
-          dll=$(find build/modules/_deps -name 'avcodec-*.dll' | head -n 1)
+          dll=$(find build/modules-clang/_deps -name 'avcodec-*.dll' | head -n 1)
           if [ -z "$dll" ]; then
             fdir="$(dirname "$(command -v ffmpeg)")"
             dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
@@ -297,14 +300,16 @@ jobs:
       - name: Build
         run: |
           set -o pipefail
-          cmake --build --preset modules 2>&1 | tee build-winclang-modules.log
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang $TESTS --build 2>&1 | tee build-winclang-modules.log
         shell: bash
 
       - name: Test
         if: inputs.run_tests
         run: |
           set -o pipefail
-          ctest --test-dir build/modules --output-on-failure 2>&1 | tee test-winclang-modules.log
+          python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang --define CAUDIO_ENABLE_TESTS=ON --test 2>&1 | tee test-winclang-modules.log
         shell: bash
 
       - name: Upload logs
@@ -337,7 +342,7 @@ jobs:
             echo ""
             echo "Per-version logs are in the run artifacts. Expected shape:"
             echo "gcc-13 red (named modules need 14+) while green in the"
-            echo "default-preset matrix -- that split IS the finding (it"
+            echo "default-intent matrix -- that split IS the finding (it"
             echo "confirms the two floors differ). Anything else red names"
             echo "the next blocker the same way."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,7 +1,7 @@
 # Docs.cmake -- Doxygen documentation target (enabled via CAUDIO_BUILD_DOCS=ON).
 # How to build docs:
 #   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
-#   cmake --build build --target doc   # generates HTML to build/docs/html
+#   cmake --build build --target doc   # generates HTML to build/docs/docs/html
 # Requires Doxygen (optional). If not found, configure still succeeds.
 # Doxyfile precedence: docs/Doxyfile.in > Doxyfile.in > Doxyfile > docs/Doxyfile.
 

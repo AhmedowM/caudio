@@ -16,7 +16,8 @@
 # Consumption (Windows first):
 #   1. CI restores the cached install prefix into CAUDIO_FFMPEG_TRIM_PREFIX
 #      (key: hash of this file, which embeds CAUDIO_FFMPEG_TRIM_VERSION),
-#      then configures with --preset ci-trimmed-gcc. Cache hit: find_package
+#      then configures the ci intent with --toolchain gcc --trimmed-ffmpeg.
+#      Cache hit: find_package
 #      consumes the prefix directly. Cache miss: one-shot configure-time
 #      source build fills it (~10 min, then cached).
 #   2. Local iteration: -DCAUDIO_USE_TRIMMED_FFMPEG=ON with

@@ -1688,7 +1688,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
                 // create ring and output
                 // NOTE (2026-10-05): kept at 8192*ch -- a flat 8192-frame cap
                 // measured +9 MB daemon RSS on an mp3 with an attached mjpeg
-                // cover (release-lto-clang, 67.7 -> 76.6 MB WS). Mechanism
+                // cover (release-lto, clang, 67.7 -> 76.6 MB WS). Mechanism
                 // unknown (suspect indirect FFmpeg buffering/timing effect);
                 // do NOT re-shrink without a measured explanation.
                 uint32_t sr = decoder_->sampleRate();

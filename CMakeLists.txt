@@ -98,8 +98,9 @@ endif()
 # different *_EXPORTS/PIC flags breaks dependents with CRC mismatch).
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Compiler policy (default-per-host selection lives in presets via
-# cmake/toolchains/auto.cmake; this is the backstop for raw configures).
+# Compiler policy (default-per-host selection lives in the toolchain
+# dispatcher via cmake/toolchains/auto.cmake; this is the backstop for raw
+# configures).
 include(cmake/CompilerPolicy.cmake)
 
 # Windows/Clang-or-MSVC: silence "unsafe CRT" deprecation noise (C4996 on
@@ -129,12 +130,22 @@ option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio"
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" ON)
 # Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
 # compiler validation, so presets carry only the intent and the per-linker
-# flag lives here. MSVC links /OPT:REF by default; nothing to add.
+# flags live here. GNU/Clang also need function/data sections at compile time;
+# MSVC links /OPT:REF by default (/Gy only splits functions).
 option(CAUDIO_LINK_SECTION_GC "drop unreferenced code/data sections at link (Apple -dead_strip, otherwise --gc-sections)" OFF)
+# Extra flags appended to our own targets only (see caudio_apply_extra_flags).
+# These never replace CMAKE_CXX_FLAGS / CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS
+# and the empty default is a no-op. Vendor/third-party targets are unaffected.
+set(CAUDIO_EXTRA_CXX_FLAGS "" CACHE STRING "extra C++ compile flags for caudio targets")
+set(CAUDIO_EXTRA_C_FLAGS "" CACHE STRING "extra C compile flags for caudio targets")
+set(CAUDIO_EXTRA_LINK_FLAGS "" CACHE STRING "extra link flags for caudio targets")
 if(CAUDIO_LINK_SECTION_GC)
   if(APPLE)
     add_link_options(-Wl,-dead_strip)
-  elseif(NOT MSVC)
+  elseif(MSVC)
+    add_compile_options(/Gy)
+  else()
+    add_compile_options(-ffunction-sections -fdata-sections)
     add_link_options(-Wl,--gc-sections)
   endif()
 endif()
@@ -188,6 +199,10 @@ if(NOT FFmpeg_ROOT AND NOT "$ENV{FFmpeg_ROOT}")
   unset(_trim_root)
 endif()
 
+function(caudio_ffmpeg_fatal)
+  message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
+endfunction()
+
 if(NOT CAUDIO_USE_TRIMMED_FFMPEG)
   find_package(FFmpeg QUIET)
 endif()
@@ -197,24 +212,38 @@ elseif(CAUDIO_USE_TRIMMED_FFMPEG)
   include(cmake/FFmpegTrimmed.cmake)
   caudio_setup_trimmed_ffmpeg()
   if(NOT FFmpeg_FOUND)
-    message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
+    caudio_ffmpeg_fatal()
   endif()
   message(STATUS "FFmpeg found (trimmed): ${FFmpeg_AVCODEC_LIBRARY}")
 elseif(CAUDIO_WITH_FETCH_FFMPEG)
   include(cmake/SetupFFmpeg.cmake)
   caudio_setup_ffmpeg()
   if(NOT FFmpeg_FOUND)
-    message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
+    caudio_ffmpeg_fatal()
   endif()
   message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
 else()
-  message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
+  caudio_ffmpeg_fatal()
 endif()
 
+# Record the ABI floor for the installed config so downstream consumers link
+# against the same FFmpeg major instead of silently re-finding another one.
+function(caudio_detect_ffmpeg_avcodec_major out)
+  set(_header "${FFmpeg_AVCODEC_INCLUDE_DIR}/libavcodec/version_major.h")
+  if(NOT EXISTS "${_header}")
+    set(_header "${FFmpeg_AVCODEC_INCLUDE_DIR}/libavcodec/version.h")
+  endif()
+  set(_major "")
+  if(EXISTS "${_header}")
+    file(STRINGS "${_header}" _line REGEX "^#define[ \t]+LIBAVCODEC_VERSION_MAJOR[ \t]+[0-9]+")
+    string(REGEX MATCH "[0-9]+" _major "${_line}")
+  endif()
+  set(${out} "${_major}" PARENT_SCOPE)
+endfunction()
+caudio_detect_ffmpeg_avcodec_major(CAUDIO_FFMPEG_AVCODEC_MAJOR)
+
 function(caudio_apply_sanitizers tgt)
-  if(WIN32)
-    return()
-  elseif(MSVC)
+  if(MSVC)
     target_compile_options(${tgt} PRIVATE /fsanitize=address)
     target_link_options(${tgt} PRIVATE /fsanitize=address)
   else()
@@ -224,10 +253,10 @@ function(caudio_apply_sanitizers tgt)
 endfunction()
 
 if(CAUDIO_ENABLE_SANITIZERS)
-  if(WIN32)
-    message(WARNING "CAUDIO_ENABLE_SANITIZERS not supported on Windows/MinGW -- sanitizers require Clang/GCC on Linux. Option ignored.")
+  if(WIN32 AND NOT MSVC)
+    message(FATAL_ERROR "CAUDIO_ENABLE_SANITIZERS is not supported with ${CMAKE_CXX_COMPILER_ID} on Windows (MinGW has no working ASan/UBSan runtime). Use Linux, or MSVC for ASan only.")
   elseif(MSVC)
-    message(WARNING "CAUDIO_ENABLE_SANITIZERS: MSVC sanitizers limited; using /fsanitize=address")
+    message(STATUS "Sanitizers enabled: MSVC ASan (/fsanitize=address)")
   else()
     message(STATUS "Sanitizers enabled: ASan+UBSan")
   endif()
@@ -367,12 +396,16 @@ include(cmake/components/combined.cmake)
 
 # Umbrella module (optional, headers are canonical)
 if(CAUDIO_ENABLE_MODULES)
-  add_library(caudio_umbrella STATIC modules/caudio.cppm)
+  add_library(caudio_umbrella STATIC)
   target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
-  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
+  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::config caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
+  caudio_apply_extra_flags(caudio_umbrella)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(caudio_umbrella)
+  endif()
 endif()
 
 # Documentation (Doxygen) -- see cmake/Docs.cmake
@@ -421,7 +454,7 @@ if(CAUDIO_ENABLE_MODULES)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
     # Module sources live at <prefix>/modules/ (NOT under include/):
     # they are build inputs for BMI consumers, not C++ headers.
-    FILE_SET CXX_MODULES DESTINATION modules
+    FILE_SET CXX_MODULES DESTINATION modules COMPONENT dev
   )
 else()
   install(
@@ -612,9 +645,14 @@ endif()
 # Installed at <prefix>/modules/ (same level as include/). These are pure
 # sources: downstream users compile them against the installed headers.
 # BMIs are never shipped (compiler/flag-specific); building them stays
-# opt-in via CAUDIO_ENABLE_MODULES. (Gating this on the option is what kept
-# module sources out of the release archives.)
-install(DIRECTORY modules/ DESTINATION modules COMPONENT dev FILES_MATCHING PATTERN "*.cppm")
+# opt-in via CAUDIO_ENABLE_MODULES. In modules mode the component file sets
+# above install their own .cppm files and the umbrella is installed explicitly;
+# otherwise one directory rule ships them, so no source comes from two rules.
+if(CAUDIO_ENABLE_MODULES)
+  install(FILES modules/caudio.cppm DESTINATION modules COMPONENT dev)
+else()
+  install(DIRECTORY modules/ DESTINATION modules COMPONENT dev FILES_MATCHING PATTERN "*.cppm")
+endif()
 
 # Man page -- roff source tracked at docs/man/caudio.1
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/man/caudio.1")
@@ -635,11 +673,12 @@ endif()
 
 # Packaging (CPack) -- TGZ/ZIP only until the first release; distro
 # generators (DEB/RPM/NSIS/DragNDrop) return when versions stabilize.
-# Output dir pinned to the build tree: otherwise `cpack` writes packages to
-# whatever CWD invoked it (e.g. the source root), and CI globs miss them.
+# Always invoke packaging through the `package` target
+# (`cmake --build <build-dir> --target package`): it runs CPack with CWD in
+# the build tree. A bare `cpack --config` from the source root stages
+# packages under that root instead.
 # Components (runtime vs dev, set on each install() above) produce one
 # archive per component; the release workflow publishes one format per OS.
-set(CPACK_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 set(CPACK_GENERATOR "TGZ;ZIP")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 # Only our components ship: third-party FetchContent install rules carry no
@@ -674,16 +713,28 @@ if(CAUDIO_ENABLE_EXAMPLES)
   target_link_libraries(caudio_mini PRIVATE caudio::player caudio::utils)
   target_include_directories(caudio_mini SYSTEM PRIVATE vendor)
   target_compile_features(caudio_mini PRIVATE cxx_std_23)
+  caudio_apply_extra_flags(caudio_mini)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(caudio_mini)
+  endif()
 
   add_executable(caudio_player_db_demo examples/player_db_demo.cpp)
   target_link_libraries(caudio_player_db_demo PRIVATE caudio::player caudio::db caudio::utils)
   target_include_directories(caudio_player_db_demo SYSTEM PRIVATE vendor)
   target_compile_features(caudio_player_db_demo PRIVATE cxx_std_23)
+  caudio_apply_extra_flags(caudio_player_db_demo)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(caudio_player_db_demo)
+  endif()
 
   add_executable(caudio_engine_demo examples/engine_demo.cpp)
   target_link_libraries(caudio_engine_demo PRIVATE caudio::engine caudio::db caudio::player caudio::utils)
   target_include_directories(caudio_engine_demo SYSTEM PRIVATE vendor)
   target_compile_features(caudio_engine_demo PRIVATE cxx_std_23)
+  caudio_apply_extra_flags(caudio_engine_demo)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(caudio_engine_demo)
+  endif()
 endif()
 
 # Modules-only consumer check: same program as mini_cpp, but importing
@@ -692,6 +743,10 @@ if(CAUDIO_ENABLE_EXAMPLES AND CAUDIO_ENABLE_MODULES)
   add_executable(caudio_mini_mod examples/mini_mod.cpp)
   target_link_libraries(caudio_mini_mod PRIVATE caudio::player caudio::utils)
   target_compile_features(caudio_mini_mod PRIVATE cxx_std_23)
+  caudio_apply_extra_flags(caudio_mini_mod)
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(caudio_mini_mod)
+  endif()
 endif()
 
 # Tests -- Catch2 via system package or FetchContent (144 tests: utils/player/db/engine/ipc/cli paths)
@@ -728,6 +783,7 @@ if(CAUDIO_ENABLE_TESTS)
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_include_directories(${name} SYSTEM PRIVATE vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
+    caudio_apply_extra_flags(${name})
     if(ARG_WITH_TEST_DATA)
       target_compile_definitions(${name} PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     endif()
@@ -780,6 +836,7 @@ if(CAUDIO_ENABLE_TESTS)
     target_include_directories(test_cli_golden PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(test_cli_golden SYSTEM PRIVATE vendor)
     target_compile_features(test_cli_golden PRIVATE cxx_std_23)
+    caudio_apply_extra_flags(test_cli_golden)
     target_compile_definitions(test_cli_golden PRIVATE TEST_CLI_BIN="$<TARGET_FILE:caudio_cli>")
     target_compile_definitions(test_cli_golden PRIVATE TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
     if(CAUDIO_ENABLE_SANITIZERS)

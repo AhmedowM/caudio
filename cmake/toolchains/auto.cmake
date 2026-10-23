@@ -1,19 +1,18 @@
 # Default toolchain selector: picks the canonical toolchain for this host
-# so bare presets (dev, ci, release, ...) mean "the right compiler here".
-# Delegates to the sibling files -- single source of truth per toolchain,
-# no compiler assignments duplicated here. Explicit -gcc/-clang/-msvc
-# presets override this via merge precedence (their mixin is listed first
-# in `inherits`).
+# so the intent presets (dev, ci, release, ...) mean "the right compiler
+# here". Delegates to the sibling files -- single source of truth per
+# toolchain, no compiler assignments duplicated here. An explicit
+# --toolchain gcc|clang|msvc|apple includes the matching detail file instead.
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
   include("${CMAKE_CURRENT_LIST_DIR}/clang.cmake")
 elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
   # Windows releases prefer LLVM Clang when it is on PATH (MSVC ABI target,
-  # verified by clang.cmake); MSVC stays for explicit *-msvc presets and CI.
+  # verified by clang.cmake); MSVC stays for --toolchain msvc and CI.
   find_program(_caudio_win_clangxx NAMES clang++)
   if(_caudio_win_clangxx)
     if(NOT _caudio_auto_msg_shown)
       message(STATUS "auto toolchain: clang++ from PATH "
-        "(Windows releases prefer Clang; use a *-msvc preset or a vcvars shell for MSVC)")
+        "(Windows releases prefer Clang; use --toolchain msvc or a vcvars shell for MSVC)")
       set(_caudio_auto_msg_shown TRUE)
     endif()
     include("${CMAKE_CURRENT_LIST_DIR}/clang.cmake")
@@ -22,7 +21,7 @@ elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
   else()
     if(NOT _caudio_auto_msg_shown)
       message(STATUS "auto toolchain: no VS environment; MinGW GCC from PATH "
-        "(use a *-msvc preset or a vcvars shell for MSVC)")
+        "(use --toolchain msvc or a vcvars shell for MSVC)")
       set(_caudio_auto_msg_shown TRUE)
     endif()
     include("${CMAKE_CURRENT_LIST_DIR}/gcc.cmake")

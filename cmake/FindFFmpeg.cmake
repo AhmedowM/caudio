@@ -92,21 +92,34 @@ if(NOT FFmpeg_SWRESAMPLE_LIBRARY)
   )
 endif()
 
+# avcodec's major is the ABI identity used by the installed caudioConfig.cmake.
+set(FFmpeg_VERSION "")
+if(FFmpeg_AVCODEC_INCLUDE_DIR)
+  set(_ffmpeg_version_header "${FFmpeg_AVCODEC_INCLUDE_DIR}/libavcodec/version_major.h")
+  if(NOT EXISTS "${_ffmpeg_version_header}")
+    set(_ffmpeg_version_header "${FFmpeg_AVCODEC_INCLUDE_DIR}/libavcodec/version.h")
+  endif()
+  if(EXISTS "${_ffmpeg_version_header}")
+    file(STRINGS "${_ffmpeg_version_header}" _ffmpeg_major_line
+      REGEX "^#define[ \t]+LIBAVCODEC_VERSION_MAJOR[ \t]+[0-9]+")
+    string(REGEX MATCH "[0-9]+" FFmpeg_VERSION "${_ffmpeg_major_line}")
+  endif()
+endif()
+
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(FFmpeg
-  DEFAULT_MSG
-  FFmpeg_AVCODEC_LIBRARY
-  FFmpeg_AVCODEC_INCLUDE_DIR
-  FFmpeg_AVFORMAT_LIBRARY
-  FFmpeg_AVUTIL_LIBRARY
+  REQUIRED_VARS
+    FFmpeg_AVCODEC_LIBRARY
+    FFmpeg_AVCODEC_INCLUDE_DIR
+    FFmpeg_AVFORMAT_LIBRARY
+    FFmpeg_AVUTIL_LIBRARY
+    FFmpeg_SWRESAMPLE_LIBRARY
+  VERSION_VAR FFmpeg_VERSION
 )
 
 if(FFmpeg_FOUND)
   set(FFmpeg_INCLUDE_DIRS ${FFmpeg_AVCODEC_INCLUDE_DIR})
-  set(FFmpeg_LIBRARIES ${FFmpeg_AVCODEC_LIBRARY} ${FFmpeg_AVFORMAT_LIBRARY} ${FFmpeg_AVUTIL_LIBRARY})
-  if(FFmpeg_SWRESAMPLE_LIBRARY)
-    list(APPEND FFmpeg_LIBRARIES ${FFmpeg_SWRESAMPLE_LIBRARY})
-  endif()
+  set(FFmpeg_LIBRARIES ${FFmpeg_AVCODEC_LIBRARY} ${FFmpeg_AVFORMAT_LIBRARY} ${FFmpeg_AVUTIL_LIBRARY} ${FFmpeg_SWRESAMPLE_LIBRARY})
 
   if(NOT TARGET FFmpeg::avcodec)
     # NOTE: keep plain INTERFACE_INCLUDE_DIRECTORIES -- IMPORTED targets
@@ -131,7 +144,7 @@ if(FFmpeg_FOUND)
       INTERFACE_INCLUDE_DIRECTORIES "${FFmpeg_AVCODEC_INCLUDE_DIR}"
     )
   endif()
-  if(FFmpeg_SWRESAMPLE_LIBRARY AND NOT TARGET FFmpeg::swresample)
+  if(NOT TARGET FFmpeg::swresample)
     add_library(FFmpeg::swresample UNKNOWN IMPORTED)
     set_target_properties(FFmpeg::swresample PROPERTIES
       IMPORTED_LOCATION "${FFmpeg_SWRESAMPLE_LIBRARY}"

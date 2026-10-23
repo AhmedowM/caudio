@@ -23,30 +23,49 @@
 
 ## Quickstart
 
-Pick the preset matching your machine (`cmake --list-presets` shows all):
+Presets describe the build intent; the host default toolchain is selected for
+you. `cmake --list-presets` shows all of them:
 
 ```sh
 git clone https://github.com/AhmedowM/caudio.git
 cd caudio
 
 # Linux (GCC is the default) / macOS (brew LLVM Clang) / Windows (see below)
-cmake --preset dev        # tests + examples
-cmake --build --preset dev
-ctest --preset dev
+cmake --preset dev        # Debug, tests + examples
+cmake --build build/dev
+ctest --test-dir build/dev --output-on-failure
 ./build/dev/caudio --version
 ./build/dev/caudio start
 ./build/dev/caudio status
 ```
 
-| Host | Preset | Toolchain |
-|---|---|---|
-| Linux | `dev` (default) or `dev-gcc` | GCC 14+ (default), `dev-clang` also works |
-| macOS | `dev-clang` | brew LLVM Clang only — AppleClang and GCC fail configure (C++23 gaps / dummy audio backend) |
-| Windows | `dev` (default) | LLVM Clang from `PATH` when installed (MSVC ABI target); falls back to MSVC / MinGW GCC |
-| Windows | `dev-msvc` | MSVC via the Visual Studio 2026 generator (no vcvars needed) — CI stays on MSVC |
-| Windows | `dev-gcc` | MinGW GCC 14+ (ships larger binaries) |
+| Preset | Intent |
+|---|---|
+| `dev` | Debug, tests + examples |
+| `ci` | Debug, tests, no audio device |
+| `release` | Release (git tag required) |
+| `release-lto` | Release + LTO (git tag required) |
+| `minsize` | MinSizeRel |
+| `minsize-lto` | MinSizeRel + LTO + section GC |
+| `modules` | C++23 modules on, no CLI/tests/examples |
 
-Other ready-made presets: `ci` (headless tests, no audio), `ci-sanitizers` (ASan+UBSan, Linux only), `release` / `release-lto` (optimized, tag required), `minsize` (smallest binary), `shared` (shared libs + `libcaudio`), `modules` (C++23 modules, no CLI), `minimal` (no CLI), `docs`, `all`. Compiler variants append `-gcc` / `-clang` / `-msvc` (`ci-clang`, `release-msvc`, …). The `custom` preset builds into `$CAUDIO_BUILD_DIR` with the compiler from `PATH`.
+For a specific compiler, arch, or build directory, use the resolver (it also
+drives CI, so local and CI commands cannot drift):
+
+```sh
+python scripts/configure.py dev --toolchain gcc --build-dir build/dev-gcc
+python scripts/configure.py dev --toolchain gcc --build-dir build/dev-gcc --build --test
+python scripts/configure.py ci --toolchain clang --build-dir build/ci-clang
+python scripts/configure.py modules --toolchain msvc --build-dir build/modules-msvc
+```
+
+| Host | Toolchain |
+|---|---|
+| Linux | GCC 14+ by default; `--toolchain clang` for LLVM Clang |
+| macOS | brew LLVM Clang by default; `--toolchain apple` for Xcode AppleClang (release builds) |
+| Windows | LLVM Clang from `PATH` when installed (MSVC ABI target); otherwise MSVC or MinGW GCC |
+| Windows | `--toolchain msvc` runs Ninja + `vcvars` (auto-discovered; pass `--vcvars PATH` if needed) |
+| Windows | `--toolchain gcc` for MinGW GCC 14+ (ships larger binaries) |
 
 Typical first session:
 
@@ -62,7 +81,7 @@ Typical first session:
 
 ## Configuration
 
-Everything is a preset; individual options exist for scripting and CI:
+Presets capture the common intents; individual cache options remain for scripting and CI:
 
 | Option | Default | Effect |
 |---|---|---|
@@ -71,21 +90,21 @@ Everything is a preset; individual options exist for scripting and CI:
 | `CAUDIO_TRIMMED_ROOT` | -- | Prebuilt trimmed FFmpeg prefix (cache `-D` or env): auto-selects the trimmed provider, no other flags needed |
 | `CAUDIO_BUILD_CLI` | `ON` | Build the `caudio` executable (`OFF` skips the CLI11 fetch entirely) |
 | `CAUDIO_BUILD_SHARED` | `OFF` | Shared `*_shared` variants + combined `libcaudio` |
-| `CAUDIO_ENABLE_TESTS` | `OFF` | Catch2 tests (`ctest --preset dev`) |
+| `CAUDIO_ENABLE_TESTS` | `OFF` | Catch2 tests (`ctest --test-dir build/dev`) |
 | `CAUDIO_ENABLE_EXAMPLES` | `OFF` | `examples/` (`caudio_mini`, `player_db_demo`, `engine_demo`) |
-| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | ASan+UBSan — Linux/GCC+Clang only, ignored on Windows/MinGW |
+| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | ASan+UBSan on Linux/GCC+Clang; MinGW is a configure error, MSVC supports ASan only |
 | `CAUDIO_ENABLE_MODULES` | `OFF` | C++23 module interfaces (`import caudio.*`); headers always build |
 | `CAUDIO_BUILD_DOCS` | `OFF` | Doxygen docs (needs `doxygen`; optional `dot`) |
 | `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip audio-device tests (no beep) for headless CI |
 | `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | clang-tidy during build |
-| `CAUDIO_REQUIRE_GIT_VERSION` | `OFF` | Fail configure without a git tag (release presets enable it) |
+| `CAUDIO_REQUIRE_GIT_VERSION` | `OFF` | Fail configure without a git tag (release intents enable it) |
 | `CMAKE_BUILD_TYPE` | -- | `Debug` / `Release` / `RelWithDebInfo` (single-config generators) |
 | `FFmpeg_ROOT` | -- | Override FFmpeg location |
 
 Requirements:
 
-- **Compilers** -- Linux: GCC 14+ (default) or Clang 17+; macOS: brew LLVM Clang (`brew install llvm`);
-Windows: LLVM Clang preferred (MSVC ABI target, also what releases build with), MSVC 2022+ via `dev-msvc`-style presets (CI), or MinGW GCC 14+
+- **Compilers** -- Linux: GCC 14+ (default) or Clang 17+; macOS: brew LLVM Clang (`brew install llvm`) or Xcode AppleClang (release);
+Windows: LLVM Clang preferred (MSVC ABI target, also what releases build with), MSVC 2022+ via `--toolchain msvc` (CI), or MinGW GCC 14+
 - **CMake ≥ 3.28**, **Ninja** (required for C++23 modules, recommended everywhere)
 - **FFmpeg** -- system install preferred (Ubuntu: `libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`; macOS: `brew install ffmpeg`; Windows: `choco install ffmpeg`), else auto-fetched
 - **Auto-fetched, no action needed** -- Catch2 3.16.0 (tests only), CLI11 2.7.2 (CLI only)
@@ -205,11 +224,13 @@ int main() {
 
 ### As C++23 modules (opt-in)
 
-Configure with the `modules` preset (`CAUDIO_ENABLE_MODULES=ON`, no CLI), then import instead of including:
+Configure with the `modules` intent (`CAUDIO_ENABLE_MODULES=ON`, no CLI), then import instead of including:
 
 ```sh
-cmake --preset modules-clang   # or modules-gcc / modules-msvc
-cmake --build --preset modules-clang
+cmake --preset modules
+cmake --build build/modules
+# or pick a toolchain explicitly:
+python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang
 ```
 
 ```cmake
@@ -236,20 +257,29 @@ int main() {
 
 Available modules mirror the libraries: `caudio`, `caudio.utils`, `caudio.media`, `caudio.player`, `caudio.db`, `caudio.engine`, `caudio.ipc`, `caudio.service`, `caudio.client` (plus `:partitions` such as `caudio.db:scan`). An install ships the `*.cppm` sources under `<prefix>/modules/`; your toolchain rebuilds BMIs at consumer-configure time — BMI CRC covers defines/flags, so prebuilt BMIs never travel across compilers. Requires CMake ≥ 3.28 and a compiler with C++23 module support (GCC 14+, Clang 17+, MSVC 2022+).
 
-API docs: `cmake --preset docs && cmake --build --preset docs` → `build/docs/docs/html` (`docs/Doxyfile.in`); man page at `docs/man/caudio.1`, installed to `${CMAKE_INSTALL_MANDIR}/man1`.
-
-Packaging:
+API docs:
 
 ```sh
-cmake --preset minsize-clang   # or minsize-apple (macOS); releases ship MinSizeRel
-cmake --build --preset minsize-clang
+python scripts/configure.py dev --docs --build-dir build/docs
+cmake --build build/docs --target doc
+# output: build/docs/docs/html (docs/Doxyfile.in)
+```
+
+The man page is at `docs/man/caudio.1`, installed to `${CMAKE_INSTALL_MANDIR}/man1`.
+
+Packaging (releases ship the `minsize` intent):
+
+```sh
+python scripts/configure.py minsize --toolchain clang --build-dir build/minsize-clang
+python scripts/configure.py minsize --toolchain clang --build-dir build/minsize-clang --build
 cmake --install build/minsize-clang --prefix /usr/local
+# macOS: --toolchain apple
 # man page: /usr/local/share/man/man1/caudio.1
 # modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/modules/*.cppm (same level as include/)
 # config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
 ```
 
-`cpack --config build/<preset>/CPackConfig.cmake` produces `caudio-<ver>-<os>-<arch>[-dev].tar.gz` / `.zip` (one format per OS: ZIP on Windows, TGZ elsewhere).
+`cmake --build build/<dir> --target package` produces `caudio-<ver>-<os>-<arch>[-dev].tar.gz` / `.zip` (one format per OS: ZIP on Windows, TGZ elsewhere).
 
 ## License
 

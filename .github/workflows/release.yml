@@ -18,15 +18,15 @@ jobs:
         # Shipping matrix (decided from the release bake-off): MinSizeRel for
         # both the runtime and the dev archive from one build; AppleClang on
         # macOS; LLVM Clang on Linux and Windows (Windows targets the MSVC
-        # ABI). Every GitHub x64+arm64 runner is covered. Compiler lives in
-        # the preset; `label` is display + artifact naming only.
+        # ABI). Every GitHub x64+arm64 runner is covered. Compiler and arch
+        # live in the matrix; `label` is display + build dir + artifact name.
         include:
-          - { os: ubuntu-24.04,     label: linux-x86_64,   preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz,    pkg_ext: tar.gz }
-          - { os: ubuntu-24.04-arm, label: linux-arm64,    preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-linux-arm64.tar.gz,     pkg_ext: tar.gz }
-          - { os: macos-15,         label: macos-arm64,    preset: minsize-apple, trim_asset: ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz,     pkg_ext: tar.gz }
-          - { os: macos-15-intel,   label: macos-x86_64,   preset: minsize-apple, trim_asset: ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz,    pkg_ext: tar.gz }
-          - { os: windows-latest,   label: windows-x86_64, preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz,  pkg_ext: zip }
-          - { os: windows-11-arm,   label: windows-arm64,  preset: minsize-clang, trim_asset: ffmpeg-trimmed-8.1.2-windows-arm64.tar.gz,   pkg_ext: zip }
+          - { os: ubuntu-24.04,     label: linux-x86_64,   toolchain: clang, arch: x86_64, trim_asset: ffmpeg-trimmed-8.1.2-linux-x86_64.tar.gz,    pkg_ext: tar.gz }
+          - { os: ubuntu-24.04-arm, label: linux-arm64,    toolchain: clang, arch: arm64,  trim_asset: ffmpeg-trimmed-8.1.2-linux-arm64.tar.gz,     pkg_ext: tar.gz }
+          - { os: macos-15,         label: macos-arm64,    toolchain: apple, arch: arm64,  trim_asset: ffmpeg-trimmed-8.1.2-macos-arm64.tar.gz,     pkg_ext: tar.gz }
+          - { os: macos-15-intel,   label: macos-x86_64,   toolchain: apple, arch: x86_64, trim_asset: ffmpeg-trimmed-8.1.2-macos-x86_64.tar.gz,    pkg_ext: tar.gz }
+          - { os: windows-latest,   label: windows-x86_64, toolchain: clang, arch: x86_64, trim_asset: ffmpeg-trimmed-8.1.2-windows-x86_64.tar.gz,  pkg_ext: zip }
+          - { os: windows-11-arm,   label: windows-arm64,  toolchain: clang, arch: arm64,  trim_asset: ffmpeg-trimmed-8.1.2-windows-arm64.tar.gz,   pkg_ext: zip }
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,7 +51,7 @@ jobs:
       - name: Select Xcode 26 (macOS)
         if: runner.os == 'macOS'
         run: |
-          # AppleClang only (minsize-apple). Pin Xcode 26 when the image ships
+          # AppleClang only (toolchain: apple). Pin Xcode 26 when the image ships
           # it; brew LLVM is deliberately absent from release builds.
           XC="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
           if [ -n "$XC" ]; then sudo xcode-select -s "$XC"; fi
@@ -143,10 +143,9 @@ jobs:
       # Release packaging only -- testing lives in ci.yml. The trimmed-first
       # cascade in CMakeLists.txt picks the trimmed provider when
       # CAUDIO_TRIMMED_ROOT is set (and falls back to the system/SetupFFmpeg
-      # provider otherwise), so one preset serves both paths. A trim outage
-      # must never block a release. --preset + -D mixes (CMake 3.28+); the
-      # minsize families are also used by the bake-off, so the tag guard is
-      # injected here.
+      # provider otherwise), so one intent serves both paths. A trim outage
+      # must never block a release. The minsize families are also used by
+      # the bake-off, so the tag guard is injected here.
       - name: Configure
         id: cfg
         env:
@@ -158,26 +157,33 @@ jobs:
           else
             echo "::warning::trimmed FFmpeg unavailable -- release uses the default provider"
           fi
-          cmake --preset ${{ matrix.preset }} -DCAUDIO_REQUIRE_GIT_VERSION=ON 2>&1 | tee configure.log
-          echo "preset=${{ matrix.preset }}" >> "$GITHUB_OUTPUT"
+          EXTRA=""
+          if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA 2>&1 | tee configure.log
+          echo "build_dir=build/${{ matrix.label }}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Build
-        run: cmake --build --preset ${{ steps.cfg.outputs.preset }}
+        run: |
+          EXTRA=""
+          if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --build
+        shell: bash
 
       - name: Package
         run: |
-          # `cmake --build --target package` FIRST: it runs cpack with CWD in
-          # the build tree so packages land in the build dir. A bare
-          # `cpack --config` from the repo root writes them to the root
-          # (CPACK_OUTPUT_DIRECTORY is not honored there -- verified).
-          cmake --build --preset ${{ steps.cfg.outputs.preset }} --target package || (cd build/${{ steps.cfg.outputs.preset }} && cpack -G "TGZ;ZIP") || echo "CPack failed"
+          # The `package` target runs CPack with CWD in the build tree, so the
+          # archives land there. A bare `cpack --config` from the repo root
+          # stages them under the root instead.
+          EXTRA=""
+          if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --package
         shell: bash
 
       - name: List packages
         run: |
-          echo "=== packages in build/${{ steps.cfg.outputs.preset }}/ ==="
-          ls -lh build/${{ steps.cfg.outputs.preset }}/*.${{ matrix.pkg_ext }}
+          echo "=== packages in build/${{ matrix.label }}/ ==="
+          ls -lh build/${{ matrix.label }}/*.${{ matrix.pkg_ext }}
         shell: bash
 
       - name: Upload artifact - packages
@@ -185,7 +191,7 @@ jobs:
         with:
           name: caudio-packages-${{ matrix.label }}
           path: |
-            build/${{ steps.cfg.outputs.preset }}/*.${{ matrix.pkg_ext }}
+            build/${{ matrix.label }}/*.${{ matrix.pkg_ext }}
           # One format per OS (pkg_ext above). A missing package must fail
           # loudly -- never ship a raw .exe as a "release" again.
           if-no-files-found: error

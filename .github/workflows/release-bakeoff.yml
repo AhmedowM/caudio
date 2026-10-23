@@ -1,14 +1,15 @@
 # Release bake-off (MANUAL observatory, not a gate).
 #
-# Compares compiler x preset-family combinations on size and shippability.
+# Compares compiler x intent-family combinations on size and shippability.
 # Legs are build + install + smoke + measure (no tests; correctness is
 # gated by ci.yml, not here).
 #
 # - FFmpeg: deps-private trimmed asset (DEPS_PAT) via CAUDIO_TRIMMED_ROOT,
 #   else system provider. The winning provider is recorded per leg.
-# - Apple legs do NOT install brew llvm; they use the *-apple presets
-#   (xcrun + CAUDIO_ALLOW_UNSUPPORTED_COMPILER + CAUDIO_APPLE_CLANG).
-# - Checkout uses fetch-depth: 0 (release presets require a git tag).
+# - Apple legs do NOT install brew llvm; they use --toolchain apple
+#   (xcrun resolves the compiler) plus --allow-unsupported-compiler, because
+#   CompilerPolicy.cmake treats AppleClang as below the C++23 baseline.
+# - Checkout uses fetch-depth: 0 (release intents require a git tag).
 # - Legs are informational (continue-on-error) with a summary in `report`.
 
 name: Release bake-off (manual)
@@ -133,34 +134,34 @@ jobs:
       - name: Configure
         id: cfg
         run: |
-          # AppleClang legs use dedicated *-apple presets (xcrun toolchain);
-          # brew legs use plain *-clang.
-          if [ "${{ matrix.compiler }}" = "apple" ]; then SUFFIX=apple; else SUFFIX=clang; fi
-          PRESET="${{ matrix.family }}-$SUFFIX"
+          # AppleClang legs use --toolchain apple (xcrun); brew legs clang.
+          if [ "${{ matrix.compiler }}" = "apple" ]; then TOOLCHAIN=apple; EXTRA="--allow-unsupported-compiler"; else TOOLCHAIN=clang; EXTRA=""; fi
+          BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
-          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
-          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON $EXTRA 2>&1 | tee configure.log
+          echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
+          echo "extra=$EXTRA" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
           set -o pipefail
           START=$SECONDS
-          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "${{ steps.cfg.outputs.toolchain }}" --arch "${{ matrix.arch }}" --build-dir "${{ steps.cfg.outputs.build_dir }}" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON ${{ steps.cfg.outputs.extra }} --build 2>&1 | tee build.log
           echo "build_seconds=$((SECONDS - START))" | tee -a build.log
 
       - name: Install + smoke + measure
         id: measure
         run: |
           set -o pipefail
-          PRESET="${{ steps.cfg.outputs.preset }}"
-          cmake --install "build/$PRESET" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
-          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          BUILD_DIR="${{ steps.cfg.outputs.build_dir }}"
+          cmake --install "$BUILD_DIR" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} build_dir=$BUILD_DIR"
           echo "=== staged tree (proves what ships) ==="
           find "$RUNNER_TEMP/stage" -type f | sort
           BIN="$RUNNER_TEMP/stage/bin/caudio"
@@ -181,9 +182,9 @@ jobs:
             echo "=== portability check skipped (brew-LLVM leg is build-only) ==="
           fi
           echo "bin_bytes=$(stat -f%z "$BIN")"
-          (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
-          RT=$(ls build/$PRESET/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
-          DEV=$(ls build/$PRESET/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
+          (cd "$BUILD_DIR" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
+          RT=$(ls "$BUILD_DIR"/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
+          DEV=$(ls "$BUILD_DIR"/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
           if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -f%z "$RT")"; else echo "pkg_bytes=0"; fi
           if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -f%z "$DEV")"; else echo "dev_bytes=0"; fi
 
@@ -274,33 +275,33 @@ jobs:
       - name: Configure
         id: cfg
         run: |
-          # Preset name is uniform: <family>-<gcc|clang> (toolchain resolves
+          # Build dir is uniform: <family>-<gcc|clang> (toolchain resolves
           # bare names from PATH, same as compilers.yml).
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then SUFFIX=gcc; else SUFFIX=clang; fi
-          PRESET="${{ matrix.family }}-$SUFFIX"
+          if [ "${{ matrix.compiler }}" = "gcc" ]; then TOOLCHAIN=gcc; else TOOLCHAIN=clang; fi
+          BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
-          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
-          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
+          echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
           set -o pipefail
           START=$SECONDS
-          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "${{ steps.cfg.outputs.toolchain }}" --build-dir "${{ steps.cfg.outputs.build_dir }}" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON --build 2>&1 | tee build.log
           echo "build_seconds=$((SECONDS - START))" | tee -a build.log
 
       - name: Install + smoke + measure
         run: |
           set -o pipefail
-          PRESET="${{ steps.cfg.outputs.preset }}"
-          cmake --install "build/$PRESET" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
-          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          BUILD_DIR="${{ steps.cfg.outputs.build_dir }}"
+          cmake --install "$BUILD_DIR" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} build_dir=$BUILD_DIR"
           echo "=== staged tree (proves what ships) ==="
           find "$RUNNER_TEMP/stage" -type f | sort
           BIN="$RUNNER_TEMP/stage/bin/caudio"
@@ -330,9 +331,9 @@ jobs:
           fi
           echo "bin_bytes=$(stat -c%s "$BIN")"
           size -A "$BIN" 2>/dev/null | sort -k2 -n -r | head -n 8 || true
-          (cd "build/$PRESET" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
-          RT=$(ls build/$PRESET/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
-          DEV=$(ls build/$PRESET/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
+          (cd "$BUILD_DIR" && cpack -G TGZ) 2>&1 | tail -n 3 || echo "cpack failed"
+          RT=$(ls "$BUILD_DIR"/*-runtime.tar.gz 2>/dev/null | head -n 1 || true)
+          DEV=$(ls "$BUILD_DIR"/*-dev.tar.gz 2>/dev/null | head -n 1 || true)
           if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -c%s "$RT")"; else echo "pkg_bytes=0"; fi
           if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -c%s "$DEV")"; else echo "dev_bytes=0"; fi
           if [ "$SMOKE_RC" -ne 0 ]; then exit "$SMOKE_RC"; fi
@@ -360,7 +361,7 @@ jobs:
         arch: [x86_64, arm64]
         compiler: [llvm, msvc]
         family: [release, release-lto, minsize, minsize-lto]
-        # MSVC presets pin the VS 2026 x64 generator, so MSVC stays x86_64.
+        # MSVC stays x86_64 (same leg coverage as before).
         exclude:
           - { compiler: msvc, arch: arm64 }
     env:
@@ -427,53 +428,44 @@ jobs:
       - name: Configure
         id: cfg
         run: |
-          # Uniform preset names: <family>-<clang|msvc>. MSVC presets pin the
-          # VS 2026 x64 generator, so only the LLVM legs carry an arm64 runner.
-          if [ "${{ matrix.compiler }}" = "msvc" ]; then SUFFIX=msvc; else SUFFIX=clang; fi
-          PRESET="${{ matrix.family }}-$SUFFIX"
+          # Build dir is uniform: <family>-<clang|msvc>. MSVC uses Ninja +
+          # vcvars now; only the LLVM legs carry an arm64 runner.
+          if [ "${{ matrix.compiler }}" = "msvc" ]; then TOOLCHAIN=msvc; else TOOLCHAIN=clang; fi
+          BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
-          EXTRA="-DCAUDIO_BUNDLE_FFMPEG_MACOS=ON"
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          cmake --preset "$PRESET" $EXTRA 2>&1 | tee configure.log
-          echo "preset=$PRESET" >> "$GITHUB_OUTPUT"
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
+          echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
+          echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Build
         run: |
           set -o pipefail
           START=$SECONDS
-          cmake --build --preset ${{ steps.cfg.outputs.preset }} 2>&1 | tee build.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "${{ steps.cfg.outputs.toolchain }}" --arch "${{ matrix.arch }}" --build-dir "${{ steps.cfg.outputs.build_dir }}" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON --build 2>&1 | tee build.log
           echo "build_seconds=$((SECONDS - START))" | tee -a build.log
         shell: bash
 
       - name: Install + smoke + measure
         run: |
           set -o pipefail
-          PRESET="${{ steps.cfg.outputs.preset }}"
-          # VS generators are multi-config: install defaults to Release
-          # while minsize presets build MinSizeRel (single-config Ninja
-          # ignores --config, so this stays Windows-only).
-          CFG="Release"
-          case "${{ matrix.family }}" in minsize*) CFG="MinSizeRel";; esac
-          cmake --install "build/$PRESET" --config "$CFG" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
-          echo "provider=${{ steps.cfg.outputs.provider }} preset=${{ steps.cfg.outputs.preset }}"
+          BUILD_DIR="${{ steps.cfg.outputs.build_dir }}"
+          cmake --install "$BUILD_DIR" --prefix "$RUNNER_TEMP/stage" 2>&1 | tee install.log
+          echo "provider=${{ steps.cfg.outputs.provider }} build_dir=$BUILD_DIR"
           echo "=== staged tree (proves what ships) ==="
           find "$RUNNER_TEMP/stage" -type f | sort
           BIN="$RUNNER_TEMP/stage/bin/caudio.exe"
           test -x "$BIN" || (echo "staged binary missing" && exit 1)
           "$BIN" --version
           echo "bin_bytes=$(stat -c%s "$BIN")"
-          # Multi-config VS generator: package the built config (MinSizeRel),
-          # not the Release default (same --config stratification as install).
-          CFG="Release"
-          case "${{ matrix.family }}" in minsize*) CFG="MinSizeRel";; esac
-          (cd "build/$PRESET" && cpack -C "$CFG" -G ZIP) 2>&1 | tail -n 3 || echo "cpack failed"
-          RT=$(ls build/$PRESET/*-runtime.zip 2>/dev/null | head -n 1 || true)
-          DEV=$(ls build/$PRESET/*-dev.zip 2>/dev/null | head -n 1 || true)
+          (cd "$BUILD_DIR" && cpack -G ZIP) 2>&1 | tail -n 3 || echo "cpack failed"
+          RT=$(ls "$BUILD_DIR"/*-runtime.zip 2>/dev/null | head -n 1 || true)
+          DEV=$(ls "$BUILD_DIR"/*-dev.zip 2>/dev/null | head -n 1 || true)
           if [ -n "$RT" ]; then echo "pkg_bytes=$(stat -c%s "$RT")"; else echo "pkg_bytes=0"; fi
           if [ -n "$DEV" ]; then echo "dev_bytes=$(stat -c%s "$DEV")"; else echo "dev_bytes=0"; fi
         shell: bash

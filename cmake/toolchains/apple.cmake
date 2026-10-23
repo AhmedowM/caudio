@@ -1,5 +1,5 @@
-# AppleClang toolchain for *-apple presets: resolves the Xcode compilers
-# via xcrun so presets pin no machine-specific paths. No brew LLVM.
+# AppleClang toolchain (--toolchain apple): resolves the Xcode compilers
+# via xcrun so the resolver pins no machine-specific paths. No brew LLVM.
 find_program(_caudio_xcrun xcrun REQUIRED)
 execute_process(COMMAND "${_caudio_xcrun}" -f clang
   OUTPUT_VARIABLE _caudio_apple_cc OUTPUT_STRIP_TRAILING_WHITESPACE

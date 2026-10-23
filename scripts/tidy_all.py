@@ -12,7 +12,7 @@ Thin wrapper around LLVM's run-clang-tidy: picks the repo .clang-tidy
 config, verifies the compilation database, parallelizes. Default mode only
 reports. With --fix only the curated safe set runs; pass --checks
 explicitly to override. Module partitions (*.cppm) are out of scope for
-now: use a classic dev preset build directory.
+now: use a header-mode dev build directory (`build/dev` by default).
 
 --headers analyzes every public header as its own TU (headers are never
 main files in the DB, so plain runs never fix them). Each header inherits
@@ -34,10 +34,10 @@ from pathlib import Path
 SAFE_FIX_CHECKS = ("modernize-use-nullptr,modernize-use-override,"
                      "modernize-use-equals-default,modernize-use-equals-delete,"
                      "modernize-deprecated-headers,performance-*")
-DEFAULT_BUILD_DIR = "build/dev-clang"
+DEFAULT_BUILD_DIR = "build/dev"
 # run-clang-tidy matches file args with re.search against DB paths. Default
 # allowlist keeps repo sources only: fetched third-party TUs (_deps) would
-# otherwise dominate the run (108 of 191 TUs in dev-clang).
+# otherwise dominate the run (108 of 191 TUs in build/dev).
 DEFAULT_SOURCE_FILTER = r"^(?!.*_deps.*).*[\\/](src|include|cli|tests|examples)[\\/]"
 
 
@@ -82,7 +82,7 @@ def main() -> int:
 
     db = repo_root() / args.build_dir / "compile_commands.json"
     if not db.exists():
-        print(f"[ERROR] no compilation database at {db} (configure the preset first)",
+        print(f"[ERROR] no compilation database at {db} (configure the dev intent first)",
               file=sys.stderr)
         return 2
 

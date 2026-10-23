@@ -12,7 +12,7 @@ several minutes (unacceptable in the default suite), and only a supervisor
 process observes daemon death directly.
 
 Usage:
-    py -3 scripts/soak_daemon.py --cli build/dev-clang/caudio.exe
+    py -3 scripts/soak_daemon.py --cli build/dev/caudio.exe
     py -3 scripts/soak_daemon.py --cli ... --iterations 50   # quick smoke
     py -3 scripts/soak_daemon.py --cli ... --no-audio        # degraded churn
                                                             # (no playback
