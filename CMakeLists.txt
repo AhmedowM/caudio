@@ -116,7 +116,6 @@ if(MSVC OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND WIN32))
 endif()
 
 # Options -- FFmpeg is required primary (dr_* deleted, vendor cleaned)
-option(CAUDIO_WITH_FETCH_FFMPEG "auto-fetch FFmpeg if not found (system -> vcpkg/Conan -> prebuilt -> source)" ON)
 option(CAUDIO_USE_TRIMMED_FFMPEG "build against a trimmed decode-only FFmpeg (cmake/FFmpegTrimmed.cmake whitelist)" OFF)
 option(CAUDIO_ENABLE_TESTS "build tests" OFF)
 option(CAUDIO_ENABLE_EXAMPLES "build examples" OFF)
@@ -185,48 +184,47 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 find_package(Threads REQUIRED)
 
-# Trimmed-first: a valid CAUDIO_TRIMMED_ROOT (cache -D or env) auto-selects
-# the trimmed provider. An explicit FFmpeg_ROOT still wins; against an
-# explicit -DCAUDIO_USE_TRIMMED_FFMPEG=OFF the root wins (announced below).
-if(NOT FFmpeg_ROOT AND NOT "$ENV{FFmpeg_ROOT}")
-  if(DEFINED CAUDIO_TRIMMED_ROOT AND EXISTS "${CAUDIO_TRIMMED_ROOT}/lib")
-    set(_trim_root "${CAUDIO_TRIMMED_ROOT}")
+# Trimmed FFmpeg selection: CAUDIO_USE_TRIMMED_FFMPEG=ON selects the trimmed
+# provider. FFmpeg_ROOT (cache or env) takes precedence; otherwise
+# CAUDIO_TRIMMED_ROOT; otherwise the default ./build/ffmpeg. CMake never builds
+# FFmpeg itself -- scripts/build-ffmpeg.py produces the trimmed tree out of tree.
+if(CAUDIO_USE_TRIMMED_FFMPEG)
+  set(_trim_candidate "")
+  if(FFmpeg_ROOT)
+    set(_trim_candidate "${FFmpeg_ROOT}")
+  elseif(DEFINED ENV{FFmpeg_ROOT})
+    set(_trim_candidate "$ENV{FFmpeg_ROOT}")
+  elseif(DEFINED CAUDIO_TRIMMED_ROOT AND EXISTS "${CAUDIO_TRIMMED_ROOT}/lib")
+    set(_trim_candidate "${CAUDIO_TRIMMED_ROOT}")
   elseif(DEFINED ENV{CAUDIO_TRIMMED_ROOT} AND EXISTS "$ENV{CAUDIO_TRIMMED_ROOT}/lib")
-    set(_trim_root "$ENV{CAUDIO_TRIMMED_ROOT}")
+    set(_trim_candidate "$ENV{CAUDIO_TRIMMED_ROOT}")
+  elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/build/ffmpeg/lib")
+    set(_trim_candidate "${CMAKE_CURRENT_SOURCE_DIR}/build/ffmpeg")
   endif()
-  if(DEFINED _trim_root)
-    set(FFmpeg_ROOT "${_trim_root}" CACHE PATH "FFmpeg root (auto-selected from CAUDIO_TRIMMED_ROOT)" FORCE)
-    set(CAUDIO_USE_TRIMMED_FFMPEG ON CACHE BOOL "trimmed FFmpeg (auto-selected from CAUDIO_TRIMMED_ROOT)" FORCE)
-    message(STATUS "Trimmed-first: CAUDIO_TRIMMED_ROOT=${_trim_root}")
+  if(_trim_candidate)
+    set(FFmpeg_ROOT "${_trim_candidate}" CACHE PATH "FFmpeg root (trimmed)" FORCE)
+    message(STATUS "Trimmed FFmpeg root: ${_trim_candidate}")
   endif()
-  unset(_trim_root)
+  unset(_trim_candidate)
 endif()
 
 function(caudio_ffmpeg_fatal)
   message(FATAL_ERROR "FFmpeg is required -- install FFmpeg (tools + dev packages) or set FFmpeg_ROOT")
 endfunction()
 
-if(NOT CAUDIO_USE_TRIMMED_FFMPEG)
-  find_package(FFmpeg QUIET)
-endif()
-if(FFmpeg_FOUND AND NOT CAUDIO_USE_TRIMMED_FFMPEG)
-  message(STATUS "FFmpeg found (system): ${FFmpeg_AVCODEC_LIBRARY}")
-elseif(CAUDIO_USE_TRIMMED_FFMPEG)
+if(CAUDIO_USE_TRIMMED_FFMPEG)
   include(cmake/FFmpegTrimmed.cmake)
   caudio_setup_trimmed_ffmpeg()
   if(NOT FFmpeg_FOUND)
     caudio_ffmpeg_fatal()
   endif()
   message(STATUS "FFmpeg found (trimmed): ${FFmpeg_AVCODEC_LIBRARY}")
-elseif(CAUDIO_WITH_FETCH_FFMPEG)
-  include(cmake/SetupFFmpeg.cmake)
-  caudio_setup_ffmpeg()
+else()
+  find_package(FFmpeg QUIET)
   if(NOT FFmpeg_FOUND)
     caudio_ffmpeg_fatal()
   endif()
-  message(STATUS "FFmpeg found via fallback: ${FFmpeg_AVCODEC_LIBRARY}")
-else()
-  caudio_ffmpeg_fatal()
+  message(STATUS "FFmpeg found (system): ${FFmpeg_AVCODEC_LIBRARY}")
 endif()
 
 # Record the ABI floor for the installed config so downstream consumers link
@@ -358,9 +356,15 @@ message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
 # TagLib's `tag` target exports install includes only; consumers use flat
-# per-subdir includes (`#include <apetag.h>`). The top-level source dir is
-# sufficient — adding every subdirectory floods the include path.
+# per-subdir includes (`#include <apetag.h>`). Derive every header dir
+# from the pinned source so all subdirectory includes resolve.
+file(GLOB_RECURSE _taglib_hdrs "${taglib_SOURCE_DIR}/taglib/*.h")
 set(CAUDIO_TAGLIB_BUILD_INCLUDES "${taglib_SOURCE_DIR}" "${taglib_BINARY_DIR}")
+foreach(_h IN LISTS _taglib_hdrs)
+  get_filename_component(_d "${_h}" DIRECTORY)
+  list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
+endforeach()
+list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
 include(cmake/components/types.cmake)
 include(cmake/components/utils.cmake)
@@ -739,7 +743,7 @@ if(CAUDIO_ENABLE_TESTS)
     target_link_libraries(${name} PRIVATE ${ARG_LIBS} Catch2::Catch2WithMain)
     # + src/: white-box tests cover src-internal helpers (engine detail fns)
     # directly. Build-tree only -- src/ is never installed.
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_include_directories(${name} SYSTEM PRIVATE vendor)
     target_compile_features(${name} PRIVATE cxx_std_23)
     caudio_apply_extra_flags(${name})
