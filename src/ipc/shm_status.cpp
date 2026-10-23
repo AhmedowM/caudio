@@ -47,7 +47,7 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
     handle.create_ = create;
 
 #ifndef _WIN32
-    int flags = O_RDWR | O_CLOEXEC;
+    int flags = O_RDWR;
     if (create)
         flags |= O_CREAT;
     int fd = ::shm_open(handle.name_.c_str(), flags, 0600);

@@ -259,6 +259,8 @@ TEST_CASE("shm status reader/writer roundtrip", "[ipc][shm]") {
     const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count() % 100000000;
     const std::string name = "test-" + std::to_string(suffix);
     auto writerRes = caudio::ipc::ShmStatusWriter::create(name);
+    if (!writerRes)
+        WARN(writerRes.error().message);
     REQUIRE(writerRes.has_value());
     auto& writer = *writerRes;
 
@@ -275,6 +277,8 @@ TEST_CASE("shm status reader/writer roundtrip", "[ipc][shm]") {
     writer.setQueueSize(3);
 
     auto readerRes = caudio::ipc::ShmStatusReader::openReadOnly(name);
+    if (!readerRes)
+        WARN(readerRes.error().message);
     REQUIRE(readerRes.has_value());
     const auto snapshot = readerRes->snapshot();
     CHECK(snapshot.position == 12.5);
