@@ -118,9 +118,6 @@ find_package_handle_standard_args(FFmpeg
 )
 
 if(FFmpeg_FOUND)
-  set(FFmpeg_INCLUDE_DIRS ${FFmpeg_AVCODEC_INCLUDE_DIR})
-  set(FFmpeg_LIBRARIES ${FFmpeg_AVCODEC_LIBRARY} ${FFmpeg_AVFORMAT_LIBRARY} ${FFmpeg_AVUTIL_LIBRARY} ${FFmpeg_SWRESAMPLE_LIBRARY})
-
   if(NOT TARGET FFmpeg::avcodec)
     # NOTE: keep plain INTERFACE_INCLUDE_DIRECTORIES -- IMPORTED targets
     # arrive as -isystem automatically; explicit SYSTEM here drops the dirs.

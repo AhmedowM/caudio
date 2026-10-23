@@ -34,7 +34,7 @@ target_compile_definitions(player PRIVATE
   MA_NO_MP3=1
 )
 if(CAUDIO_ENABLE_MODULES)
-  target_compile_options(player PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
+  ca_set_module_warnings(player)
 endif()
 
 if(CAUDIO_BUILD_SHARED)

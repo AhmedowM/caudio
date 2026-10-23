@@ -274,15 +274,12 @@ configure_file(
 # opt-in shared umbrella (combined -> libcaudio).
 add_library(sqlite3 STATIC vendor/sqlite3.c)
 add_library(caudio::sqlite3 ALIAS sqlite3)
-set_target_properties(sqlite3 PROPERTIES OUTPUT_NAME sqlite3)
 target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 # BUILD_INTERFACE only: vendor headers are NOT installed (nothing installed
 # references them), so no INSTALL_INTERFACE -- a dangling install path breaks
 # downstream configure with "non-existent path" errors.
 # SYSTEM: vendored amalgamation -- dependents (db/*.cpp include sqlite3.h)
 # must not inherit its extension-token noise under Clang. Propagates.
-target_include_directories(sqlite3 SYSTEM PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
 # Trimmed amalgamation: only the API surface
 # in use (prepare/bind/step/column/finalize, exec, open_v2, WAL + foreign_keys
@@ -302,10 +299,6 @@ target_compile_definitions(sqlite3 PUBLIC
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
 target_include_directories(blake3 SYSTEM PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
-# suppress GCC warnings in vendored C
-if(NOT MSVC)
-  target_compile_options(blake3 PRIVATE -w)
-endif()
 
 # FetchContent deps needed before components. CLI11/Catch2 are lazy: prefer
 # a system/vcpkg/Conan package first so plain configures don't pay for a git
@@ -331,10 +324,8 @@ if(CAUDIO_BUILD_CLI)
       GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(CLI11)
-    set(CAUDIO_CLI11_EXTRA_INCLUDE ${CLI11_SOURCE_DIR}/include)
   else()
     message(STATUS "CLI11 found (system): includes come from CLI11::CLI11")
-    set(CAUDIO_CLI11_EXTRA_INCLUDE "")
   endif()
 endif()
 
@@ -363,22 +354,10 @@ message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
-if(NOT MSVC)
-  # Vendored-style silence: TagLib's own headers trip -Wall -Wextra
-  # (e.g. -Wmicrosoft-unqualified-friend); same -w treatment as blake3.
-  # MSVC builds keep their (quiet) defaults.
-  target_compile_options(tag PRIVATE -w)
-endif()
 # TagLib's `tag` target exports install includes only; consumers use flat
-# per-subdir includes (`#include <apetag.h>`). Derive every header dir
-# from the pinned source.
-file(GLOB_RECURSE _taglib_hdrs "${taglib_SOURCE_DIR}/taglib/*.h")
+# per-subdir includes (`#include <apetag.h>`). The top-level source dir is
+# sufficient — adding every subdirectory floods the include path.
 set(CAUDIO_TAGLIB_BUILD_INCLUDES "${taglib_SOURCE_DIR}" "${taglib_BINARY_DIR}")
-foreach(_h IN LISTS _taglib_hdrs)
-  get_filename_component(_d "${_h}" DIRECTORY)
-  list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
-endforeach()
-list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
 include(cmake/components/types.cmake)
 include(cmake/components/utils.cmake)
@@ -466,7 +445,7 @@ else()
   )
 endif()
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/include/caudio/version_config.hpp DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/caudio COMPONENT dev)
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev FILES_MATCHING PATTERN "*.hpp")
 
 # NOTE: vendor headers (sqlite3.h, blake3.h) are deliberately NOT installed --
 # no public header references them (fwd-decls only). Only the static archives
@@ -483,7 +462,7 @@ configure_package_config_file(
 write_basic_package_version_file(
   "${CMAKE_CURRENT_BINARY_DIR}/caudioConfigVersion.cmake"
   VERSION ${PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion
+  COMPATIBILITY SameMinorVersion
 )
 install(FILES
   "${CMAKE_CURRENT_BINARY_DIR}/caudioConfig.cmake"
@@ -690,7 +669,7 @@ set(CPACK_PACKAGE_NAME "caudio")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "caudio")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "C++23 music player library -- utils, player, db, engine, ipc, client, service")
-set(CPACK_PACKAGE_CONTACT "caudio@example.com")
+set(CPACK_PACKAGE_CONTACT "caudio-devel@github.com")
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" CPACK_SYSTEM_NAME)
 # Architecture tag for filenames (normalize generator spellings).
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")

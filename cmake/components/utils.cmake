@@ -25,6 +25,7 @@ set(CAUDIO_UTILS_SOURCES
   src/utils/thread.cpp
 )
 caudio_add_component(utils SOURCES ${CAUDIO_UTILS_SOURCES} MODULE_SOURCES ${CAUDIO_UTILS_MODULE_SOURCES} DEPS Threads::Threads)
+ca_set_module_warnings(utils)
 target_include_directories(utils PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(utils EXTRA_DEPS Threads::Threads)

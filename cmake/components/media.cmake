@@ -14,6 +14,7 @@ set(CAUDIO_MEDIA_SOURCES
   src/media/fingerprint.cpp
 )
 caudio_add_component(media SOURCES ${CAUDIO_MEDIA_SOURCES} MODULE_SOURCES ${CAUDIO_MEDIA_MODULE_SOURCES} DEPS caudio::utils caudio::types)
+ca_set_module_warnings(media)
 # FFmpeg (sole decoder backend) is used only by src/media/decoders/ffmpeg.cpp
 # (via ffmpeg_impl.hpp), so link it here PRIVATE. STATIC private deps propagate
 # as $<LINK_ONLY:...> to the final executables, so consumers still resolve

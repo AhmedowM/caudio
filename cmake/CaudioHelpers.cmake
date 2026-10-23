@@ -1,10 +1,10 @@
 # CaudioHelpers.cmake -- DRY helpers for caudio components
 # Provides ca_set_warnings / ca_set_module_warnings and shared component scaffolding.
 
-if(DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL})
+if(DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL} AND NOT CMAKE_GENERATOR MATCHES "Ninja")
   set(CAUDIO_MSVC_MP_FLAG "/MP$ENV{CMAKE_BUILD_PARALLEL_LEVEL}")
 else()
-  set(CAUDIO_MSVC_MP_FLAG "/MP")
+  set(CAUDIO_MSVC_MP_FLAG "")
 endif()
 
 # U-6b gate: our own targets treat use of the deprecated caudio::db:: /
@@ -13,8 +13,8 @@ endif()
 # secure-CRT deprecations, so /we4996 would be too broad (MSVC is CI-only;
 # shipping compilers are GCC/Clang, where alias-use deprecation is verified).
 set(CAUDIO_WARNING_FLAGS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 ${CAUDIO_MSVC_MP_FLAG}>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror=deprecated-declarations>)
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /wd4324 /WX ${CAUDIO_MSVC_MP_FLAG}>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror=deprecated-declarations -Werror>)
 
 function(ca_set_warnings tgt)
   target_compile_options(${tgt} PRIVATE ${CAUDIO_WARNING_FLAGS})
@@ -22,7 +22,7 @@ endfunction()
 
 function(ca_set_module_warnings tgt)
   if(CAUDIO_ENABLE_MODULES)
-    target_compile_options(${tgt} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local>)
+    target_compile_options(${tgt} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
   endif()
 endfunction()
 

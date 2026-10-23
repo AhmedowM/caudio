@@ -11,8 +11,5 @@ set(CAUDIO_IPC_SOURCES
   src/ipc/protocol.cpp
   src/ipc/shm_status.cpp
 )
-caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::config caudio::utils Threads::Threads INCLUDES vendor)
+caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::config caudio::utils Threads::Threads)
 ca_set_module_warnings(ipc)
-if(CAUDIO_ENABLE_MODULES)
-  target_compile_options(ipc PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-global-module>)
-endif()
