@@ -165,3 +165,18 @@ function(caudio_add_shared_variant NAME)
     caudio_apply_sanitizers(${NAME}_shared)
   endif()
 endfunction()
+
+# Build an example executable with the standard boilerplate:
+#   add_executable + link libs + vendor SYSTEM include + cxx_std_23 +
+#   extra flags + sanitizers (if enabled).
+function(caudio_add_example name srcs)
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "LIBS")
+  add_executable(${name} ${srcs})
+  target_link_libraries(${name} PRIVATE ${ARG_LIBS})
+  target_include_directories(${name} SYSTEM PRIVATE vendor)
+  target_compile_features(${name} PRIVATE cxx_std_23)
+  caudio_apply_extra_flags(${name})
+  if(CAUDIO_ENABLE_SANITIZERS)
+    caudio_apply_sanitizers(${name})
+  endif()
+endfunction()
