@@ -19,6 +19,6 @@ if(APPLE)
   endif()
 elseif(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   message(WARNING "MinGW GCC works but ships larger binaries (+winpthread "
-    "DLL); the msvc or clang toolchain is preferred for releases.")
+    "DLL); the clang toolchain is preferred for releases.")
 endif()
 # Linux: GCC default, Clang first-class -- silence is the policy.

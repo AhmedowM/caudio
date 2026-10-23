@@ -8,6 +8,9 @@ cmake_minimum_required(VERSION 3.28)
 #   2. git describe --tags (normal clones, CI with fetch-depth: 0)
 #   3. VERSION file (tarballs, shallow exports -- bumped in the release-prep commit)
 #   4. 0.1.0 + loud warning (never silent; NOT a release build)
+# Release-toolchain contract (single source): minsize intent with clang
+# on Linux/Windows, apple toolchain on macOS. Stated here; CI and docs
+# reference this, do not duplicate elsewhere.
 option(CAUDIO_REQUIRE_GIT_VERSION "fail configure when no git tag is found (default OFF)" OFF)
 set(CAUDIO_VERSION_SUFFIX "")
 macro(_caudio_split_version INPUT OUT_OK)
@@ -727,7 +730,7 @@ if(CAUDIO_ENABLE_TESTS)
   enable_testing()
 
   if(CAUDIO_TEST_NOAUDIO)
-    add_compile_definitions(CAUDIO_TEST_NOAUDIO=1)
+    add_compile_definitions(CAUDIO_TEST_NOAUDIO_BUILD=1)
   endif()
 
   function(caudio_add_catch_test name src)

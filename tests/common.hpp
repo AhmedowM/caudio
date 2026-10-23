@@ -27,13 +27,15 @@ namespace caudio::test {
 
 /**
  * @brief Returns true when audio device tests should be skipped.
- * @details Checks env `CAUDIO_TEST_NOAUDIO` for values `1`, `true`, `True`.
+ * @details Checks compile definition `CAUDIO_TEST_NOAUDIO_BUILD` first, then
+ * falls back to env `CAUDIO_TEST_NOAUDIO` for values `1`, `true`, `True`.
  * When true, tests that would call `AudioOutput::create` / `ma_device_start`
  * and beep should `SKIP` instead. Set in CI via `CAUDIO_TEST_NOAUDIO=1`.
- * @return true if `CAUDIO_TEST_NOAUDIO` is `1`/`true`/`True`.
+ * @return true if `CAUDIO_TEST_NOAUDIO_BUILD` is defined or
+ * `CAUDIO_TEST_NOAUDIO` is `1`/`true`/`True`.
  */
 inline bool noAudio() noexcept {
-#ifdef CAUDIO_TEST_NOAUDIO
+#ifdef CAUDIO_TEST_NOAUDIO_BUILD
     return true;
 #endif
     const char* v = std::getenv("CAUDIO_TEST_NOAUDIO");

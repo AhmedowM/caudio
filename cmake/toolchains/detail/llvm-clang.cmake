@@ -2,15 +2,10 @@
 # dispatchers). Plain `clang` on PATH is AppleClang, which lags our C++23
 # baseline; GCC builds miniaudio with a dummy backend (no audio).
 #
-# AppleClang mode (CAUDIO_APPLE_CLANG): when set, skip the brew pin entirely
-# so the caller's compiler (xcrun/PATH) flows through; CompilerPolicy.cmake
-# still requires -DCAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON. This is a manual
-# escape hatch only: --toolchain apple resolves Xcode clang directly in
-# toolchains/apple.cmake and never includes this file.
 # NOTE: the cache variable does NOT survive try_compile (compiler ABI
 # probes re-run this file in a fresh scope), but the environment does --
 # so callers export CAUDIO_APPLE_CLANG=1 and both forms are honored.
-if(CAUDIO_APPLE_CLANG OR DEFINED ENV{CAUDIO_APPLE_CLANG})
+if(DEFINED ENV{CAUDIO_APPLE_CLANG})
   message(STATUS "AppleClang mode: keeping caller-provided compiler "
     "(unsupported)")
   return()
