@@ -42,78 +42,11 @@ set(CAUDIO_FFMPEG_TRIM_PREFIX "${CMAKE_BINARY_DIR}/ffmpeg"
 # Decode-only whitelist: --disable-all base, then re-enable exactly what the
 # engine uses (decoder.cpp/resample needs avcodec+swresample; extractMetadata/
 # scan needs avformat; everything links avutil). One source of truth used by
-# the cmake module AND the producer workflow.
-set(FFMPEG_TRIM_FLAGS
-  --enable-shared --disable-static
-  --enable-pic
-  --disable-all
-  --disable-autodetect
-  --enable-avcodec --enable-avformat --enable-avutil --enable-swresample
-  --disable-avfilter --disable-avdevice --disable-swscale
-  --disable-programs --disable-doc --disable-debug
-  --disable-network
-  --disable-hwaccels
-  --disable-encoders --disable-muxers --disable-filters
-  --disable-indevs --disable-outdevs
-  --enable-zlib
-  # Decoders: pcm_* family + the ~40 named audio decoders. Native
-  # implementations only (no libmp3lame/libopus/libvorbis/libgsm/libspeex/
-  # libopencore_* external deps). Name fixes vs review text: mpc7/mpc8 (not
-  # musepack7/8), amrnb/amrwb (not amr_nb/amr_wb), dca (not dts).
-  --enable-decoder=pcm_alaw --enable-decoder=pcm_bluray --enable-decoder=pcm_dvd
-  --enable-decoder=pcm_f16le --enable-decoder=pcm_f24le
-  --enable-decoder=pcm_f32be --enable-decoder=pcm_f32le
-  --enable-decoder=pcm_f64be --enable-decoder=pcm_f64le
-  --enable-decoder=pcm_lxf --enable-decoder=pcm_mulaw
-  --enable-decoder=pcm_s8 --enable-decoder=pcm_s8_planar
-  --enable-decoder=pcm_s16be --enable-decoder=pcm_s16be_planar
-  --enable-decoder=pcm_s16le --enable-decoder=pcm_s16le_planar
-  --enable-decoder=pcm_s24be --enable-decoder=pcm_s24daud
-  --enable-decoder=pcm_s24le --enable-decoder=pcm_s24le_planar
-  --enable-decoder=pcm_s32be --enable-decoder=pcm_s32le --enable-decoder=pcm_s32le_planar
-  --enable-decoder=pcm_s64be --enable-decoder=pcm_s64le
-  --enable-decoder=pcm_sga
-  --enable-decoder=pcm_u8 --enable-decoder=pcm_u16be --enable-decoder=pcm_u16le
-  --enable-decoder=pcm_u24be --enable-decoder=pcm_u24le
-  --enable-decoder=pcm_u32be --enable-decoder=pcm_u32le
-  --enable-decoder=pcm_vidc
-  --enable-decoder=adpcm_ms --enable-decoder=adpcm_ima_wav
-  --enable-decoder=flac --enable-decoder=mp3float --enable-decoder=vorbis --enable-decoder=opus
-  --enable-decoder=aac --enable-decoder=aac_latm --enable-decoder=alac --enable-decoder=ape
-  --enable-decoder=mpc7 --enable-decoder=mpc8
-  --enable-decoder=wavpack --enable-decoder=tta --enable-decoder=tak --enable-decoder=shorten
-  --enable-decoder=wmalossless --enable-decoder=wmapro --enable-decoder=wmav1 --enable-decoder=wmav2
-  --enable-decoder=ac3 --enable-decoder=eac3 --enable-decoder=dca
-  --enable-decoder=truehd --enable-decoder=mlp
-  --enable-decoder=dsd_lsbf --enable-decoder=dsd_msbf
-  --enable-decoder=dsd_lsbf_planar --enable-decoder=dsd_msbf_planar
-  --enable-decoder=amrnb --enable-decoder=amrwb
-  --enable-decoder=speex --enable-decoder=gsm
-  # Demuxers: mov covers mov/mp4/m4a, matroska covers mka/webm audio, ogg
-  # covers .ogg/.opus. No standalone `opus` demuxer exists (review text fix).
-  --enable-demuxer=wav --enable-demuxer=w64 --enable-demuxer=aiff --enable-demuxer=au
-  --enable-demuxer=caf --enable-demuxer=flac --enable-demuxer=mp3 --enable-demuxer=ogg
-  --enable-demuxer=mov --enable-demuxer=aac --enable-demuxer=asf
-  --enable-demuxer=ape --enable-demuxer=mpc --enable-decoder=mpc8 --enable-demuxer=wv
-  --enable-demuxer=tta --enable-demuxer=amr --enable-demuxer=matroska
-  --enable-demuxer=ac3 --enable-demuxer=eac3 --enable-demuxer=dts
-  --enable-demuxer=truehd --enable-demuxer=mlp --enable-demuxer=spdif
-  --enable-demuxer=voc --enable-demuxer=ircam --enable-demuxer=sox
-  --enable-demuxer=gsm --enable-demuxer=sbc
-  # Parsers needed by the kept demuxer/decoder pairs.
-  --enable-parser=aac --enable-parser=aac_latm --enable-parser=ac3 --enable-parser=dca
-  --enable-parser=flac --enable-parser=mpegaudio --enable-parser=opus
-  --enable-parser=vorbis --enable-parser=tak
-  # Protocols: local files only. Internet radio (http/hls + TLS) stays a
-  # future re-enable, never silent.
-  --enable-protocol=file --enable-protocol=pipe
-  # Bitstream filters: raw-.aac reshape + core-extraction + rechunk helpers.
-  --enable-bsf=aac_adtstoasc --enable-bsf=opus_metadata --enable-bsf=truehd_core
-  --enable-bsf=eac3_core --enable-bsf=dca_core --enable-bsf=pcm_rechunk
-  --enable-bsf=dump_extra
-  CACHE STRING "configure flags for the trimmed decode-only FFmpeg build"
-)
-
+# the cmake module AND the producer workflow. Flags live in
+# cmake/ffmpeg_trimmed_flags.txt (one per line) to avoid regex parsing.
+file(READ "${CMAKE_CURRENT_LIST_DIR}/ffmpeg_trimmed_flags.txt" _trim_flags_raw)
+separate_arguments(FFMPEG_TRIM_FLAGS NATIVE_COMMAND "${_trim_flags_raw}")
+unset(_trim_flags_raw)
 set(CAUDIO_FFMPEG_TRIM_FLAGS "${FFMPEG_TRIM_FLAGS}")
 
 # Honors a prebuilt trimmed tree via FFmpeg_ROOT; otherwise performs a

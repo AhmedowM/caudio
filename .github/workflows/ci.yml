@@ -340,14 +340,14 @@ jobs:
           else
             src="$dest/_deps/ffmpeg_prebuilt-src/bin"
           fi
-          for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
-            test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
-            cp "$src/$d" "$dest/"
+          for d in "$src"/avcodec-*.dll "$src"/avformat-*.dll "$src"/avutil-*.dll "$src"/swresample-*.dll; do
+            test -f "$d" || (echo "missing $d" && exit 1)
+            cp "$d" "$dest/"
           done
           uroot="$(cygpath "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin")"
-          for d in libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll; do
-            test -f "$uroot/$d" || (echo "missing $uroot/$d" && exit 1)
-            cp "$uroot/$d" "$dest/"
+          for d in "$uroot"/libstdc++-*.dll "$uroot"/libgcc_s_*-1.dll "$uroot"/libwinpthread-*.dll; do
+            test -f "$d" || (echo "missing $d" && exit 1)
+            cp "$d" "$dest/"
           done
           ls "$dest/"*.dll
         shell: bash
@@ -436,9 +436,9 @@ jobs:
           else
             src="$dest/_deps/ffmpeg_prebuilt-src/bin"
           fi
-          for d in avcodec-62.dll avformat-62.dll avutil-60.dll swresample-6.dll; do
-            test -f "$src/$d" || (echo "missing $src/$d" && exit 1)
-            cp "$src/$d" "$dest/"
+          for d in "$src"/avcodec-*.dll "$src"/avformat-*.dll "$src"/avutil-*.dll "$src"/swresample-*.dll; do
+            test -f "$d" || (echo "missing $d" && exit 1)
+            cp "$d" "$dest/"
           done
           ls "$dest/"*.dll
         shell: bash

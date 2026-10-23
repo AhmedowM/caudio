@@ -47,33 +47,35 @@ def cmake_module() -> Path:
     return repo_root() / "cmake" / "FFmpegTrimmed.cmake"
 
 
-def parse_trim_cmake(text: str) -> tuple[str, list[str]]:
-    """Extract pinned version + flag list from cmake/FFmpegTrimmed.cmake."""
+def trim_flags_file() -> Path:
+    return repo_root() / "cmake" / "ffmpeg_trimmed_flags.txt"
+
+
+def parse_trim_version(text: str) -> str:
+    """Extract pinned version from cmake/FFmpegTrimmed.cmake."""
     m = re.search(r'set\(CAUDIO_FFMPEG_TRIM_VERSION\s+"([^"]+)"', text)
     if not m:
         print("[ERROR] CAUDIO_FFMPEG_TRIM_VERSION not found in FFmpegTrimmed.cmake",
               file=sys.stderr)
         sys.exit(1)
-    version = m.group(1)
-    lines = text.splitlines()
-    try:
-        start = next(i for i, l in enumerate(lines)
-                     if l.strip() == "set(FFMPEG_TRIM_FLAGS")
-    except StopIteration:
-        print("[ERROR] FFMPEG_TRIM_FLAGS block not found in FFmpegTrimmed.cmake",
-              file=sys.stderr)
+    return m.group(1)
+
+
+def read_trim_flags() -> list[str]:
+    """Read configure flags from cmake/ffmpeg_trimmed_flags.txt (one per line)."""
+    flags_file = trim_flags_file()
+    if not flags_file.exists():
+        print(f"[ERROR] flags file not found: {flags_file}", file=sys.stderr)
         sys.exit(1)
     flags: list[str] = []
-    for line in lines[start + 1:]:
+    for line in flags_file.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
-        if stripped.startswith("CACHE"):
-            break
-        code = line.split("#", 1)[0]
-        flags.extend(re.findall(r"--[^\s\"']+", code))
+        if stripped and not stripped.startswith("#"):
+            flags.append(stripped)
     if not flags:
-        print("[ERROR] no flags extracted from FFMPEG_TRIM_FLAGS", file=sys.stderr)
+        print(f"[ERROR] no flags found in {flags_file}", file=sys.stderr)
         sys.exit(1)
-    return version, flags
+    return flags
 
 
 def asset_name(version: str) -> str:
@@ -190,7 +192,8 @@ def main() -> None:
     args = ap.parse_args()
 
     text = cmake_module().read_text(encoding="utf-8")
-    pinned_version, flags = parse_trim_cmake(text)
+    pinned_version = parse_trim_version(text)
+    flags = read_trim_flags()
     version = args.ffmpeg_version or pinned_version
 
     if args.print_flags:
