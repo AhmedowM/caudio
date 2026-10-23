@@ -367,19 +367,26 @@ foreach(_h IN LISTS _taglib_hdrs)
 endforeach()
 list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
 include(cmake/CaudioHelpers.cmake)
-include(cmake/components/types.cmake)
-include(cmake/components/utils.cmake)
-include(cmake/components/config.cmake)
-include(cmake/components/media.cmake)
-include(cmake/components/player.cmake)
-include(cmake/components/db.cmake)
-include(cmake/components/engine.cmake)
-include(cmake/components/ipc.cmake)
-include(cmake/components/service.cmake)
-include(cmake/components/client.cmake)
-include(cmake/components/cli.cmake)
-include(cmake/components/app.cmake)
-include(cmake/components/combined.cmake)
+# Component includes in dependency order. Each component's .cmake registers
+# its target via caudio_add_component; including them here builds the surface.
+set(CAUDIO_COMPONENTS
+  types
+  utils
+  config
+  media
+  player
+  db
+  engine
+  ipc
+  service
+  client
+  cli
+  app
+  combined
+)
+foreach(_comp IN LISTS CAUDIO_COMPONENTS)
+  include(cmake/components/${_comp}.cmake)
+endforeach()
 
 # Umbrella module (optional, headers are canonical)
 if(CAUDIO_ENABLE_MODULES)
