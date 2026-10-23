@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`71c704d`)
 - Windows config-directory resolution now matches the other platforms
   (`120a928`)
+- Shared-memory status segments use POSIX `/`-prefixed names, so the
+  reader/writer round-trip works on macOS
 
 ## [v1.8.0] - 2026-10-19
 

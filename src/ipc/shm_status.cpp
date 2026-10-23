@@ -37,7 +37,11 @@ void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept {
 }
 
 ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bool create) {
+#ifdef _WIN32
     std::string fullName = "caudio-" + name + "-status";
+#else
+    std::string fullName = "/caudio-" + name + "-status";
+#endif
     ShmStatusHandle handle;
     handle.name_ = std::move(fullName);
     handle.create_ = create;

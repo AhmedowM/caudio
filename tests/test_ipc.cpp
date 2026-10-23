@@ -256,8 +256,8 @@ TEST_CASE("library stats command roundtrip", "[ipc]") {
 }
 
 TEST_CASE("shm status reader/writer roundtrip", "[ipc][shm]") {
-    const std::string name =
-        "test-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+    const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count() % 100000000;
+    const std::string name = "test-" + std::to_string(suffix);
     auto writerRes = caudio::ipc::ShmStatusWriter::create(name);
     REQUIRE(writerRes.has_value());
     auto& writer = *writerRes;
