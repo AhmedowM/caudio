@@ -5,14 +5,7 @@
 
 # Auto-detect FFmpeg root from ffmpeg executable in PATH (portable, no hardcoding)
 if(NOT FFmpeg_ROOT AND NOT DEFINED ENV{FFmpeg_ROOT})
-  find_program(_FFmpeg_EXECUTABLE_HINT ffmpeg ffprobe
-    PATHS ENV PATH
-    NO_DEFAULT_PATH
-  )
-  # Fallback to default find_program search
-  if(NOT _FFmpeg_EXECUTABLE_HINT)
-    find_program(_FFmpeg_EXECUTABLE_HINT ffmpeg)
-  endif()
+  find_program(_FFmpeg_EXECUTABLE_HINT ffmpeg)
   if(_FFmpeg_EXECUTABLE_HINT)
     get_filename_component(_FFmpeg_BIN_HINT "${_FFmpeg_EXECUTABLE_HINT}" DIRECTORY)
     get_filename_component(_FFmpeg_ROOT_HINT "${_FFmpeg_BIN_HINT}/.." ABSOLUTE)
@@ -27,70 +20,48 @@ if(NOT FFmpeg_ROOT AND NOT DEFINED ENV{FFmpeg_ROOT})
   endif()
 endif()
 
-find_path(FFmpeg_AVCODEC_INCLUDE_DIR
-  NAMES libavcodec/avcodec.h
-  PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
-  PATH_SUFFIXES include
-  NO_DEFAULT_PATH
+set(_ffmpeg_libs
+  "AVCODEC|libavcodec/avcodec.h|avcodec libavcodec"
+  "AVFORMAT|libavformat/avformat.h|avformat libavformat"
+  "AVUTIL|libavutil/avutil.h|avutil libavutil"
+  "SWRESAMPLE|libswresample/swresample.h|swresample libswresample"
 )
-if(NOT FFmpeg_AVCODEC_INCLUDE_DIR)
-  find_path(FFmpeg_AVCODEC_INCLUDE_DIR
-    NAMES libavcodec/avcodec.h
+
+foreach(_entry IN LISTS _ffmpeg_libs)
+  string(REPLACE "|" ";" _parts "${_entry}")
+  list(GET _parts 0 _suffix)
+  list(GET _parts 1 _header)
+  list(GET _parts 2 _libs)
+
+  set(_inc_var "FFmpeg_${_suffix}_INCLUDE_DIR")
+  set(_lib_var "FFmpeg_${_suffix}_LIBRARY")
+
+  find_path(${_inc_var}
+    NAMES ${_header}
+    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES include
+    NO_DEFAULT_PATH
   )
-endif()
+  if(NOT ${_inc_var})
+    find_path(${_inc_var}
+      NAMES ${_header}
+      PATH_SUFFIXES include
+    )
+  endif()
 
-find_library(FFmpeg_AVCODEC_LIBRARY
-  NAMES avcodec libavcodec
-  PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
-  PATH_SUFFIXES lib bin
-  NO_DEFAULT_PATH
-)
-if(NOT FFmpeg_AVCODEC_LIBRARY)
-  find_library(FFmpeg_AVCODEC_LIBRARY
-    NAMES avcodec libavcodec
+  find_library(${_lib_var}
+    NAMES ${_libs}
+    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES lib bin
+    NO_DEFAULT_PATH
   )
-endif()
-
-find_library(FFmpeg_AVFORMAT_LIBRARY
-  NAMES avformat libavformat
-  PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
-  PATH_SUFFIXES lib bin
-  NO_DEFAULT_PATH
-)
-if(NOT FFmpeg_AVFORMAT_LIBRARY)
-  find_library(FFmpeg_AVFORMAT_LIBRARY
-    NAMES avformat libavformat
-    PATH_SUFFIXES lib bin
-  )
-endif()
-
-find_library(FFmpeg_AVUTIL_LIBRARY
-  NAMES avutil libavutil
-  PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
-  PATH_SUFFIXES lib bin
-  NO_DEFAULT_PATH
-)
-if(NOT FFmpeg_AVUTIL_LIBRARY)
-  find_library(FFmpeg_AVUTIL_LIBRARY
-    NAMES avutil libavutil
-    PATH_SUFFIXES lib bin
-  )
-endif()
-
-find_library(FFmpeg_SWRESAMPLE_LIBRARY
-  NAMES swresample libswresample
-  PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
-  PATH_SUFFIXES lib bin
-  NO_DEFAULT_PATH
-)
-if(NOT FFmpeg_SWRESAMPLE_LIBRARY)
-  find_library(FFmpeg_SWRESAMPLE_LIBRARY
-    NAMES swresample libswresample
-    PATH_SUFFIXES lib bin
-  )
-endif()
+  if(NOT ${_lib_var})
+    find_library(${_lib_var}
+      NAMES ${_libs}
+      PATH_SUFFIXES lib bin
+    )
+  endif()
+endforeach()
 
 # avcodec's major is the ABI identity used by the installed caudioConfig.cmake.
 set(FFmpeg_VERSION "")
@@ -118,42 +89,23 @@ find_package_handle_standard_args(FFmpeg
 )
 
 if(FFmpeg_FOUND)
-  if(NOT TARGET FFmpeg::avcodec)
-    # NOTE: keep plain INTERFACE_INCLUDE_DIRECTORIES -- IMPORTED targets
-    # arrive as -isystem automatically; explicit SYSTEM here drops the dirs.
-    add_library(FFmpeg::avcodec UNKNOWN IMPORTED)
-    set_target_properties(FFmpeg::avcodec PROPERTIES
-      IMPORTED_LOCATION "${FFmpeg_AVCODEC_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${FFmpeg_AVCODEC_INCLUDE_DIR}"
-    )
-  endif()
-  if(NOT TARGET FFmpeg::avformat)
-    add_library(FFmpeg::avformat UNKNOWN IMPORTED)
-    set_target_properties(FFmpeg::avformat PROPERTIES
-      IMPORTED_LOCATION "${FFmpeg_AVFORMAT_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${FFmpeg_AVCODEC_INCLUDE_DIR}"
-    )
-  endif()
-  if(NOT TARGET FFmpeg::avutil)
-    add_library(FFmpeg::avutil UNKNOWN IMPORTED)
-    set_target_properties(FFmpeg::avutil PROPERTIES
-      IMPORTED_LOCATION "${FFmpeg_AVUTIL_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${FFmpeg_AVCODEC_INCLUDE_DIR}"
-    )
-  endif()
-  if(NOT TARGET FFmpeg::swresample)
-    add_library(FFmpeg::swresample UNKNOWN IMPORTED)
-    set_target_properties(FFmpeg::swresample PROPERTIES
-      IMPORTED_LOCATION "${FFmpeg_SWRESAMPLE_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${FFmpeg_AVCODEC_INCLUDE_DIR}"
-    )
-  endif()
+  foreach(_suffix AVCODEC AVFORMAT AVUTIL SWRESAMPLE)
+    string(TOLOWER "${_suffix}" _lower)
+    set(_target "FFmpeg::${_lower}")
+    if(NOT TARGET ${_target})
+      set(_lib_var "FFmpeg_${_suffix}_LIBRARY")
+      set(_inc_var "FFmpeg_${_suffix}_INCLUDE_DIR")
+      add_library(${_target} UNKNOWN IMPORTED)
+      set_target_properties(${_target} PROPERTIES
+        IMPORTED_LOCATION "${${_lib_var}}"
+        INTERFACE_INCLUDE_DIRECTORIES "${${_inc_var}}"
+      )
+    endif()
+  endforeach()
 endif()
 
-mark_as_advanced(
-  FFmpeg_AVCODEC_INCLUDE_DIR
-  FFmpeg_AVCODEC_LIBRARY
-  FFmpeg_AVFORMAT_LIBRARY
-  FFmpeg_AVUTIL_LIBRARY
-  FFmpeg_SWRESAMPLE_LIBRARY
-)
+set(_ffmpeg_advanced "FFmpeg_AVCODEC_INCLUDE_DIR" "FFmpeg_AVCODEC_LIBRARY")
+foreach(_suffix AVFORMAT AVUTIL SWRESAMPLE)
+  list(APPEND _ffmpeg_advanced "FFmpeg_${_suffix}_INCLUDE_DIR" "FFmpeg_${_suffix}_LIBRARY")
+endforeach()
+mark_as_advanced(${_ffmpeg_advanced})
