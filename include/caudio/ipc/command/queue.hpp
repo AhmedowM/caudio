@@ -7,6 +7,7 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/types/wire.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <optional>

@@ -48,7 +48,7 @@ option(CAUDIO_ENABLE_SANITIZERS "Enable ASan+UBSan (like C: -fsanitize=address,u
 option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
-option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" OFF)
+option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" ON)
 # Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
 # to work around duplicate-symbol/ODR issues from merged static twins. Static +
 # header-only is the default; opt in only if you need shared libs.
@@ -60,6 +60,7 @@ option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (
 # flags live here. GNU/Clang also need function/data sections at compile time;
 # MSVC links /OPT:REF by default (/Gy only splits functions).
 option(CAUDIO_LINK_SECTION_GC "drop unreferenced code/data sections at link (Apple -dead_strip, otherwise --gc-sections)" OFF)
+option(CAUDIO_ENABLE_HEADER_SELF_CONTAINMENT "compile every public header as standalone TU" OFF)
 # Extra flags appended to our own targets only (see caudio_apply_extra_flags).
 # These never replace CMAKE_CXX_FLAGS / CMAKE_C_FLAGS / CMAKE_EXE_LINKER_FLAGS
 # and the empty default is a no-op. Vendor/third-party targets are unaffected.

@@ -88,6 +88,10 @@ if(CAUDIO_ENABLE_TESTS)
   endif()
 
   # D-4: compile every public header as a standalone TU (build gate, no ctest
-  # entry -- the objects are never linked, only compiled).
-  caudio_add_header_self_containment()
+  # entry -- the objects are never linked, only compiled). Opt-in via
+  # CAUDIO_ENABLE_HEADER_SELF_CONTAINMENT because it adds one compile per
+  # public header with no link artifact.
+  if(CAUDIO_ENABLE_HEADER_SELF_CONTAINMENT)
+    caudio_add_header_self_containment()
+  endif()
 endif()

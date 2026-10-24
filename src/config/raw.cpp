@@ -3,6 +3,9 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/result.hpp>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
 #include "config_detail.hpp"
 
