@@ -14,11 +14,9 @@
 
 #include <caudio/legacy_aliases.hpp>
 #include <caudio/types/record.hpp>
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace caudio::db {
 

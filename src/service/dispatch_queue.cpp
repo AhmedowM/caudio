@@ -3,9 +3,9 @@
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/media/audio_ext.hpp>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
-#include <caudio/media/audio_ext.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
@@ -15,6 +15,7 @@
 #include <engine/engine_access.hpp>
 #include <expected>
 #include <filesystem>
+#include <media/fingerprint.hpp>
 #include <memory>
 #include <optional>
 #include <string>
@@ -22,7 +23,6 @@
 #include <system_error>
 #include <utility>
 #include <vector>
-#include <media/fingerprint.hpp>
 
 #include "service_impl.hpp"
 

@@ -25,8 +25,9 @@ namespace caudio::media {
  */
 inline bool hasAudioExt(const std::filesystem::path& p) {
     auto ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::ranges::transform(ext, ext.begin(), [](unsigned char c) -> char {
+        return static_cast<char>(std::tolower(c));
+    });
     return ext == ".mp3" || ext == ".flac" || ext == ".ogg" || ext == ".opus" || ext == ".oga" ||
            ext == ".wav" || ext == ".m4a" || ext == ".mp4" || ext == ".wma" || ext == ".asf" ||
            ext == ".aiff" || ext == ".aif" || ext == ".ape" || ext == ".mpc" || ext == ".wv";

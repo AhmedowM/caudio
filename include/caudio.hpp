@@ -1,18 +1,5 @@
 #pragma once
 
-#include <caudio/app.hpp>
-#include <caudio/client.hpp>
-#include <caudio/config.hpp>
-#include <caudio/db.hpp>
-#include <caudio/engine.hpp>
-#include <caudio/ipc.hpp>
-#include <caudio/media.hpp>
-#include <caudio/player.hpp>
-#include <caudio/service.hpp>
-#include <caudio/types.hpp>
-#include <caudio/utils.hpp>
-#include <caudio/version.hpp>
-
 /**
  * @file caudio.hpp
  * @brief Umbrella header for caudio -- modern C++23 music player library.
@@ -90,3 +77,16 @@
  * @see caudio.service
  * @see caudio_config
  */
+
+#include <caudio/app.hpp>
+#include <caudio/client.hpp>
+#include <caudio/config.hpp>
+#include <caudio/db.hpp>
+#include <caudio/engine.hpp>
+#include <caudio/ipc.hpp>
+#include <caudio/media.hpp>
+#include <caudio/player.hpp>
+#include <caudio/service.hpp>
+#include <caudio/types.hpp>
+#include <caudio/utils.hpp>
+#include <caudio/version.hpp>

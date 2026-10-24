@@ -52,4 +52,3 @@ computeFingerprint(const std::filesystem::path& path) {
 }
 
 } // namespace caudio::media::internal
-

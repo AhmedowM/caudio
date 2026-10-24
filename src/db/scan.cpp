@@ -367,4 +367,3 @@ scanLibrary(Database& db, int64_t libraryId,
 }
 
 } // namespace caudio::db
-

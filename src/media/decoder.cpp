@@ -76,4 +76,3 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
 }
 
 } // namespace caudio::media
-

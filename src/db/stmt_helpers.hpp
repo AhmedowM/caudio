@@ -99,4 +99,3 @@ struct StmtGuard {
 void fillTrackFromStmt(sqlite3_stmt* stmt, caudio::types::Track& t);
 
 } // namespace caudio::db::internal
-

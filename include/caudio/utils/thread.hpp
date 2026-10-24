@@ -3,7 +3,6 @@
 #include <caudio/utils/error.hpp>
 #include <chrono>
 #include <cstdint>
-#include <expected>
 #include <string_view>
 #include <thread>
 

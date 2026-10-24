@@ -53,4 +53,3 @@ std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path);
 
 } // namespace caudio::media::internal
-

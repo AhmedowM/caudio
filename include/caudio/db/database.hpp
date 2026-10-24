@@ -21,7 +21,6 @@
 #include <optional>
 #include <shared_mutex>
 #include <span>
-#include <string>
 #include <string_view>
 #include <vector>
 
@@ -158,7 +157,6 @@ class Database final {
     struct Impl;
     std::unique_ptr<Impl> impl_;
 
-  private:
     // Inline helpers -- reduce duplication between insert/update binds
     /**
      * @brief Binds all Track fields for INSERT statement (24 parameters).
@@ -195,7 +193,6 @@ class Database final {
         "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
         "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
 
-  private:
     // Raw locking surface -- private; reached from outside the class through
     // the single friend struct DatabaseAccess (src/db/database_access.hpp).
     /**

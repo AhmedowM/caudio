@@ -1,9 +1,9 @@
-﻿#include <cerrno>
-#include <algorithm>
+﻿#include <algorithm>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <cerrno>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -101,7 +101,6 @@ struct Decoder::Impl {
     std::vector<float> spill_{};
     std::size_t spillPos_{0};
 };
-
 
 caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     AVFormatContext* fmt = avformat_alloc_context();
@@ -652,4 +651,3 @@ caudio::utils::Expected<void> Decoder::seek(double seconds) {
 }
 
 } // namespace caudio::media
-
