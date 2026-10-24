@@ -1,5 +1,6 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
+#include <ipc/protocol_internal.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/types/format.hpp>
 #include <caudio/types/parse.hpp>

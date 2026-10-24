@@ -46,14 +46,6 @@ struct DatabaseOptions {
 using DbOpts [[deprecated("use DatabaseOptions instead")]] = DatabaseOptions; // legacy-shim-ok
 
 /**
- * @brief Closes an owned SQLite handle (defined in core.cpp).
- * @ingroup caudio_db
- */
-struct SqliteCloser {
-    void operator()(sqlite3* db) const noexcept;
-};
-
-/**
  * @brief Main SQLite database handle with thread-safe CRUD.
  * @ingroup caudio_db
  * @details Thread safety: dbMutex_ (shared_mutex) guards the handle and all
@@ -182,19 +174,6 @@ class Database final {
      * NULL binds for optional deleted_at.
      */
     static void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t);
-    static constexpr std::string_view insertTrackSql =
-        "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
-        "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
-        "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
-        "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    static constexpr std::string_view updateTrackSql =
-        "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
-        "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
-        "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
-        "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
-
-    // Raw locking surface -- private; reached from outside the class through
-    // the single friend struct DatabaseAccess (src/db/database_access.hpp).
     /**
      * @brief Gets or prepares a cached statement (caller must hold cacheMutex_).
      * @ingroup caudio_db

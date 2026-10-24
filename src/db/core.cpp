@@ -28,6 +28,14 @@
 
 namespace caudio::db {
 
+/**
+ * @brief Closes an owned SQLite handle (defined in core.cpp).
+ * @ingroup caudio_db
+ */
+struct SqliteCloser {
+    void operator()(sqlite3* db) const noexcept;
+};
+
 inline constexpr std::string_view schema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
@@ -170,6 +178,17 @@ inline constexpr std::string_view schema =
 
 inline constexpr std::string_view schemaDefaultLibrary =
     "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');";
+
+inline constexpr std::string_view insertTrackSql =
+    "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
+    "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
+    "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
+    "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+inline constexpr std::string_view updateTrackSql =
+    "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
+    "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
+    "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
+    "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
 
 // Private implementation: the SQLite handle, statement cache, locks and the
 // background writer live here so the public header stays include-light.

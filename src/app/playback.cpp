@@ -15,6 +15,7 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/math.hpp>
 #include <chrono>
 #include <expected>
 #include <format>
@@ -70,8 +71,8 @@ AppResult App::play() {
         }
         std::string who = transportWho(res);
         std::string line =
-            wasPaused  ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
-            : restored ? std::format("Resuming {} from {}", who, caudio::app::fmtClock(priorPos))
+            wasPaused  ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
+            : restored ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
                        : std::format("Playing {}", who);
         return Outcome{
             .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
@@ -108,7 +109,7 @@ AppResult App::pause() {
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         std::string who = transportWho(res);
         return Outcome{.result = std::move(*res),
-                       .line = std::format("Paused {} at {}", who, caudio::app::fmtClock(st->pos)),
+                       .line = std::format("Paused {} at {}", who, caudio::utils::formatClock(st->pos)),
                        .toStderr = false,
                        .failed = false};
     }
@@ -144,7 +145,7 @@ AppResult App::resume() {
         // Hoisted: the line must be built before Outcome moves *res (the
         // braced list otherwise reads moved-from strings on some toolchains).
         std::string who = caudio::app::trackWho(*st);
-        std::string at = caudio::app::fmtClock(st->pos);
+        std::string at = caudio::utils::formatClock(st->pos);
         return Outcome{.result = std::move(*res),
                        .line = std::format("Resuming {} from {}", who, at),
                        .toStderr = false,

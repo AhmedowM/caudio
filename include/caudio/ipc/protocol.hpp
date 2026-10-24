@@ -108,66 +108,6 @@ struct IpcReply final {
     uint32_t id{0};
     std::expected<Result, caudio::utils::Error> result{};
 };
-
-// ---------------------------------------------------------------------------
-// JSON helpers for enums
-// ---------------------------------------------------------------------------
-namespace detail {
-
-/**
- * @brief Convert StatusCode enum to string representation.
- * @ingroup caudio_ipc
- * @param r Status code to convert.
- * @return String representation (e.g., "Ok", "InvalidArg", "NotFound").
- */
-std::string resultCodeToString(caudio::utils::StatusCode r);
-
-/**
- * @brief Convert string to StatusCode enum.
- * @ingroup caudio_ipc
- * @param sv String to parse.
- * @return StatusCode enum value, or error if unknown.
- */
-std::expected<caudio::utils::StatusCode, caudio::utils::Error>
-resultCodeFromString(std::string_view sv);
-
-// Track JSON helpers live in caudio::utils (utils/record_json.hpp) -- single
-// definition.
-// Playlist JSON helpers
-/**
- * @brief Convert Playlist struct to JSON object.
- * @ingroup caudio_ipc
- * @param p Playlist to convert.
- * @return JSON object with all playlist fields.
- */
-Json playlistToJson(const caudio::types::Playlist& p);
-
-/**
- * @brief Convert JSON object to Playlist struct.
- * @ingroup caudio_ipc
- * @param j JSON object with playlist fields.
- * @return Playlist struct, or error if parsing fails.
- */
-std::expected<caudio::types::Playlist, caudio::utils::Error> playlistFromJson(const Json& j);
-
-/**
- * @brief Convert Error struct to JSON object.
- * @ingroup caudio_ipc
- * @param e Error to convert.
- * @return JSON object with type, code, code_value, and message fields.
- */
-Json errorToJson(const caudio::utils::Error& e);
-
-/**
- * @brief Convert JSON object to Error struct.
- * @ingroup caudio_ipc
- * @param j JSON object with code/code_value and message fields.
- * @return Error struct, or error if parsing fails.
- */
-std::expected<caudio::utils::Error, caudio::utils::Error> errorFromJson(const Json& j);
-
-} // namespace detail
-
 // ---------------------------------------------------------------------------
 // Command JSON
 // ---------------------------------------------------------------------------

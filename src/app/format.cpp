@@ -20,15 +20,6 @@
 
 namespace caudio::app {
 
-std::string fmtClock(double secs) {
-    if (secs < 0)
-        secs = 0;
-    long total = static_cast<long>(secs);
-    if (long h = total / 3600; h > 0)
-        return std::format("{:02}:{:02}:{:02}", h, (total % 3600) / 60, total % 60);
-    return std::format("{:02}:{:02}", (total % 3600) / 60, total % 60);
-}
-
 std::string trackWho(const caudio::ipc::Status& st) {
     if (!st.artist.empty() && !st.title.empty())
         return st.artist + " - " + st.title;

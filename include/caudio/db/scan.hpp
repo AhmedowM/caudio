@@ -38,22 +38,6 @@ namespace caudio::db {
  */
 using ScanMode = caudio::media::ScanMode;
 
-namespace detail {
-
-/**
- * @brief Compatibility forwarder to `caudio::media::hasAudioExt`.
- * @ingroup caudio_db
- * @param p Path to check.
- * @return true if extension is a supported audio extension.
- * @deprecated Use `caudio::media::hasAudioExt` instead.
- */
-[[deprecated("use caudio::media::hasAudioExt")]]
-inline bool hasAudioExt(const std::filesystem::path& p) {
-    return caudio::media::hasAudioExt(p);
-}
-
-} // namespace detail
-
 /**
  * @brief Compatibility forwarder to `caudio::media::scanTracks`.
  * @ingroup caudio_db

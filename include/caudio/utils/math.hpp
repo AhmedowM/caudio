@@ -4,12 +4,14 @@
  * @file math.hpp
  * @brief Miscellaneous math utilities.
  * @ingroup caudio_utils
+ * @include-only This header is fully inline; no .cpp is required.
  */
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <string>
 #include <string_view>
 
@@ -71,6 +73,21 @@ inline bool fromHex(std::string_view hexStr, std::array<std::uint8_t, 32>& out) 
         out[i] = static_cast<std::uint8_t>((hi << 4) | lo);
     }
     return true;
+}
+
+/**
+ * @brief Formats seconds as mm:ss or hh:mm:ss.
+ * @ingroup caudio_utils
+ * @param secs Position or duration in seconds (negative clamps to 0).
+ * @return Formatted time string.
+ */
+[[nodiscard]] inline std::string formatClock(double secs) {
+    if (secs < 0)
+        secs = 0;
+    long total = static_cast<long>(secs);
+    if (long h = total / 3600; h > 0)
+        return std::format("{:02}:{:02}:{:02}", h, (total % 3600) / 60, total % 60);
+    return std::format("{:02}:{:02}", (total % 3600) / 60, total % 60);
 }
 
 } // namespace caudio::utils

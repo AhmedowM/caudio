@@ -10,6 +10,7 @@
 #include <caudio/client/client.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/utils/error.hpp>
+#include <caudio/utils/math.hpp>
 #include <cmath>
 #include <format>
 #include <optional>
@@ -66,7 +67,7 @@ AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
     auto res = sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
-    std::string line = std::format("Bookmark added at {}", caudio::app::fmtClock(pos));
+    std::string line = std::format("Bookmark added at {}", caudio::utils::formatClock(pos));
     return Outcome{
         .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
 }
@@ -88,7 +89,7 @@ AppResult App::bookmarkGoto(int64_t id) {
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         std::string who = caudio::app::trackWho(*st);
-        std::string line = std::format("Resuming {} from {}", who, caudio::app::fmtClock(st->pos));
+        std::string line = std::format("Resuming {} from {}", who, caudio::utils::formatClock(st->pos));
         return Outcome{
             .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }

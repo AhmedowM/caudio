@@ -24,6 +24,7 @@
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/config.hpp>
+#include <caudio/utils/math.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
@@ -108,7 +109,7 @@ std::string statusLine(const caudio::ipc::Status& st) {
         who = st.artist + st.title;
     if (!who.empty())
         s += " " + who;
-    s += " [" + caudio::app::fmtClock(st.pos) + "/" + caudio::app::fmtClock(st.dur) + "]";
+    s += " [" + caudio::utils::formatClock(st.pos) + "/" + caudio::utils::formatClock(st.dur) + "]";
     return s;
 }
 
