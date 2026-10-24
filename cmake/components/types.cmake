@@ -14,6 +14,7 @@ if(CAUDIO_ENABLE_MODULES)
 else()
   add_library(types INTERFACE)
   add_library(caudio::types ALIAS types)
+  set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS types)
   target_include_directories(types INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

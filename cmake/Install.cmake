@@ -1,35 +1,31 @@
 # Install targets, exports, docs, man page, license, systemd service.
-# Component targets are registered in CAUDIO_INSTALL_LIBS below.
-# Components are registered via caudio_add_component / caudio_add_shared_variant;
-# the install list here must stay in sync with component definitions.
-set(CAUDIO_INSTALL_LIBS
-  types
-  utils
-  config
-  media
-  player
-  db
-  engine
-  ipc
-  client
-  service
-  app
-  sqlite3
-  blake3
-  tag
-)
+# Component targets are registered in the CAUDIO_TARGETS directory property
+# by caudio_add_component / caudio_add_shared_variant (cmake/CaudioHelpers.cmake).
+# Vendor libs (sqlite3, blake3, tag) and the module umbrella are appended manually.
+get_directory_property(CAUDIO_INSTALL_LIBS DIRECTORY ${CMAKE_SOURCE_DIR} CAUDIO_TARGETS)
+if(NOT CAUDIO_INSTALL_LIBS)
+  set(CAUDIO_INSTALL_LIBS "")
+endif()
+
+# Split static libs from shared variants (_shared suffix).
+set(_caudio_static "")
+set(_caudio_shared "")
+foreach(_tgt IN LISTS CAUDIO_INSTALL_LIBS)
+  if(_tgt MATCHES "_shared$")
+    list(APPEND _caudio_shared ${_tgt})
+  else()
+    list(APPEND _caudio_static ${_tgt})
+  endif()
+endforeach()
+set(CAUDIO_INSTALL_LIBS ${_caudio_static})
+unset(_caudio_static)
+unset(_caudio_shared)
+
+# Vendor libs are not registered via caudio_add_component -- add them manually.
+list(APPEND CAUDIO_INSTALL_LIBS sqlite3 blake3 tag)
+
 if(CAUDIO_BUILD_SHARED)
-  list(APPEND CAUDIO_INSTALL_LIBS
-    utils_shared
-    media_shared
-    player_shared
-    db_shared
-    engine_shared
-    client_shared
-    service_shared
-    app_shared
-    combined
-  )
+  list(APPEND CAUDIO_INSTALL_LIBS combined)
 endif()
 if(CAUDIO_ENABLE_MODULES)
   list(APPEND CAUDIO_INSTALL_LIBS caudio_umbrella)

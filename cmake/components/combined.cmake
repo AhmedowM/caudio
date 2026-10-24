@@ -1,6 +1,7 @@
-# combined is the opt-in shared libcaudio: utils/player/db/engine whole-archived.
-# ipc/service/client stay static-only (daemon IPC has no shared ABI); config
-# sources compile into ipc. Gated on CAUDIO_BUILD_SHARED (OFF by default).
+# combined is the opt-in shared libcaudio: utils/player/db/engine/media
+# whole-archived into a single shared lib. ipc/service/client/app/config ship
+# as separate *_shared targets (daemon IPC has no shared ABI); config sources
+# compile into ipc statically. Gated on CAUDIO_BUILD_SHARED (OFF by default).
 if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
   add_library(caudio::combined ALIAS combined)

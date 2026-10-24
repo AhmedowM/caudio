@@ -92,6 +92,7 @@ if(CAUDIO_ENABLE_CCACHE)
     message(WARNING "CAUDIO_ENABLE_CCACHE=ON but neither ccache nor sccache found -- compiling without launcher")
   endif()
 endif()
+unset(_launcher)
 
 # clang-tidy integration (requires compile_commands.json)
 if(CAUDIO_ENABLE_CLANG_TIDY)
@@ -277,6 +278,12 @@ set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE)
 set(WITH_ZLIB OFF)
 FetchContent_MakeAvailable(TagLib)
 message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
+unset(BUILD_TESTS)
+unset(BUILD_EXAMPLES)
+unset(BUILD_BINDINGS)
+unset(BUILD_TESTING)
+unset(CMAKE_DISABLE_FIND_PACKAGE_CppUnit)
+unset(WITH_ZLIB)
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
@@ -291,6 +298,8 @@ foreach(_h IN LISTS _taglib_hdrs)
   list(APPEND CAUDIO_TAGLIB_BUILD_INCLUDES "${_d}")
 endforeach()
 list(REMOVE_DUPLICATES CAUDIO_TAGLIB_BUILD_INCLUDES)
+unset(_taglib_hdrs)
+unset(_d)
 include(cmake/CaudioHelpers.cmake)
 # Component includes in dependency order. Each component's .cmake registers
 # its target via caudio_add_component; including them here builds the surface.
@@ -312,6 +321,7 @@ set(CAUDIO_COMPONENTS
 foreach(_comp IN LISTS CAUDIO_COMPONENTS)
   include(cmake/components/${_comp}.cmake)
 endforeach()
+unset(_comp)
 
 # Umbrella module (optional, headers are canonical)
 if(CAUDIO_ENABLE_MODULES)

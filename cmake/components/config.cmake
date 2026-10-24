@@ -10,3 +10,6 @@ set(CAUDIO_CONFIG_SOURCES
 )
 caudio_add_component(config SOURCES ${CAUDIO_CONFIG_SOURCES} MODULE_SOURCES ${CAUDIO_CONFIG_MODULE_SOURCES} DEPS caudio::utils Threads::Threads)
 ca_set_module_warnings(config)
+if(CAUDIO_BUILD_SHARED)
+  caudio_add_shared_variant(config EXTRA_DEPS caudio::utils_shared Threads::Threads)
+endif()
