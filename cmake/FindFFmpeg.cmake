@@ -32,13 +32,14 @@ foreach(_entry IN LISTS _ffmpeg_libs)
   list(GET _parts 0 _suffix)
   list(GET _parts 1 _header)
   list(GET _parts 2 _libs)
+  string(REPLACE " " ";" _libs "${_libs}")
 
   set(_inc_var "FFmpeg_${_suffix}_INCLUDE_DIR")
   set(_lib_var "FFmpeg_${_suffix}_LIBRARY")
 
   find_path(${_inc_var}
     NAMES ${_header}
-    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
+    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} $ENV{FFmpeg_ROOT} ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES include
     NO_DEFAULT_PATH
   )
@@ -51,7 +52,7 @@ foreach(_entry IN LISTS _ffmpeg_libs)
 
   find_library(${_lib_var}
     NAMES ${_libs}
-    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} ENV FFmpeg_ROOT ${_FFmpeg_SEARCH_HINTS}
+    PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} $ENV{FFmpeg_ROOT} ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES lib bin
     NO_DEFAULT_PATH
   )
