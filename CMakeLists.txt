@@ -208,6 +208,7 @@ target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 # SYSTEM: vendored amalgamation -- dependents (db/*.cpp include sqlite3.h)
 # must not inherit its extension-token noise under Clang. Propagates.
 target_compile_definitions(sqlite3 PUBLIC SQLITE_ENABLE_FTS5=1)
+target_compile_options(sqlite3 PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 # Trimmed amalgamation: only the API surface
 # in use (prepare/bind/step/column/finalize, exec, open_v2, WAL + foreign_keys
 # + FTS5). OMIT_LOAD_EXTENSION is also hardening. None of the omitted areas
@@ -226,6 +227,7 @@ target_compile_definitions(sqlite3 PUBLIC
 add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
 target_include_directories(blake3 SYSTEM PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
+target_compile_options(blake3 PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 
 # FetchContent deps needed before components. CLI11/Catch2 are lazy: prefer
 # a system/vcpkg/Conan package first so plain configures don't pay for a git
@@ -288,6 +290,7 @@ unset(WITH_ZLIB)
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
 add_library(caudio::tag ALIAS tag)
+target_compile_options(tag PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 # TagLib's `tag` target exports install includes only; consumers use flat
 # per-subdir includes (`#include <apetag.h>`). Derive every header dir
 # from the pinned source so all subdirectory includes resolve.

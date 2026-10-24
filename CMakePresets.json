@@ -85,5 +85,35 @@
         "CAUDIO_ENABLE_EXAMPLES": "OFF"
       }
     }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "release-lto",
+      "configurePreset": "release-lto"
+    },
+    {
+      "name": "minsize",
+      "configurePreset": "minsize"
+    },
+    {
+      "name": "minsize-lto",
+      "configurePreset": "minsize-lto"
+    },
+    {
+      "name": "modules",
+      "configurePreset": "modules"
+    }
   ]
 }
