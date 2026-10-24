@@ -1,4 +1,4 @@
-#include <array>
+﻿#include <array>
 #include <atomic>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -42,7 +42,7 @@ namespace {
 // change: owner + built-in admins + system get full access, everyone else
 // nothing. SDDL is constant; conversion cannot fail short of OOM, and then
 // we fall back to default attributes (availability wins, documented).
-constexpr wchar_t kPipeSddl[] = L"D:(A;;GA;;;OW)(A;;GA;;;BA)(A;;GA;;;SY)";
+constexpr wchar_t pipeSddl[] = L"D:(A;;GA;;;OW)(A;;GA;;;BA)(A;;GA;;;SY)";
 // Layout-compatible with SECURITY_ATTRIBUTES (length, descriptor, inherit).
 struct PipeSecurityAttributes {
     DWORD nLength{0};
@@ -55,7 +55,7 @@ class PipeDacl {
         sa_.nLength = sizeof(sa_);
         LPVOID sd = nullptr;
         DWORD len = 0;
-        if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(kPipeSddl, kSddlRevision1, &sd,
+        if (::ConvertStringSecurityDescriptorToSecurityDescriptorW(pipeSddl, sddlRevision1, &sd,
                                                                    &len) &&
             sd) {
             sa_.descriptor = sd;
@@ -158,7 +158,7 @@ caudio::utils::Expected<void> IpcServer::Impl::listen(const std::filesystem::pat
 #ifdef _WIN32
     // Atomic take-over: whoever exchanges non-null owns the close.
     HANDLE prev = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-    if (prev && prev != kInvalidHandleValue) {
+    if (prev && prev != invalidHandleValue) {
         ::CloseHandle(prev);
     }
     std::string pathStr = socketPath_;
@@ -167,9 +167,9 @@ caudio::utils::Expected<void> IpcServer::Impl::listen(const std::filesystem::pat
     for (char c : pathStr)
         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
     PipeDacl dacl;
-    HANDLE h = ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                  kPipeUnlimited, 16384, 16384, 0, dacl.attributes());
-    if (h == kInvalidHandleValue) {
+    HANDLE h = ::CreateNamedPipeW(w.c_str(), pipeAccessDuplex, pipeTypeByte | pipeWait,
+                                  pipeUnlimited, 16384, 16384, 0, dacl.attributes());
+    if (h == invalidHandleValue) {
         DWORD err = ::GetLastError();
         return std::unexpected{caudio::utils::makeError(
             caudio::utils::StatusCode::Io, "CreateNamedPipeW failed: " + std::to_string(err))};
@@ -253,9 +253,9 @@ void IpcServer::Impl::run(std::stop_token st,
                         w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
                     PipeDacl dacl;
                     HANDLE h =
-                        ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                           kPipeUnlimited, 16384, 16384, 0, dacl.attributes());
-                    if (h != kInvalidHandleValue) {
+                        ::CreateNamedPipeW(w.c_str(), pipeAccessDuplex, pipeTypeByte | pipeWait,
+                                           pipeUnlimited, 16384, 16384, 0, dacl.attributes());
+                    if (h != invalidHandleValue) {
                         pipeHandle_.store(reinterpret_cast<std::intptr_t>(h));
                         continue;
                     }
@@ -281,7 +281,7 @@ void IpcServer::Impl::run(std::stop_token st,
                             // Reset failed: drop the instance; the top of the
                             // loop rebuilds a fresh listening one.
                             HANDLE stale = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-                            if (stale && stale != kInvalidHandleValue)
+                            if (stale && stale != invalidHandleValue)
                                 ::CloseHandle(stale);
                         }
                         continue;
@@ -295,7 +295,7 @@ void IpcServer::Impl::run(std::stop_token st,
             // a close here can never double-close. (Only this loop creates
             // instances, so a non-null take is always the connected one.)
             HANDLE clientHandle = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-            if (!clientHandle || clientHandle == kInvalidHandleValue) {
+            if (!clientHandle || clientHandle == invalidHandleValue) {
                 // Lost the race with shutdown; loop back to the stop check.
                 continue;
             }
@@ -307,9 +307,9 @@ void IpcServer::Impl::run(std::stop_token st,
                     w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
                 PipeDacl nextDacl;
                 HANDLE next =
-                    ::CreateNamedPipeW(w.c_str(), kPipeAccessDuplex, kPipeTypeByte | kPipeWait,
-                                       kPipeUnlimited, 16384, 16384, 0, nextDacl.attributes());
-                if (next != kInvalidHandleValue) {
+                    ::CreateNamedPipeW(w.c_str(), pipeAccessDuplex, pipeTypeByte | pipeWait,
+                                       pipeUnlimited, 16384, 16384, 0, nextDacl.attributes());
+                if (next != invalidHandleValue) {
                     pipeHandle_.store(reinterpret_cast<std::intptr_t>(next));
                 }
                 // else: stay without a listener; the loop re-checks stop
@@ -555,9 +555,9 @@ void IpcServer::Impl::shutdown() {
         for (char c : pathStr)
             w.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
         for (int attempt = 0; attempt < 40; ++attempt) {
-            HANDLE h = ::CreateFileW(w.c_str(), kGenericRead | kGenericWrite, 0, nullptr,
-                                     kOpenExisting, 0, nullptr);
-            if (h != kInvalidHandleValue) {
+            HANDLE h = ::CreateFileW(w.c_str(), genericRead | genericWrite, 0, nullptr,
+                                     openExisting, 0, nullptr);
+            if (h != invalidHandleValue) {
                 ::CloseHandle(h);
                 break;
             }
@@ -567,7 +567,7 @@ void IpcServer::Impl::shutdown() {
     // Take-over (see listen()): if the accept loop is mid-handshake it owns
     // its handle; anything left here is ours to close.
     HANDLE cur = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-    if (cur && cur != kInvalidHandleValue) {
+    if (cur && cur != invalidHandleValue) {
         ::CloseHandle(cur);
     }
 #else
@@ -588,7 +588,7 @@ void IpcServer::Impl::shutdown() {
     // Post-join drain: the accept loop may have stored a fresh listen
     // instance after our pre-join take. Exchange is idempotent.
     HANDLE leftover = reinterpret_cast<HANDLE>(pipeHandle_.exchange(-1));
-    if (leftover && leftover != kInvalidHandleValue) {
+    if (leftover && leftover != invalidHandleValue) {
         ::CloseHandle(leftover);
     }
 #endif
@@ -616,3 +616,4 @@ void IpcServer::Impl::shutdown() {
 }
 
 } // namespace caudio::service
+

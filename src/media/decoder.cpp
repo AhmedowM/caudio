@@ -1,4 +1,4 @@
-#include <array>
+﻿#include <array>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
@@ -24,8 +24,8 @@ bool Decoder::probe(std::span<const std::byte> data) noexcept {
 
 caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
                                                                 caudio::utils::Logger* logger) {
-    constexpr std::size_t kProbeBytes = 32;
-    std::array<std::byte, kProbeBytes> buf{};
+    constexpr std::size_t probeBytes = 32;
+    std::array<std::byte, probeBytes> buf{};
     std::size_t n = 0;
     int64_t orig = reader.tell();
     if (orig < 0)
@@ -76,3 +76,4 @@ caudio::utils::Expected<std::unique_ptr<Decoder>> Decoder::open(Reader& reader,
 }
 
 } // namespace caudio::media
+

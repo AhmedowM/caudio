@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /**
  * @file ring.hpp
@@ -21,8 +21,8 @@ namespace caudio::utils {
  * @ingroup caudio_utils
  * @details Uses default 64 bytes (common x86-64 line size). Must be power-of-two.
  */
-inline constexpr std::size_t kRingCacheLine = 64UZ;
-static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must be power-of-2");
+inline constexpr std::size_t ringCacheLine = 64UZ;
+static_assert((ringCacheLine & (ringCacheLine - 1)) == 0, "ringCacheLine must be power-of-2");
 
 /**
  * @brief Single-producer single-consumer ring buffer for trivially copyable types.
@@ -30,7 +30,7 @@ static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must
  * @tparam T Element type; must be trivially copyable (memcpy-able).
  * @details SPSC invariants and atomics:
  * - `wr_` and `rd_` are monotonically increasing frame counters, cache-line
- *   padded (`alignas(kRingCacheLine)`) to avoid false sharing.
+ *   padded (`alignas(ringCacheLine)`) to avoid false sharing.
  * - `write()` is producer-only: loads `wr_` relaxed (writer owns it), loads
  *   `rd_` acquire to observe consumer progress; stores `wr_` release.
  * - `read()` is consumer-only: loads `rd_` relaxed (reader owns it), loads
@@ -42,7 +42,7 @@ static_assert((kRingCacheLine & (kRingCacheLine - 1)) == 0, "kRingCacheLine must
  *   reset with read/write is a data race. No fence beyond release stores.
  * - Data movement uses `memcpy` with wrap-around; capacity is in frames.
  *
- * @see kRingCacheLine
+ * @see ringCacheLine
  */
 template <typename T>
     requires std::is_trivially_copyable_v<T>
@@ -244,8 +244,8 @@ class SpscRing {
     std::size_t cap_{0};        ///< Capacity in frames.
     std::uint32_t channels_{1}; ///< Channels per frame.
     std::vector<T> buf_{};      ///< Interleaved storage [cap_*channels].
-    alignas(kRingCacheLine) std::atomic<std::size_t> wr_{0}; ///< Producer index (monotonic).
-    alignas(kRingCacheLine) std::atomic<std::size_t> rd_{0}; ///< Consumer index (monotonic).
+    alignas(ringCacheLine) std::atomic<std::size_t> wr_{0}; ///< Producer index (monotonic).
+    alignas(ringCacheLine) std::atomic<std::size_t> rd_{0}; ///< Consumer index (monotonic).
 };
 
 } // namespace caudio::utils

@@ -1,4 +1,4 @@
-#include <algorithm>
+﻿#include <algorithm>
 #include <atomic>
 #include <bit>
 #include <caudio/ipc/shm_status.hpp>
@@ -84,15 +84,15 @@ ShmStatusHandle::ExpectedShm ShmStatusHandle::create(const std::string& name, bo
     for (char c : handle.name_)
         wname.push_back(static_cast<wchar_t>(static_cast<unsigned char>(c)));
 
-    DWORD access = kFileMapRead | kFileMapWrite;
-    DWORD protect = kPageReadWrite;
+    DWORD access = fileMapRead | fileMapWrite;
+    DWORD protect = pageReadWrite;
     HANDLE hMap = nullptr;
 
     if (create) {
-        hMap = ::CreateFileMappingW(kInvalidHandleValue, nullptr, protect, 0,
+        hMap = ::CreateFileMappingW(invalidHandleValue, nullptr, protect, 0,
                                     sizeof(AtomicShmStatus), wname.c_str());
     } else {
-        hMap = ::OpenFileMappingW(access, kFalse, wname.c_str());
+        hMap = ::OpenFileMappingW(access, boolFalse, wname.c_str());
     }
 
     if (!hMap) {
@@ -327,3 +327,4 @@ ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, bool creat
 }
 
 } // namespace caudio::ipc
+

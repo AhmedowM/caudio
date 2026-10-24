@@ -1,4 +1,4 @@
-#include <atomic>
+﻿#include <atomic>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
@@ -452,10 +452,10 @@ void Player::Impl::preroll() {
 }
 
 void Player::Impl::decodeLoop(std::stop_token st) {
-    constexpr std::size_t kMaxChunkFrames = 1024;
+    constexpr std::size_t maxChunkFrames = 1024;
     // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
     std::vector<float> scratch;
-    scratch.reserve(kMaxChunkFrames * 8);
+    scratch.reserve(maxChunkFrames * 8);
 
     while (!st.stop_requested()) {
         // Wait for openGate and decodeBusy
@@ -487,8 +487,8 @@ void Player::Impl::decodeLoop(std::stop_token st) {
 
         uint32_t ch = decoder_->channels();
         std::size_t maxFrames = avail / ch;
-        if (maxFrames > kMaxChunkFrames)
-            maxFrames = kMaxChunkFrames;
+        if (maxFrames > maxChunkFrames)
+            maxFrames = maxChunkFrames;
         std::size_t maxChunkByCh = 2048 / ch;
         if (maxFrames > maxChunkByCh)
             maxFrames = maxChunkByCh;
@@ -523,3 +523,4 @@ int64_t Player::Impl::nowMs() noexcept {
 }
 
 } // namespace caudio::player
+

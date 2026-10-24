@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /**
  * @file windows_fwd.hpp
@@ -44,78 +44,78 @@ using PCWSTR = const wchar_t*;
 
 // --- Constants (guarded where windows.h also defines macros) ---
 #ifndef INVALID_HANDLE_VALUE
-static const HANDLE kInvalidHandleValue = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+static const HANDLE invalidHandleValue = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 #endif
 #ifndef GENERIC_READ
-static const DWORD kGenericRead = 0x80000000UL;
+static const DWORD genericRead = 0x80000000UL;
 #endif
 #ifndef GENERIC_WRITE
-static const DWORD kGenericWrite = 0x40000000UL;
+static const DWORD genericWrite = 0x40000000UL;
 #endif
 #ifndef FILE_SHARE_READ
-static const DWORD kFileShareRead = 0x00000001UL;
+static const DWORD fileShareRead = 0x00000001UL;
 #endif
 #ifndef OPEN_EXISTING
-static const DWORD kOpenExisting = 3UL;
+static const DWORD openExisting = 3UL;
 #endif
 #ifndef OPEN_ALWAYS
-static const DWORD kOpenAlways = 4UL;
+static const DWORD openAlways = 4UL;
 #endif
 #ifndef FILE_ATTRIBUTE_NORMAL
-static const DWORD kFileAttributeNormal = 0x80UL;
+static const DWORD fileAttributeNormal = 0x80UL;
 #endif
 #ifndef FILE_FLAG_OVERLAPPED
-static const DWORD kFileFlagOverlapped = 0x40000000UL;
+static const DWORD fileFlagOverlapped = 0x40000000UL;
 #endif
 #ifndef LOCKFILE_EXCLUSIVE_LOCK
-static const DWORD kLockFileExclusiveLock = 0x00000002UL;
+static const DWORD lockFileExclusiveLock = 0x00000002UL;
 #endif
 #ifndef LOCKFILE_FAIL_IMMEDIATELY
-static const DWORD kLockFileFailImmediately = 0x00000001UL;
+static const DWORD lockFileFailImmediately = 0x00000001UL;
 #endif
 #ifndef SYNCHRONIZE
-static const DWORD kSynchronize = 0x00100000UL;
+static const DWORD synchronize = 0x00100000UL;
 #endif
 #ifndef WAIT_TIMEOUT
-static const DWORD kWaitTimeout = 258UL;
+static const DWORD waitTimeout = 258UL;
 #endif
 #ifndef PIPE_READMODE_BYTE
-static const DWORD kPipeReadModeByte = 0x00000000UL;
+static const DWORD pipeReadModeByte = 0x00000000UL;
 #endif
-static const DWORD kPipeAccessDuplex = 0x00000003UL;
-static const DWORD kPipeTypeByte = 0x00000000UL;
-static const DWORD kPipeWait = 0x00000000UL;
-static const DWORD kPipeUnlimited = 255UL;
-static const DWORD kPageReadWrite = 0x04UL;
-static const DWORD kFileMapRead = 0x0004UL;
-static const DWORD kFileMapWrite = 0x0002UL;
-static const DWORD kSddlRevision1 = 1UL;
+static const DWORD pipeAccessDuplex = 0x00000003UL;
+static const DWORD pipeTypeByte = 0x00000000UL;
+static const DWORD pipeWait = 0x00000000UL;
+static const DWORD pipeUnlimited = 255UL;
+static const DWORD pageReadWrite = 0x04UL;
+static const DWORD fileMapRead = 0x0004UL;
+static const DWORD fileMapWrite = 0x0002UL;
+static const DWORD sddlRevision1 = 1UL;
 #ifndef DETACHED_PROCESS
-static const DWORD kDetachedProcess = 0x00000008UL;
+static const DWORD detachedProcess = 0x00000008UL;
 #endif
 #ifndef MAX_PATH
-static const DWORD kMaxPath = 260;
+static const DWORD maxPath = 260;
 #endif
 #ifndef ERROR_PIPE_BUSY
-static const DWORD kErrorPipeBusy = 231UL;
+static const DWORD errorPipeBusy = 231UL;
 #endif
 #ifndef ERROR_FILE_NOT_FOUND
-static const DWORD kErrorFileNotFound = 2UL;
+static const DWORD errorFileNotFound = 2UL;
 #endif
 #ifndef ERROR_BROKEN_PIPE
-static const DWORD kErrorBrokenPipe = 109UL;
+static const DWORD errorBrokenPipe = 109UL;
 #endif
 #ifndef ERROR_INVALID_PARAMETER
-static const DWORD kErrorInvalidParameter = 87UL;
+static const DWORD errorInvalidParameter = 87UL;
 #endif
 #ifndef ERROR_SUCCESS
-static const DWORD kErrorSuccess = 0UL;
+static const DWORD errorSuccess = 0UL;
 #endif
 #ifndef PROCESS_QUERY_LIMITED_INFORMATION
-static const DWORD kProcessQueryLimitedInformation = 0x1000UL;
+static const DWORD processQueryLimitedInformation = 0x1000UL;
 #endif
 #ifndef FALSE
-static const BOOL kFalse = 0;
+static const BOOL boolFalse = 0;
 #endif
 #ifndef WINAPI
 #define WINAPI __stdcall

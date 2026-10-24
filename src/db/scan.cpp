@@ -1,4 +1,4 @@
-#include <sqlite3.h>
+﻿#include <sqlite3.h>
 
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
@@ -54,7 +54,7 @@ scanLibrary(Database& db, int64_t libraryId,
     int64_t added = 0;
     int64_t updated = 0;
     int64_t failed = 0;
-    constexpr size_t kBatchSize = 500;
+    constexpr size_t batchSize = 500;
     size_t batchPending = 0;
     std::unique_lock<std::shared_mutex> batchLock;
     bool inTx = false;
@@ -118,7 +118,7 @@ scanLibrary(Database& db, int64_t libraryId,
             batchPending++;
             if (progress)
                 progress(scanned, 0, trk.path);
-            if (batchPending >= kBatchSize) {
+            if (batchPending >= batchSize) {
                 auto c = commitBatch();
                 if (!c) {
                     rollbackBatch();
@@ -316,7 +316,7 @@ scanLibrary(Database& db, int64_t libraryId,
         batchPending++;
         if (progress)
             progress(scanned, 0, trk.path);
-        if (batchPending >= kBatchSize) {
+        if (batchPending >= batchSize) {
             auto c = commitBatch();
             if (!c) {
                 rollbackBatch();
@@ -367,3 +367,4 @@ scanLibrary(Database& db, int64_t libraryId,
 }
 
 } // namespace caudio::db
+

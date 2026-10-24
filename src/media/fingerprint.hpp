@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <algorithm>
 #include <array>
@@ -34,7 +34,7 @@ namespace caudio::media::internal {
  * @details 64 KiB each. Files <= 64 KiB hash only once (head == whole file plus size/version
  * trailer).
  */
-inline constexpr size_t kSample = 64uz * 1024uz;
+inline constexpr size_t sample = 64uz * 1024uz;
 
 /**
  * @brief Computes a sampled BLAKE3 fingerprint for a file.
@@ -47,9 +47,10 @@ inline constexpr size_t kSample = 64uz * 1024uz;
  * field allows future fingerprint upgrades without silent collisions.
  * @par Thread safety
  * Thread-safe: uses `thread_local` buffer; no shared state. File I/O is blocking.
- * @see kSample
+ * @see sample
  */
 std::expected<std::array<uint8_t, 32>, caudio::utils::Error>
 computeFingerprint(const std::filesystem::path& path);
 
 } // namespace caudio::media::internal
+

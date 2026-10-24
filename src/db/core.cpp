@@ -1,4 +1,4 @@
-#include <sqlite3.h>
+﻿#include <sqlite3.h>
 
 #include <array>
 #include <caudio/db/database.hpp>
@@ -28,7 +28,7 @@
 
 namespace caudio::db {
 
-inline constexpr std::string_view kSchema =
+inline constexpr std::string_view schema =
     "PRAGMA journal_mode=WAL;"
     "PRAGMA synchronous=NORMAL;"
     "PRAGMA cache_size=-8000;"
@@ -168,7 +168,7 @@ inline constexpr std::string_view kSchema =
     "updated DATETIME DEFAULT CURRENT_TIMESTAMP);"
     "INSERT OR IGNORE INTO engine_state(id) VALUES (1);";
 
-inline constexpr std::string_view kSchemaDefaultLibrary =
+inline constexpr std::string_view schemaDefaultLibrary =
     "INSERT OR IGNORE INTO libraries (id, path, name) VALUES (1, '', 'default');";
 
 // Private implementation: the SQLite handle, statement cache, locks and the
@@ -247,7 +247,7 @@ Database::open(std::string_view path, const DatabaseOptions& opts) {
     }
     char* err = nullptr;
     internal::SqliteErrGuard errGuard{err};
-    rc = sqlite3_exec(raw, std::string(kSchema).c_str(), nullptr, nullptr, &err);
+    rc = sqlite3_exec(raw, std::string(schema).c_str(), nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {
         std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
         // Gracefully handle existing duplicate queue positions on migration:
@@ -268,7 +268,7 @@ Database::open(std::string_view path, const DatabaseOptions& opts) {
             err = nullptr;
         }
     }
-    rc = sqlite3_exec(raw, std::string(kSchemaDefaultLibrary).c_str(), nullptr, nullptr, &err);
+    rc = sqlite3_exec(raw, std::string(schemaDefaultLibrary).c_str(), nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {
         std::string msg = err ? std::string(err) : sqlite3_errmsg(raw);
         if (opts.logger)
@@ -402,7 +402,7 @@ Database::findByPathLocked(std::string_view path) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE path=?";
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto sRes = getCachedForUse(sql);
     if (!sRes)
@@ -424,7 +424,7 @@ Database::findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE fingerprint=?";
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto sRes = getCachedForUse(sql);
     if (!sRes)
@@ -448,7 +448,7 @@ Database::insertTrackLocked(const caudio::types::Track& t) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     std::unique_lock cacheLk{impl_->cacheMutex_};
-    auto sRes = getCachedForUse(kInsertTrackSql);
+    auto sRes = getCachedForUse(insertTrackSql);
     if (!sRes)
         return std::unexpected{sRes.error()};
     SqliteStatement& st = *(*sRes);
@@ -475,7 +475,7 @@ Database::updateTrackLocked(const caudio::types::Track& t) {
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     std::unique_lock cacheLk{impl_->cacheMutex_};
-    auto sRes = getCachedForUse(kUpdateTrackSql);
+    auto sRes = getCachedForUse(updateTrackSql);
     if (!sRes)
         return std::unexpected{sRes.error()};
     SqliteStatement& st = *(*sRes);
@@ -662,7 +662,7 @@ std::expected<caudio::types::Track, caudio::utils::Error> Database::getTrackLock
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE id=?";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE id=?";
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto sRes = getCachedForUse(sql);
     if (!sRes)
@@ -685,7 +685,7 @@ Database::findByFingerprint(const std::array<uint8_t, 32>& fp) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE fingerprint=?";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE fingerprint=?";
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto sRes = getCachedForUse(sql);
     if (!sRes)
@@ -709,7 +709,7 @@ Database::findByPath(std::string_view path) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE path=?";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE path=?";
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto sRes = getCachedForUse(sql);
     if (!sRes)
@@ -732,7 +732,7 @@ Database::listTracks(const TrackQuery* q) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) + " WHERE 1=1";
+    std::string sql = std::string(internal::selectTracksCols) + " WHERE 1=1";
     if (q) {
         if (q->library_id)
             sql += " AND library_id=?";
@@ -1225,7 +1225,7 @@ Database::playlistGetTracks(int64_t pid) {
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    std::string sql = std::string(internal::kSelectTracksCols) +
+    std::string sql = std::string(internal::selectTracksCols) +
                       " JOIN playlist_items pi ON pi.track_id=tracks.id "
                       "WHERE pi.playlist_id=? ORDER BY pi.position";
     SqliteStatement st;
@@ -1681,7 +1681,7 @@ Database::libraryStats(std::optional<int> mostPlayed) {
         d.most_played.emplace();
         if (*mostPlayed > 0) {
             std::string sql =
-                std::string(internal::kSelectTracksCols) +
+                std::string(internal::selectTracksCols) +
                 " WHERE deleted_at IS NULL AND play_count > 0 ORDER BY play_count DESC LIMIT " +
                 std::to_string(*mostPlayed);
             auto sRes = getCachedForUse(sql);

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <caudio/db/types.hpp>
 #include <string_view>
@@ -7,7 +7,7 @@
  * @file stmt_helpers.hpp
  * @brief Shared statement helpers for the db layer.
  * @ingroup caudio_db
- * @details Provides the canonical column list `kSelectTracksCols`,
+ * @details Provides the canonical column list `selectTracksCols`,
  * the row-mapper `fillTrackFromStmt()` and the RAII `SqliteErrGuard`.
  * All helpers are header-only and live in `caudio::db::internal`.
  */
@@ -23,7 +23,7 @@ namespace caudio::db::internal {
  * @ingroup caudio_db
  * @details Order matches `fillTrackFromStmt()` indices 0..25. Keep in sync.
  */
-inline constexpr std::string_view kSelectTracksCols =
+inline constexpr std::string_view selectTracksCols =
     "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
     "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
     "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, library_id "
@@ -82,11 +82,11 @@ struct StmtGuard {
 };
 
 /**
- * @brief Maps the current row of a `kSelectTracksCols` statement into a Track.
+ * @brief Maps the current row of a `selectTracksCols` statement into a Track.
  * @ingroup caudio_db
  * @param stmt Prepared statement positioned on a row (via `step()`).
  * @param t Output track to populate.
- * @details Column order must match `kSelectTracksCols`:
+ * @details Column order must match `selectTracksCols`:
  * 0:id 1:fingerprint(BLOB32) 2:path 3:deleted_at 4:size 5:mtime 6:duration
  * 7:sample_rate 8:channels 9:bitrate 10:title 11:artist 12:album
  * 13:album_artist 14:genre 15:year 16:track_num 17:disc_num 18:cover_art_path
@@ -94,8 +94,9 @@ struct StmtGuard {
  * 24:dirty 25:library_id. Fingerprint is zeroed if the blob is not 32 bytes.
  * @par Thread safety
  * Caller must hold the DB lock protecting the statement's connection.
- * @see kSelectTracksCols
+ * @see selectTracksCols
  */
 void fillTrackFromStmt(sqlite3_stmt* stmt, caudio::types::Track& t);
 
 } // namespace caudio::db::internal
+

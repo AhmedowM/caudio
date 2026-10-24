@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /**
  * @file database.hpp
@@ -96,7 +96,7 @@ class Database final {
      * @param path Filesystem path (empty => :memory:).
      * @param opts Options (writeBatchSize).
      * @return Owning Database pointer or Error Io/Corrupt.
-     * @details Executes kSchema, handles the queue UNIQUE migration gracefully
+     * @details Executes schema, handles the queue UNIQUE migration gracefully
      * (ignores duplicate-position errors), ensures the default library row and
      * migrates engine_state.active_queue_id if missing. Starts the background
      * writer thread.
@@ -163,9 +163,9 @@ class Database final {
     /**
      * @brief Binds all Track fields for INSERT statement (24 parameters).
      * @ingroup caudio_db
-     * @param st Prepared statement (kInsertTrackSql).
+     * @param st Prepared statement (insertTrackSql).
      * @param t Track to bind.
-     * @details Parameter order matches kInsertTrackSql: fingerprint, path, size, mtime,
+     * @details Parameter order matches insertTrackSql: fingerprint, path, size, mtime,
      * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
      * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
      * last_played, date_added, last_scanned, dirty, library_id.
@@ -175,21 +175,21 @@ class Database final {
     /**
      * @brief Binds all Track fields for UPDATE statement (26 parameters).
      * @ingroup caudio_db
-     * @param st Prepared statement (kUpdateTrackSql).
+     * @param st Prepared statement (updateTrackSql).
      * @param t Track to bind (id must be non-zero).
-     * @details Parameter order matches kUpdateTrackSql: fingerprint, path, size, mtime,
+     * @details Parameter order matches updateTrackSql: fingerprint, path, size, mtime,
      * duration, sample_rate, channels, bitrate, title, artist, album, album_artist,
      * genre, year, track_num, disc_num, cover_art_path, rating, play_count,
      * last_played, date_added, last_scanned, dirty, library_id, deleted_at, id.
      * NULL binds for optional deleted_at.
      */
     static void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t);
-    static constexpr std::string_view kInsertTrackSql =
+    static constexpr std::string_view insertTrackSql =
         "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
         "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
         "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    static constexpr std::string_view kUpdateTrackSql =
+    static constexpr std::string_view updateTrackSql =
         "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
         "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
         "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "

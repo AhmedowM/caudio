@@ -1,4 +1,4 @@
-#include <caudio/utils/error.hpp>
+﻿#include <caudio/utils/error.hpp>
 #include <caudio/utils/thread.hpp>
 #include <caudio/windows_fwd.hpp>
 #include <cstddef>
@@ -7,7 +7,7 @@
 #include <string_view>
 
 #ifdef _WIN32
-inline constexpr unsigned kUtf8CodePage = 65001;
+inline constexpr unsigned utf8CodePage = 65001;
 #else
 #include <pthread.h>
 #include <time.h>
@@ -32,11 +32,11 @@ Expected<void> setNativeHandleName(void* nativeHandle, std::string_view name) no
 #pragma GCC diagnostic pop
 #endif
         if (pSetDesc) {
-            int wlen = MultiByteToWideChar(kUtf8CodePage, 0, name.data(),
+            int wlen = MultiByteToWideChar(utf8CodePage, 0, name.data(),
                                            static_cast<int>(name.size()), nullptr, 0);
             if (wlen > 0) {
                 std::wstring wbuf(static_cast<std::size_t>(wlen), L'\0');
-                MultiByteToWideChar(kUtf8CodePage, 0, name.data(), static_cast<int>(name.size()),
+                MultiByteToWideChar(utf8CodePage, 0, name.data(), static_cast<int>(name.size()),
                                     wbuf.data(), wlen);
                 HRESULT hr = pSetDesc(reinterpret_cast<HANDLE>(nativeHandle), wbuf.c_str());
                 (void)hr;
@@ -169,3 +169,4 @@ namespace caudio::utils {
 }
 
 } // namespace caudio::utils
+

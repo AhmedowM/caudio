@@ -1,4 +1,4 @@
-#include <cerrno>
+﻿#include <cerrno>
 #include <algorithm>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
@@ -96,7 +96,7 @@ struct Decoder::Impl {
     uint64_t pos_{0};
     PacketPtr scratchPkt_{};
     FramePtr scratchFrame_{};
-    static constexpr std::size_t kConvertFrames = 4096;
+    static constexpr std::size_t convertFrames = 4096;
     std::vector<float> convertBuf_{};
     std::vector<float> spill_{};
     std::size_t spillPos_{0};
@@ -232,7 +232,7 @@ std::size_t Decoder::Impl::decode(std::span<float> out) {
     AVFrame* frame = scratchFrame_.get();
     // Decode at most what `out` (plus the bounded spill_) can hold: each
     // iteration serves spill_ first and converts at most one more frame, so
-    // swr_convert always sees the full kConvertFrames window (P-7).
+    // swr_convert always sees the full convertFrames window (P-7).
     while (totalDecoded < frames && !eofReached) {
         totalDecoded += serveSpill(out, totalDecoded, frames);
         if (totalDecoded >= frames)
@@ -339,11 +339,11 @@ int Decoder::Impl::convertFrameBuffered(AVFrame* frame) {
     if (ch == 0 || !frame || frame->nb_samples <= 0)
         return 0;
     try {
-        if (convertBuf_.size() < kConvertFrames * ch)
-            convertBuf_.resize(kConvertFrames * ch);
+        if (convertBuf_.size() < convertFrames * ch)
+            convertBuf_.resize(convertFrames * ch);
         uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(convertBuf_.data())};
         int appended = 0;
-        int n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames),
+        int n = swr_convert(swr_, outPtrs, static_cast<int>(convertFrames),
                             const_cast<const uint8_t**>(frame->extended_data), frame->nb_samples);
         if (n < 0)
             return n;
@@ -364,15 +364,15 @@ int Decoder::Impl::drainResampler() {
     if (ch == 0)
         return 0;
     try {
-        if (convertBuf_.size() < kConvertFrames * ch)
-            convertBuf_.resize(kConvertFrames * ch);
+        if (convertBuf_.size() < convertFrames * ch)
+            convertBuf_.resize(convertFrames * ch);
         uint8_t* outPtrs[1] = {reinterpret_cast<uint8_t*>(convertBuf_.data())};
         // Pull out anything swr held back (oversize frame, filter delay) so
         // swr-internal storage stays bounded by one frame instead of growing
         // one residue per decoded frame.
         int appended = 0;
         int n = 0;
-        while ((n = swr_convert(swr_, outPtrs, static_cast<int>(kConvertFrames), nullptr, 0)) > 0) {
+        while ((n = swr_convert(swr_, outPtrs, static_cast<int>(convertFrames), nullptr, 0)) > 0) {
             spill_.insert(spill_.end(), convertBuf_.data(),
                           convertBuf_.data() + static_cast<std::size_t>(n) * ch);
             appended += n;
@@ -454,15 +454,15 @@ bool Decoder::Impl::init() {
 
     // Allocate AVIOContext with our callbacks -- use larger buffer for high-rate FLAC/WAV
     // probing
-    constexpr size_t kBufferSize = 8192;
-    uint8_t* avioBuffer = static_cast<uint8_t*>(av_malloc(kBufferSize));
+    constexpr size_t bufferSize = 8192;
+    uint8_t* avioBuffer = static_cast<uint8_t*>(av_malloc(bufferSize));
     if (!avioBuffer) {
         avformat_free_context(fmt_);
         fmt_ = nullptr;
         return false;
     }
 
-    avio_ = avio_alloc_context(avioBuffer, static_cast<int>(kBufferSize), 0, this, &readCallback,
+    avio_ = avio_alloc_context(avioBuffer, static_cast<int>(bufferSize), 0, this, &readCallback,
                                nullptr, &seekCallback);
     if (!avio_) {
         av_free(avioBuffer);
@@ -652,3 +652,4 @@ caudio::utils::Expected<void> Decoder::seek(double seconds) {
 }
 
 } // namespace caudio::media
+

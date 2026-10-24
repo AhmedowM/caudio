@@ -1,4 +1,4 @@
-#include <sqlite3.h>
+﻿#include <sqlite3.h>
 
 #include <atomic>
 #include <caudio/db/database.hpp>
@@ -51,7 +51,7 @@ using caudio::db::DatabaseAccess;
 // takes tens of ms (device open + preroll), so a colliding skip waits
 // instead of failing Busy. Monitor paths keep try_lock (fail-fast).
 namespace {
-constexpr std::chrono::milliseconds kQueueLockWait{500};
+constexpr std::chrono::milliseconds queueLockWait{500};
 }
 
 // All engine state and implementation live here so the public header stays
@@ -502,7 +502,7 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     } // end if Playing
 
     // Stopped -> resume persisted track if config enabled, else start new via cursor
-    if (!tryLockQueueFor(kQueueLockWait))
+    if (!tryLockQueueFor(queueLockWait))
         return queueBusy("play", "queue busy");
     queue_.queue_id = queueId;
     caudio::types::Track t;
@@ -548,7 +548,7 @@ Engine::ExpectedVoid Engine::Impl::playTrack(int64_t trackId) {
     if (trackId <= 0)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "bad track id"));
-    if (!tryLockQueueFor(kQueueLockWait))
+    if (!tryLockQueueFor(queueLockWait))
         return queueBusy("playTrack", "queue busy");
     auto idx = db_->queueIndexOf(queue_.queue_id, trackId);
     if (!idx) {
@@ -706,7 +706,7 @@ Engine::ExpectedVoid Engine::Impl::suspendCurrentTrack() {
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::State, "no track"));
     }
-    if (!tryLockQueueFor(kQueueLockWait)) {
+    if (!tryLockQueueFor(queueLockWait)) {
         return queueBusy("suspend", "queue busy");
     }
     // Mirror stop() teardown but keep cursor, current track, and history
@@ -730,7 +730,7 @@ Engine::ExpectedVoid Engine::Impl::suspendCurrentTrack() {
 
 Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::types::Track& t, double pos,
                                                        bool wasPaused) {
-    if (!tryLockQueueFor(kQueueLockWait)) {
+    if (!tryLockQueueFor(queueLockWait)) {
         return queueBusy("resume", "queue busy");
     }
     // The user may have moved on while suspended (next/prev/play from
@@ -964,7 +964,7 @@ Engine::ExpectedVoid Engine::Impl::switchQueue(int64_t qid) {
 }
 
 Engine::ExpectedVoid Engine::Impl::next() {
-    return advanceLocked(false, (int)kQueueLockWait.count());
+    return advanceLocked(false, (int)queueLockWait.count());
 }
 
 Engine::ExpectedVoid Engine::Impl::autoNext() {
@@ -1008,7 +1008,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
     bool locked =
         lockWaitMs > 0 ? tryLockQueueFor(std::chrono::milliseconds(lockWaitMs)) : tryLockQueue();
     if (!locked) {
-        // Monitor autoNext fail-fast is routine (next tick retries) — stay
+        // Monitor autoNext fail-fast is routine (next tick retries) â€” stay
         // silent; only user-wait collisions are diagnostic.
         if (lockWaitMs > 0)
             return queueBusy("next", "busy");
@@ -1053,7 +1053,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
 Engine::ExpectedVoid Engine::Impl::prev() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
-    if (!tryLockQueueFor(kQueueLockWait))
+    if (!tryLockQueueFor(queueLockWait))
         return queueBusy("prev", "busy");
     caudio::types::Track t;
     auto r = queuePrevLocked(t);
@@ -2074,10 +2074,10 @@ void Engine::Impl::monitorLoop(std::stop_token st) {
 }
 
 void Engine::Impl::decodeLoop(std::stop_token st) {
-    constexpr std::size_t kMaxChunkFrames = 1024;
+    constexpr std::size_t maxChunkFrames = 1024;
     // Reusable decode scratch (P-2): grown only, never reallocated per chunk.
     std::vector<float> scratch;
-    scratch.reserve(kMaxChunkFrames * 8);
+    scratch.reserve(maxChunkFrames * 8);
     while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
         auto ps = playbackState_.load(std::memory_order_acquire);
         if (ps != caudio::types::PlaybackState::Playing || !decoder_ || !ring_) {
@@ -2099,8 +2099,8 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
         if (ch == 0)
             ch = 2;
         size_t maxFrames = avail / ch;
-        if (maxFrames > kMaxChunkFrames)
-            maxFrames = kMaxChunkFrames;
+        if (maxFrames > maxChunkFrames)
+            maxFrames = maxChunkFrames;
         size_t maxChunkByCh = 2048 / ch;
         if (maxFrames > maxChunkByCh)
             maxFrames = maxChunkByCh;
@@ -2141,3 +2141,4 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
 }
 
 } // namespace caudio::engine
+

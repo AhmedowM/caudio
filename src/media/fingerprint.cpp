@@ -1,4 +1,4 @@
-#include <blake3.h>
+﻿#include <blake3.h>
 
 #include <array>
 #include <caudio/utils/error.hpp>
@@ -27,16 +27,16 @@ computeFingerprint(const std::filesystem::path& path) {
             caudio::utils::makeError(caudio::utils::StatusCode::Io, "cannot open file")};
     blake3_hasher hasher;
     blake3_hasher_init(&hasher);
-    thread_local std::array<std::byte, kSample> buf{};
-    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
+    thread_local std::array<std::byte, sample> buf{};
+    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(sample));
     size_t n = (size_t)f.gcount();
     if (n)
         blake3_hasher_update(&hasher, buf.data(), n);
-    if (sz > kSample) {
+    if (sz > sample) {
         f.clear();
-        f.seekg((std::streamoff)(sz - kSample), std::ios::beg);
+        f.seekg((std::streamoff)(sz - sample), std::ios::beg);
         if (f) {
-            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(kSample));
+            f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(sample));
             n = (size_t)f.gcount();
             if (n)
                 blake3_hasher_update(&hasher, buf.data(), n);
@@ -52,3 +52,4 @@ computeFingerprint(const std::filesystem::path& path) {
 }
 
 } // namespace caudio::media::internal
+
