@@ -8,7 +8,6 @@ set(CAUDIO_PLAYER_MODULE_SOURCES
   modules/caudio/player/output.cppm
 )
 set(CAUDIO_PLAYER_SOURCES
-  src/player/miniaudio_impl.cpp
   src/player/output.cpp
   src/player/core.cpp
 )

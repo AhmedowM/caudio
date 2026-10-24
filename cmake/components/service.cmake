@@ -8,7 +8,6 @@ set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_server.cpp
   src/service/service_paths.cpp
   src/service/service_status.cpp
-  src/service/service_audio.cpp
   src/service/service_impl.cpp
   src/service/dispatch_playback.cpp
   src/service/dispatch_queue.cpp

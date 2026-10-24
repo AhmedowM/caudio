@@ -351,4 +351,54 @@ AppResult App::shutdownDaemon() {
     return Outcome{std::nullopt, "daemon stopped", false, false};
 }
 
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+App::sendRaw(const caudio::ipc::Command& cmd, std::chrono::milliseconds timeout) {
+    caudio::client::Client client{config_.dbPath, config_.socketPath};
+    auto res = client.send(cmd, timeout);
+    if (!res)
+        return std::unexpected{res.error()};
+    if (std::holds_alternative<caudio::utils::Error>(*res))
+        return std::unexpected{std::get<caudio::utils::Error>(*res)};
+    return std::move(*res);
+}
+
+std::expected<caudio::ipc::Result, caudio::utils::Error>
+App::sendPlay(const caudio::ipc::Command& cmd) {
+    auto res = sendRaw(cmd);
+    if (!res) {
+        const auto& e = res.error();
+        if (e.code == caudio::utils::StatusCode::State && e.message == "daemon not running") {
+            if (!startDaemon(false)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                auto retry = sendRaw(cmd);
+                if (retry)
+                    return retry;
+                return std::unexpected{retry.error()};
+            }
+            return sendRaw(cmd);
+        }
+    }
+    return res;
+}
+
+AppResult Outcome::warn(std::string message) {
+    return Outcome{std::nullopt, std::move(message), true, false};
+}
+
+AppResult Outcome::fail(std::string message) {
+    return Outcome{std::nullopt, std::move(message), true, true};
+}
+
+BatchResult BatchReport::fail(std::string message) {
+    return BatchReport{std::nullopt, "", std::move(message), 1};
+}
+
+AppResult App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
+                       std::optional<std::string> line) {
+    auto owned = std::move(res);
+    if (!owned)
+        return std::unexpected{owned.error()};
+    return Outcome{std::move(*owned), std::move(line), false};
+}
+
 } // namespace caudio::app

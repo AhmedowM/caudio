@@ -3,7 +3,6 @@
 # The CLI shell (cli/src/shell/*) stays a thin renderer on top of this lib.
 set(CAUDIO_APP_SOURCES
   src/app/lifecycle.cpp
-  src/app/transport.cpp
   src/app/playback.cpp
   src/app/format.cpp
   src/app/paths.cpp
@@ -14,7 +13,6 @@ set(CAUDIO_APP_SOURCES
   src/app/tags.cpp
   src/app/system.cpp
   src/app/config.cpp
-  src/app/preview.cpp
 )
 set(CAUDIO_APP_MODULE_SOURCES
   modules/caudio/app.cppm

@@ -251,4 +251,15 @@ AppResult App::seek(double target, bool isRelative) {
                    .quiet = true};
 }
 
+void App::setPreviewHost(std::function<AppResult(const std::string& file)> host) {
+    previewHost_ = std::move(host);
+}
+
+AppResult App::previewFile(const std::string& file) {
+    if (previewHost_) {
+        return previewHost_(file);
+    }
+    return Outcome::fail("preview host not configured");
+}
+
 } // namespace caudio::app

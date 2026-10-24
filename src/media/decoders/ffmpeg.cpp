@@ -1,8 +1,4 @@
 #include <cerrno>
-// NOTE: no direct FFmpeg includes here -- most libav* 8.x headers lack
-// extern "C" guards, so including them directly mangles symbols (link
-// failure). All libav declarations come from ffmpeg_impl.hpp's
-// extern "C" block below.
 #include <algorithm>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
@@ -20,9 +16,92 @@
 #include <string>
 #include <string_view>
 
-#include "ffmpeg_impl.hpp"
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wglobal-module"
+#endif
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
+#include <libavutil/channel_layout.h>
+#include <libavutil/opt.h>
+#include <libavutil/samplefmt.h>
+#include <libswresample/swresample.h>
+}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 namespace caudio::media {
+
+struct Decoder::Impl {
+    Impl() = default;
+    ~Impl();
+
+    [[nodiscard]] uint32_t sampleRate() const noexcept;
+    [[nodiscard]] uint32_t channels() const noexcept;
+    [[nodiscard]] uint64_t totalFrames() const noexcept;
+
+    std::size_t decode(std::span<float> out);
+
+    caudio::utils::Expected<void> seek(double seconds);
+
+    bool init();
+
+    void cleanup();
+
+    struct PacketDeleter {
+        void operator()(AVPacket* p) const noexcept {
+            if (p)
+                av_packet_free(&p);
+        }
+    };
+    struct FrameDeleter {
+        void operator()(AVFrame* p) const noexcept {
+            if (p)
+                av_frame_free(&p);
+        }
+    };
+    using PacketPtr = std::unique_ptr<AVPacket, PacketDeleter>;
+    using FramePtr = std::unique_ptr<AVFrame, FrameDeleter>;
+    struct LayoutGuard {
+        AVChannelLayout l{};
+        LayoutGuard() = default;
+        ~LayoutGuard() {
+            av_channel_layout_uninit(&l);
+        }
+        LayoutGuard(const LayoutGuard&) = delete;
+        LayoutGuard& operator=(const LayoutGuard&) = delete;
+    };
+
+    int convertFrameBuffered(AVFrame* frame);
+    int drainResampler();
+    std::size_t serveSpill(std::span<float> out, std::size_t totalDecoded, std::size_t frames);
+
+    static int readCallback(void* opaque, uint8_t* buf, int bufSize);
+
+    // AVIO seek: AVSEEK_SIZE queries size, AVSEEK_FORCE stripped, seekable=1
+    static int64_t seekCallback(void* opaque, int64_t offset, int whence);
+
+    Reader* reader_{nullptr};
+    AVFormatContext* fmt_{nullptr};
+    AVCodecContext* dec_{nullptr};
+    AVIOContext* avio_{nullptr};
+    struct SwrContext* swr_{nullptr};
+    int audioStreamIdx_{-1};
+    uint32_t sampleRate_{0};
+    uint32_t channels_{0};
+    uint64_t totalFrames_{0};
+    uint64_t pos_{0};
+    PacketPtr scratchPkt_{};
+    FramePtr scratchFrame_{};
+    static constexpr std::size_t kConvertFrames = 4096;
+    std::vector<float> convertBuf_{};
+    std::vector<float> spill_{};
+    std::size_t spillPos_{0};
+};
+
 
 caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
     AVFormatContext* fmt = avformat_alloc_context();

@@ -36,7 +36,6 @@
 #include <utility>
 #include <vector>
 
-#include "service_audio.hpp"
 #include "service_impl.hpp"
 #include "service_status.hpp"
 #include "tag_writer.hpp"
@@ -67,6 +66,10 @@ using caudio::ipc::PlaylistTracks;
 using caudio::ipc::Preview;
 using caudio::ipc::TagEdit;
 using caudio::ipc::TagGet;
+
+namespace detail {
+double durationFromDecoder(const std::filesystem::path& path) noexcept;
+} // namespace detail
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::LibraryScan& cmd) {

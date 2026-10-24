@@ -22,7 +22,6 @@
 #include <cstring>
 #include <db/database_access.hpp>
 #include <db/stmt_helpers.hpp>
-#include <engine/engine_types.hpp>
 #include <engine/history.hpp>
 #include <engine/shuffle.hpp>
 #include <expected>
@@ -57,6 +56,45 @@ constexpr std::chrono::milliseconds kQueueLockWait{500};
 
 // All engine state and implementation live here so the public header stays
 // cheap (no mpsc/ring/std-threading includes). Engine methods delegate.
+
+/**
+ * @brief In-memory queue cursor and shuffle state.
+ * @details `perm` is empty when shuffle is off; when on it holds a
+ * permutation of `[0, queueCount)` shuffled via detail::shufflePerm.
+ * `cursor` is the next index to consume (persisted as `cursor_pos`).
+ * `queue_id` is the active queue (persisted as `active_queue_id`).
+ * Protected by `Engine::queueMutex_` for writers; readers use atomics
+ * or hold the mutex.
+ */
+struct QueueState {
+    bool shuffle{false}; ///< Whether shuffle is enabled.
+    caudio::types::RepeatMode repeat{caudio::types::RepeatMode::Off}; ///< Repeat mode.
+    std::vector<int64_t> perm{}; ///< Shuffle permutation (positions, not track_ids).
+    size_t cursor{0};            ///< Next position index in perm or linear queue.
+    int64_t queue_id{1};         ///< Active queue id.
+};
+
+/**
+ * @brief Persisted engine state (row `engine_state.id=1`).
+ * @details Mirrors columns `shuffle_enabled, repeat_mode, cursor_pos,
+ * current_track_id, volume, shuffle_perm (BLOB), active_queue_id,
+ * pre_mute_volume, position_ms`. `active_queue_id` may be missing on old DBs -- loadState falls
+ * back to `1` and saveState tries `sqlNew` then `sqlOld`. `pre_mute_volume` and `position_ms` are
+ * best-effort both ways (missing columns keep their defaults). `shuffle_perm` is `perm` serialized
+ * as `int64_t` blob.
+ */
+struct EngineState {
+    int shuffleEnabled{0}; ///< Persisted shuffle flag (0/1).
+    caudio::types::RepeatMode repeatMode{
+        caudio::types::RepeatMode::Off}; ///< Persisted repeat mode.
+    int64_t cursorPos{0};                ///< Persisted cursor (QueueState::cursor).
+    int64_t currentTrackId{0};           ///< Last current track id.
+    float volume{1.0f};                  ///< Persisted volume [0,1].
+    int64_t activeQueueId{1};            ///< Persisted active queue id.
+    float preMuteVolume{0.5f};           ///< Restore level for unmute (0,1].
+    int64_t positionMs{0};               ///< Persisted position in the current track.
+};
+
 struct Engine::Impl {
     explicit Impl(const EngineConfig& cfg);
 

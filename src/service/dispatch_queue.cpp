@@ -3,6 +3,8 @@
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/media/audio_ext.hpp>
 #include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
@@ -20,11 +22,82 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+#include <media/fingerprint.hpp>
 
 #include "service_impl.hpp"
-#include "track_resolve.hpp"
 
 namespace caudio::service {
+
+namespace detail {
+
+double durationFromDecoder(const std::filesystem::path& path) noexcept;
+
+inline std::expected<caudio::types::Track, caudio::utils::Error>
+ensureLibraryTrack(caudio::db::Database& db, const std::filesystem::path& p) {
+    auto fpRes = caudio::media::internal::computeFingerprint(p);
+    if (!fpRes)
+        return std::unexpected{fpRes.error()};
+    caudio::types::Track t;
+    t.path = p.generic_string();
+    t.fingerprint = *fpRes;
+    t.duration = durationFromDecoder(p);
+    std::error_code ec2;
+    auto sz = std::filesystem::file_size(p, ec2);
+    if (!ec2)
+        t.size = static_cast<int64_t>(sz);
+    auto ftime = std::filesystem::last_write_time(p, ec2);
+    if (!ec2)
+        t.mtime = static_cast<int64_t>(ftime.time_since_epoch().count());
+    if (auto meta = caudio::media::extractMetadata(t.path); meta) {
+        t.title = std::move(meta->title);
+        t.artist = std::move(meta->artist);
+        t.album = std::move(meta->album);
+        t.album_artist = std::move(meta->album_artist);
+        t.genre = std::move(meta->genre);
+        t.year = meta->year;
+        t.track_num = meta->track_num;
+        t.disc_num = meta->disc_num;
+        if (meta->duration > 0)
+            t.duration = meta->duration;
+        t.sample_rate = static_cast<uint32_t>(meta->sample_rate);
+        t.channels = static_cast<uint32_t>(meta->channels);
+        t.bitrate = meta->bitrate;
+    }
+    auto ins = db.insertTrack(t);
+    if (ins) {
+        t.id = *ins;
+        return t;
+    }
+    if (ins.error().code == caudio::utils::StatusCode::AlreadyExists) {
+        if (auto existing = db.findByFingerprint(t.fingerprint))
+            return std::move(*existing);
+        if (auto byPath = db.findByPath(t.path))
+            return std::move(*byPath);
+    }
+    return std::unexpected{ins.error()};
+}
+
+double durationFromDecoder(const std::filesystem::path& path) noexcept {
+    try {
+        auto readerRes = caudio::media::FileReader::open(path);
+        if (!readerRes)
+            return 0.0;
+        auto& readerPtr = readerRes.value();
+        auto decRes = caudio::media::Decoder::open(*readerPtr);
+        if (!decRes)
+            return 0.0;
+        auto& decPtr = decRes.value();
+        std::uint32_t sr = decPtr->sampleRate();
+        std::uint64_t frames = decPtr->totalFrames();
+        if (sr == 0)
+            return 0.0;
+        return static_cast<double>(frames) / static_cast<double>(sr);
+    } catch (...) {
+        return 0.0;
+    }
+}
+
+} // namespace detail
 
 using caudio::engine::detail::ServiceAccess;
 using namespace caudio::ipc;
