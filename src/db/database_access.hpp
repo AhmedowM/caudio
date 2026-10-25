@@ -42,27 +42,21 @@ struct DatabaseAccess {
      * @param db Database instance.
      * @return Borrowed handle, may be null if not open.
      */
-    static sqlite3* handle(Database& db) noexcept {
-        return db.handle();
-    }
+    static sqlite3* handle(Database& db) noexcept;
     /**
      * @brief Forwards to Database::handleLocked().
      * @ingroup caudio_db
      * @param db Database instance.
      * @return Borrowed handle.
      */
-    static sqlite3* handleLocked(Database& db) noexcept {
-        return db.handleLocked();
-    }
+    static sqlite3* handleLocked(Database& db) noexcept;
     /**
      * @brief Forwards to Database::mutex().
      * @ingroup caudio_db
      * @param db Database instance.
      * @return Reference to the shared_mutex guarding the handle and tables.
      */
-    static std::shared_mutex& mutex(Database& db) noexcept {
-        return db.mutex();
-    }
+    static std::shared_mutex& mutex(Database& db) noexcept;
     /**
      * @brief Forwards to Database::getCachedForUse().
      * @ingroup caudio_db
@@ -71,9 +65,7 @@ struct DatabaseAccess {
      * @return Prepared statement pointer, or Error (Internal) if prepare fails.
      */
     static std::expected<SqliteStatement*, caudio::utils::Error>
-    getCachedForUse(Database& db, std::string_view sql) {
-        return db.getCachedForUse(sql);
-    }
+    getCachedForUse(Database& db, std::string_view sql);
 
     // --- Track / library locked helpers ---
     /**
@@ -84,9 +76,7 @@ struct DatabaseAccess {
      * @return Track or Error NotFound/Internal.
      */
     static std::expected<caudio::types::Track, caudio::utils::Error>
-    findByPathLocked(Database& db, std::string_view path) {
-        return db.findByPathLocked(path);
-    }
+    findByPathLocked(Database& db, std::string_view path);
     /**
      * @brief Forwards to Database::findByFingerprintLocked().
      * @ingroup caudio_db
@@ -95,9 +85,7 @@ struct DatabaseAccess {
      * @return Track or Error NotFound/Internal.
      */
     static std::expected<caudio::types::Track, caudio::utils::Error>
-    findByFingerprintLocked(Database& db, const std::array<uint8_t, 32>& fp) {
-        return db.findByFingerprintLocked(fp);
-    }
+    findByFingerprintLocked(Database& db, const std::array<uint8_t, 32>& fp);
     /**
      * @brief Forwards to Database::getTrackLocked().
      * @ingroup caudio_db
@@ -106,9 +94,7 @@ struct DatabaseAccess {
      * @return Track or Error.
      */
     static std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(Database& db,
-                                                                                    int64_t id) {
-        return db.getTrackLocked(id);
-    }
+                                                                                     int64_t id);
     /**
      * @brief Forwards to Database::insertTrackLocked().
      * @ingroup caudio_db
@@ -117,9 +103,7 @@ struct DatabaseAccess {
      * @return New row id or Error AlreadyExists/Internal.
      */
     static std::expected<int64_t, caudio::utils::Error>
-    insertTrackLocked(Database& db, const caudio::types::Track& t) {
-        return db.insertTrackLocked(t);
-    }
+    insertTrackLocked(Database& db, const caudio::types::Track& t);
     /**
      * @brief Forwards to Database::updateTrackLocked().
      * @ingroup caudio_db
@@ -128,9 +112,7 @@ struct DatabaseAccess {
      * @return Success or Error InvalidArg/NotFound/Internal.
      */
     static std::expected<void, caudio::utils::Error>
-    updateTrackLocked(Database& db, const caudio::types::Track& t) {
-        return db.updateTrackLocked(t);
-    }
+    updateTrackLocked(Database& db, const caudio::types::Track& t);
     /**
      * @brief Forwards to Database::deleteTrackLocked().
      * @ingroup caudio_db
@@ -138,9 +120,7 @@ struct DatabaseAccess {
      * @param id Track id.
      * @return Success or Error NotFound/Internal.
      */
-    static std::expected<void, caudio::utils::Error> deleteTrackLocked(Database& db, int64_t id) {
-        return db.deleteTrackLocked(id);
-    }
+    static std::expected<void, caudio::utils::Error> deleteTrackLocked(Database& db, int64_t id);
     /**
      * @brief Forwards to Database::libraryListLocked().
      * @ingroup caudio_db
@@ -148,9 +128,7 @@ struct DatabaseAccess {
      * @return Vector of libraries or Error.
      */
     static std::expected<std::vector<Library>, caudio::utils::Error>
-    libraryListLocked(Database& db) {
-        return db.libraryListLocked();
-    }
+    libraryListLocked(Database& db);
     /**
      * @brief Forwards to Database::libraryUpdateLocked().
      * @ingroup caudio_db
@@ -159,9 +137,7 @@ struct DatabaseAccess {
      * @return Success or Error InvalidArg/NotFound/Internal.
      */
     static std::expected<void, caudio::utils::Error> libraryUpdateLocked(Database& db,
-                                                                         const Library& l) {
-        return db.libraryUpdateLocked(l);
-    }
+                                                                         const Library& l);
 
     // --- Playlist / queue locked helpers ---
     /**
@@ -175,9 +151,7 @@ struct DatabaseAccess {
      */
     static std::expected<int64_t, caudio::utils::Error>
     createPlaylistLocked(Database& db, std::string_view name, int type = 0,
-                         std::string_view smart_query = {}) {
-        return db.createPlaylistLocked(name, type, smart_query);
-    }
+                         std::string_view smart_query = {});
     /**
      * @brief Forwards to Database::playlistAddTrackLocked().
      * @ingroup caudio_db
@@ -188,9 +162,7 @@ struct DatabaseAccess {
      * @return Success or Error.
      */
     static std::expected<void, caudio::utils::Error>
-    playlistAddTrackLocked(Database& db, int64_t pid, int64_t tid, int64_t pos = -1) {
-        return db.playlistAddTrackLocked(pid, tid, pos);
-    }
+    playlistAddTrackLocked(Database& db, int64_t pid, int64_t tid, int64_t pos = -1);
     /**
      * @brief Forwards to Database::queueEnqueueLocked().
      * @ingroup caudio_db
@@ -201,9 +173,7 @@ struct DatabaseAccess {
      * @return Success or Error.
      */
     static std::expected<void, caudio::utils::Error>
-    queueEnqueueLocked(Database& db, int64_t qid, int64_t tid, int64_t pos = -1) {
-        return db.queueEnqueueLocked(qid, tid, pos);
-    }
+    queueEnqueueLocked(Database& db, int64_t qid, int64_t tid, int64_t pos = -1);
     /**
      * @brief Forwards to Database::queueDequeueLocked().
      * @ingroup caudio_db
@@ -212,9 +182,7 @@ struct DatabaseAccess {
      * @return QueueItem or Error NotFound.
      */
     static std::expected<caudio::types::QueueItem, caudio::utils::Error>
-    queueDequeueLocked(Database& db, int64_t qid) {
-        return db.queueDequeueLocked(qid);
-    }
+    queueDequeueLocked(Database& db, int64_t qid);
 };
 
 } // namespace caudio::db
