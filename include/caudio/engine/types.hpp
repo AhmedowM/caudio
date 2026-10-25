@@ -57,7 +57,7 @@ namespace caudio::engine {
  * @see EngineEvent
  * @see Engine::pollEvent
  */
-enum class EngineEventType : int {
+enum class EngineEventType : std::uint8_t {
     None = 0,         ///< No event.
     TrackStarted = 1, ///< New track started (pushEvent from doPlayTrack / next).
     TrackEnded = 2,   ///< Reserved (emitted via callbacks with pct).

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 /**
  * @file wire.hpp
  * @brief Dep-free wire vocabulary shared by the engine and the IPC layer.
@@ -30,7 +32,7 @@ namespace caudio::types {
  * - `One`: repeats the current track without advancing the cursor.
  * @see caudio::ipc::Status
  */
-enum class RepeatMode : int { Off = 0, All = 1, One = 2 };
+enum class RepeatMode : std::uint8_t { Off = 0, All = 1, One = 2 };
 
 /**
  * @brief Playback state machine (wire value).
@@ -43,6 +45,6 @@ enum class RepeatMode : int { Off = 0, All = 1, One = 2 };
  * - Any -> `Stopped` via Engine::stop().
  * @see caudio::ipc::Status
  */
-enum class PlaybackState : int { Stopped = 0, Ready = 1, Playing = 2, Paused = 3 };
+enum class PlaybackState : std::uint8_t { Stopped = 0, Ready = 1, Playing = 2, Paused = 3 };
 
 } // namespace caudio::types

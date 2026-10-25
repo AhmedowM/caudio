@@ -64,8 +64,8 @@ class SpscRing {
      */
     SpscRing(std::size_t capacityFrames, std::uint32_t channels = 1)
         : cap_(capacityFrames), channels_(channels), buf_(capacityFrames * channels) {
-        // capacityFrames ==0 is allowed? The C API returned InvalidArg. In C++ we ensure cap>0.
-        // If cap==0, buffer empty and all ops no-op.
+        if (cap_ > 0 && (cap_ & (cap_ - 1)) == 0)
+            mask_ = cap_ - 1;
     }
 
     SpscRing(const SpscRing&) = delete;
@@ -127,7 +127,7 @@ class SpscRing {
             return 0;
         if (frames > free)
             frames = free;
-        std::size_t wrIdx = wr % cap_;
+        std::size_t wrIdx = mask_ != 0 ? (wr & mask_) : (wr % cap_);
         std::size_t ch = static_cast<std::size_t>(channels_);
         std::size_t first = cap_ - wrIdx;
         if (first > frames)
@@ -178,7 +178,7 @@ class SpscRing {
             return 0;
         if (frames > avail)
             frames = avail;
-        std::size_t rdIdx = rd % cap_;
+        std::size_t rdIdx = mask_ != 0 ? (rd & mask_) : (rd % cap_);
         std::size_t ch = static_cast<std::size_t>(channels_);
         std::size_t first = cap_ - rdIdx;
         if (first > frames)
@@ -247,6 +247,7 @@ class SpscRing {
     std::vector<T> buf_{};      ///< Interleaved storage [cap_*channels].
     alignas(ringCacheLine) std::atomic<std::size_t> wr_{0}; ///< Producer index (monotonic).
     alignas(ringCacheLine) std::atomic<std::size_t> rd_{0}; ///< Consumer index (monotonic).
+    std::size_t mask_{0}; ///< cap_-1 when cap_ is a power of two, else 0 (use modulo).
 };
 
 } // namespace caudio::utils

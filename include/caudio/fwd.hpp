@@ -13,6 +13,7 @@
  * @include-only This header is fully inline; no .cpp is required.
  */
 
+#include <cstdint>
 #include <expected>
 #include <type_traits>
 
@@ -34,7 +35,7 @@ class Engine;
 struct EngineConfig;
 struct EngineCallbacks;
 struct EngineEvent;
-enum class EngineEventType : int;
+enum class EngineEventType : std::uint8_t;
 // PlaybackState / RepeatMode are wire enums owned by `caudio::types` (see
 // types/wire.hpp); `caudio::engine` re-exports them as aliases (engine/types.hpp).
 } // namespace caudio::engine
@@ -66,8 +67,8 @@ class ShmStatusWriter;
 } // namespace caudio::ipc
 
 namespace caudio::types {
-enum class RepeatMode : int;
-enum class PlaybackState : int;
+enum class RepeatMode : std::uint8_t;
+enum class PlaybackState : std::uint8_t;
 struct Track;
 struct Playlist;
 struct QueueItem;
@@ -84,7 +85,7 @@ class Generator;
 class Logger;
 class Json;
 class JsonRef;
-enum class StatusCode : int;
+enum class StatusCode : std::uint8_t;
 struct Error;
 
 /**

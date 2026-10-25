@@ -6,6 +6,7 @@
  * @ingroup caudio_utils
  */
 
+#include <cstdint>
 #include <format>
 #include <string_view>
 
@@ -20,7 +21,7 @@ namespace caudio::utils {
  * @see Error
  * @see toString
  */
-enum class StatusCode : int {
+enum class StatusCode : std::uint8_t {
     Ok = 0,            ///< Success.
     InvalidArg = 1,    ///< Invalid argument supplied by caller.
     NotFound = 2,      ///< Requested entity not found.

@@ -30,31 +30,31 @@ namespace caudio::types {
  */
 struct Track {
     int64_t id{};                          ///< Row id (PK, 0 = not yet persisted).
-    std::array<uint8_t, 32> fingerprint{}; ///< BLAKE3-256 content fingerprint (UNIQUE).
-    std::string path;                      ///< Absolute filesystem path (NOT NULL).
     int64_t size{};                        ///< File size in bytes.
     int64_t mtime{};                       ///< Last write time (filesystem epoch).
     double duration{};                     ///< Duration in seconds.
-    uint32_t sample_rate{};                ///< Sample rate in Hz.
-    uint32_t channels{};                   ///< Channel count.
-    int32_t bitrate{};                     ///< Bitrate in bps.
+    int64_t play_count{};                  ///< Number of plays.
+    int64_t last_played{};                 ///< Timestamp of last play (unix seconds).
+    int64_t date_added{};                  ///< Timestamp when inserted.
+    int64_t last_scanned{};                ///< Timestamp of last scan.
+    int64_t deleted_at{};                  ///< Soft-delete timestamp (0 = live).
+    int64_t library_id{1};                 ///< Owning library id (FK -> libraries.id).
+    std::string path;                      ///< Absolute filesystem path (NOT NULL).
     std::string title;                     ///< Title tag.
     std::string artist;                    ///< Artist tag.
     std::string album;                     ///< Album tag.
     std::string album_artist;              ///< Album-artist tag.
     std::string genre;                     ///< Genre tag.
+    std::string cover_art_path;            ///< Path to cover art file.
+    uint32_t sample_rate{};                ///< Sample rate in Hz.
+    uint32_t channels{};                   ///< Channel count.
+    int32_t bitrate{};                     ///< Bitrate in bps.
     int32_t year{};                        ///< Year tag.
     int32_t track_num{};                   ///< Track number within disc.
     int32_t disc_num{};                    ///< Disc number.
-    std::string cover_art_path;            ///< Path to cover art file.
     int32_t rating{};                      ///< User rating (0..5).
-    int64_t play_count{};                  ///< Number of plays.
-    int64_t last_played{};                 ///< Timestamp of last play (unix seconds).
-    int64_t date_added{};                  ///< Timestamp when inserted.
-    int64_t last_scanned{};                ///< Timestamp of last scan.
+    std::array<uint8_t, 32> fingerprint{}; ///< BLAKE3-256 content fingerprint (UNIQUE).
     bool dirty{false};                     ///< True if metadata needs re-scan.
-    int64_t deleted_at{};                  ///< Soft-delete timestamp (0 = live).
-    int64_t library_id{1};                 ///< Owning library id (FK -> libraries.id).
 };
 
 /**
