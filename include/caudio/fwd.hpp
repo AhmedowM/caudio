@@ -46,8 +46,6 @@ class Decoder;
 } // namespace caudio::media
 
 namespace caudio::player {
-using Reader = caudio::media::Reader;
-using Decoder = caudio::media::Decoder;
 class AudioOutput;
 } // namespace caudio::player
 
@@ -61,7 +59,6 @@ class Service;
 
 namespace caudio::ipc {
 struct Status;
-class ShmStatusHandle;
 class ShmStatusReader;
 class ShmStatusWriter;
 } // namespace caudio::ipc

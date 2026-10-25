@@ -7,7 +7,6 @@ export namespace caudio::db {
 using ::caudio::db::DbStats;
 using ::caudio::db::HistoryQuery;
 using ::caudio::db::Library;
-using ::caudio::db::LibraryStatsDetailedData;
 using ::caudio::db::Queue;
 using ::caudio::db::TrackQuery;
 } // namespace caudio::db

@@ -81,13 +81,6 @@ struct LibraryStats final {
 };
 
 /**
- * @brief Compatibility spelling of `LibraryStats`.
- * @ingroup caudio_ipc
- * @deprecated Set `LibraryStats::top_n` instead. Kept until v2.0.0.
- */
-using LibraryStatsDetailed = LibraryStats;
-
-/**
  * @struct LibraryAdd
  * @brief Add a file or directory to the library with metadata extraction.
  * @ingroup caudio_ipc

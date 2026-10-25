@@ -205,14 +205,6 @@ class App {
     AppResult play();
 
     /**
-     * @brief Deprecated spelling for play().
-     * @ingroup caudio_app
-     */
-    [[deprecated("use play() instead")]] AppResult doPlay() {
-        return play();
-    }
-
-    /**
      * @brief Plays files immediately in a new queue.
      * @ingroup caudio_app
      * @param files Pre-expanded file list (glob expansion stays in frontends).
@@ -252,11 +244,6 @@ class App {
      */
     AppResult queueList();
 
-    /** @brief Deprecated spelling for queueList(). @ingroup caudio_app */
-    [[deprecated("use queueList() instead")]] AppResult queues() {
-        return queueList();
-    }
-
     /**
      * @brief Lists tracks in the active queue (added or playback order).
      * @ingroup caudio_app
@@ -266,11 +253,6 @@ class App {
 
     /** @brief Switches the active queue. @ingroup caudio_app */
     AppResult queueSwitch(std::int64_t qid);
-
-    /** @brief Deprecated spelling for queueSwitch(). @ingroup caudio_app */
-    [[deprecated("use queueSwitch() instead")]] AppResult switchQueue(std::int64_t qid) {
-        return queueSwitch(qid);
-    }
 
     /** @brief Creates a queue container. @ingroup caudio_app */
     AppResult queueCreate(const std::string& name);

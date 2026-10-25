@@ -38,24 +38,6 @@
 namespace caudio::player {
 
 /**
- * @brief Audio playback device information.
- * @ingroup caudio_player
- * @details Compatibility alias of `caudio::types::DeviceInfo`; the canonical
- * definition contains the device identifier, name and default status.
- * @deprecated Spell `caudio::types::DeviceInfo` directly.
- */
-using DeviceInfo = caudio::types::DeviceInfo;
-
-/**
- * @brief Container for enumerated audio devices.
- * @ingroup caudio_player
- * @details Compatibility alias of `caudio::types::DeviceList`, returned by
- * enumerateDevices().
- * @deprecated Spell `caudio::types::DeviceList` directly.
- */
-using DeviceList = caudio::types::DeviceList;
-
-/**
  * @brief Enumerate all available audio playback devices
  * @return DeviceList containing all playback devices
  *
@@ -79,7 +61,7 @@ using DeviceList = caudio::types::DeviceList;
  * - Cleans up with ma_context_uninit()
  * - Only returns playback devices (capture devices ignored)
  */
-DeviceList enumerateDevices();
+caudio::types::DeviceList enumerateDevices();
 
 /**
  * @class AudioOutput

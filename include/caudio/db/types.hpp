@@ -12,7 +12,6 @@
  * invariants beyond those documented per-field.
  */
 
-#include <caudio/legacy_aliases.hpp>
 #include <caudio/types/record.hpp>
 #include <cstdint>
 #include <optional>
@@ -63,15 +62,6 @@ struct DbStats {
     int64_t num_libraries{};     ///< Number of libraries.
     int64_t total_duration_ms{}; ///< Sum of track durations in milliseconds.
 };
-
-/**
- * @brief Detailed per-library statistics.
- * @ingroup caudio_db
- * @details Returned by `Database::libraryStatsDetailed()`. Compatibility
- * alias of `caudio::types::LibraryStatsDetailed`.
- * @deprecated Spell `caudio::types::LibraryStatsDetailed` directly.
- */
-using LibraryStatsDetailedData = caudio::types::LibraryStatsDetailed;
 
 /**
  * @brief Filter for listing tracks.

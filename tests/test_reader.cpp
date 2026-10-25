@@ -1,7 +1,7 @@
 #include <array>
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
@@ -10,11 +10,12 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
-#include <span>
 #include <string>
 #include <vector>
-using namespace caudio::player;
+using namespace caudio::media;
 using namespace caudio::utils;
+using caudio::media::FileReader;
+using caudio::media::MemoryReader;
 
 // Helper to create a temp file with RIFF header
 static std::filesystem::path makeTempFile(const std::string& name, std::vector<std::byte> data) {

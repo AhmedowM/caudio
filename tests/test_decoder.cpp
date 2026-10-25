@@ -1,7 +1,7 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
-#include <caudio/player/decoder.hpp>
-#include <caudio/player/reader.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -10,13 +10,15 @@
 #include <cstdio>
 #include <filesystem>
 #include <limits>
-#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
-using namespace caudio::player;
+using namespace caudio::media;
 using namespace caudio::utils;
+using caudio::media::Decoder;
+using caudio::media::FileReader;
+using caudio::media::MemoryReader;
 
 TEST_CASE("decode registry probe unsupported", "[decoder]") {
     std::vector<std::byte> sig(32, std::byte{'X'});

@@ -102,7 +102,7 @@ struct Decoder::Impl {
     std::size_t spillPos_{0};
 };
 
-caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
+caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path) {
     AVFormatContext* fmt = avformat_alloc_context();
     if (!fmt) {
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::NoMem,
@@ -127,7 +127,7 @@ caudio::utils::Expected<TrackMetadata> extractMetadata(std::string_view path) {
                                                         "avformat_find_stream_info failed"));
     }
 
-    TrackMetadata meta;
+    caudio::types::TrackMetadata meta;
 
     int audioStreamIdx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     AVDictionary* streamMeta =

@@ -152,22 +152,6 @@ TEST_CASE("scanLibrary inserts and dedup by fingerprint", "[db_scan]") {
     }
 }
 
-TEST_CASE("deprecated db::scanDirectory forwarder matches media scanTracksToVector", "[db_scan]") {
-    auto dir = tempDirPath("scan_compat");
-    std::ofstream(dir / "compat.wav", std::ios::binary) << "compat audio";
-    auto media = caudio::media::scanTracksToVector(dir, caudio::media::ScanMode::Sampled);
-    REQUIRE(media.has_value());
-    REQUIRE(media->size() == 1);
-    // legacy-shim-ok
-    auto compat = caudio::db::scanDirectory(dir, caudio::db::ScanMode::Sampled);
-    REQUIRE(compat.has_value());
-    REQUIRE(compat->size() == media->size());
-    REQUIRE(compat->front().path == media->front().path);
-    REQUIRE(compat->front().fingerprint == media->front().fingerprint);
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
-}
-
 TEST_CASE("scan non-existent dir returns empty", "[db_scan]") {
     auto tracks = caudio::media::scanTracksToVector("/nonexistent_path_xyz_12345",
                                                     caudio::media::ScanMode::Sampled);

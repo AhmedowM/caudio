@@ -20,40 +20,6 @@
 namespace caudio::db {
 
 /**
- * @brief Serializes a Track to JSON.
- * @ingroup caudio_db
- * @deprecated Use `caudio::utils::trackToJson` instead.
- * @param t Track to serialize.
- * @return JSON object with all Track fields; fingerprint is hex-encoded.
- * Keys keep insertion order (ordered backend behind `caudio::utils::Json`).
- * @par Thread safety
- * Pure function, thread-safe.
- */
-[[deprecated("use caudio::utils::trackToJson")]]
-inline caudio::utils::Json trackToJson(const caudio::types::Track& t) {
-    return caudio::utils::trackToJson(t);
-}
-
-/**
- * @brief Deserializes a Track from ordered JSON.
- * @ingroup caudio_db
- * @deprecated Use `caudio::utils::trackFromJson` instead.
- * @param j JSON object (as produced by `trackToJson`).
- * @return Track on success, or `Error` with `StatusCode::Corrupt` if parsing fails.
- * @details Missing keys use defaults; `library_id == 0` is normalized to 1.
- * If `fingerprint` is missing or not valid hex, a fallback fingerprint
- * derived from `path` is used.
- * @par Thread safety
- * Pure function, thread-safe.
- * @see trackToJson
- */
-[[deprecated("use caudio::utils::trackFromJson")]]
-inline std::expected<caudio::types::Track, caudio::utils::Error>
-trackFromJson(const caudio::utils::Json& j) {
-    return caudio::utils::trackFromJson(j);
-}
-
-/**
  * @brief Exports all tracks to a JSON file.
  * @ingroup caudio_db
  * @param db Database to export from.

@@ -19,7 +19,6 @@
 #include <expected>
 #include <memory>
 #include <optional>
-#include <shared_mutex>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -37,13 +36,6 @@ struct DatabaseOptions {
     /// never emitted from destructors. Set from opts at open().
     caudio::utils::Logger* logger{nullptr};
 };
-
-/**
- * @brief Deprecated spelling of DatabaseOptions.
- * @ingroup caudio_db
- * @deprecated Use `DatabaseOptions` instead (kept until v2.0.0).
- */
-using DbOpts [[deprecated("use DatabaseOptions instead")]] = DatabaseOptions; // legacy-shim-ok
 
 /**
  * @brief Main SQLite database handle with thread-safe CRUD.
@@ -371,13 +363,6 @@ class Database final {
     std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     listQueueItems(int64_t qid);
 
-    /** @brief Deprecated spelling for listQueueItems(). @ingroup caudio_db */
-    [[deprecated("use listQueueItems() instead")]]
-    std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
-    queueList(int64_t qid) {
-        return listQueueItems(qid);
-    }
-
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
 
     std::expected<std::vector<Queue>, caudio::utils::Error> listQueues();
@@ -445,13 +430,6 @@ class Database final {
     std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     listHistory(const HistoryQuery* q = nullptr);
 
-    /** @brief Deprecated spelling for listHistory(). @ingroup caudio_db */
-    [[deprecated("use listHistory() instead")]]
-    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
-    historyList(const HistoryQuery* q = nullptr) {
-        return listHistory(q);
-    }
-
     /**
      * @brief Clears all history.
      * @ingroup caudio_db
@@ -484,13 +462,6 @@ class Database final {
      */
     std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
     listBookmarks(int64_t tid);
-
-    /** @brief Deprecated spelling for listBookmarks(). @ingroup caudio_db */
-    [[deprecated("use listBookmarks() instead")]]
-    std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
-    bookmarkList(int64_t tid) {
-        return listBookmarks(tid);
-    }
     /**
      * @brief Gets a bookmark by id.
      * @ingroup caudio_db
@@ -530,12 +501,6 @@ class Database final {
      * Thread-safe: shared_lock (delegates to libraryListLocked).
      */
     std::expected<std::vector<Library>, caudio::utils::Error> listLibraries();
-
-    /** @brief Deprecated spelling for listLibraries(). @ingroup caudio_db */
-    [[deprecated("use listLibraries() instead")]]
-    std::expected<std::vector<Library>, caudio::utils::Error> libraryList() {
-        return listLibraries();
-    }
     std::expected<void, caudio::utils::Error> libraryUpdate(const Library& l);
     std::expected<void, caudio::utils::Error> libraryDelete(int64_t id);
 
@@ -559,13 +524,6 @@ class Database final {
      */
     std::expected<caudio::types::LibraryStats, caudio::utils::Error>
     libraryStats(std::optional<int> mostPlayed = std::nullopt);
-
-    /** @brief Deprecated spelling for libraryStats(topN). @ingroup caudio_db */
-    [[deprecated("use libraryStats(std::optional<int>) instead")]]
-    std::expected<caudio::types::LibraryStats, caudio::utils::Error>
-    libraryStatsDetailed(int topN = 10) {
-        return libraryStats(topN);
-    }
 
 }; // class Database
 

@@ -25,7 +25,6 @@ using ::caudio::ipc::LibraryRemove;
 using ::caudio::ipc::LibraryScan;
 using ::caudio::ipc::LibrarySearch;
 using ::caudio::ipc::LibraryStats;
-using ::caudio::ipc::LibraryStatsDetailed;
 using ::caudio::ipc::Next;
 using ::caudio::ipc::Pause;
 using ::caudio::ipc::Play;

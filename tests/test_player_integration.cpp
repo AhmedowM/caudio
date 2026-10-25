@@ -5,10 +5,10 @@
 #include <caudio/db/types.hpp>
 #include <caudio/engine/engine.hpp>
 #include <caudio/engine/types.hpp>
-#include <caudio/player/decoder.hpp>
+#include <caudio/media/decoder.hpp>
+#include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
 #include <caudio/player/player.hpp>
-#include <caudio/player/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
@@ -30,16 +30,9 @@ using namespace caudio::utils;
 using namespace caudio::db;
 using namespace caudio::engine;
 using namespace caudio::test_helpers;
+using caudio::media::Decoder;
+using caudio::media::FileReader;
 
-static_assert(
-    std::is_same_v<caudio::player::DeviceInfo, caudio::types::DeviceInfo>); // legacy-shim-ok
-static_assert(
-    std::is_same_v<caudio::player::DeviceList, caudio::types::DeviceList>); // legacy-shim-ok
-static_assert(
-    std::is_same_v<caudio::player::TrackMetadata, caudio::types::TrackMetadata>); // legacy-shim-ok
-
-// `State` is internal to player; `PlaybackState` is the wire enum. Ready is
-// reserved for wire compatibility and is intentionally not mapped by player.
 static_assert(static_cast<int>(caudio::player::State::Stopped) == 0);
 static_assert(static_cast<int>(caudio::player::State::Playing) == 1);
 static_assert(static_cast<int>(caudio::player::State::Paused) == 2);

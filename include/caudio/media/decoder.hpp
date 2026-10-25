@@ -38,14 +38,6 @@
 namespace caudio::media {
 
 /**
- * @brief Audio file metadata tags.
- * @ingroup caudio_media
- * @details Compatibility alias of `caudio::types::TrackMetadata`.
- * @deprecated Spell `caudio::types::TrackMetadata` directly.
- */
-using TrackMetadata = caudio::types::TrackMetadata;
-
-/**
  * @brief Extracts metadata tags from an audio file.
  * @ingroup caudio_media
  * @param path Filesystem path to probe.

@@ -10,11 +10,6 @@
  *   (`caudio::media::scanTracks`, `caudio::media::scanTracksToVector`).
  * - `caudio::db` keeps the DB-coupled half: `scanLibrary` (batched upsert
  *   of the discovered tracks under the database mutex).
- *
- * The `caudio::db::scan`, `caudio::db::scanDirectory` and
- * `caudio::db::ScanMode` spellings remain as compatibility forwarders to the
- * media spellings and are deprecated (documentation only -- the module
- * partition re-exports them, so no `[[deprecated]]` attribute is used).
  */
 
 #include <caudio/db/types.hpp>
@@ -29,40 +24,6 @@
 #include <vector>
 
 namespace caudio::db {
-
-/**
- * @brief Compatibility alias of `caudio::media::ScanMode`.
- * @ingroup caudio_db
- * @details Scan fingerprinting mode (Sampled vs Full).
- * @deprecated Use `caudio::media::ScanMode` instead.
- */
-using ScanMode = caudio::media::ScanMode;
-
-/**
- * @brief Compatibility forwarder to `caudio::media::scanTracks`.
- * @ingroup caudio_db
- * @param root Root directory to traverse recursively.
- * @param mode Fingerprinting mode (Sampled vs Full).
- * @return Generator yielding one `Track` per audio file.
- * @deprecated Use `caudio::media::scanTracks` instead.
- */
-inline caudio::utils::Generator<caudio::types::Track> scan(const std::filesystem::path& root,
-                                                           ScanMode mode = ScanMode::Sampled) {
-    return caudio::media::scanTracks(root, mode);
-}
-
-/**
- * @brief Compatibility forwarder to `caudio::media::scanTracksToVector`.
- * @ingroup caudio_db
- * @param root Root directory.
- * @param mode Fingerprinting mode.
- * @return Vector of tracks, or `Error` (currently always succeeds, returns empty on missing root).
- * @deprecated Use `caudio::media::scanTracksToVector` instead.
- */
-inline std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled) {
-    return caudio::media::scanTracksToVector(root, mode);
-}
 
 /**
  * @brief Scans a library root and upserts tracks into the database.
@@ -93,6 +54,6 @@ scanDirectory(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampl
 std::expected<void, caudio::utils::Error>
 scanLibrary(Database& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {},
-            ScanMode mode = ScanMode::Sampled);
+            caudio::media::ScanMode mode = caudio::media::ScanMode::Sampled);
 
 } // namespace caudio::db

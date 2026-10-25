@@ -280,12 +280,6 @@ class Engine final {
      */
     std::expected<caudio::db::DbStats, caudio::utils::Error> stats();
 
-    /** @brief Deprecated spelling for stats(). @ingroup caudio_engine */
-    [[deprecated("use stats() instead")]] std::expected<caudio::db::DbStats, caudio::utils::Error>
-    getStats() {
-        return stats();
-    }
-
     /**
      * @brief Lists history entries.
      * @ingroup caudio_engine
@@ -307,17 +301,6 @@ class Engine final {
      * Thread-safe; takes unique_lock on the database mutex.
      */
     std::expected<void, caudio::utils::Error> clearHistory();
-
-    /**
-     * @brief Returns last decoder/output error string.
-     * @ingroup caudio_engine
-     * @return Error message or empty string if none.
-     * @par Thread safety
-     * Thread-safe; reads lastErr_ (written from doPlayTrack, not atomic but single-writer).
-     * @deprecated Use the returned Error instead.
-     * @see doPlayTrack
-     */
-    [[deprecated("use the returned Error instead")]] std::string lastError() const;
 
     /**
      * @brief Enables or disables shuffle.

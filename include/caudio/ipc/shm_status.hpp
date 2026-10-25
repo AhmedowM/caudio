@@ -48,7 +48,7 @@ struct ShmStatus {
 };
 
 /**
- * @brief Plain data handed to `ShmStatusHandle::publish` by the daemon.
+ * @brief Plain data handed to `ShmStatusWriter::publish` by the daemon.
  * @ingroup caudio_ipc
  * @details Decouples the writer from `engine::Engine` (the daemon extracts
  * these fields; `ipc` never sees the engine). `title`/`artist` are views into
@@ -98,79 +98,9 @@ inline float atomicLoadFloat(const std::atomic<uint32_t>& a) noexcept;
 inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept;
 
 /**
- * @brief RAII owner of the shared-memory segment (creator or reader side).
- * @ingroup caudio_ipc
- * @deprecated Use `ShmStatusReader` or `ShmStatusWriter`; this type exposes
- * both sides and remains until v2.0.0.
- */
-class ShmStatusHandle {
-  public:
-    using ExpectedShm = std::expected<ShmStatusHandle, caudio::utils::Error>;
-
-    /**
-     * @brief Creates or opens the segment by name.
-     * @ingroup caudio_ipc
-     * @param name Platform segment name (derived from the database path).
-     * @param create True to create, false to open an existing one.
-     */
-    static ExpectedShm create(const std::string& name, bool create);
-    /**
-     * @brief Opens an existing segment read-only (client side).
-     * @ingroup caudio_ipc
-     */
-    static ExpectedShm openReadOnly(const std::string& name);
-
-    /** @brief Unmaps and closes (idempotent). */
-    ~ShmStatusHandle();
-
-    ShmStatusHandle(const ShmStatusHandle&) = delete;
-    ShmStatusHandle& operator=(const ShmStatusHandle&) = delete;
-
-    /** @brief Move-constructs, transferring the mapping. */
-    ShmStatusHandle(ShmStatusHandle&& other) noexcept;
-    /** @brief Move-assigns, transferring the mapping. */
-    ShmStatusHandle& operator=(ShmStatusHandle&& other) noexcept;
-
-    /** @brief True when the mapping is live. @ingroup caudio_ipc */
-    bool valid() const noexcept;
-    /** @brief Segment name. @ingroup caudio_ipc */
-    const std::string& name() const noexcept;
-
-    /**
-     * @brief Seqlock reader: returns a snapshot copy of the status.
-     * @ingroup caudio_ipc
-     */
-    ShmStatus snapshot() const;
-
-    /**
-     * @brief Seqlock writer: publishes position/volume/state/track/title/artist.
-     * @ingroup caudio_ipc
-     * @param u Plain data; no `engine::Engine` needed at this layer.
-     */
-    void publish(const ShmStatusUpdate& u) noexcept;
-
-    /** @ingroup caudio_ipc */
-    void setDuration(double dur) noexcept;
-    /** @ingroup caudio_ipc */
-    void setQueueSize(size_t sz) noexcept;
-
-  private:
-    /** @brief Private default ctor; use create()/openReadOnly(). */
-    ShmStatusHandle() = default;
-
-    void close() noexcept;
-
-    AtomicShmStatus* map_{nullptr};
-    std::size_t size_{0};
-    std::string name_;
-    bool create_{false};
-    std::intptr_t handle_{-1};
-};
-
-/**
  * @brief Client-side read view of the shared-memory status segment.
  * @ingroup caudio_ipc
- * @details Split from `ShmStatusHandle`; exposes only snapshot reads.
+ * @details Exposes only snapshot reads.
  */
 class ShmStatusReader {
   public:
@@ -203,15 +133,21 @@ class ShmStatusReader {
     ShmStatus snapshot() const;
 
   private:
-    explicit ShmStatusReader(ShmStatusHandle handle) noexcept;
+    /** @brief Private default ctor; use openReadOnly(). */
+    ShmStatusReader() = default;
 
-    ShmStatusHandle handle_;
+    void close() noexcept;
+
+    AtomicShmStatus* map_{nullptr};
+    std::size_t size_{0};
+    std::string name_;
+    std::intptr_t handle_{-1};
 };
 
 /**
  * @brief Daemon-side write view of the shared-memory status segment.
  * @ingroup caudio_ipc
- * @details Split from `ShmStatusHandle`; exposes only publishing.
+ * @details Exposes only publishing.
  */
 class ShmStatusWriter {
   public:
@@ -253,17 +189,16 @@ class ShmStatusWriter {
     void setQueueSize(size_t sz) noexcept;
 
   private:
-    explicit ShmStatusWriter(ShmStatusHandle handle) noexcept;
+    /** @brief Private default ctor; use create(). */
+    ShmStatusWriter() = default;
 
-    ShmStatusHandle handle_;
+    void close() noexcept;
+
+    AtomicShmStatus* map_{nullptr};
+    std::size_t size_{0};
+    std::string name_;
+    bool create_{false};
+    std::intptr_t handle_{-1};
 };
-
-/**
- * @brief Creates the daemon-side status segment for a database hash.
- * @ingroup caudio_ipc
- * @param hash Database identity hash (from the db path).
- * @param create True to create, false to open.
- */
-ShmStatusHandle::ExpectedShm createShmStatus(const std::string& hash, bool create);
 
 } // namespace caudio::ipc

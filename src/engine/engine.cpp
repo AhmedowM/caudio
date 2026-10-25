@@ -343,10 +343,6 @@ std::expected<void, caudio::utils::Error> Engine::clearHistory() {
     return impl_->clearHistory();
 }
 
-std::string Engine::lastError() const {
-    return impl_->lastError();
-}
-
 Engine::ExpectedVoid Engine::setShuffle(bool on) {
     return impl_->setShuffle(on);
 }

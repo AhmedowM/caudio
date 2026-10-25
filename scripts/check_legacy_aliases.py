@@ -34,7 +34,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 EXCLUDE = {
-    (ROOT / "include/caudio/legacy_aliases.hpp").resolve(),
     # Re-export the deprecated names so the module API keeps working during the
     # deprecation window; first-party code must not use them.
     (ROOT / "modules/caudio/db/json.cppm").resolve(),
@@ -42,9 +41,7 @@ EXCLUDE = {
     (ROOT / "modules/caudio/db/types.cppm").resolve(),
     (ROOT / "modules/caudio/ipc/result.cppm").resolve(),
     (ROOT / "modules/caudio/player.cppm").resolve(),
-    (ROOT / "modules/caudio/player/decoder.cppm").resolve(),
     (ROOT / "modules/caudio/player/output.cppm").resolve(),
-    (ROOT / "modules/caudio/player/reader.cppm").resolve(),
     (ROOT / "modules/caudio/media/decoder.cppm").resolve(),
 }
 EXT = {".hpp", ".hh", ".h", ".cpp", ".cc", ".cxx", ".cppm"}

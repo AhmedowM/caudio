@@ -18,36 +18,7 @@ namespace caudio::ipc {
 // Library Statistics Results
 // ---------------------------------------------------------------------------
 
-// The canonical type is `caudio::types::LibraryStats`; the IPC spellings
-// below are compatibility aliases kept until v2.0.0.
-
-/**
- * @brief Library statistics (returned by LibraryStats).
- * @ingroup caudio_ipc
- * @details Same-type alias of `caudio::types::LibraryStats`; kept for IPC
- * source compatibility.
- *
- * @deprecated Use `caudio::types::LibraryStats` instead. The IPC spelling is a
- * compatibility alias kept until v2.0.0.
- *
- * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20,
- * "total_duration_ms": 36000000, "total_play_time_ms": 7200000}
- */
-using LibraryStatsData = caudio::types::LibraryStats;
-
-/**
- * @brief Compatibility spelling of `LibraryStats` for the detailed projection.
- * @ingroup caudio_ipc
- * @details Same-type alias of `caudio::types::LibraryStats`; kept for IPC
- * source compatibility.
- *
- * @deprecated Use `caudio::types::LibraryStats` instead. The IPC spelling is a
- * compatibility alias kept until v2.0.0.
- *
- * @json_example {"type": "LibraryStats", "tracks": 1000, "queues": 5, "playlists": 20,
- * "total_duration_ms": 36000000, "total_play_time_ms": 7200000, "most_played": [...]}
- */
-using LibraryStatsDetailedData = caudio::types::LibraryStats;
+// The canonical type is `caudio::types::LibraryStats`.
 
 // ---------------------------------------------------------------------------
 // Track and Playlist Results

@@ -184,12 +184,4 @@ struct LibraryStats {
     std::optional<std::vector<Track>> most_played{};
 };
 
-/**
- * @brief Compatibility spelling of `LibraryStats`.
- * @ingroup caudio_types
- * @deprecated Use `LibraryStats` and check `most_played` for the detailed
- * projection. Kept until v2.0.0.
- */
-using LibraryStatsDetailed = LibraryStats;
-
 } // namespace caudio::types

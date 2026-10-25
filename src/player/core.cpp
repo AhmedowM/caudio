@@ -33,8 +33,8 @@ struct Player::Impl {
     uint32_t channels_{2};
 
     // Playback components
-    std::unique_ptr<Reader> reader_;
-    std::unique_ptr<Decoder> decoder_;
+    std::unique_ptr<media::Reader> reader_;
+    std::unique_ptr<media::Decoder> decoder_;
     std::unique_ptr<caudio::utils::SpscRing<float>> ring_;
     std::unique_ptr<AudioOutput> output_;
 
@@ -58,7 +58,7 @@ struct Player::Impl {
 
     bool init(const PlayerOptions& opts);
     Player::ExpectedVoid open(std::string_view path);
-    Player::ExpectedVoid openReader(std::unique_ptr<Reader> reader);
+    Player::ExpectedVoid openReader(std::unique_ptr<media::Reader> reader);
     Player::ExpectedVoid play();
     Player::ExpectedVoid pause();
     Player::ExpectedVoid resume();
@@ -99,7 +99,7 @@ Player::ExpectedVoid Player::open(std::string_view path) {
     return impl_->open(path);
 }
 
-Player::ExpectedVoid Player::openReader(std::unique_ptr<Reader> reader) {
+Player::ExpectedVoid Player::openReader(std::unique_ptr<media::Reader> reader) {
     return impl_->openReader(std::move(reader));
 }
 
@@ -135,10 +135,6 @@ std::chrono::duration<double> Player::position() const noexcept {
     return impl_->position();
 }
 
-std::string_view Player::lastError() const noexcept {
-    return impl_->lastError();
-}
-
 bool Player::Impl::init(const PlayerOptions& opts) {
     sampleRate_ = opts.sampleRate ? opts.sampleRate : 48000;
     channels_ = opts.channels ? opts.channels : 2;
@@ -171,7 +167,7 @@ Player::ExpectedVoid Player::Impl::open(std::string_view path) {
     return rRes;
 }
 
-Player::ExpectedVoid Player::Impl::openReader(std::unique_ptr<Reader> reader) {
+Player::ExpectedVoid Player::Impl::openReader(std::unique_ptr<media::Reader> reader) {
     if (!reader) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("null reader")});
@@ -185,7 +181,7 @@ Player::ExpectedVoid Player::Impl::openReader(std::unique_ptr<Reader> reader) {
     }
 
     // Open decoder
-    auto decResult = Decoder::open(*reader, logger_);
+    auto decResult = media::Decoder::open(*reader, logger_);
     if (!decResult) {
         lastError_ = decResult.error().message;
         state_.store(State::Error, std::memory_order_release);

@@ -9,7 +9,6 @@ using ::caudio::types::DeviceInfo;
 using ::caudio::types::DeviceList;
 using ::caudio::types::HistoryEntry;
 using ::caudio::types::LibraryStats;
-using ::caudio::types::LibraryStatsDetailed;
 using ::caudio::types::Playlist;
 using ::caudio::types::QueueItem;
 using ::caudio::types::Track;

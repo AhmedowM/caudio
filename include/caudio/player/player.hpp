@@ -75,13 +75,6 @@ struct PlayerOptions {
 };
 
 /**
- * @brief Deprecated spelling of PlayerOptions.
- * @ingroup caudio_player
- * @deprecated Use `PlayerOptions` instead (kept until v2.0.0).
- */
-using PlayerOpts [[deprecated("use PlayerOptions instead")]] = PlayerOptions; // legacy-shim-ok
-
-/**
  * @class Player
  * @brief Core audio player with gapless playback and multi-format support
  * @ingroup caudio_player
@@ -177,7 +170,7 @@ class Player {
      *
      * Thread Safety: Thread-safe (uses openMutex_ for exclusive access)
      */
-    ExpectedVoid openReader(std::unique_ptr<Reader> reader);
+    ExpectedVoid openReader(std::unique_ptr<media::Reader> reader);
 
     /**
      * @brief Start or resume playback
@@ -285,19 +278,6 @@ class Player {
      * Thread Safety: Thread-safe (atomic loads with acquire/relaxed ordering)
      */
     std::chrono::duration<double> position() const noexcept;
-
-    /**
-     * @brief Get last error message
-     * @return String view of the last error message (empty if none)
-     *
-     * Returns the error message from the last failed operation.
-     * Cleared on successful open().
-     *
-     * Thread Safety: Thread-safe (atomic state + string access from control thread)
-     *
-     * @deprecated Use the returned Error instead.
-     */
-    [[deprecated("use the returned Error instead")]] std::string_view lastError() const noexcept;
 
   private:
     /** @brief Private default ctor; use create() factory. */

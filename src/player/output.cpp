@@ -8,8 +8,6 @@
 #include <caudio/utils/math.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/utils/ring.hpp>
-#include <cstddef>
-#include <cstdint>
 #include <expected>
 #include <memory>
 #include <span>
@@ -34,8 +32,8 @@ struct AudioOutput::Impl {
                              ma_uint32 frameCount);
 };
 
-DeviceList enumerateDevices() {
-    DeviceList list;
+caudio::types::DeviceList enumerateDevices() {
+    caudio::types::DeviceList list;
     ma_context context;
     ma_context_config ctxConfig = ma_context_config_init();
     ma_result res = ma_context_init(nullptr, 0, &ctxConfig, &context);
@@ -54,7 +52,7 @@ DeviceList enumerateDevices() {
         list.devices.reserve(playbackCount);
         for (ma_uint32 i = 0; i < playbackCount; ++i) {
             const auto& info = pPlaybackInfos[i];
-            DeviceInfo di;
+            caudio::types::DeviceInfo di;
             di.name = info.name;
             di.isDefault = info.isDefault;
             // Use simple index-based ID for user-friendly CLI

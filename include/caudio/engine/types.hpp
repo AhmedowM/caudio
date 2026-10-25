@@ -41,7 +41,6 @@
  */
 
 #include <caudio/fwd.hpp>
-#include <caudio/legacy_aliases.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstdint>
