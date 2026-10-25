@@ -20,11 +20,9 @@
 #include <CLI/CLI.hpp>
 #include <app/detail.hpp>
 #include <caudio/app/app.hpp>
-#include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/config.hpp>
-#include <caudio/utils/math.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
@@ -33,6 +31,7 @@
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/json.hpp>
 #include <caudio/utils/log.hpp>
+#include <caudio/utils/math.hpp>
 #include <caudio/utils/print.hpp>
 #include <caudio/utils/result.hpp>
 #include <caudio/version.hpp>

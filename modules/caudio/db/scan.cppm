@@ -14,5 +14,5 @@ using ::caudio::db::ScanMode;
 } // namespace caudio::db
 
 export namespace caudio::db::detail {
-using ::caudio::db::detail::hasAudioExt;
+using ::caudio::media::hasAudioExt;
 }

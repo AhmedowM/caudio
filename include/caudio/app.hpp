@@ -11,5 +11,4 @@
  */
 
 #include <caudio/app/app.hpp>
-#include <caudio/app/format.hpp>
 #include <caudio/app/paths.hpp>

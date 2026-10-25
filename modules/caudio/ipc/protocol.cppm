@@ -19,12 +19,3 @@ using ::caudio::ipc::serializeRequest;
 using ::caudio::ipc::toJson;
 using ::caudio::ipc::toJsonString;
 } // namespace caudio::ipc
-
-export namespace caudio::ipc::detail {
-using ::caudio::ipc::detail::errorFromJson;
-using ::caudio::ipc::detail::errorToJson;
-using ::caudio::ipc::detail::playlistFromJson;
-using ::caudio::ipc::detail::playlistToJson;
-using ::caudio::ipc::detail::resultCodeFromString;
-using ::caudio::ipc::detail::resultCodeToString;
-} // namespace caudio::ipc::detail

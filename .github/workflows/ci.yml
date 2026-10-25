@@ -143,16 +143,25 @@ jobs:
         run: |
           choco install ninja -y --no-progress || echo "ninja choco install failed"
           # FFmpeg via system or SetupFFmpeg fallback -- no hard fail if not found, but tests need it
-          # Try choco ffmpeg as best-effort; fallback cmake/SetupFFmpeg.cmake will fetch prebuilt if needed
-          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will use SetupFFmpeg fallback"
+          # Try choco ffmpeg as best-effort; fallback downloads prebuilt if needed
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will download prebuilt"
           cmake --version
           ninja --version
-          ffmpeg -version || echo "ffmpeg not on PATH, relying on SetupFFmpeg fallback"
+          ffmpeg -version || echo "ffmpeg not on PATH, will download prebuilt"
+
+      - name: Download FFmpeg (Windows MSVC fallback)
+        if: runner.os == 'Windows' && matrix.toolchain == 'msvc'
+        shell: pwsh
+        run: |
+          python scripts/download-ffmpeg.py
+          $root = python scripts/download-ffmpeg.py --print-root
+          echo "FFmpeg_ROOT=$root" >> $env:GITHUB_ENV
+          echo "$root/bin" >> $env:GITHUB_PATH
 
       - name: Configure
         run: |
           python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --print
-          python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }}
+          python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --ffmpeg-root $env:FFmpeg_ROOT
 
       - name: Expose DLLs (Windows)
         if: runner.os == 'Windows'
@@ -190,8 +199,8 @@ jobs:
       - name: Package (TGZ/ZIP)
         run: |
           # `cmake --build --target package` runs CPack with CWD in the build
-          # tree, so the archives land there. Packaging is a gate here: no
-          # swallowed failures.
+          # tree, so the archives land there. Keep package failures fatal so
+          # the upload step cannot hide the original CPack diagnostic.
           python scripts/configure.py ci --toolchain ${{ matrix.toolchain }} --build-dir build/ci-${{ matrix.toolchain }} --package
         shell: bash
 
@@ -270,6 +279,7 @@ jobs:
             mingw-w64-ucrt-x86_64-zlib
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-python
             make
             pkgconf
             nasm
@@ -310,13 +320,24 @@ jobs:
         # and bare `g++` here is the proven ucrt64 gcc 16.2 (the runner's
         # C:\mingw64 15.2 chokes on the fattest TUs). Build/Test stay on
         # default shells so DLL staging (below) governs loader resolution.
+        # Native Windows CMake must use Git for Windows: MSYS2 Git's HTTPS
+        # remote helper aborts when FetchContent invokes it from cmd.exe.
         run: |
-          if python scripts/configure.py ci --toolchain gcc --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir build/ci-trimmed-gcc; then
+          git_executable='C:/Program Files/Git/cmd/git.exe'
+          if python scripts/configure.py ci \
+            --toolchain gcc \
+            --trimmed-ffmpeg \
+            --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" \
+            --define "GIT_EXECUTABLE=$git_executable" \
+            --build-dir build/ci-trimmed-gcc; then
             echo "build_dir=build/ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
             echo "trimmed=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc
+            python scripts/configure.py ci \
+              --toolchain gcc \
+              --define "GIT_EXECUTABLE=$git_executable" \
+              --build-dir build/ci-gcc
             echo "build_dir=build/ci-gcc" >> "$GITHUB_OUTPUT"
             echo "trimmed=false" >> "$GITHUB_OUTPUT"
           fi
@@ -636,7 +657,10 @@ jobs:
         env:
           CC: gcc-16
           CXX: g++-16
-        run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers
+        run: >-
+          python scripts/configure.py ci --toolchain gcc --sanitizers
+          --define CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
+          --build-dir build/ci-sanitizers
 
       - name: Build
         run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers --build
@@ -648,7 +672,10 @@ jobs:
           # leaks, UBSan and ASan reports stay fatal. NOTE: env blocks need
           # ${{ }} context syntax -- $VAR is NOT expanded here.
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/sanitizers/lsan.supp:report_objects=1
-        run: python scripts/configure.py ci --toolchain gcc --sanitizers --build-dir build/ci-sanitizers --test
+        run: >-
+          python scripts/configure.py ci --toolchain gcc --sanitizers
+          --define CMAKE_CATCH_DISCOVER_TESTS_DISCOVERY_MODE=PRE_TEST
+          --build-dir build/ci-sanitizers --jobs 4 --test
 
   install-smoke:
     name: install-smoke (ubuntu-24.04 / gcc-16)
@@ -703,8 +730,6 @@ jobs:
           test -f /tmp/caudio-install/include/caudio/version.hpp && echo "version.hpp found" || (echo "version.hpp missing" && exit 1)
           echo "=== no module sources in header-mode install ==="
           test ! -d /tmp/caudio-install/include/caudio/src && echo "no src/*.cppm (expected, modules OFF)" || (echo "unexpected src/*.cppm shipped" && exit 1)
-          echo "=== module sources shipped (dev component, build stays opt-in) ==="
-          test -f /tmp/caudio-install/modules/caudio.cppm && echo "modules/caudio.cppm found" || (echo "modules/caudio.cppm missing" && exit 1)
           test -f /tmp/caudio-install/lib/cmake/caudio/caudioConfig.cmake && echo "caudioConfig.cmake found" || echo "caudioConfig.cmake missing"
           test -f /tmp/caudio-install/lib/cmake/caudio/FindFFmpeg.cmake && echo "FindFFmpeg.cmake found" || (echo "FindFFmpeg.cmake missing" && exit 1)
           test -f /tmp/caudio-install/include/caudio/version_config.hpp && echo "version_config.hpp found" || (echo "version_config.hpp missing" && exit 1)

@@ -190,7 +190,7 @@ std::expected<void, std::uint32_t> App::Impl::spawnDaemon(const caudio::config::
             linkBuf[n] = '\0';
             exePath = linkBuf;
         } else {
-            exePath = impl_->argv0_.empty() ? "/proc/self/exe" : impl_->argv0_;
+            exePath = argv0_.empty() ? "/proc/self/exe" : argv0_;
         }
     }
 #elif defined(__APPLE__)
@@ -203,8 +203,8 @@ std::expected<void, std::uint32_t> App::Impl::spawnDaemon(const caudio::config::
             std::vector<char> dyn(size);
             if (_NSGetExecutablePath(dyn.data(), &size) == 0) {
                 exePath = dyn.data();
-            } else if (!impl_->argv0_.empty()) {
-                exePath = impl_->argv0_;
+            } else if (!argv0_.empty()) {
+                exePath = argv0_;
             } else {
                 exePath = "./caudio";
             }
@@ -223,8 +223,8 @@ std::expected<void, std::uint32_t> App::Impl::spawnDaemon(const caudio::config::
             if (n > 0) {
                 linkBuf[n] = '\0';
                 exePath = linkBuf;
-            } else if (!impl_->argv0_.empty()) {
-                exePath = impl_->argv0_;
+            } else if (!argv0_.empty()) {
+                exePath = argv0_;
             } else {
                 exePath = "./caudio";
             }

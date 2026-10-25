@@ -17,7 +17,6 @@ set(CAUDIO_APP_SOURCES
 set(CAUDIO_APP_MODULE_SOURCES
   modules/caudio/app.cppm
   modules/caudio/app/core.cppm
-  modules/caudio/app/format.cppm
   modules/caudio/app/paths.cppm
 )
 caudio_add_component(app SOURCES ${CAUDIO_APP_SOURCES} MODULE_SOURCES ${CAUDIO_APP_MODULE_SOURCES} DEPS caudio::config caudio::client caudio::ipc caudio::media caudio::utils Threads::Threads)

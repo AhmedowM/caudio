@@ -175,7 +175,7 @@ function(caudio_apply_sanitizers tgt)
     target_compile_options(${tgt} PRIVATE /fsanitize=address)
     target_link_options(${tgt} PRIVATE /fsanitize=address)
   else()
-    target_compile_options(${tgt} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+    target_compile_options(${tgt} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -g -O0)
     target_link_options(${tgt} PRIVATE -fsanitize=address,undefined)
   endif()
 endfunction()
@@ -331,7 +331,7 @@ unset(_comp)
 if(CAUDIO_ENABLE_MODULES)
   add_library(caudio_umbrella STATIC)
   target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
-  target_include_directories(caudio_umbrella PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
+  target_include_directories(caudio_umbrella PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
   target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::config caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
@@ -365,11 +365,12 @@ install(FILES
   COMPONENT dev
 )
 
-# Bundle FFmpeg runtime DLLs/dylibs next to the executable.
-include(cmake/BundleFFmpeg.cmake)
-
 # Install targets, exports, docs, man page, license, systemd service.
 include(cmake/Install.cmake)
+
+# Bundle FFmpeg runtime DLLs/dylibs and run Apple fixups after the CLI install
+# rule so the executable exists in the staged install tree.
+include(cmake/BundleFFmpeg.cmake)
 
 # CPack packaging configuration.
 include(cmake/Packaging.cmake)
