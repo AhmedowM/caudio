@@ -14,6 +14,7 @@
 #include <app/format_internal.hpp>
 #include <app/paths_internal.hpp>
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/engine/types.hpp>
@@ -39,16 +40,16 @@ namespace caudio::app {
 
 AppResult App::queueList() {
     caudio::ipc::Command cmd{caudio::ipc::QueueQueues{}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 std::expected<TrackList, caudio::utils::Error> App::queueTracks(const std::string& order) {
     caudio::ipc::Command cmd{caudio::ipc::QueueList{order}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     int64_t curId = 0;
-    caudio::client::Client probe{config_.dbPath, config_.socketPath};
+    caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
     if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
         if (auto* st = std::get_if<caudio::ipc::Status>(&*ps))
             curId = st->track_id;
@@ -58,12 +59,12 @@ std::expected<TrackList, caudio::utils::Error> App::queueTracks(const std::strin
 
 AppResult App::queueSwitch(std::int64_t qid) {
     caudio::ipc::Command cmd{caudio::ipc::QueueSwitch{qid}};
-    return confirm(sendRaw(cmd), std::format("Switched to queue {}", qid));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Switched to queue {}", qid));
 }
 
 AppResult App::queueCreate(const std::string& name) {
     caudio::ipc::Command cmd{caudio::ipc::QueueCreate{name}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     if (auto* qc = std::get_if<caudio::ipc::QueueCreated>(&*res)) {
@@ -82,7 +83,7 @@ AppResult App::queueCreate(const std::string& name) {
 
 AppResult App::queueDelete(std::int64_t qid) {
     caudio::ipc::Command cmd{caudio::ipc::QueueDelete{qid}};
-    return confirm(sendRaw(cmd), std::format("Deleted queue {}", qid));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Deleted queue {}", qid));
 }
 
 BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::string& id, bool search,
@@ -102,14 +103,14 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
     if (!hasId && !search && !hasPlaylist && paths.empty())
         return BatchReport::fail("queue add: need a PATH, --id ID, or --search QUERY");
     if (hasPlaylist && replace) {
-        auto clr = sendRaw(caudio::ipc::Command{caudio::ipc::QueueClear{}});
+        auto clr = impl_->sendRaw(caudio::ipc::Command{caudio::ipc::QueueClear{}});
         if (!clr)
             return std::unexpected{clr.error()};
     }
     // Seed the known-id set so re-adds warn instead of duplicating.
     std::set<int64_t> seen;
     {
-        caudio::client::Client probe{config_.dbPath, config_.socketPath};
+        caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
         if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::QueueList{"added"}})) {
             if (auto* qt = std::get_if<caudio::ipc::QueueTracks>(&*ps)) {
                 for (auto& t : qt->tracks)
@@ -120,7 +121,7 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
     BatchReport rep;
     if (hasPlaylist) {
         caudio::ipc::Command tcmd{caudio::ipc::PlaylistTracks{playlist}};
-        auto tres = sendRaw(tcmd);
+        auto tres = impl_->sendRaw(tcmd);
         if (!tres)
             return std::unexpected{tres.error()};
         auto* pd = std::get_if<caudio::ipc::PlaylistData>(&*tres);
@@ -136,7 +137,7 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
         for (auto& t : pd->tracks) {
             caudio::ipc::Command cmd{
                 caudio::ipc::QueueAdd{.query = std::to_string(t.id), .search = false}};
-            auto res = sendRaw(cmd);
+            auto res = impl_->sendRaw(cmd);
             if (!res) {
                 detail::renderErrorInto(rep.err, res.error());
                 continue;
@@ -155,7 +156,7 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
     if (hasId || search) {
         caudio::ipc::Command cmd{
             caudio::ipc::QueueAdd{.query = hasId ? id : paths[0], .search = search}};
-        auto res = sendRaw(cmd);
+        auto res = impl_->sendRaw(cmd);
         if (!res)
             return std::unexpected{res.error()};
         rep.json = std::move(*res);
@@ -192,7 +193,7 @@ BatchResult App::queueAdd(const std::vector<std::string>& paths, const std::stri
     caudio::ipc::QueueTracks collected{};
     for (auto& f : files) {
         caudio::ipc::Command cmd{caudio::ipc::QueueAdd{.query = f, .search = false}};
-        auto res = sendRaw(cmd);
+        auto res = impl_->sendRaw(cmd);
         if (!res) {
             detail::renderErrorInto(rep.err, res.error());
             hardFail = true;
@@ -229,7 +230,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
     };
     std::vector<RemTarget> all;
     {
-        caudio::client::Client probe{config_.dbPath, config_.socketPath};
+        caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
         auto ps = probe.send(caudio::ipc::Command{caudio::ipc::QueueList{"added"}});
         if (!ps)
             return std::unexpected{ps.error()};
@@ -332,7 +333,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
     std::vector<caudio::types::Track> removedTracks;
     for (auto& t : targets) {
         caudio::ipc::Command cmd{caudio::ipc::QueueRemove{std::to_string(t.pos)}};
-        auto res = sendRaw(cmd);
+        auto res = impl_->sendRaw(cmd);
         if (!res) {
             detail::renderErrorInto(rep.err, res.error());
             hardFail = true;
@@ -350,7 +351,7 @@ BatchResult App::queueRemove(const std::string& id, const std::string& pos,
 
 AppResult App::queueMove(std::size_t from, std::size_t to) {
     caudio::ipc::Command cmd{caudio::ipc::QueueMove{.from = from, .to = to}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     std::size_t n = 0;
@@ -364,7 +365,7 @@ AppResult App::queueMove(std::size_t from, std::size_t to) {
 
 AppResult App::queueClear() {
     caudio::ipc::Command cmd{caudio::ipc::QueueClear{}};
-    return confirm(sendRaw(cmd), "Queue cleared");
+    return impl_->confirm(impl_->sendRaw(cmd), "Queue cleared");
 }
 
 AppResult App::queueShuffle(const std::string& mode) {
@@ -376,7 +377,7 @@ AppResult App::queueShuffle(const std::string& mode) {
     else if (!mode.empty())
         return Outcome::fail(std::format("shuffle: invalid mode '{}' (expected on|off)", mode));
     caudio::ipc::Command cmd{caudio::ipc::QueueShuffle{on}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     // Report the resulting state (the daemon answers Status).
@@ -410,7 +411,7 @@ AppResult App::queueRepeat(const std::string& mode) {
         return Outcome::fail(std::format("repeat: invalid mode '{}' (expected off|one|all)", mode));
     else {
         // Bare repeat cycles off -> all -> one -> off.
-        caudio::client::Client probe{config_.dbPath, config_.socketPath};
+        caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
         if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
             if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
                 if (st->repeat == RM::Off)
@@ -425,7 +426,7 @@ AppResult App::queueRepeat(const std::string& mode) {
             return Outcome::fail("repeat: could not read current mode");
     }
     caudio::ipc::Command cmd{caudio::ipc::QueueRepeat{m}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     RM finalMode = *m;
@@ -433,8 +434,8 @@ AppResult App::queueRepeat(const std::string& mode) {
         finalMode = st->repeat;
     return Outcome{.result = std::move(*res),
                    .line = std::format("Repeat: {}", finalMode == RM::All   ? "all"
-                                                     : finalMode == RM::One ? "one"
-                                                                            : "off"),
+                                                       : finalMode == RM::One ? "one"
+                                                                                : "off"),
                    .toStderr = false,
                    .failed = false};
 }

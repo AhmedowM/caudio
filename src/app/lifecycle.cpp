@@ -39,6 +39,7 @@
 #endif
 
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
@@ -91,23 +92,29 @@ bool pidFileAlive(const std::filesystem::path& pidPath) {
 }
 } // namespace
 
-App::App(caudio::config::Config cfg) : config_(std::move(cfg)) {}
+App::App(caudio::config::Config cfg) : impl_(std::make_unique<Impl>()) {
+    impl_->config_ = std::move(cfg);
+}
 
 App::~App() = default;
 
 void App::setConfig(caudio::config::Config cfg) {
-    config_ = std::move(cfg);
+    impl_->config_ = std::move(cfg);
 }
 
 void App::setArgv0(std::string argv0) {
-    argv0_ = std::move(argv0);
+    impl_->argv0_ = std::move(argv0);
 }
 
 void App::setDaemonHost(std::function<AppResult(bool foreground)> host) {
-    daemonHost_ = std::move(host);
+    impl_->daemonHost_ = std::move(host);
 }
 
-std::filesystem::path App::pidPathForConfig() const {
+void App::setPreviewHost(std::function<AppResult(const std::string& file)> host) {
+    impl_->previewHost_ = std::move(host);
+}
+
+std::filesystem::path App::Impl::pidPathForConfig() const {
     // Canonical pid path -- single source via caudio.config (hash of dbPath + XDG/LOCALAPPDATA)
     auto r = caudio::config::pidPathFor(config_.dbPath);
     if (r)
@@ -119,7 +126,7 @@ std::filesystem::path App::pidPathForConfig() const {
     return pp / "caudio.pid";
 }
 
-std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config& cfg) {
+std::expected<void, std::uint32_t> App::Impl::spawnDaemon(const caudio::config::Config& cfg) {
 #ifdef _WIN32
     wchar_t exeBuf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, exeBuf, MAX_PATH);
@@ -183,7 +190,7 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
             linkBuf[n] = '\0';
             exePath = linkBuf;
         } else {
-            exePath = argv0_.empty() ? "/proc/self/exe" : argv0_;
+            exePath = impl_->argv0_.empty() ? "/proc/self/exe" : impl_->argv0_;
         }
     }
 #elif defined(__APPLE__)
@@ -196,8 +203,8 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
             std::vector<char> dyn(size);
             if (_NSGetExecutablePath(dyn.data(), &size) == 0) {
                 exePath = dyn.data();
-            } else if (!argv0_.empty()) {
-                exePath = argv0_;
+            } else if (!impl_->argv0_.empty()) {
+                exePath = impl_->argv0_;
             } else {
                 exePath = "./caudio";
             }
@@ -216,13 +223,12 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
             if (n > 0) {
                 linkBuf[n] = '\0';
                 exePath = linkBuf;
-            } else if (!argv0_.empty()) {
-                exePath = argv0_;
+            } else if (!impl_->argv0_.empty()) {
+                exePath = impl_->argv0_;
             } else {
                 exePath = "./caudio";
             }
         }
-    }
 #endif
     if (!cfg.configPath.empty()) {
         std::string cfgStr = cfg.configPath.generic_string();
@@ -235,7 +241,7 @@ std::expected<void, std::uint32_t> App::spawnDaemon(const caudio::config::Config
 #endif
 }
 
-AppResult App::startDaemon(bool foreground) {
+AppResult App::Impl::startDaemon(bool foreground) {
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     if (client.probe()) {
         return Outcome{std::nullopt,
@@ -249,7 +255,7 @@ AppResult App::startDaemon(bool foreground) {
     // file left by a killed daemon is cleared immediately instead of
     // burning the full wait.
     {
-        auto pidPath = pidPathForConfig();
+    auto pidPath = pidPathForConfig();
         for (int i = 0; i < 20; ++i) {
             bool c = client.probe();
             std::error_code ec;
@@ -317,8 +323,12 @@ AppResult App::startDaemon(bool foreground) {
     }
 }
 
+AppResult App::startDaemon(bool foreground) {
+    return impl_->startDaemon(foreground);
+}
+
 AppResult App::shutdownDaemon() {
-    caudio::client::Client client{config_.dbPath, config_.socketPath};
+    caudio::client::Client client{impl_->config_.dbPath, impl_->config_.socketPath};
     auto cmd = caudio::ipc::Command{caudio::ipc::Shutdown{}};
     auto res = client.send(cmd, std::chrono::milliseconds{2000});
     if (!res) {
@@ -329,7 +339,7 @@ AppResult App::shutdownDaemon() {
         // even if send failed, attempt to poll pid file
     }
     // poll pid file and socket until daemon exits
-    auto pidPath = pidPathForConfig();
+    auto pidPath = impl_->pidPathForConfig();
     for (int i = 0; i < 20; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::error_code ec;
@@ -346,13 +356,13 @@ AppResult App::shutdownDaemon() {
     bool conn = client.probe();
     if (conn) {
         return Outcome::fail(
-            std::format("shutdown: daemon still running at {}", config_.socketPath));
+            std::format("shutdown: daemon still running at {}", impl_->config_.socketPath));
     }
     return Outcome{std::nullopt, "daemon stopped", false, false};
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-App::sendRaw(const caudio::ipc::Command& cmd, std::chrono::milliseconds timeout) {
+App::Impl::sendRaw(const caudio::ipc::Command& cmd, std::chrono::milliseconds timeout) {
     caudio::client::Client client{config_.dbPath, config_.socketPath};
     auto res = client.send(cmd, timeout);
     if (!res)
@@ -363,7 +373,7 @@ App::sendRaw(const caudio::ipc::Command& cmd, std::chrono::milliseconds timeout)
 }
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
-App::sendPlay(const caudio::ipc::Command& cmd) {
+App::Impl::sendPlay(const caudio::ipc::Command& cmd) {
     auto res = sendRaw(cmd);
     if (!res) {
         const auto& e = res.error();
@@ -393,7 +403,7 @@ BatchResult BatchReport::fail(std::string message) {
     return BatchReport{std::nullopt, "", std::move(message), 1};
 }
 
-AppResult App::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
+AppResult App::Impl::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
                        std::optional<std::string> line) {
     auto owned = std::move(res);
     if (!owned)

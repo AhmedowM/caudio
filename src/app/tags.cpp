@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
@@ -26,12 +27,12 @@ bool isTagField(std::string_view field) {
 
 AppResult App::tagEdit(std::int64_t id, const std::string& field, const std::string& value) {
     caudio::ipc::Command cmd{caudio::ipc::TagEdit{id, field, value}};
-    return confirm(sendRaw(cmd), std::format("Updated {} for track {}", field, id));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Updated {} for track {}", field, id));
 }
 
 AppResult App::tagGet(std::int64_t id) {
     caudio::ipc::Command cmd{caudio::ipc::TagGet{id}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 std::expected<TagValue, caudio::utils::Error> App::tagValue(std::int64_t id,
@@ -41,7 +42,7 @@ std::expected<TagValue, caudio::utils::Error> App::tagValue(std::int64_t id,
                                                         "unknown tag field '" + field + "'")};
     }
     caudio::ipc::Command cmd{caudio::ipc::TagGet{id}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     auto* st = std::get_if<caudio::ipc::SingleTrack>(&*res);

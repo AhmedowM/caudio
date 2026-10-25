@@ -8,6 +8,7 @@
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>
@@ -25,12 +26,12 @@ namespace caudio::app {
 
 AppResult App::libraryScan(std::optional<std::string> path, bool fullHash) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryScan{path, fullHash}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 AppResult App::librarySearch(const std::string& query, int limit) {
     caudio::ipc::Command cmd{caudio::ipc::LibrarySearch{query, limit}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& queues,
@@ -42,7 +43,7 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
     caudio::ipc::Command cmd{caudio::ipc::LibraryStats{}};
     if (mostPlayed >= 0)
         cmd = caudio::ipc::Command{caudio::ipc::LibraryStats{mostPlayed}};
-    auto statsRes = sendRaw(cmd);
+    auto statsRes = impl_->sendRaw(cmd);
     if (!statsRes)
         return std::unexpected{statsRes.error()};
     table = std::move(*statsRes);
@@ -52,7 +53,7 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
         rep.out += '\n';
     if (!queues.empty()) {
         caudio::ipc::Command queueCmd{caudio::ipc::QueueQueues{}};
-        auto res = sendRaw(queueCmd);
+        auto res = impl_->sendRaw(queueCmd);
         if (!res)
             return std::unexpected{res.error()};
         auto* qs = std::get_if<caudio::ipc::Queues>(&*res);
@@ -95,7 +96,7 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
     }
     for (auto pid : playlists) {
         caudio::ipc::Command listCmd{caudio::ipc::PlaylistTracks{pid}};
-        auto res = sendRaw(listCmd);
+        auto res = impl_->sendRaw(listCmd);
         if (!res)
             return std::unexpected{res.error()};
         auto* pd = std::get_if<caudio::ipc::PlaylistData>(&*res);
@@ -106,7 +107,7 @@ BatchResult App::libraryStats(int mostPlayed, const std::vector<std::string>& qu
         std::string name;
         {
             caudio::ipc::Command lcmd{caudio::ipc::PlaylistList{}};
-            auto lres = sendRaw(lcmd);
+            auto lres = impl_->sendRaw(lcmd);
             if (lres) {
                 if (auto* pl = std::get_if<caudio::ipc::Playlists>(&*lres)) {
                     for (auto& p : pl->playlists) {
@@ -138,12 +139,12 @@ AppResult App::libraryList(const std::string& query, int limit, int offset,
         offset, artist.empty() ? std::optional<std::string>{} : std::optional<std::string>{artist},
         album.empty() ? std::optional<std::string>{} : std::optional<std::string>{album},
         genre.empty() ? std::optional<std::string>{} : std::optional<std::string>{genre}}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 AppResult App::libraryAdd(const std::string& path, bool recursive) {
     caudio::ipc::Command cmd{caudio::ipc::LibraryAdd{path, recursive}};
-    return confirm(sendRaw(cmd), std::format("Added {} to library", path));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Added {} to library", path));
 }
 
 AppResult App::libraryRemove(const std::string& query) {
@@ -165,7 +166,7 @@ AppResult App::libraryRemove(const std::string& query) {
         }
         if (id != 0) {
             caudio::ipc::Command cmd{caudio::ipc::TagGet{id}};
-            if (auto res = sendRaw(cmd)) {
+            if (auto res = impl_->sendRaw(cmd)) {
                 if (auto* st = std::get_if<caudio::ipc::SingleTrack>(&*res))
                     label = caudio::app::addedLabel(st->track);
             }
@@ -177,7 +178,7 @@ AppResult App::libraryRemove(const std::string& query) {
             label = fn;
     }
     caudio::ipc::Command cmd{caudio::ipc::LibraryRemove{query}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     std::string line = !label.empty() ? std::format("Removed from library {}", label)

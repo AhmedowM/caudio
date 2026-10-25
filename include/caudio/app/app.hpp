@@ -513,67 +513,8 @@ class App {
     AppResult previewFile(const std::string& file);
 
   private:
-    /**
-     * @brief Sends a command and normalizes server-side errors.
-     * @ingroup caudio_app
-     * @param cmd IPC command to send.
-     * @param timeout Per-attempt timeout (default 2 s).
-     * @return Server result, or the transport/server error.
-     * @details Unwraps `Error` results into unexpected, so callers handle
-     * transport and application errors uniformly.
-     */
-    std::expected<caudio::ipc::Result, caudio::utils::Error>
-    sendRaw(const caudio::ipc::Command& cmd,
-            std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});
-
-    /**
-     * @brief Pairs a result with its success line, passing errors through.
-     * @ingroup caudio_app
-     * @param res Daemon outcome to wrap.
-     * @param line Human success line; nullopt means bare-render the result.
-     * @return Outcome data for the frontend; errors surface unchanged.
-     */
-    AppResult confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
-                      std::optional<std::string> line = std::nullopt);
-
-    /**
-     * @brief Spawns a detached daemon child for the given config.
-     * @ingroup caudio_app
-     * @param cfg Config selecting db/socket paths for the child.
-     * @return Success, or the OS error code when spawning failed.
-     * @details Windows uses DETACHED_PROCESS; POSIX double-detaches via
-     * fork/setsid (single fork + wait-free, like the historical behavior).
-     * The child's readiness is NOT waited on here -- see startDaemon().
-     */
-    std::expected<void, std::uint32_t> spawnDaemon(const caudio::config::Config& cfg);
-
-    /**
-     * @brief Derives the pid-file path for the bound config.
-     * @ingroup caudio_app
-     * @return Canonical pid path, or a db-adjacent fallback.
-     */
-    std::filesystem::path pidPathForConfig() const;
-
-    /**
-     * @brief Sends a play-like command, autostarting a down daemon.
-     * @ingroup caudio_app
-     * @param cmd IPC command to send.
-     */
-    std::expected<caudio::ipc::Result, caudio::utils::Error>
-    sendPlay(const caudio::ipc::Command& cmd);
-
-    /**
-     * @brief Human track label for the last transport result.
-     * @ingroup caudio_app
-     * @return Track label, or "unknown track" for non-status results.
-     */
-    std::string transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res);
-
-    caudio::config::Config config_; ///< Bound config (db/socket/log paths).
-    std::string argv0_;             ///< Executable path for POSIX re-spawn.
-    std::function<AppResult(bool foreground)> daemonHost_{}; ///< Injected foreground daemon host.
-    std::function<AppResult(const std::string& file)>
-        previewHost_{}; ///< Injected local preview host.
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 } // namespace caudio::app

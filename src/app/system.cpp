@@ -6,6 +6,7 @@
 
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/ipc/command.hpp>
@@ -20,25 +21,25 @@
 namespace caudio::app {
 
 AppResult App::status() {
-    return confirm(sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}}));
+    return impl_->confirm(impl_->sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}}));
 }
 
 AppResult App::info() {
-    return confirm(sendRaw(caudio::ipc::Command{caudio::ipc::Info{}}));
+    return impl_->confirm(impl_->sendRaw(caudio::ipc::Command{caudio::ipc::Info{}}));
 }
 
 AppResult App::setVolume(const caudio::ipc::VolumeSet& volume) {
-    return confirm(sendRaw(caudio::ipc::Command{volume}));
+    return impl_->confirm(impl_->sendRaw(caudio::ipc::Command{volume}));
 }
 
 AppResult App::historyList(int limit) {
     caudio::ipc::Command cmd{caudio::ipc::HistoryList{limit}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 AppResult App::historyClear() {
     caudio::ipc::Command cmd{caudio::ipc::HistoryClear{}};
-    return confirm(sendRaw(cmd), "History cleared");
+    return impl_->confirm(impl_->sendRaw(cmd), "History cleared");
 }
 
 AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
@@ -47,7 +48,7 @@ AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
     if (position.has_value()) {
         pos = *position;
     } else {
-        caudio::client::Client probe{config_.dbPath, config_.socketPath};
+        caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
         auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
         if (!ps)
             return std::unexpected{ps.error()};
@@ -64,7 +65,7 @@ AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
         pos = 0.0;
     int64_t posMs = (int64_t)std::llround(pos * 1000.0);
     caudio::ipc::Command cmd{caudio::ipc::BookmarkAdd{posMs, std::move(note), track}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     std::string line = std::format("Bookmark added at {}", caudio::utils::formatClock(pos));
@@ -74,17 +75,17 @@ AppResult App::bookmarkAdd(std::optional<double> position, std::string note,
 
 AppResult App::bookmarkList(std::optional<int64_t> track) {
     caudio::ipc::Command cmd{caudio::ipc::BookmarkList{track}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 AppResult App::bookmarkRemove(int64_t id) {
     caudio::ipc::Command cmd{caudio::ipc::BookmarkRemove{id}};
-    return confirm(sendRaw(cmd), std::format("Bookmark {} removed", id));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Bookmark {} removed", id));
 }
 
 AppResult App::bookmarkGoto(int64_t id) {
     caudio::ipc::Command cmd{caudio::ipc::BookmarkGoto{id}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
@@ -99,19 +100,19 @@ AppResult App::bookmarkGoto(int64_t id) {
 
 AppResult App::deviceList() {
     caudio::ipc::Command cmd{caudio::ipc::DeviceList{}};
-    return confirm(sendRaw(cmd));
+    return impl_->confirm(impl_->sendRaw(cmd));
 }
 
 AppResult App::deviceSet(const std::string& id) {
     caudio::ipc::Command cmd{caudio::ipc::DeviceSet{id}};
-    return confirm(sendRaw(cmd), std::format("Default device: {}", id));
+    return impl_->confirm(impl_->sendRaw(cmd), std::format("Default device: {}", id));
 }
 
 AppResult App::deviceTest(std::optional<std::string> id) {
     caudio::ipc::Command cmd{caudio::ipc::DeviceTest{id}};
     std::string line =
         id.has_value() ? std::format("Device available: {}", *id) : "Default device available";
-    return confirm(sendRaw(cmd), std::move(line));
+    return impl_->confirm(impl_->sendRaw(cmd), std::move(line));
 }
 
 } // namespace caudio::app

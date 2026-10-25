@@ -9,6 +9,7 @@
 
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
+#include <app/app_impl.hpp>
 #include <caudio/app/format.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/engine/types.hpp>
@@ -27,7 +28,7 @@
 
 namespace caudio::app {
 
-std::string App::transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res) {
+std::string App::Impl::transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res) {
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
         return caudio::app::trackWho(*st);
     return std::string{"unknown track"};
@@ -41,7 +42,7 @@ AppResult App::play() {
     double priorPos = 0;
     int64_t priorTrack = 0;
     {
-        caudio::client::Client probe{config_.dbPath, config_.socketPath};
+        caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
         if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
             if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
                 wasPaused = (st->state == caudio::types::PlaybackState::Paused);
@@ -52,7 +53,7 @@ AppResult App::play() {
         }
     }
     caudio::ipc::Command cmd{caudio::ipc::Play{}};
-    auto res = sendPlay(cmd);
+    auto res = impl_->sendPlay(cmd);
     if (!res)
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
@@ -61,15 +62,15 @@ AppResult App::play() {
         // (a crashed session may have advanced the cursor).
         bool restored = false;
         if (wasStopped && priorTrack != 0 && priorPos > 0.0 && st->track_id == priorTrack) {
-            if (auto seekRes = sendRaw(caudio::ipc::Command{caudio::ipc::Seek{priorPos}})) {
-                if (auto fresh = sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+            if (auto seekRes = impl_->sendRaw(caudio::ipc::Command{caudio::ipc::Seek{priorPos}})) {
+                if (auto fresh = impl_->sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
                     if (std::holds_alternative<caudio::ipc::Status>(*fresh))
                         res = std::move(fresh);
                 }
                 restored = true;
             }
         }
-        std::string who = transportWho(res);
+        std::string who = impl_->transportWho(res);
         std::string line =
             wasPaused  ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
             : restored ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
@@ -83,7 +84,7 @@ AppResult App::play() {
 
 AppResult App::playFiles(const std::vector<std::string>& files, bool save) {
     caudio::ipc::Command cmd{caudio::ipc::PlayFiles{files, save}};
-    auto res = sendPlay(cmd);
+    auto res = impl_->sendPlay(cmd);
     if (!res)
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
@@ -99,7 +100,7 @@ AppResult App::playFiles(const std::vector<std::string>& files, bool save) {
 
 AppResult App::pause() {
     caudio::ipc::Command cmd{caudio::ipc::Pause{}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res) {
         const auto& e = res.error();
         if (e.code == caudio::utils::StatusCode::State && e.message == "not playing")
@@ -107,7 +108,7 @@ AppResult App::pause() {
         return std::unexpected{e};
     }
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
-        std::string who = transportWho(res);
+        std::string who = impl_->transportWho(res);
         return Outcome{.result = std::move(*res),
                        .line = std::format("Paused {} at {}", who, caudio::utils::formatClock(st->pos)),
                        .toStderr = false,
@@ -119,14 +120,14 @@ AppResult App::pause() {
 
 AppResult App::resume() {
     caudio::ipc::Command cmd{caudio::ipc::Resume{}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res) {
         const auto& e = res.error();
         if (e.code == caudio::utils::StatusCode::State && e.message == "not paused") {
             // Forgiving resume: playing -> warn; stopped -> play from cursor.
             bool playing = false;
             bool probed = false;
-            caudio::client::Client probe{config_.dbPath, config_.socketPath};
+            caudio::client::Client probe{impl_->config_.dbPath, impl_->config_.socketPath};
             if (auto ps = probe.send(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
                 if (auto* st = std::get_if<caudio::ipc::Status>(&*ps)) {
                     probed = true;
@@ -157,11 +158,11 @@ AppResult App::resume() {
 
 AppResult App::restart() {
     caudio::ipc::Command cmd{caudio::ipc::Restart{}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     // Hoisted: read before Outcome moves *res (see resume()).
-    std::string who = transportWho(res);
+    std::string who = impl_->transportWho(res);
     return Outcome{.result = std::move(*res),
                    .line = std::format("Restarting {}", who),
                    .toStderr = false,
@@ -170,17 +171,17 @@ AppResult App::restart() {
 
 AppResult App::stop() {
     caudio::ipc::Command cmd{caudio::ipc::Stop{}};
-    return confirm(sendRaw(cmd), "Stopped");
+    return impl_->confirm(impl_->sendRaw(cmd), "Stopped");
 }
 
 AppResult App::next() {
     caudio::ipc::Command cmd{caudio::ipc::Next{}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res && res.error().code == caudio::utils::StatusCode::Busy) {
         // Transient queue-lock contention (racing gapless advance or a
         // sibling command): retry once after a beat before surfacing it.
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        res = sendRaw(cmd);
+        res = impl_->sendRaw(cmd);
     }
     if (!res) {
         const auto& e = res.error();
@@ -189,7 +190,7 @@ AppResult App::next() {
         return std::unexpected{e};
     }
     // Hoisted: read before Outcome moves *res (see resume()).
-    std::string who = transportWho(res);
+    std::string who = impl_->transportWho(res);
     return Outcome{.result = std::move(*res),
                    .line = std::format("Playing {}", who),
                    .toStderr = false,
@@ -198,11 +199,11 @@ AppResult App::next() {
 
 AppResult App::prev() {
     caudio::ipc::Command cmd{caudio::ipc::Prev{}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res && res.error().code == caudio::utils::StatusCode::Busy) {
         // Same transient contention as next(): retry once (see above).
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        res = sendRaw(cmd);
+        res = impl_->sendRaw(cmd);
     }
     if (!res) {
         const auto& e = res.error();
@@ -213,7 +214,7 @@ AppResult App::prev() {
         return std::unexpected{e};
     }
     // Hoisted: read before Outcome moves *res (see resume()).
-    std::string who = transportWho(res);
+    std::string who = impl_->transportWho(res);
     return Outcome{.result = std::move(*res),
                    .line = std::format("Playing {}", who),
                    .toStderr = false,
@@ -222,7 +223,7 @@ AppResult App::prev() {
 
 AppResult App::seek(double target, bool isRelative) {
     if (isRelative) {
-        caudio::client::Client client{config_.dbPath, config_.socketPath};
+        caudio::client::Client client{impl_->config_.dbPath, impl_->config_.socketPath};
         auto sres = client.send(caudio::ipc::Command{caudio::ipc::StatusReq{}});
         double pos = 0;
         bool hasPos = false;
@@ -242,7 +243,7 @@ AppResult App::seek(double target, bool isRelative) {
         }
     }
     caudio::ipc::Command cmd{caudio::ipc::Seek{target}};
-    auto res = sendRaw(cmd);
+    auto res = impl_->sendRaw(cmd);
     if (!res)
         return std::unexpected{res.error()};
     return Outcome{.result = std::move(*res),
@@ -252,13 +253,9 @@ AppResult App::seek(double target, bool isRelative) {
                    .quiet = true};
 }
 
-void App::setPreviewHost(std::function<AppResult(const std::string& file)> host) {
-    previewHost_ = std::move(host);
-}
-
 AppResult App::previewFile(const std::string& file) {
-    if (previewHost_) {
-        return previewHost_(file);
+    if (impl_->previewHost_) {
+        return impl_->previewHost_(file);
     }
     return Outcome::fail("preview host not configured");
 }
