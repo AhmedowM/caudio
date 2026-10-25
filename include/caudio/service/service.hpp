@@ -122,11 +122,6 @@ class Service final {
      */
     caudio::ipc::ShmStatusWriter* shmWriter() noexcept;
 
-    /** @brief Deprecated spelling for shmWriter(). @ingroup caudio_service */
-    caudio::ipc::ShmStatusWriter* shmHandle() noexcept {
-        return shmWriter();
-    }
-
     /**
      * @brief Private constructor used by create().
      */

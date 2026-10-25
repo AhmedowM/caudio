@@ -1,6 +1,5 @@
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
-#include <ipc/protocol_internal.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/types/format.hpp>
 #include <caudio/types/parse.hpp>
@@ -15,8 +14,8 @@
 #include <exception>
 #include <expected>
 #include <format>
+#include <ipc/protocol_internal.hpp>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -949,7 +948,7 @@ Json toJson(const Result& r) {
                 j["play_count"] = v.play_count;
                 j["last_played"] = v.last_played;
                 return j;
-            } else if constexpr (std::is_same_v<T, HistoryEntry>) {
+            } else if constexpr (std::is_same_v<T, types::HistoryEntry>) {
                 Json j;
                 j["type"] = "HistoryEntry";
                 j["id"] = v.id;
@@ -1355,7 +1354,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     if (!jeExp)
                         return std::unexpected{jeExp.error()};
                     const Json je = std::move(*jeExp);
-                    HistoryEntry e{};
+                    types::HistoryEntry e{};
                     if (je.contains("id") && je["id"].isNumber())
                         e.id = je["id"].get<int64_t>();
                     if (je.contains("track_id") && je["track_id"].isNumber())
@@ -1392,7 +1391,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     if (!jbExp)
                         return std::unexpected{jbExp.error()};
                     const Json jb = std::move(*jbExp);
-                    BookmarkEntry e{};
+                    types::Bookmark e{};
                     if (jb.contains("id") && jb["id"].isNumber())
                         e.id = jb["id"].get<int64_t>();
                     if (jb.contains("track_id") && jb["track_id"].isNumber())
@@ -1417,7 +1416,7 @@ std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j) {
                     if (!jdExp)
                         return std::unexpected{jdExp.error()};
                     const Json jd = std::move(*jdExp);
-                    DeviceInfo di{};
+                    types::DeviceInfo di{};
                     if (jd.contains("id") && jd["id"].isString())
                         di.id = jd["id"].get<std::string>();
                     if (jd.contains("name") && jd["name"].isString())

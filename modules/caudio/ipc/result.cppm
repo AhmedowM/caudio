@@ -4,17 +4,14 @@ module;
 export module caudio.ipc:result;
 
 export namespace caudio::ipc {
-using ::caudio::ipc::BookmarkEntry;
 using ::caudio::ipc::Bookmarks;
 using ::caudio::ipc::CliError;
 using ::caudio::ipc::ConfigValue;
 using ::caudio::ipc::ConfigValues;
-using ::caudio::ipc::DeviceInfo;
 using ::caudio::ipc::Devices;
 using ::caudio::ipc::Empty;
 using ::caudio::ipc::ExpectedReply;
 using ::caudio::ipc::History;
-using ::caudio::ipc::HistoryEntry;
 using ::caudio::ipc::PlaylistCreated;
 using ::caudio::ipc::PlaylistData;
 using ::caudio::ipc::PlaylistImportReport;

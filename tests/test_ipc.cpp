@@ -39,12 +39,6 @@ static_assert(allCommandAlternatives(static_cast<Command*>(nullptr)));
 static_assert(CommandType<const Play&>);
 static_assert(!CommandAlternative<const Play>);
 
-static_assert(std::is_same_v<caudio::ipc::DeviceInfo, caudio::types::DeviceInfo>); // legacy-shim-ok
-static_assert(
-    std::is_same_v<caudio::ipc::HistoryEntry, caudio::types::HistoryEntry>); // legacy-shim-ok
-static_assert(
-    std::is_same_v<caudio::ipc::BookmarkEntry, caudio::types::Bookmark>); // legacy-shim-ok
-
 } // namespace
 
 TEST_CASE("daemon start/stop", "[ipc][cli]") {
@@ -106,7 +100,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
 }
 
 TEST_CASE("bookmark protocol roundtrip", "[ipc]") {
-    Command add{BookmarkAdd{83000, "note", 42}};
+    Command add{BookmarkAdd{.position_ms = 83000, .note = "note", .track_id = 42}};
     auto addJson = toJson(add);
     auto addBack = commandFromJson(addJson);
     REQUIRE(addBack.has_value());
@@ -125,7 +119,8 @@ TEST_CASE("bookmark protocol roundtrip", "[ipc]") {
     CHECK(!listVal->track_id.has_value());
 
     Result res{Bookmarks{{
-        BookmarkEntry{1, 42, 83000, "note", 1700},
+        caudio::types::Bookmark{
+            .id = 1, .track_id = 42, .position_ms = 83000, .note = "note", .created = 1700},
     }}};
     auto resJson = toJson(res);
     auto resBack = resultFromJson(resJson);
@@ -142,8 +137,17 @@ TEST_CASE("bookmark protocol roundtrip", "[ipc]") {
 
 TEST_CASE("history protocol roundtrip", "[ipc]") {
     Result res{History{{
-        HistoryEntry{1, 42, 1700000000000, 1700000000240, 240000, 100.0, 1, "Song", "Artist",
-                     "/music/song.mp3", 240.0},
+        caudio::types::HistoryEntry{.id = 1,
+                                    .track_id = 42,
+                                    .started_at = 1700000000000,
+                                    .completed_at = 1700000000240,
+                                    .position_ms = 240000,
+                                    .completion_pct = 100.0,
+                                    .queue_id = 1,
+                                    .title = "Song",
+                                    .artist = "Artist",
+                                    .path = "/music/song.mp3",
+                                    .duration = 240.0},
     }}};
     auto resJson = toJson(res);
     auto resBack = resultFromJson(resJson);
@@ -167,8 +171,8 @@ TEST_CASE("history protocol roundtrip", "[ipc]") {
 
 TEST_CASE("devices protocol roundtrip", "[ipc]") {
     Result res{Devices{{
-        DeviceInfo{"hw:0,0", "Built-in Audio", true},
-        DeviceInfo{"hw:1,0", "USB Headset", false},
+        caudio::types::DeviceInfo{.id = "hw:0,0", .name = "Built-in Audio", .isDefault = true},
+        caudio::types::DeviceInfo{.id = "hw:1,0", .name = "USB Headset", .isDefault = false},
     }}};
     auto resJson = toJson(res);
     REQUIRE(resJson["type"].snapshot().get<std::string>() == "Devices");
@@ -190,8 +194,13 @@ TEST_CASE("library stats detailed protocol roundtrip", "[ipc]") {
     track.path = "/music/song.mp3";
     track.title = "Song";
     track.duration = 240.0;
-    Result res{caudio::types::LibraryStats{100, 5, 20, 36000000, 7200000,
-                                           std::vector<caudio::types::Track>{track}}};
+    Result res{
+        caudio::types::LibraryStats{.tracks = 100,
+                                    .queues = 5,
+                                    .playlists = 20,
+                                    .total_duration_ms = 36000000,
+                                    .total_play_time_ms = 7200000,
+                                    .most_played = std::vector<caudio::types::Track>{track}}};
     auto resJson = toJson(res);
     REQUIRE(resJson["type"].snapshot().get<std::string>() == "LibraryStats");
     auto resBack = resultFromJson(resJson);
@@ -210,7 +219,12 @@ TEST_CASE("library stats detailed protocol roundtrip", "[ipc]") {
 }
 
 TEST_CASE("library stats summary protocol roundtrip", "[ipc]") {
-    Result res{caudio::types::LibraryStats{100, 5, 20, 36000000, 7200000, std::nullopt}};
+    Result res{caudio::types::LibraryStats{.tracks = 100,
+                                           .queues = 5,
+                                           .playlists = 20,
+                                           .total_duration_ms = 36000000,
+                                           .total_play_time_ms = 7200000,
+                                           .most_played = std::nullopt}};
     auto resJson = toJson(res);
     REQUIRE(resJson["type"].snapshot().get<std::string>() == "LibraryStats");
     CHECK_FALSE(resJson.contains("most_played"));

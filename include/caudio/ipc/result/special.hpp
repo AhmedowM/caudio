@@ -22,7 +22,7 @@ namespace caudio::ipc {
 using Empty = std::monostate;
 
 /**
- * @brief Error type alias for CLI errors.
+ * @brief Error type for CLI error responses.
  * @ingroup caudio_ipc
  *
  * @see caudio::utils::Error

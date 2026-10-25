@@ -37,7 +37,8 @@ struct EngineCallbacks;
 struct EngineEvent;
 enum class EngineEventType : std::uint8_t;
 // PlaybackState / RepeatMode are wire enums owned by `caudio::types` (see
-// types/wire.hpp); `caudio::engine` re-exports them as aliases (engine/types.hpp).
+// types/wire.hpp); engine/types.hpp uses caudio::types::PlaybackState /
+// caudio::types::RepeatMode directly.
 } // namespace caudio::engine
 
 namespace caudio::media {
