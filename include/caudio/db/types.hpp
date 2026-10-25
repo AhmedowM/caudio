@@ -6,8 +6,7 @@
  * @ingroup caudio_db
  * @details Defines the db-local plain-data structs (Queue, Library, DbStats,
  * TrackQuery, HistoryQuery). The shared records (Track, Playlist, QueueItem,
- * HistoryEntry, Bookmark, LibraryStatsDetailed) live in `caudio::types`;
- * their deprecated `caudio::db::` shims are declared in `legacy_aliases.hpp`.
+ * HistoryEntry, Bookmark, LibraryStats) live in `caudio::types`.
  * All are trivially copyable aggregates with default-initialised members; no
  * invariants beyond those documented per-field.
  */

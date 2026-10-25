@@ -4,11 +4,10 @@
  * @file json.hpp
  * @brief JSON import/export for tracks.
  * @ingroup caudio_db
- * @details Implements `trackToJson`, `trackFromJson`, `exportJson` and
- * `importJson` for JSON serialization of Track rows. The Track codec itself
- * now lives in `caudio::utils` (`utils/record_json.hpp`); the `caudio::db::`
- * spellings below are deprecated forwarders. Uses ordered JSON
- * (keys in insertion order) to preserve field order across export/import.
+ * @details Implements `exportJson` and `importJson` for JSON serialization of
+ * Track rows. The Track codec itself lives in `caudio::utils`
+ * (`utils/record_json.hpp`). Uses ordered JSON (keys in insertion order) to
+ * preserve field order across export/import.
  */
 
 #include <caudio/db/types.hpp>

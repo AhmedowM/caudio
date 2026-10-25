@@ -7,9 +7,7 @@
  * @details Value structs shared across the db, engine, ipc and app layers:
  * Track, Playlist, QueueItem, HistoryEntry, Bookmark, DeviceInfo, DeviceList,
  * TrackMetadata and LibraryStats. All are default-initialised aggregates; no
- * invariants beyond those documented per-field. `caudio::db`, `caudio::player`
- * and `caudio::ipc` keep aliases for the old spellings until v2.0.0 (the db
- * shims live in `legacy_aliases.hpp`).
+ * invariants beyond those documented per-field.
  */
 
 #include <array>
