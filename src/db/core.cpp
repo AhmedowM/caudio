@@ -9,8 +9,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <db/fts.hpp>
 #include <db/database_access.hpp>
+#include <db/fts.hpp>
 #include <db/queue.hpp>
 #include <db/statement.hpp>
 #include <db/stmt_helpers.hpp>
@@ -208,8 +208,8 @@ struct Database::Impl {
     WriterThread writer_;
 
     // Raw locking surface
-    std::expected<SqliteStatement*, caudio::utils::Error> getCachedForUse(
-        std::string_view sql) const;
+    std::expected<SqliteStatement*, caudio::utils::Error>
+    getCachedForUse(std::string_view sql) const;
     sqlite3* handle() const noexcept;
     sqlite3* handleLocked() const noexcept;
     std::shared_mutex& mutex() const noexcept;
@@ -219,8 +219,7 @@ struct Database::Impl {
     findByPathLocked(std::string_view path);
     std::expected<caudio::types::Track, caudio::utils::Error>
     findByFingerprintLocked(const std::array<uint8_t, 32>& fp);
-    std::expected<int64_t, caudio::utils::Error>
-    insertTrackLocked(const caudio::types::Track& t);
+    std::expected<int64_t, caudio::utils::Error> insertTrackLocked(const caudio::types::Track& t);
     std::expected<void, caudio::utils::Error> updateTrackLocked(const caudio::types::Track& t);
     std::expected<void, caudio::utils::Error> deleteTrackLocked(int64_t id);
     std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(int64_t id);
@@ -229,8 +228,7 @@ struct Database::Impl {
 
     // Playlist / queue locked helpers
     std::expected<int64_t, caudio::utils::Error>
-    createPlaylistLocked(std::string_view name, int type = 0,
-                         std::string_view smart_query = {});
+    createPlaylistLocked(std::string_view name, int type = 0, std::string_view smart_query = {});
     std::expected<void, caudio::utils::Error> playlistAddTrackLocked(int64_t pid, int64_t tid,
                                                                      int64_t pos = -1);
     std::expected<void, caudio::utils::Error> queueEnqueueLocked(int64_t qid, int64_t tid,
@@ -573,9 +571,9 @@ std::expected<std::vector<Library>, caudio::utils::Error> Database::Impl::librar
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    if (auto e = st.prepare(db_.get(),
-                            "SELECT id, path, name, date_added, last_scanned, auto_scan, "
-                            "recursive, extensions FROM libraries ORDER BY id");
+    if (auto e =
+            st.prepare(db_.get(), "SELECT id, path, name, date_added, last_scanned, auto_scan, "
+                                  "recursive, extensions FROM libraries ORDER BY id");
         !e)
         return std::unexpected{e.error()};
     std::vector<Library> out;
@@ -601,9 +599,8 @@ std::expected<void, caudio::utils::Error> Database::Impl::libraryUpdateLocked(co
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    if (auto e =
-            st.prepare(db_.get(), "UPDATE libraries SET path=?, name=?, last_scanned=?, "
-                                     "auto_scan=?, recursive=?, extensions=? WHERE id=?");
+    if (auto e = st.prepare(db_.get(), "UPDATE libraries SET path=?, name=?, last_scanned=?, "
+                                       "auto_scan=?, recursive=?, extensions=? WHERE id=?");
         !e)
         return std::unexpected{e.error()};
     st.bindText(1, l.path);
@@ -1049,15 +1046,16 @@ Database::createPlaylistFromTracks(std::string_view name, std::span<const int64_
 }
 
 std::expected<int64_t, caudio::utils::Error>
-Database::Impl::createPlaylistLocked(std::string_view name, int type, std::string_view smart_query) {
+Database::Impl::createPlaylistLocked(std::string_view name, int type,
+                                     std::string_view smart_query) {
     if (name.empty())
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     SqliteStatement st;
-    if (auto e = st.prepare(db_.get(),
-                            "INSERT INTO playlists (name, type, smart_query) VALUES (?,?,?)");
+    if (auto e =
+            st.prepare(db_.get(), "INSERT INTO playlists (name, type, smart_query) VALUES (?,?,?)");
         !e)
         return std::unexpected{e.error()};
     st.bindText(1, name);
@@ -1073,9 +1071,8 @@ Database::Impl::createPlaylistLocked(std::string_view name, int type, std::strin
     return sqlite3_last_insert_rowid(db_.get());
 }
 
-std::expected<void, caudio::utils::Error> Database::Impl::playlistAddTrackLocked(int64_t pid,
-                                                                                 int64_t tid,
-                                                                                 int64_t pos) {
+std::expected<void, caudio::utils::Error>
+Database::Impl::playlistAddTrackLocked(int64_t pid, int64_t tid, int64_t pos) {
     if (pid == 0 || tid == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db_)
@@ -1083,10 +1080,9 @@ std::expected<void, caudio::utils::Error> Database::Impl::playlistAddTrackLocked
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
     if (pos < 0) {
         SqliteStatement ms;
-        if (auto e =
-                ms.prepare(db_.get(),
-                           "SELECT COALESCE(MAX(position), -1)+1 FROM playlist_items WHERE "
-                           "playlist_id=?");
+        if (auto e = ms.prepare(db_.get(),
+                                "SELECT COALESCE(MAX(position), -1)+1 FROM playlist_items WHERE "
+                                "playlist_id=?");
             e) {
             ms.bindInt(1, pid);
             if (ms.step())
@@ -1096,9 +1092,8 @@ std::expected<void, caudio::utils::Error> Database::Impl::playlistAddTrackLocked
             pos = 0;
     } else {
         SqliteStatement ss;
-        if (auto e =
-                ss.prepare(db_.get(), "UPDATE playlist_items SET position=position+1 WHERE "
-                                      "playlist_id=? AND position>=?");
+        if (auto e = ss.prepare(db_.get(), "UPDATE playlist_items SET position=position+1 WHERE "
+                                           "playlist_id=? AND position>=?");
             e) {
             ss.bindInt(1, pid);
             ss.bindInt(2, pos);
@@ -1305,9 +1300,8 @@ std::expected<void, caudio::utils::Error> Database::queueEnqueue(int64_t qid, in
     return impl_->queueEnqueueLocked(qid, tid, pos);
 }
 
-std::expected<void, caudio::utils::Error> Database::Impl::queueEnqueueLocked(int64_t qid,
-                                                                             int64_t tid,
-                                                                             int64_t pos) {
+std::expected<void, caudio::utils::Error>
+Database::Impl::queueEnqueueLocked(int64_t qid, int64_t tid, int64_t pos) {
     return caudio::db::queueEnqueueLocked(db_.get(), qid, tid, pos);
 }
 
@@ -1838,4 +1832,4 @@ DatabaseAccess::queueDequeueLocked(Database& db, int64_t qid) {
     return db.impl_->queueDequeueLocked(qid);
 }
 
-} // namespace caudio::db // namespace caudio::db
+} // namespace caudio::db

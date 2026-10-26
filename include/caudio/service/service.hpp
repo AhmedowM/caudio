@@ -84,6 +84,13 @@ class Service final {
     caudio::utils::Expected<void> run(std::stop_token st);
 
     /**
+     * @brief Replaces the attached database and reloads engine state from it.
+     * @param db Shared database contract (must be non-null and open).
+     * @return Success or Error InvalidArg if db is null or not open.
+     */
+    caudio::utils::Expected<void> attachDatabase(std::shared_ptr<caudio::contracts::IDatabase> db);
+
+    /**
      * @brief Gracefully shut down the service.
      *
      * Signals shutdown to IPC server and Engine, removes PID file, socket file (Unix),

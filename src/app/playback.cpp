@@ -27,7 +27,8 @@
 
 namespace caudio::app {
 
-std::string App::Impl::transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res) {
+std::string
+App::Impl::transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res) {
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res))
         return caudio::app::trackWho(*st);
     return std::string{"unknown track"};
@@ -71,9 +72,11 @@ AppResult App::play() {
         }
         std::string who = impl_->transportWho(res);
         std::string line =
-            wasPaused  ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
-            : restored ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
-                       : std::format("Playing {}", who);
+            wasPaused
+                ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
+            : restored
+                ? std::format("Resuming {} from {}", who, caudio::utils::formatClock(priorPos))
+                : std::format("Playing {}", who);
         return Outcome{
             .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }
@@ -109,7 +112,8 @@ AppResult App::pause() {
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         std::string who = impl_->transportWho(res);
         return Outcome{.result = std::move(*res),
-                       .line = std::format("Paused {} at {}", who, caudio::utils::formatClock(st->pos)),
+                       .line =
+                           std::format("Paused {} at {}", who, caudio::utils::formatClock(st->pos)),
                        .toStderr = false,
                        .failed = false};
     }

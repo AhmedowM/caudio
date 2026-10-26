@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <stop_token>
 #include <string>
+#include <support/engine_test_helpers.hpp>
 #include <system_error>
 #include <thread>
 #include <type_traits>
@@ -21,7 +22,6 @@
 #include <variant>
 
 #include "../src/client/ipc_client.hpp"
-#include <support/engine_test_helpers.hpp>
 using namespace caudio::ipc;
 using namespace caudio::utils;
 using namespace caudio::db;

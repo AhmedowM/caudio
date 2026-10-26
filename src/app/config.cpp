@@ -6,8 +6,8 @@
  * answer from the local file without a daemon; writes go through it.
  */
 
-#include <caudio/app/app.hpp>
 #include <app/app_impl.hpp>
+#include <caudio/app/app.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>

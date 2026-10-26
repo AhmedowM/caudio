@@ -7,11 +7,11 @@
  * resolution), loading, saving, deletion, renaming, file export/import.
  */
 
+#include <app/app_impl.hpp>
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
 #include <app/paths_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <app/app_impl.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/ipc/command.hpp>
@@ -198,7 +198,8 @@ AppResult App::playlistDelete(std::int64_t pid) {
 
 AppResult App::playlistRename(std::int64_t pid, const std::string& name) {
     caudio::ipc::Command cmd{caudio::ipc::PlaylistRename{.pid = pid, .newName = name}};
-    return impl_->confirm(impl_->sendRaw(cmd), std::format("Renamed playlist {} to '{}'", pid, name));
+    return impl_->confirm(impl_->sendRaw(cmd),
+                          std::format("Renamed playlist {} to '{}'", pid, name));
 }
 
 BatchResult App::playlistExport(std::int64_t pid, const std::string& path,

@@ -6,8 +6,8 @@
  */
 
 #include <algorithm>
-#include <caudio/app/app.hpp>
 #include <app/app_impl.hpp>
+#include <caudio/app/app.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

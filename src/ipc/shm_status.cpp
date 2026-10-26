@@ -100,8 +100,7 @@ std::string openShmRaw(const std::string& name, bool create, ShmRaw& raw) {
     }
 
     if (!hMap) {
-        return "CreateFileMapping/OpenFileMapping failed: " +
-               std::to_string(::GetLastError());
+        return "CreateFileMapping/OpenFileMapping failed: " + std::to_string(::GetLastError());
     }
 
     void* ptr = ::MapViewOfFile(hMap, access, 0, 0, sizeof(AtomicShmStatus));
@@ -119,8 +118,8 @@ std::string openShmRaw(const std::string& name, bool create, ShmRaw& raw) {
 }
 
 // Closes a raw SHM handle.
-void closeShmRaw(AtomicShmStatus*& map, std::size_t& size, std::intptr_t& handle,
-                 bool created, const std::string& name) noexcept {
+void closeShmRaw(AtomicShmStatus*& map, std::size_t& size, std::intptr_t& handle, bool created,
+                 const std::string& name) noexcept {
     (void)size;
     (void)created;
     (void)name;
@@ -152,8 +151,7 @@ ShmStatusReader::ExpectedShm ShmStatusReader::openReadOnly(const std::string& na
     ShmRaw raw;
     std::string err = openShmRaw(name, false, raw);
     if (!err.empty())
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io, err)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, err)};
     ShmStatusReader reader;
     reader.map_ = raw.map;
     reader.size_ = raw.size;
@@ -167,8 +165,7 @@ ShmStatusReader::~ShmStatusReader() {
 }
 
 ShmStatusReader::ShmStatusReader(ShmStatusReader&& other) noexcept
-    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)),
-      handle_(other.handle_) {
+    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)), handle_(other.handle_) {
     other.map_ = nullptr;
     other.size_ = 0;
     other.handle_ = -1;
@@ -240,8 +237,7 @@ ShmStatusWriter::ExpectedShm ShmStatusWriter::create(const std::string& name) {
     ShmRaw raw;
     std::string err = openShmRaw(name, true, raw);
     if (!err.empty())
-        return std::unexpected{
-            caudio::utils::makeError(caudio::utils::StatusCode::Io, err)};
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::Io, err)};
     ShmStatusWriter writer;
     writer.map_ = raw.map;
     writer.size_ = raw.size;
@@ -256,8 +252,8 @@ ShmStatusWriter::~ShmStatusWriter() {
 }
 
 ShmStatusWriter::ShmStatusWriter(ShmStatusWriter&& other) noexcept
-    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)),
-      create_(other.create_), handle_(other.handle_) {
+    : map_(other.map_), size_(other.size_), name_(std::move(other.name_)), create_(other.create_),
+      handle_(other.handle_) {
     other.map_ = nullptr;
     other.size_ = 0;
     other.handle_ = -1;

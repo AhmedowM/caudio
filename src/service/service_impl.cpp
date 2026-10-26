@@ -305,6 +305,16 @@ void Service::Impl::shutdown() {
 caudio::contracts::IDatabase& Service::db() noexcept {
     return *impl_->db_;
 }
+
+caudio::utils::Expected<void>
+Service::attachDatabase(std::shared_ptr<caudio::contracts::IDatabase> db) {
+    if (!db || !db->isOpen()) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null db")};
+    }
+    impl_->db_ = std::move(db);
+    return engine().attachDatabase(impl_->db_);
+}
 /**
  * @brief Access the audio engine instance.
  * @return Reference to the Engine.

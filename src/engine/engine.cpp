@@ -996,6 +996,12 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
             atEnd = queue_.cursor >= cnt;
         }
         if (atEnd) {
+            // Natural end with repeat off: clear resume position so play()
+            // doesn't seek to end-of-track and loop forever.
+            state_.positionMs = 0;
+            state_.currentTrackId = 0;
+            hasCurrent_.store(false, std::memory_order_release);
+            (void)saveState();
             unlockQueue();
             playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
             if (output_)
@@ -1003,7 +1009,6 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
             if (ring_)
                 ring_->reset();
             pausePos_ = 0;
-            hasCurrent_.store(false, std::memory_order_release);
             return {};
         }
     }

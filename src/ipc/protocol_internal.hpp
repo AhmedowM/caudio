@@ -52,8 +52,7 @@ Json playlistToJson(const caudio::types::Playlist& p);
  * @param j JSON object with playlist fields.
  * @return Playlist struct, or error if parsing fails.
  */
-std::expected<caudio::types::Playlist, caudio::utils::Error>
-playlistFromJson(const Json& j);
+std::expected<caudio::types::Playlist, caudio::utils::Error> playlistFromJson(const Json& j);
 
 /**
  * @brief Convert Error struct to JSON object.

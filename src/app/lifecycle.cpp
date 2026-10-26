@@ -38,8 +38,8 @@
 #endif
 #endif
 
-#include <caudio/app/app.hpp>
 #include <app/app_impl.hpp>
+#include <caudio/app/app.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/config.hpp>
 #include <caudio/ipc/command.hpp>
@@ -106,11 +106,11 @@ void App::setArgv0(std::string argv0) {
     impl_->argv0_ = std::move(argv0);
 }
 
-void App::setDaemonHost(std::function<AppResult(bool foreground)> host) {
+void App::attachDaemonHost(std::function<AppResult(bool foreground)> host) {
     impl_->daemonHost_ = std::move(host);
 }
 
-void App::setPreviewHost(std::function<AppResult(const std::string& file)> host) {
+void App::attachPreviewHost(std::function<AppResult(const std::string& file)> host) {
     impl_->previewHost_ = std::move(host);
 }
 
@@ -255,7 +255,7 @@ AppResult App::Impl::startDaemon(bool foreground) {
     // file left by a killed daemon is cleared immediately instead of
     // burning the full wait.
     {
-    auto pidPath = pidPathForConfig();
+        auto pidPath = pidPathForConfig();
         for (int i = 0; i < 20; ++i) {
             bool c = client.probe();
             std::error_code ec;
@@ -404,7 +404,7 @@ BatchResult BatchReport::fail(std::string message) {
 }
 
 AppResult App::Impl::confirm(std::expected<caudio::ipc::Result, caudio::utils::Error>&& res,
-                       std::optional<std::string> line) {
+                             std::optional<std::string> line) {
     auto owned = std::move(res);
     if (!owned)
         return std::unexpected{owned.error()};

@@ -78,11 +78,11 @@ struct App::Impl {
      */
     std::string transportWho(const std::expected<caudio::ipc::Result, caudio::utils::Error>& res);
 
-    caudio::config::Config config_;         ///< Bound config (db/socket/log paths).
-    std::string argv0_;                     ///< Executable path for POSIX re-spawn.
+    caudio::config::Config config_; ///< Bound config (db/socket/log paths).
+    std::string argv0_;             ///< Executable path for POSIX re-spawn.
     std::function<AppResult(bool foreground)> daemonHost_{}; ///< Injected foreground daemon host.
     std::function<AppResult(const std::string& file)>
-        previewHost_{};                     ///< Injected local preview host.
+        previewHost_{}; ///< Injected local preview host.
 };
 
 } // namespace caudio::app

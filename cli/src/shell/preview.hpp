@@ -5,7 +5,7 @@
  * @brief CLI-owned ephemeral local file preview (no daemon).
  * @details The app layer stays free of the player dependency; the CLI
  * shell owns the player-backed preview and injects it into the App
- * orchestrator via App::setPreviewHost.
+ * orchestrator via App::attachPreviewHost.
  */
 
 #include <caudio/app/app.hpp>

@@ -89,7 +89,8 @@ AppResult App::bookmarkGoto(int64_t id) {
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         std::string who = caudio::app::trackWho(*st);
-        std::string line = std::format("Resuming {} from {}", who, caudio::utils::formatClock(st->pos));
+        std::string line =
+            std::format("Resuming {} from {}", who, caudio::utils::formatClock(st->pos));
         return Outcome{
             .result = std::move(*res), .line = std::move(line), .toStderr = false, .failed = false};
     }

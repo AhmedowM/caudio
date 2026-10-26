@@ -143,7 +143,7 @@ class App {
      * @param host Callable that runs the service in-process and blocks;
      *             when unset, `startDaemon(true)` returns an error.
      */
-    void setDaemonHost(std::function<AppResult(bool foreground)> host);
+    void attachDaemonHost(std::function<AppResult(bool foreground)> host);
 
     /**
      * @brief Injects the local preview implementation (CLI owns the player-backed one).
@@ -153,7 +153,7 @@ class App {
      * @details The app layer stays free of the player dependency: the CLI
      * owns the player-backed preview and injects it here.
      */
-    void setPreviewHost(std::function<AppResult(const std::string& file)> host);
+    void attachPreviewHost(std::function<AppResult(const std::string& file)> host);
 
     /**
      * @brief Starts the daemon (foreground service or background spawn).
@@ -488,7 +488,7 @@ class App {
      * @brief Plays a file ephemerally without touching the daemon/queue.
      * @ingroup caudio_app
      * @details Delegates to the injected preview host (see
-     * setPreviewHost); returns an error when no host is configured.
+     * attachPreviewHost); returns an error when no host is configured.
      */
     AppResult previewFile(const std::string& file);
 

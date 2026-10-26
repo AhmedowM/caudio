@@ -10,11 +10,11 @@
  */
 
 #include <algorithm>
+#include <app/app_impl.hpp>
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
 #include <app/paths_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <app/app_impl.hpp>
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/engine/types.hpp>
@@ -434,8 +434,8 @@ AppResult App::queueRepeat(const std::string& mode) {
         finalMode = st->repeat;
     return Outcome{.result = std::move(*res),
                    .line = std::format("Repeat: {}", finalMode == RM::All   ? "all"
-                                                       : finalMode == RM::One ? "one"
-                                                                                : "off"),
+                                                     : finalMode == RM::One ? "one"
+                                                                            : "off"),
                    .toStderr = false,
                    .failed = false};
 }

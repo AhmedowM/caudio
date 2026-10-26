@@ -29,14 +29,12 @@ openEngineWithDatabase(std::string_view path, const caudio::engine::EngineConfig
     return instance;
 }
 inline std::expected<std::unique_ptr<caudio::service::Service>, caudio::utils::Error>
-openServiceWithDatabase(std::string_view path,
-                        const caudio::service::ServiceConfig& config) {
+openServiceWithDatabase(std::string_view path, const caudio::service::ServiceConfig& config) {
     auto database = caudio::db::Database::open(path);
     if (!database)
         return std::unexpected(database.error());
 
-    std::shared_ptr<caudio::contracts::IDatabase> sharedDatabase(
-        std::move(database.value()));
+    std::shared_ptr<caudio::contracts::IDatabase> sharedDatabase(std::move(database.value()));
     return caudio::service::Service::create(config, std::move(sharedDatabase));
 }
 

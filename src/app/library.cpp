@@ -5,10 +5,10 @@
  * @details Phase 1: returns outcome data; the frontend renders.
  */
 
+#include <app/app_impl.hpp>
 #include <app/detail.hpp>
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
-#include <app/app_impl.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

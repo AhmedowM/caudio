@@ -94,7 +94,7 @@ struct DatabaseAccess {
      * @return Track or Error.
      */
     static std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(Database& db,
-                                                                                     int64_t id);
+                                                                                    int64_t id);
     /**
      * @brief Forwards to Database::insertTrackLocked().
      * @ingroup caudio_db
