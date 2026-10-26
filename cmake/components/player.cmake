@@ -11,7 +11,7 @@ set(CAUDIO_PLAYER_SOURCES
   src/player/output.cpp
   src/player/core.cpp
 )
-caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils caudio::types caudio::media INCLUDES vendor)
+caudio_add_component(player SOURCES ${CAUDIO_PLAYER_SOURCES} MODULE_SOURCES ${CAUDIO_PLAYER_MODULE_SOURCES} DEPS caudio::utils caudio::types INCLUDES vendor PRIVATE_DEPS caudio::media)
 # GCC cannot parse Apple's ObjC-blocks system headers pulled in by miniaudio's
 # CoreAudio backend; Apple Clang-only. Local mac devs (Xcode Clang) keep full
 # audio; GNU-on-macOS CI builds fall back to the other backends (NOAUDIO anyway).
