@@ -152,22 +152,28 @@ jobs:
           CAUDIO_TRIMMED_ROOT: ${{ steps.trimdl.outputs.trim_root }}
         run: |
           set -o pipefail
+          TRIMMED=""
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)"
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
           else
             echo "::warning::trimmed FFmpeg unavailable -- release uses the default provider"
           fi
           EXTRA=""
           if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
-          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA 2>&1 | tee configure.log
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} $TRIMMED --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA 2>&1 | tee configure.log
           echo "build_dir=build/${{ matrix.label }}" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Build
         run: |
+          TRIMMED=""
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
+          fi
           EXTRA=""
           if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
-          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --build
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} $TRIMMED --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --build
         shell: bash
 
       - name: Package
@@ -175,9 +181,13 @@ jobs:
           # The `package` target runs CPack with CWD in the build tree, so the
           # archives land there. A bare `cpack --config` from the repo root
           # stages them under the root instead.
+          TRIMMED=""
+          if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
+          fi
           EXTRA=""
           if [ "${{ matrix.toolchain }}" = "apple" ]; then EXTRA="--allow-unsupported-compiler"; fi
-          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --package
+          python scripts/configure.py minsize --toolchain ${{ matrix.toolchain }} --arch ${{ matrix.arch }} $TRIMMED --require-git-version --build-dir "build/${{ matrix.label }}" $EXTRA --package
         shell: bash
 
       - name: List packages

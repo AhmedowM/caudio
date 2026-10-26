@@ -80,8 +80,8 @@ jobs:
         run: |
           set -o pipefail
           BUILD_DIR="build/${{ inputs.family }}-${{ inputs.toolchain }}"
-          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --build-dir "$BUILD_DIR" 2>&1 | tee configure.log
-          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --build-dir "$BUILD_DIR" --build 2>&1 | tee build.log
+          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir "$BUILD_DIR" 2>&1 | tee configure.log
+          python scripts/configure.py "${{ inputs.family }}" --toolchain "${{ inputs.toolchain }}" --trimmed-ffmpeg --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" --build-dir "$BUILD_DIR" --build 2>&1 | tee build.log
           cmake --install "$BUILD_DIR" --prefix "$PWD/stage" 2>&1 | tee install.log
 
       - name: Bare-metal run (no FFmpeg in the container)

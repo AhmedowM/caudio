@@ -138,12 +138,14 @@ jobs:
           if [ "${{ matrix.compiler }}" = "apple" ]; then TOOLCHAIN=apple; EXTRA="--allow-unsupported-compiler"; else TOOLCHAIN=clang; EXTRA=""; fi
           BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
+          TRIMMED=""
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON $EXTRA 2>&1 | tee configure.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" $TRIMMED --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON $EXTRA 2>&1 | tee configure.log
           echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
           echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
           echo "extra=$EXTRA" >> "$GITHUB_OUTPUT"
@@ -280,12 +282,14 @@ jobs:
           if [ "${{ matrix.compiler }}" = "gcc" ]; then TOOLCHAIN=gcc; else TOOLCHAIN=clang; fi
           BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
+          TRIMMED=""
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" $TRIMMED --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
           echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
           echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
 
@@ -433,12 +437,14 @@ jobs:
           if [ "${{ matrix.compiler }}" = "msvc" ]; then TOOLCHAIN=msvc; else TOOLCHAIN=clang; fi
           BUILD_DIR="build/${{ matrix.family }}-$TOOLCHAIN"
           set -o pipefail
+          TRIMMED=""
           if [ -n "${{ steps.trimdl.outputs.trim_root }}" ]; then
             echo "provider=trimmed (CAUDIO_TRIMMED_ROOT cascade)" >> "$GITHUB_OUTPUT"
+            TRIMMED="--trimmed-ffmpeg --ffmpeg-root ${{ steps.trimdl.outputs.trim_root }}"
           else
             echo "provider=system" >> "$GITHUB_OUTPUT"
           fi
-          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
+          python scripts/configure.py "${{ matrix.family }}" --toolchain "$TOOLCHAIN" --arch "${{ matrix.arch }}" $TRIMMED --build-dir "$BUILD_DIR" --define CAUDIO_BUNDLE_FFMPEG_MACOS=ON 2>&1 | tee configure.log
           echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
           echo "toolchain=$TOOLCHAIN" >> "$GITHUB_OUTPUT"
         shell: bash
