@@ -4,7 +4,8 @@
 # toolchain, no compiler assignments duplicated here. An explicit
 # --toolchain gcc|clang|msvc|apple includes the matching detail file instead.
 if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-  include("${CMAKE_CURRENT_LIST_DIR}/clang.cmake")
+  # AppleClang (via xcrun) is the default and fully supported compiler on macOS.
+  include("${CMAKE_CURRENT_LIST_DIR}/apple.cmake")
 elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
   # Windows releases prefer LLVM Clang when it is on PATH (MSVC ABI target,
   # verified by clang.cmake); MSVC stays for --toolchain msvc and CI.
