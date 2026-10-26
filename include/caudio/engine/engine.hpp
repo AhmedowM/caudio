@@ -23,11 +23,11 @@
  *   migration (try sqlNew, fallback to sqlOld). persistShuffleBlobLocked
  *   and persistCursorLocked update the blob/cursor transactionally.
  * - History: doHistoryMark uses shouldMarkPlayed(historyThresholdPct/Secs)
- *   with atomic CAS on markedPlayed_ and a BEGIN IMMEDIATE transaction.
+ *   with atomic CAS on markedPlayed_ and a database-owned transaction.
  * Locking: queueMutex_ (timed mutex) for the queue state -- try_lock on fast
  * and monitor paths, bounded wait for transport commands (play/next/prev);
- * decodeMtx_ (mutex) for decoder_/ring_ vs seek/decodeLoop; queue/state DB
- * writes go through Database::mutex() (shared_mutex) + withTransaction.
+ * decodeMtx_ (mutex) for decoder_/ring_ vs seek/decodeLoop; persistence and
+ * history operations go through the backend-neutral contracts::IDatabase.
  * Events: a bounded event queue (64 slots) with drop-on-full, dispatched via
  * pushEvent to callbacks under cbMutex_.
  * Implementation details (atomics, threads, mpsc queue, ring, DB rows) live
@@ -94,41 +94,24 @@ class Engine final {
      * @param cfg Engine configuration (poll/gapless/history thresholds).
      * @return Owning Engine or Error from init().
      * @details Starts decodeThread_ and optionally monitorThread_ via init().
-     * No DB is opened; attach via open() or attachDatabase().
+     * No database is opened; optionally attach a store with attachDatabase().
      * @par Thread safety
      * Thread-safe; constructs internal atomics/threads.
-     * @see open
      * @see attachDatabase
      */
     static ExpectedEngine create(const EngineConfig& cfg = {});
 
     /**
-     * @brief Opens (or creates) a database and creates an Engine.
+     * @brief Attaches an already-open database implementation.
      * @ingroup caudio_engine
-     * @param path Filesystem path (passed to Database::open).
-     * @param cfg Engine configuration.
-     * @return Owning Engine or Error (Io/Corrupt from Database::open).
-     * @details Opens the DB, attaches it, loads persisted state via
-     * loadState() (active_queue_id migration) and restores volume to
-     * the AudioOutput if present.
-     * @par Thread safety
-     * Thread-safe; see Database::open.
-     * @see Database::open
-     * @see loadState
-     */
-    static ExpectedEngine open(std::string_view path, const EngineConfig& cfg = {});
-
-    /**
-     * @brief Attaches an already-open Database.
-     * @ingroup caudio_engine
-     * @param db Shared Database handle (must be non-null and open).
+     * @param db Shared database contract (must be non-null and open).
      * @return Success or Error InvalidArg / loadState failure.
-     * @retval StatusCode::InvalidArg if db is null or handle is null.
+     * @retval StatusCode::InvalidArg if db is null or not open.
      * @par Thread safety
-     * Thread-safe; calls loadState() under dbMutex_.
+     * Thread-safe; calls the database implementation to load state.
      * @see loadState
      */
-    ExpectedVoid attachDatabase(std::shared_ptr<caudio::db::Database> db);
+    ExpectedVoid attachDatabase(std::shared_ptr<caudio::contracts::IDatabase> db);
 
     /** @brief Tears down threads and persists state. @ingroup caudio_engine */
     ~Engine();

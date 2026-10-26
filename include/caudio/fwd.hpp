@@ -30,6 +30,10 @@ struct DbStats;
 class SqliteStatement;
 } // namespace caudio::db
 
+namespace caudio::contracts {
+class IDatabase;
+} // namespace caudio::contracts
+
 namespace caudio::engine {
 class Engine;
 struct EngineConfig;

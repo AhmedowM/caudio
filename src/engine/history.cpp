@@ -1,20 +1,11 @@
-#include <sqlite3.h>
-
-#include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
 #include <cstdint>
-#include <db/database_access.hpp>
 #include <engine/history.hpp>
 #include <expected>
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
-#include <string>
 #include <utility>
-#include <vector>
 
 namespace caudio::engine::detail {
 
@@ -44,86 +35,18 @@ bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int 
 
 namespace caudio::engine {
 
-using caudio::db::DatabaseAccess;
-
-History::History(std::shared_ptr<caudio::db::Database> db) : db_(std::move(db)) {}
+History::History(std::shared_ptr<caudio::contracts::IDatabase> db) : db_(std::move(db)) {}
 
 History::ExpectedEntries History::listHistory(int limit) {
-    if (!db_ || !DatabaseAccess::handle(*db_))
+    if (!db_ || !db_->isOpen())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
-
-    std::string sql = "SELECT h.id, h.track_id, h.started_at, h.completed_at, h.position_ms, "
-                      "h.completion_pct, h.queue_id, t.title, t.artist, t.path, t.duration "
-                      "FROM history h "
-                      "JOIN tracks t ON t.id = h.track_id "
-                      "ORDER BY h.started_at DESC";
-
-    bool hasLimit = limit > 0;
-    if (hasLimit)
-        sql += " LIMIT ?";
-
-    sqlite3* h = DatabaseAccess::handle(*db_);
-    std::shared_lock lk(DatabaseAccess::mutex(*db_));
-
-    sqlite3_stmt* raw = nullptr;
-    int rc = sqlite3_prepare_v2(h, sql.c_str(), -1, &raw, nullptr);
-    if (rc != SQLITE_OK)
-        return std::unexpected(
-            caudio::utils::makeError(caudio::utils::StatusCode::Internal, sqlite3_errmsg(h)));
-
-    struct StmtGuard {
-        sqlite3_stmt* s;
-        ~StmtGuard() {
-            if (s)
-                sqlite3_finalize(s);
-        }
-    } guard(raw);
-
-    if (hasLimit)
-        sqlite3_bind_int(raw, 1, limit);
-
-    std::vector<caudio::types::HistoryEntry> out;
-    while (sqlite3_step(raw) == SQLITE_ROW) {
-        caudio::types::HistoryEntry e;
-        e.id = sqlite3_column_int64(raw, 0);
-        e.track_id = sqlite3_column_int64(raw, 1);
-        e.started_at = sqlite3_column_int64(raw, 2);
-        if (sqlite3_column_type(raw, 3) != SQLITE_NULL)
-            e.completed_at = sqlite3_column_int64(raw, 3);
-        e.position_ms = sqlite3_column_int64(raw, 4);
-        e.completion_pct = sqlite3_column_double(raw, 5);
-        e.queue_id = sqlite3_column_int64(raw, 6);
-        e.title = sqlite3_column_text(raw, 7)
-                      ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 7))
-                      : "";
-        e.artist = sqlite3_column_text(raw, 8)
-                       ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 8))
-                       : "";
-        e.path = sqlite3_column_text(raw, 9)
-                     ? reinterpret_cast<const char*>(sqlite3_column_text(raw, 9))
-                     : "";
-        e.duration = sqlite3_column_double(raw, 10);
-        out.push_back(std::move(e));
-    }
-    return out;
+    return db_->engineHistoryList(limit);
 }
 
 History::ExpectedVoid History::clearHistory() {
-    if (!db_ || !DatabaseAccess::handle(*db_))
+    if (!db_ || !db_->isOpen())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
-
-    std::unique_lock lk(DatabaseAccess::mutex(*db_));
-    sqlite3* h = DatabaseAccess::handle(*db_);
-    char* err = nullptr;
-    int rc = sqlite3_exec(h, "DELETE FROM history", nullptr, nullptr, &err);
-    if (rc != SQLITE_OK) {
-        std::string msg = err ? std::string(err) : "clear history failed";
-        sqlite3_free(err);
-        return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::Internal, msg));
-    }
-    if (err)
-        sqlite3_free(err);
-    return {};
+    return db_->engineHistoryClear();
 }
 
 } // namespace caudio::engine

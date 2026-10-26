@@ -310,6 +310,7 @@ include(cmake/CaudioHelpers.cmake)
 set(CAUDIO_COMPONENTS
   types
   utils
+  contracts
   config
   media
   player
@@ -332,7 +333,7 @@ if(CAUDIO_ENABLE_MODULES)
   add_library(caudio_umbrella STATIC)
   target_sources(caudio_umbrella PUBLIC FILE_SET CXX_MODULES TYPE CXX_MODULES BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/modules FILES modules/caudio.cppm)
   target_include_directories(caudio_umbrella PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
-  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::config caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
+  target_link_libraries(caudio_umbrella PUBLIC caudio::types caudio::utils caudio::contracts caudio::config caudio::media caudio::player caudio::db caudio::engine caudio::ipc caudio::service caudio::client caudio::app)
   ca_set_warnings(caudio_umbrella)
   ca_set_module_warnings(caudio_umbrella)
   caudio_apply_extra_flags(caudio_umbrella)

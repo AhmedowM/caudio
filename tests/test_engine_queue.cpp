@@ -15,6 +15,7 @@
 #include <random>
 #include <set>
 #include <string>
+#include <support/engine_test_helpers.hpp>
 #include <utility>
 #include <vector>
 using namespace caudio::db;
@@ -258,7 +259,7 @@ TEST_CASE("engine queue perm persistence blob cursor qid", "[engine_queue]") {
         eng->shutdown();
     }
     // reopen and verify persisted
-    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto e2Res = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());
     // after reopen shuffle should still be on (state shuffleEnabled=1)
@@ -459,7 +460,7 @@ TEST_CASE("engine queue persists via cursor non-shuffle", "[engine_queue]") {
         sqlite3_finalize(st2);
         sqlite3_close(ch);
     }
-    auto e2Res = Engine::open(
+    auto e2Res = openEngineWithDatabase(
         dbPath, EngineConfig{.enableMonitorThread = false, .allowSimulatedPlayback = true});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());

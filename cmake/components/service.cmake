@@ -15,7 +15,7 @@ set(CAUDIO_SERVICE_SOURCES
   src/service/dispatch_config.cpp
   src/service/tag_writer.cpp
 )
-caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::config caudio::ipc caudio::utils Threads::Threads INCLUDES vendor PRIVATE_DEPS caudio::engine caudio::db caudio::media caudio::player)
+caudio_add_component(service SOURCES ${CAUDIO_SERVICE_SOURCES} MODULE_SOURCES ${CAUDIO_SERVICE_MODULE_SOURCES} DEPS caudio::config caudio::ipc caudio::utils caudio::engine Threads::Threads INCLUDES vendor PRIVATE_DEPS caudio::db caudio::media caudio::player)
 target_link_libraries(service PRIVATE tag)
 target_include_directories(service SYSTEM PRIVATE ${CAUDIO_TAGLIB_BUILD_INCLUDES})
 # Link rt by name PRIVATE: a find_library() absolute path would be copied into

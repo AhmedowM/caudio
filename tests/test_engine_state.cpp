@@ -13,6 +13,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <support/engine_test_helpers.hpp>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -74,7 +75,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
     sqlite3_finalize(st);
     sqlite3_close(h);
     // reopen via Engine::open and verify loaded
-    auto e2Res = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto e2Res = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());
     REQUIRE(eng2->volume() > 0.41f);
@@ -105,7 +106,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
 
 TEST_CASE("engine state open without file creates default", "[engine_state]") {
     std::string dbPath = tempDbPath("eng_state_default").string();
-    auto eRes = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->volume() == 1.0f);
@@ -248,7 +249,7 @@ TEST_CASE("engine persists resume position across restart", "[engine_state]") {
         sqlite3_close(h);
     }
     {
-        auto eRes = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+        auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
         REQUIRE(eng->state() == caudio::types::PlaybackState::Stopped);
@@ -295,7 +296,7 @@ TEST_CASE("explicit stop clears the resume position", "[engine_state]") {
         eng->shutdown();
     }
     {
-        auto eRes = Engine::open(dbPath, EngineConfig{.enableMonitorThread = false});
+        auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
         REQUIRE(eng->position() == 0.0);

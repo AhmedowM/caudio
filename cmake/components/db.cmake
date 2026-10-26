@@ -15,6 +15,7 @@ set(CAUDIO_DB_MODULE_SOURCES
 
 set(CAUDIO_DB_SOURCES
   src/db/core.cpp
+  src/db/engine_api.cpp
   src/db/queue.cpp
   src/db/scan.cpp
   src/db/search.cpp
@@ -25,7 +26,7 @@ set(CAUDIO_DB_SOURCES
   src/db/fts.cpp
   src/db/stmt_helpers.cpp
 )
-caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::utils caudio::media Threads::Threads)
+caudio_add_component(db SOURCES ${CAUDIO_DB_SOURCES} MODULE_SOURCES ${CAUDIO_DB_MODULE_SOURCES} DEPS caudio::contracts caudio::utils caudio::media Threads::Threads)
 target_link_libraries(db PRIVATE caudio::sqlite3)
 ca_set_module_warnings(db)
 

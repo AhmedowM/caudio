@@ -184,6 +184,7 @@ Eight components, link only what you use:
 | Target | Covers |
 |---|---|
 | `caudio::utils` | Errors, logging, JSON facade, threads, queues/rings, printing, versioning |
+| `caudio::contracts` | Backend-neutral interfaces shared between components |
 | `caudio::media` | File reading, FFmpeg decoding, metadata/tags, library scan discovery |
 | `caudio::player` | Audio output, gapless playback (reader/decoder re-exported from `caudio::media`) |
 | `caudio::db` | SQLite storage: tracks, library scan persistence, FTS5 search, batched writes |
@@ -198,20 +199,33 @@ Headers under `include/caudio/` are canonical and always build:
 find_package(caudio CONFIG REQUIRED)
 
 add_executable(myapp main.cpp)
-target_link_libraries(myapp PRIVATE caudio::engine)
+target_link_libraries(myapp PRIVATE caudio::engine caudio::db)
 ```
 
 ```cpp
 #include <caudio.hpp> // umbrella: utils, player, db, engine, ipc, client, service
+#include <memory>
 #include <print>
+#include <utility>
 
 int main() {
-    auto engRes = caudio::engine::Engine::open(":memory:");
+    auto dbRes = caudio::db::Database::open(":memory:");
+    if (!dbRes) {
+        std::println(stderr, "database open: {}", dbRes.error().message);
+        return 1;
+    }
+    auto database = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
+
+    auto engRes = caudio::engine::Engine::create();
     if (!engRes) {
-        std::println(stderr, "open: {}", engRes.error().message);
+        std::println(stderr, "engine create: {}", engRes.error().message);
         return 1;
     }
     auto eng = std::move(engRes.value());
+    if (auto r = eng->attachDatabase(database); !r) {
+        std::println(stderr, "database attach: {}", r.error().message);
+        return 1;
+    }
     if (auto r = eng->play(); !r) {
         std::println(stderr, "play: {}", r.error().message);
         return 1;

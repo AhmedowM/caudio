@@ -1,14 +1,11 @@
 #pragma once
 
-#include <caudio/db/types.hpp>
+#include <caudio/contracts/database.hpp>
 #include <caudio/utils.hpp>
 #include <chrono>
 #include <cstdint>
 #include <expected>
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
-#include <string>
 #include <vector>
 
 /**
@@ -17,10 +14,6 @@
  * @details `History` is constructed by Engine only; the entry type is the
  * shared `caudio::types::HistoryEntry` (11 fields incl. track snapshots).
  */
-
-namespace caudio::db {
-class Database;
-}
 
 namespace caudio::engine::detail {
 
@@ -56,11 +49,7 @@ bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int 
 namespace caudio::engine {
 
 /**
- * @brief Thin history query helper over a Database handle.
- * @details Constructed with a `shared_ptr<Database>`; listHistory and
- * clearHistory operate directly on `db_` with the same locking
- * discipline as Database. Used by Engine::listHistory / clearHistory
- * which delegate to a temporary History instance.
+ * @brief Thin history query helper over an IDatabase implementation.
  */
 class History final {
   public:
@@ -70,17 +59,16 @@ class History final {
 
     /**
      * @brief Constructs a History helper.
-     * @param db Shared Database handle (must be open).
+     * @param db Shared database contract (must be open).
      */
-    explicit History(std::shared_ptr<caudio::db::Database> db);
+    explicit History(std::shared_ptr<caudio::contracts::IDatabase> db);
 
     /**
      * @brief Lists recent history entries joined with track metadata.
      * @param limit Max rows to return (0 = no limit, default 50).
      * @return Vector of entries ordered by started_at DESC or Error.
      * @par Thread safety
-     * Takes `shared_lock` on `db_->mutex()`; concurrent readers allowed,
-     * writers (clearHistory / doHistoryMark) take `unique_lock`.
+     * Synchronization is owned by the database implementation.
      */
     ExpectedEntries listHistory(int limit = 50);
 
@@ -88,12 +76,12 @@ class History final {
      * @brief Clears all history rows.
      * @return Success or Error.
      * @par Thread safety
-     * Takes `unique_lock` on `db_->mutex()` and executes `DELETE FROM history`.
+     * Synchronization is owned by the database implementation.
      */
     ExpectedVoid clearHistory();
 
   private:
-    std::shared_ptr<caudio::db::Database> db_; ///< Shared DB handle.
+    std::shared_ptr<caudio::contracts::IDatabase> db_; ///< Shared persistence contract.
 };
 
 } // namespace caudio::engine

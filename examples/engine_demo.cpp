@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
         std::cerr << "[engine_demo] open failed: " << dbRes.error().message << "\n";
         return 1;
     }
-    // Keep shared_ptr for Engine::attachDatabase if needed; Engine::open owns its own DB.
+    // The caller owns the backend and attaches it to the Engine.
     auto dbShared = std::shared_ptr<Database>(std::move(dbRes.value()));
     std::cout << "[engine_demo] opening DB: " << used << "\n";
 
@@ -170,9 +170,7 @@ int main(int argc, char** argv) {
     };
     cfg.callbacks = cbs;
 
-    // Engine::open with its own DB handle -- but we already have dbShared; demonstrate attach path
-    // For parity with C engine_demo.c which uses ca_engine_attach, we use attach if possible.
-    // Create engine via open on same path then attach shared DB alternative:
+    // Create the Engine independently from the selected database backend.
     auto engineRes = Engine::create(cfg);
     if (!engineRes) {
         std::cerr << "[engine_demo] Engine::create failed: " << engineRes.error().message << "\n";

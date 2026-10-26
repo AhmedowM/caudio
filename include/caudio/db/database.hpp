@@ -11,6 +11,7 @@
  */
 
 #include <array>
+#include <caudio/contracts/database.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
@@ -48,7 +49,7 @@ struct DatabaseOptions {
  * @see DatabaseOptions
  * @see SqliteStatement
  */
-class Database final {
+class Database final : public caudio::contracts::IDatabase {
   public:
     /**
      * @brief Default-constructs an empty (not open) Database.
@@ -66,7 +67,7 @@ class Database final {
      * @brief Closes the writer, clears the statement cache and resets the handle.
      * @ingroup caudio_db
      */
-    ~Database();
+    ~Database() override;
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
     // Move is not thread-safe after open: caller must ensure no concurrent DB access.
@@ -103,6 +104,8 @@ class Database final {
      * Thread-safe; delegates to the writer's flush().
      */
     std::expected<void, caudio::utils::Error> flush();
+
+    bool isOpen() const noexcept override;
 
     /**
      * @brief Enqueues multiple tracks atomically (single transaction).
@@ -182,7 +185,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id);
+    std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id) override;
 
     /**
      * @brief Finds a track by fingerprint.
@@ -363,7 +366,11 @@ class Database final {
     std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     listQueueItems(int64_t qid);
 
+    std::expected<caudio::types::Track, caudio::utils::Error>
+    queueTrackAt(int64_t qid, int64_t position) override;
+
     std::expected<Queue, caudio::utils::Error> getQueue(int64_t qid);
+    std::expected<bool, caudio::utils::Error> queueExists(int64_t qid) override;
 
     std::expected<std::vector<Queue>, caudio::utils::Error> listQueues();
 
@@ -393,7 +400,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_; delegates to queueCountLocked().
      */
-    std::size_t queueCount(int64_t qid);
+    std::size_t queueCount(int64_t qid) override;
 
     /**
      * @brief Finds the 0-based index of a track in a queue.
@@ -407,7 +414,7 @@ class Database final {
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_.
      */
-    std::optional<size_t> queueIndexOf(int64_t qid, int64_t trackId);
+    std::optional<std::size_t> queueIndexOf(int64_t qid, int64_t trackId) override;
 
     // History
     /**
@@ -512,6 +519,7 @@ class Database final {
      * Thread-safe: shared_lock + cacheMutex_ for cached statements.
      */
     std::expected<DbStats, caudio::utils::Error> getStats();
+    std::expected<caudio::contracts::PlaybackStats, caudio::utils::Error> playbackStats() override;
 
     /**
      * @brief Returns library stats (counts and totals, optionally most-played).
@@ -524,6 +532,22 @@ class Database final {
      */
     std::expected<caudio::types::LibraryStats, caudio::utils::Error>
     libraryStats(std::optional<int> mostPlayed = std::nullopt);
+
+    std::expected<caudio::contracts::PlaybackState, caudio::utils::Error>
+    loadEngineState() override;
+    std::expected<void, caudio::utils::Error>
+    saveEngineState(const caudio::contracts::PlaybackState& state) override;
+    std::expected<void, caudio::utils::Error>
+    saveEngineShuffle(bool enabled, std::span<const int64_t> permutation,
+                      int64_t cursor_position) override;
+    std::expected<void, caudio::utils::Error> saveEngineCursor(int64_t cursor_position) override;
+    std::expected<void, caudio::utils::Error> markPlayed(int64_t track_id, int64_t started_at,
+                                                         int64_t completed_at, int64_t position_ms,
+                                                         double completion_pct,
+                                                         int64_t queue_id) override;
+    std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
+    engineHistoryList(int limit) override;
+    std::expected<void, caudio::utils::Error> engineHistoryClear() override;
 
 }; // class Database
 
