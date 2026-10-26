@@ -153,7 +153,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg,
         return std::unexpected{engRes.error()};
     }
     std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
-    if (auto e = eng->attachDatabase(std::move(db)); !e) {
+    if (auto e = eng->attachDatabase(db); !e) {
         detail::releaseLock(lockFd);
         return std::unexpected{e.error()};
     }

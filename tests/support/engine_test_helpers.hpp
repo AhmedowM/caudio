@@ -2,8 +2,10 @@
 
 #include <caudio/db/database.hpp>
 #include <caudio/engine/engine.hpp>
+#include <caudio/service/service.hpp>
 #include <caudio/utils/error.hpp>
 #include <expected>
+#include <filesystem>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -25,6 +27,17 @@ openEngineWithDatabase(std::string_view path, const caudio::engine::EngineConfig
     if (auto attached = instance->attachDatabase(std::move(sharedDatabase)); !attached)
         return std::unexpected(attached.error());
     return instance;
+}
+inline std::expected<std::unique_ptr<caudio::service::Service>, caudio::utils::Error>
+openServiceWithDatabase(std::string_view path,
+                        const caudio::service::ServiceConfig& config) {
+    auto database = caudio::db::Database::open(path);
+    if (!database)
+        return std::unexpected(database.error());
+
+    std::shared_ptr<caudio::contracts::IDatabase> sharedDatabase(
+        std::move(database.value()));
+    return caudio::service::Service::create(config, std::move(sharedDatabase));
 }
 
 } // namespace caudio::test_helpers

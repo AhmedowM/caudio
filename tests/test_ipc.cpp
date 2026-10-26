@@ -21,6 +21,7 @@
 #include <variant>
 
 #include "../src/client/ipc_client.hpp"
+#include <support/engine_test_helpers.hpp>
 using namespace caudio::ipc;
 using namespace caudio::utils;
 using namespace caudio::db;
@@ -53,7 +54,7 @@ TEST_CASE("daemon start/stop", "[ipc][cli]") {
     cfg.configPath = dir / "config.json";
 
     // Start daemon
-    auto svcRes = Service::create(cfg);
+    auto svcRes = openServiceWithDatabase(cfg.dbPath.generic_string(), cfg);
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
@@ -314,7 +315,7 @@ TEST_CASE("command roundtrip - volume", "[ipc][cli]") {
     cfg.configPath = dir / "config.json";
 
     // Start daemon
-    auto svcRes = Service::create(cfg);
+    auto svcRes = openServiceWithDatabase(cfg.dbPath.generic_string(), cfg);
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
@@ -370,7 +371,7 @@ TEST_CASE("command roundtrip - status", "[ipc][cli]") {
     cfg.configPath = dir / "config.json";
 
     // Start daemon
-    auto svcRes = Service::create(cfg);
+    auto svcRes = openServiceWithDatabase(cfg.dbPath.generic_string(), cfg);
     REQUIRE(svcRes.has_value());
     auto svc = std::move(svcRes.value());
 
