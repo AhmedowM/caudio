@@ -26,9 +26,10 @@
 namespace caudio::db {
 
 std::expected<void, caudio::utils::Error>
-scanLibrary(Database& db, int64_t libraryId,
+scanLibrary(contracts::IDatabase& db_, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress,
             caudio::media::ScanMode mode) {
+    Database& db = dynamic_cast<Database&>(db_);
     if (libraryId == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     auto libs = db.listLibraries();

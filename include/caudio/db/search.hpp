@@ -11,7 +11,6 @@
  * All stages are under a single `shared_lock` to avoid unlock gaps.
  */
 
-#include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
 #include <expected>
 #include <string>
@@ -39,7 +38,7 @@ namespace caudio::db {
  * @see searchLike
  */
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-searchFts(Database& db, std::string_view query, int limit = 50);
+searchFts(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 /**
  * @brief LIKE-only search (no FTS).
@@ -53,7 +52,7 @@ searchFts(Database& db, std::string_view query, int limit = 50);
  * Thread-safe: acquires `shared_lock`.
  */
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-searchLike(Database& db, std::string_view query, int limit = 50);
+searchLike(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 /**
  * @brief Sanitizes a raw FTS5 query term.
@@ -76,6 +75,6 @@ std::string sanitizeFtsTerm(std::string_view term);
  * @see searchFts
  */
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-search(Database& db, std::string_view query, int limit = 50);
+search(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 } // namespace caudio::db

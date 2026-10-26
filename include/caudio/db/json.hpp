@@ -10,7 +10,6 @@
  * preserve field order across export/import.
  */
 
-#include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/utils/record_json.hpp>
 #include <expected>
@@ -31,7 +30,7 @@ namespace caudio::db {
  * @see importJson
  * @see trackToJson
  */
-std::expected<void, caudio::utils::Error> exportJson(Database& db,
+std::expected<void, caudio::utils::Error> exportJson(contracts::IDatabase& db,
                                                      const std::filesystem::path& outPath);
 
 /**
@@ -54,7 +53,7 @@ std::expected<void, caudio::utils::Error> exportJson(Database& db,
  * @see exportJson
  * @see trackFromJson
  */
-std::expected<void, caudio::utils::Error> importJson(Database& db,
+std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db,
                                                      const std::filesystem::path& inPath);
 
 } // namespace caudio::db

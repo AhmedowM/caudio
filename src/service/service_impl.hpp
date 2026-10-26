@@ -10,8 +10,8 @@
  */
 
 #include <atomic>
-#include <caudio/db/database.hpp>
 #include <caudio/engine/engine.hpp>
+#include <caudio/fwd.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/ipc/shm_status.hpp>
@@ -29,7 +29,7 @@
 namespace caudio::service {
 
 struct Service::Impl {
-    Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
+    Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::contracts::IDatabase> db,
          std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
          std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
          std::string socketPath, std::intptr_t lockFd,
@@ -152,7 +152,7 @@ struct Service::Impl {
     handle(const caudio::ipc::VolumeSet& v);
 
     ServiceConfig config_;
-    std::shared_ptr<caudio::db::Database> db_;
+    std::shared_ptr<caudio::contracts::IDatabase> db_;
     std::unique_ptr<caudio::engine::Engine> engine_;
     std::unique_ptr<IpcServer> server_;
     std::unique_ptr<caudio::utils::Logger> logger_;

@@ -59,7 +59,8 @@ class Service final {
      * Creates PID file, initializes shared memory status block for event-driven status snapshots,
      * and starts IPC server listening on derived or explicit socket path.
      */
-    static ExpectedService create(const ServiceConfig& cfg);
+    static ExpectedService create(const ServiceConfig& cfg,
+                                  std::shared_ptr<caudio::contracts::IDatabase> db = nullptr);
 
     /**
      * @brief Destructor: ensures cleanup via shutdown().
@@ -96,7 +97,7 @@ class Service final {
      * @brief Access the database instance.
      * @return Reference to the Database.
      */
-    caudio::db::Database& db() noexcept;
+    caudio::contracts::IDatabase& db() noexcept;
 
     /**
      * @brief Access the audio engine instance.
@@ -125,7 +126,7 @@ class Service final {
     /**
      * @brief Private constructor used by create().
      */
-    Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
+    Service(const ServiceConfig& cfg, std::shared_ptr<caudio::contracts::IDatabase> db,
             std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
             std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
             std::string socketPath, std::intptr_t lockFd,

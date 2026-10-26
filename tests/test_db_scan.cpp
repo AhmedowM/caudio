@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/contracts/database.hpp>
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/media/scan.hpp>

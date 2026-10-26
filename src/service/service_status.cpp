@@ -18,7 +18,7 @@
 #endif
 
 #include <caudio/config.hpp>
-#include <caudio/db.hpp>
+#include <caudio/contracts/database.hpp>
 #include <caudio/engine.hpp>
 #include <caudio/ipc.hpp>
 #include <caudio/player.hpp>
@@ -28,8 +28,8 @@
 #include <caudio/windows_fwd.hpp>
 
 namespace caudio::service::detail {
-std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
-                                                                     caudio::db::Database& db) {
+std::expected<caudio::ipc::Status, caudio::utils::Error>
+buildStatus(caudio::engine::Engine& eng, caudio::contracts::IDatabase& db) {
     caudio::ipc::Status s{};
     s.version = std::string(caudio::version::version());
     s.state = eng.state();

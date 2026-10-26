@@ -17,6 +17,8 @@
 #include <expected>
 #include <type_traits>
 
+#include "caudio/db/types.hpp"
+
 struct sqlite3;
 struct sqlite3_stmt;
 
@@ -28,6 +30,9 @@ namespace caudio::db {
 class Database;
 struct DbStats;
 class SqliteStatement;
+struct Queue;
+struct Library;
+struct TrackQuery;
 } // namespace caudio::db
 
 namespace caudio::contracts {

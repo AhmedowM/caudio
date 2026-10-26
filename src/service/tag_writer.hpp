@@ -9,16 +9,14 @@
  */
 #pragma once
 
-#include <caudio/db/types.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
-#include <expected>
 #include <filesystem>
 
-namespace caudio::db {
-// Defined in db/core.hpp (full Database API); reference params need only this.
-class Database;
-} // namespace caudio::db
+namespace caudio::contracts {
+// Defined in contracts/database.hpp (full Database API); reference params need only this.
+class IDatabase;
+} // namespace caudio::contracts
 
 namespace caudio::service::detail {
 
@@ -47,7 +45,7 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
  * mtime, and audio technicals refresh from the new bytes. The id is stable:
  * lookup is path-keyed, never fingerprint-keyed (the fingerprint changed).
  */
-caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
+caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::contracts::IDatabase& db,
                                                                  caudio::types::Track t);
 
 } // namespace caudio::service::detail

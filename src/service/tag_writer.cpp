@@ -185,7 +185,7 @@ caudio::utils::Expected<void> writeFileTags(const std::filesystem::path& p,
     return {};
 }
 
-caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::db::Database& db,
+caudio::utils::Expected<caudio::types::Track> reregisterTrackRow(caudio::contracts::IDatabase& db,
                                                                  caudio::types::Track t) {
     auto fpRes = caudio::media::internal::computeFingerprint(t.path);
     if (!fpRes)

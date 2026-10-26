@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <atomic>
 #include <caudio/config.hpp>
-#include <caudio/db/database.hpp>
+#include <caudio/contracts/database.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
@@ -48,7 +48,8 @@ Service::~Service() {
     shutdown();
 }
 
-Service::ExpectedService Service::create(const ServiceConfig& cfg) {
+Service::ExpectedService Service::create(const ServiceConfig& cfg,
+                                         std::shared_ptr<caudio::contracts::IDatabase> db) {
     // Determine socket path
     std::string spStr;
     if (!cfg.socketPath.empty()) {
@@ -131,16 +132,16 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
     caudio::utils::Logger* logger = loggerPtr.get();
 
     // open DB
-    caudio::db::DatabaseOptions dbOpts;
-    dbOpts.logger = logger;
-    auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string(), dbOpts);
-    if (!dbRes) {
-        auto err = dbRes.error();
-        std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
-        detail::releaseLock(lockFd);
-        return std::unexpected{caudio::utils::makeError(err.code, msg)};
-    }
-    std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
+    // caudio::db::DatabaseOptions dbOpts;
+    // dbOpts.logger = logger;
+    // auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string(), dbOpts);
+    // if (!dbRes) {
+    //     auto err = dbRes.error();
+    //     std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
+    //     detail::releaseLock(lockFd);
+    //     return std::unexpected{caudio::utils::makeError(err.code, msg)};
+    // }
+    // std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
 
     // create Engine
     caudio::engine::EngineConfig ecfg{};
@@ -152,7 +153,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         return std::unexpected{engRes.error()};
     }
     std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
-    if (auto e = eng->attachDatabase(dbShared); !e) {
+    if (auto e = eng->attachDatabase(std::move(db)); !e) {
         detail::releaseLock(lockFd);
         return std::unexpected{e.error()};
     }
@@ -199,15 +200,15 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg) {
         shmWriter = std::make_unique<caudio::ipc::ShmStatusWriter>(std::move(*shmRes));
 
     auto svc = std::unique_ptr<Service>(
-        new Service(cfg, dbShared, std::move(eng), std::move(srvPtr), std::move(loggerPtr), pidPath,
-                    spStr, lockFd, std::move(shmWriter), shmName));
+        new Service(cfg, std::move(db), std::move(eng), std::move(srvPtr), std::move(loggerPtr),
+                    pidPath, spStr, lockFd, std::move(shmWriter), shmName));
     svc->impl_->logger_->info("daemon started version={} pid={} db={} socket={}",
                               caudio::version::version(), pidStr, cfg.dbPath.generic_string(),
                               spStr);
     return svc;
 }
 
-Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
+Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::contracts::IDatabase> db,
                  std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                  std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                  std::string socketPath, std::intptr_t lockFd,
@@ -216,7 +217,7 @@ Service::Service(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database>
                                    std::move(logger), std::move(pidPath), std::move(socketPath),
                                    lockFd, std::move(shmWriter), std::move(shmName))) {}
 
-Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::db::Database> db,
+Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::contracts::IDatabase> db,
                     std::unique_ptr<caudio::engine::Engine> eng, std::unique_ptr<IpcServer> srv,
                     std::unique_ptr<caudio::utils::Logger> logger, std::filesystem::path pidPath,
                     std::string socketPath, std::intptr_t lockFd,
@@ -301,7 +302,7 @@ void Service::Impl::shutdown() {
     // shm handle will be cleaned up via RAII
 }
 
-caudio::db::Database& Service::db() noexcept {
+caudio::contracts::IDatabase& Service::db() noexcept {
     return *impl_->db_;
 }
 /**

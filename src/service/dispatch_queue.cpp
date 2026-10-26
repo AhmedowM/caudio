@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <caudio/db/database.hpp>
 #include <caudio/db/search.hpp>
 #include <caudio/db/types.hpp>
 #include <caudio/ipc/command.hpp>
@@ -33,7 +34,7 @@ namespace detail {
 double durationFromDecoder(const std::filesystem::path& path) noexcept;
 
 inline std::expected<caudio::types::Track, caudio::utils::Error>
-ensureLibraryTrack(caudio::db::Database& db, const std::filesystem::path& p) {
+ensureLibraryTrack(caudio::contracts::IDatabase& db, const std::filesystem::path& p) {
     auto fpRes = caudio::media::internal::computeFingerprint(p);
     if (!fpRes)
         return std::unexpected{fpRes.error()};

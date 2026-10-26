@@ -26,8 +26,9 @@ namespace caudio::db {
 
 using caudio::utils::Json;
 
-std::expected<void, caudio::utils::Error> exportJson(Database& db,
+std::expected<void, caudio::utils::Error> exportJson(contracts::IDatabase& db_,
                                                      const std::filesystem::path& outPath) {
+    Database& db = dynamic_cast<Database&>(db_);
     auto tracks = db.listTracks(nullptr);
     if (!tracks)
         return std::unexpected{tracks.error()};
@@ -47,8 +48,9 @@ std::expected<void, caudio::utils::Error> exportJson(Database& db,
     return {};
 }
 
-std::expected<void, caudio::utils::Error> importJson(Database& db,
+std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
                                                      const std::filesystem::path& inPath) {
+    Database& db = dynamic_cast<Database&>(db_);
     std::ifstream f(inPath, std::ios::binary);
     if (!f)
         return std::unexpected{

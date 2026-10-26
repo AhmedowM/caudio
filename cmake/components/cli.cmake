@@ -14,7 +14,7 @@ target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp cli/src/shell/output_f
 target_include_directories(caudio_cli PRIVATE cli/src/shell)
 target_include_directories(caudio_cli SYSTEM PRIVATE vendor)
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc caudio::player CLI11::CLI11 Threads::Threads)
+target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc caudio::db caudio::player CLI11::CLI11 Threads::Threads)
 # FFmpeg is not linked here directly: caudio::media links it PRIVATE (see
 # media.cmake) and that propagates as $<LINK_ONLY:...> through cli -> player -> media.
 ca_set_warnings(caudio_cli)

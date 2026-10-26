@@ -49,7 +49,8 @@ tryFtsQuery(sqlite3* h, std::string_view query, int limit) {
 }
 
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-searchFts(Database& db, std::string_view query, int limit) {
+searchFts(contracts::IDatabase& db_, std::string_view query, int limit) {
+    Database& db = dynamic_cast<Database&>(db_);
     if (query.empty())
         return std::vector<caudio::types::Track>{};
     std::string sanitized = internal::sanitizeFtsTerm(query);
@@ -99,7 +100,8 @@ searchFts(Database& db, std::string_view query, int limit) {
 }
 
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-searchLike(Database& db, std::string_view query, int limit) {
+searchLike(contracts::IDatabase& db_, std::string_view query, int limit) {
+    Database& db = dynamic_cast<Database&>(db_);
     if (query.empty())
         return std::vector<caudio::types::Track>{};
     std::string esc = internal::escapeLike(query);
@@ -142,7 +144,8 @@ std::string sanitizeFtsTerm(std::string_view term) {
 }
 
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-search(Database& db, std::string_view query, int limit) {
+search(contracts::IDatabase& db_, std::string_view query, int limit) {
+    Database& db = dynamic_cast<Database&>(db_);
     return searchFts(db, query, limit);
 }
 

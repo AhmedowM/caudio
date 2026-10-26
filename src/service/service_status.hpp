@@ -14,9 +14,9 @@ namespace caudio::engine {
 class Engine;
 } // namespace caudio::engine
 
-namespace caudio::db {
-class Database;
-} // namespace caudio::db
+namespace caudio::contracts {
+class IDatabase;
+} // namespace caudio::contracts
 
 namespace caudio::service::detail {
 
@@ -28,7 +28,7 @@ namespace caudio::service::detail {
  * @param db Database reference.
  * @return Status on success, Error on failure.
  */
-std::expected<caudio::ipc::Status, caudio::utils::Error> buildStatus(caudio::engine::Engine& eng,
-                                                                     caudio::db::Database& db);
+std::expected<caudio::ipc::Status, caudio::utils::Error>
+buildStatus(caudio::engine::Engine& eng, caudio::contracts::IDatabase& db);
 
 } // namespace caudio::service::detail

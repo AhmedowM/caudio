@@ -23,6 +23,7 @@
 #include <caudio/app/paths.hpp>
 #include <caudio/client/client.hpp>
 #include <caudio/config.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
@@ -704,7 +705,12 @@ int Shell::run(int argc, char** argv) {
         scfg.logLevel = config_.logLevel;
         scfg.logToStderr = foreground;
         scfg.autoResumeOnPlay = config_.autoResumeOnPlay;
-        auto svc = caudio::service::Service::create(scfg);
+        auto db = caudio::db::Database::open(scfg.dbPath.generic_string());
+        if (!db) {
+            return caudio::app::Outcome::fail(std::format(
+                "start failed: {} (db: {})", db.error().message, config_.dbPath.generic_string()));
+        }
+        auto svc = caudio::service::Service::create(scfg, std::move(db.value()));
         if (!svc) {
             return caudio::app::Outcome::fail(std::format(
                 "start failed: {} (db: {})", svc.error().message, config_.dbPath.generic_string()));

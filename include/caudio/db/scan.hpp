@@ -12,16 +12,13 @@
  *   of the discovered tracks under the database mutex).
  */
 
-#include <caudio/db/types.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/media/audio_ext.hpp>
 #include <caudio/media/scan.hpp>
 #include <cstdint>
 #include <expected>
-#include <filesystem>
 #include <functional>
 #include <string_view>
-#include <vector>
 
 namespace caudio::db {
 
@@ -52,7 +49,7 @@ namespace caudio::db {
  * @see Database::findByFingerprintLocked
  */
 std::expected<void, caudio::utils::Error>
-scanLibrary(Database& db, int64_t libraryId,
+scanLibrary(contracts::IDatabase& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {},
             caudio::media::ScanMode mode = caudio::media::ScanMode::Sampled);
 
