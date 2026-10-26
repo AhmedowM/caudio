@@ -160,7 +160,7 @@ struct Engine::Impl {
     ExpectedVoid setRepeat(caudio::types::RepeatMode m);
 
     // library / history
-    std::expected<caudio::db::DbStats, caudio::utils::Error> stats();
+    std::expected<caudio::engine::EngineStats, caudio::utils::Error> stats();
     std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     listHistory(int limit);
     std::expected<void, caudio::utils::Error> clearHistory();
@@ -330,7 +330,7 @@ caudio::types::RepeatMode Engine::repeat() const noexcept {
     return impl_->repeat();
 }
 
-std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::stats() {
+std::expected<caudio::engine::EngineStats, caudio::utils::Error> Engine::stats() {
     return impl_->stats();
 }
 
@@ -850,10 +850,21 @@ void Engine::Impl::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     unlockQueue();
 }
 
-std::expected<caudio::db::DbStats, caudio::utils::Error> Engine::Impl::stats() {
+std::expected<caudio::engine::EngineStats, caudio::utils::Error> Engine::Impl::stats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
-    return db_->getStats();
+    auto ds = db_->getStats();
+    if (!ds)
+        return std::unexpected(ds.error());
+    return EngineStats{
+        ds->num_tracks,
+        ds->num_playlists,
+        ds->num_queue_items,
+        ds->num_history,
+        ds->num_bookmarks,
+        ds->num_libraries,
+        ds->total_duration_ms,
+    };
 }
 
 std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>

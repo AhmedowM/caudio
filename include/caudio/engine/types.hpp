@@ -132,4 +132,20 @@ struct EngineConfig {
     caudio::utils::Logger* logger{nullptr};
 };
 
+/**
+ * @brief Engine statistics, independent of the database layer.
+ * @ingroup caudio_engine
+ * @details Mirror of `caudio::db::DbStats` without the SQLite dependency.
+ * Returned by `Engine::stats()` so consumers do not need to link `caudio::db`.
+ */
+struct EngineStats {
+    int64_t num_tracks{};        ///< Number of live tracks.
+    int64_t num_playlists{};     ///< Number of playlists.
+    int64_t num_queue_items{};   ///< Number of queue items.
+    int64_t num_history{};       ///< Number of history entries.
+    int64_t num_bookmarks{};     ///< Number of bookmarks.
+    int64_t num_libraries{};     ///< Number of libraries.
+    int64_t total_duration_ms{}; ///< Sum of track durations in milliseconds.
+};
+
 } // namespace caudio::engine

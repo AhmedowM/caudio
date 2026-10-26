@@ -35,7 +35,6 @@
  * cheap; the public API is unchanged.
  */
 
-#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
@@ -278,7 +277,7 @@ class Engine final {
      * @see caudio::db::Database::getStats
      * @see caudio::db::DbStats
      */
-    std::expected<caudio::db::DbStats, caudio::utils::Error> stats();
+    std::expected<caudio::engine::EngineStats, caudio::utils::Error> stats();
 
     /**
      * @brief Lists history entries.
