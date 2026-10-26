@@ -26,6 +26,12 @@ else()
   endif()
 endif()
 if(NOT EXISTS "${_caudio_llvm_root}/bin/clang")
+  # Allow AppleClang (or any other compiler) when the user explicitly opts in.
+  if(CAUDIO_ALLOW_UNSUPPORTED_COMPILER OR DEFINED ENV{CAUDIO_ALLOW_UNSUPPORTED_COMPILER})
+    message(STATUS "CAUDIO_ALLOW_UNSUPPORTED_COMPILER=ON: keeping caller-provided "
+      "compiler (unsupported on macOS)")
+    return()
+  endif()
   message(FATAL_ERROR
     "LLVM Clang required on macOS (brew install llvm). "
     "AppleClang lags our C++23 baseline; GCC yields a dummy audio backend. "
