@@ -51,7 +51,7 @@ namespace caudio::media {
  * GCC 14.2 module ICE. Decoders needing direct memory access (e.g., Vorbis)
  * should use MemoryReader which provides contiguous memory access.
  */
-class Reader {
+class CAUDIO_API Reader {
   public:
     virtual ~Reader() = default;
 
@@ -112,7 +112,7 @@ class Reader {
  * - tell(): Returns -1 on error
  * - size(): Returns cached size or -1
  */
-class FileReader final : public Reader {
+class CAUDIO_API FileReader final : public Reader {
   public:
     FileReader() = delete;
 
@@ -167,7 +167,7 @@ class FileReader final : public Reader {
  * - Network streams buffered in memory
  * - Decoders requiring direct memory access (Vorbis, etc.)
  */
-class MemoryReader final : public Reader {
+class CAUDIO_API MemoryReader final : public Reader {
   public:
     MemoryReader() = delete;
 

@@ -61,7 +61,7 @@ namespace caudio::player {
  * - Cleans up with ma_context_uninit()
  * - Only returns playback devices (capture devices ignored)
  */
-caudio::types::DeviceList enumerateDevices();
+CAUDIO_API caudio::types::DeviceList enumerateDevices();
 
 /**
  * @class AudioOutput
@@ -92,7 +92,7 @@ caudio::types::DeviceList enumerateDevices();
  *   create() -> init() -> start() -> (playback) -> stop() -> shutdown()
  *   Destructor calls shutdown() automatically.
  */
-class AudioOutput {
+class CAUDIO_API AudioOutput {
   public:
     using Expected = std::expected<std::unique_ptr<AudioOutput>, caudio::utils::Error>;
 

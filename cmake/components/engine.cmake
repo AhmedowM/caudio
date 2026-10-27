@@ -10,7 +10,7 @@ set(CAUDIO_ENGINE_SOURCES
   src/engine/history.cpp
   src/engine/shuffle.cpp
 )
-caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} MODULE_SOURCES ${CAUDIO_ENGINE_MODULE_SOURCES} DEPS caudio::contracts caudio::player caudio::media caudio::utils Threads::Threads)
+caudio_add_component(engine SOURCES ${CAUDIO_ENGINE_SOURCES} MODULE_SOURCES ${CAUDIO_ENGINE_MODULE_SOURCES} DEPS caudio::contracts caudio::utils Threads::Threads PRIVATE_DEPS  caudio::player caudio::media)
 ca_set_module_warnings(engine)
 
 if(CAUDIO_BUILD_SHARED)

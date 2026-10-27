@@ -291,6 +291,7 @@ unset(WITH_ZLIB)
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
 add_library(caudio::tag ALIAS tag)
+target_compile_definitions(tag PRIVATE TAGLIB_STATIC)
 target_compile_options(tag PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 # TagLib's `tag` target exports install includes only; consumers use flat
 # per-subdir includes (`#include <apetag.h>`). Derive every header dir

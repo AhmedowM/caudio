@@ -49,7 +49,7 @@ struct DatabaseOptions {
  * @see DatabaseOptions
  * @see SqliteStatement
  */
-class Database final : public caudio::contracts::IDatabase {
+class CAUDIO_API Database final : public caudio::contracts::IDatabase {
   public:
     /**
      * @brief Default-constructs an empty (not open) Database.

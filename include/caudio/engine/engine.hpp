@@ -82,7 +82,7 @@ struct ServiceAccess;
  * @see PlaybackState
  * @see EngineConfig
  */
-class Engine final {
+class CAUDIO_API Engine final {
   public:
     using ExpectedVoid = std::expected<void, caudio::utils::Error>; ///< Void or Error.
     using ExpectedEngine =

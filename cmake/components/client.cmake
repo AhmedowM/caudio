@@ -11,5 +11,5 @@ set(CAUDIO_CLIENT_SOURCES
 caudio_add_component(client SOURCES ${CAUDIO_CLIENT_SOURCES} MODULE_SOURCES ${CAUDIO_CLIENT_MODULE_SOURCES} DEPS caudio::config caudio::ipc caudio::utils Threads::Threads INCLUDES vendor)
 ca_set_module_warnings(client)
 if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(client EXTRA_DEPS caudio::ipc caudio::utils_shared Threads::Threads)
+  caudio_add_shared_variant(client EXTRA_DEPS caudio::ipc_shared caudio::utils_shared Threads::Threads)
 endif()

@@ -103,7 +103,7 @@ struct PlayerOptions {
  * - Errors stored in lastError_, state set to Error
  * - All public methods return Expected<void> for explicit error handling
  */
-class Player {
+class CAUDIO_API Player {
   public:
     using ExpectedVoid = std::expected<void, caudio::utils::Error>;
     using ExpectedPlayer = std::expected<std::unique_ptr<Player>, caudio::utils::Error>;

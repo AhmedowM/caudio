@@ -43,7 +43,7 @@ namespace caudio::media {
  * @param path Filesystem path to probe.
  * @return Metadata on success, Error on failure.
  */
-caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path);
+CAUDIO_API caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path);
 
 /**
  * @class Decoder
@@ -58,7 +58,7 @@ caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::strin
  * - Io: Decoder-level I/O error during seek
  * - Internal: Decoder not properly initialized
  */
-class Decoder final {
+class CAUDIO_API Decoder final {
   public:
     /**
      * @brief Probe raw header bytes for a supported format.

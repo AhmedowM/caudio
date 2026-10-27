@@ -30,7 +30,7 @@ namespace caudio::db {
  * @see importJson
  * @see trackToJson
  */
-std::expected<void, caudio::utils::Error> exportJson(contracts::IDatabase& db,
+CAUDIO_API std::expected<void, caudio::utils::Error> exportJson(contracts::IDatabase& db,
                                                      const std::filesystem::path& outPath);
 
 /**
@@ -53,7 +53,7 @@ std::expected<void, caudio::utils::Error> exportJson(contracts::IDatabase& db,
  * @see exportJson
  * @see trackFromJson
  */
-std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db,
+CAUDIO_API std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db,
                                                      const std::filesystem::path& inPath);
 
 } // namespace caudio::db

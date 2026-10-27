@@ -21,14 +21,14 @@ namespace caudio::config {
  * - POSIX socket/pid/lock are under $XDG_RUNTIME_DIR/caudio or $XDG_DATA_HOME/caudio or
  * ~/.local/share/caudio
  */
-caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
-caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath);
-caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath);
 /**
  * @brief Daemon log file path for a database: `<db-dir>/caudio.log`.
  * Falls back to the temp dir when the db path has no parent.
  */
-caudio::utils::Expected<std::filesystem::path> logPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path> logPathFor(const std::filesystem::path& dbPath);
 
 /**
  * @brief User-facing configuration loaded from config.json.
@@ -58,7 +58,7 @@ struct Config {
  * Reads JSON config file, falls back to defaults for missing keys.
  * Supports legacy keys: db_path, log_level (snake_case).
  */
-caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path);
+CAUDIO_API caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path);
 
 /**
  * @brief Save configuration to file.
@@ -68,6 +68,6 @@ caudio::utils::Expected<Config> loadConfig(const std::filesystem::path& path);
  * Creates parent directories if needed. Writes JSON with 2-space indentation.
  * Only writes dbPath, device, logLevel, and socketPath (if non-empty).
  */
-caudio::utils::Expected<void> saveConfig(const Config& cfg);
+CAUDIO_API caudio::utils::Expected<void> saveConfig(const Config& cfg);
 
 } // namespace caudio::config

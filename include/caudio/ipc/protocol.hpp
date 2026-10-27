@@ -117,7 +117,7 @@ struct IpcReply final {
  * @param cmd Command to serialize.
  * @return JSON object with "type" field and command-specific fields.
  */
-Json toJson(const Command& cmd);
+CAUDIO_API Json toJson(const Command& cmd);
 
 /**
  * @brief Deserialize a Command from JSON.
@@ -125,7 +125,7 @@ Json toJson(const Command& cmd);
  * @param j JSON object with "type" field and command-specific fields.
  * @return Command variant, or error if type is unknown or parsing fails.
  */
-std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j);
+CAUDIO_API std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j);
 
 /**
  * @brief Deserialize a Result from JSON (forward-declared so
@@ -134,7 +134,7 @@ std::expected<Command, caudio::utils::Error> commandFromJson(const Json& j);
  * @param j JSON object with "type" field and result-specific fields.
  * @return Result variant, or error if type is unknown or parsing fails.
  */
-std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j);
+CAUDIO_API std::expected<Result, caudio::utils::Error> resultFromJson(const Json& j);
 
 // Generic fromJson template wrapper: fromJson<Command>(json)
 /**
@@ -165,7 +165,7 @@ std::expected<T, caudio::utils::Error> fromJson(const Json& j) {
  * @param r Result to serialize.
  * @return JSON object with "type" field and result-specific fields.
  */
-Json toJson(const Result& r);
+CAUDIO_API Json toJson(const Result& r);
 
 // ---------------------------------------------------------------------------
 // IpcRequest / IpcReply serialization
@@ -176,7 +176,7 @@ Json toJson(const Result& r);
  * @param req Request to serialize.
  * @return JSON string (compact format).
  */
-std::string serializeRequest(const IpcRequest& req);
+CAUDIO_API std::string serializeRequest(const IpcRequest& req);
 
 /**
  * @brief Deserialize an IpcRequest from JSON string.
@@ -184,7 +184,7 @@ std::string serializeRequest(const IpcRequest& req);
  * @param sv JSON string to parse.
  * @return IpcRequest, or error if parsing fails or required fields are missing.
  */
-std::expected<IpcRequest, caudio::utils::Error> deserializeRequest(std::string_view sv);
+CAUDIO_API std::expected<IpcRequest, caudio::utils::Error> deserializeRequest(std::string_view sv);
 
 /**
  * @brief Serialize an IpcReply to JSON string.
@@ -192,7 +192,7 @@ std::expected<IpcRequest, caudio::utils::Error> deserializeRequest(std::string_v
  * @param rep Reply to serialize.
  * @return JSON string (compact format).
  */
-std::string serializeReply(const IpcReply& rep);
+CAUDIO_API std::string serializeReply(const IpcReply& rep);
 
 /**
  * @brief Deserialize an IpcReply from JSON string.
@@ -200,7 +200,7 @@ std::string serializeReply(const IpcReply& rep);
  * @param sv JSON string to parse.
  * @return IpcReply, or error if parsing fails or required fields are missing.
  */
-std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view sv);
+CAUDIO_API std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view sv);
 
 // ---------------------------------------------------------------------------
 // Framing: [4-byte BE len][json]
@@ -211,7 +211,7 @@ std::expected<IpcReply, caudio::utils::Error> deserializeReply(std::string_view 
  * @param json JSON payload to frame.
  * @return Vector of bytes: [len_be][json...] where len_be is 4-byte big-endian length.
  */
-std::vector<std::byte> frame(std::string_view json);
+CAUDIO_API std::vector<std::byte> frame(std::string_view json);
 
 /**
  * @brief Extract JSON payload from framed buffer.
@@ -219,7 +219,7 @@ std::vector<std::byte> frame(std::string_view json);
  * @param buf Buffer containing [4-byte BE len][json...].
  * @return JSON string payload, or error if frame is incomplete or invalid.
  */
-std::expected<std::string, caudio::utils::Error> deframe(std::span<const std::byte> buf);
+CAUDIO_API std::expected<std::string, caudio::utils::Error> deframe(std::span<const std::byte> buf);
 
 /**
  * @brief Serialize a Result to pretty-printed JSON string.
@@ -227,7 +227,7 @@ std::expected<std::string, caudio::utils::Error> deframe(std::span<const std::by
  * @param r Result to serialize.
  * @return Pretty-printed JSON string (2-space indentation).
  */
-std::string toJsonString(const Result& r);
+CAUDIO_API std::string toJsonString(const Result& r);
 
 /**
  * @brief Serialize a Command to pretty-printed JSON string.
@@ -235,6 +235,6 @@ std::string toJsonString(const Result& r);
  * @param c Command to serialize.
  * @return Pretty-printed JSON string (2-space indentation).
  */
-std::string toJsonString(const Command& c);
+CAUDIO_API std::string toJsonString(const Command& c);
 
 } // namespace caudio::ipc

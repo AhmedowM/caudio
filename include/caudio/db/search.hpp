@@ -37,7 +37,7 @@ namespace caudio::db {
  * @see tryFtsQuery
  * @see searchLike
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+CAUDIO_API std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 searchFts(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 /**
@@ -51,7 +51,7 @@ searchFts(contracts::IDatabase& db, std::string_view query, int limit = 50);
  * @par Thread safety
  * Thread-safe: acquires `shared_lock`.
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+CAUDIO_API std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 searchLike(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 /**
@@ -61,7 +61,7 @@ searchLike(contracts::IDatabase& db, std::string_view query, int limit = 50);
  * @return Sanitized FTS5 term (empty means match-nothing).
  * @details Strips FTS5 operators and escapes quotes by doubling them.
  */
-std::string sanitizeFtsTerm(std::string_view term);
+CAUDIO_API std::string sanitizeFtsTerm(std::string_view term);
 
 /**
  * @brief Unified search entry point (FTS with fallback).
@@ -74,7 +74,7 @@ std::string sanitizeFtsTerm(std::string_view term);
  * Thread-safe (delegates to `searchFts`).
  * @see searchFts
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+CAUDIO_API std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 search(contracts::IDatabase& db, std::string_view query, int limit = 50);
 
 } // namespace caudio::db

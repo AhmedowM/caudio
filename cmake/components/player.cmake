@@ -37,5 +37,5 @@ if(CAUDIO_ENABLE_MODULES)
 endif()
 
 if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(player EXTRA_DEPS caudio::utils_shared)
+  caudio_add_shared_variant(player EXTRA_DEPS caudio::utils_shared caudio::media_shared)
 endif()

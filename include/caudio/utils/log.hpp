@@ -6,6 +6,7 @@
  * @ingroup caudio_utils
  */
 
+#include <caudio/fwd.hpp>
 #include <format>
 #include <functional>
 #include <mutex>
@@ -104,7 +105,7 @@ constexpr std::optional<LogLevel> parseLogLevelValue(std::string_view value) noe
  * @see LogLevel
  * @see toString
  */
-class Logger {
+class CAUDIO_API Logger {
   public:
     /**
      * @brief Callback invoked for each enabled log message.

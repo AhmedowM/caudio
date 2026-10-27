@@ -46,7 +46,7 @@ namespace caudio::app {
  * stderr with exit 1, quiet skips human rendering of a carried result,
  * neither is silent success.
  */
-struct Outcome {
+struct CAUDIO_API Outcome {
     std::optional<caudio::ipc::Result> result;
     std::optional<std::string> line;
     bool toStderr = false;
@@ -66,7 +66,7 @@ using AppResult = std::expected<Outcome, caudio::utils::Error>;
  * stderr in both modes, json renders under --json, out prints in text
  * mode, exitCode is the process exit code.
  */
-struct BatchReport {
+struct CAUDIO_API BatchReport {
     std::optional<ipc::Result> json;
     std::string out;
     std::string err;
@@ -81,7 +81,7 @@ inline constexpr std::array<std::string_view, 8> tagFields{
     "title", "artist", "album", "album_artist", "genre", "year", "track_number", "disc_number"};
 
 /** @brief True when field names a known tag field. @ingroup caudio_app */
-bool isTagField(std::string_view field);
+CAUDIO_API bool isTagField(std::string_view field);
 
 /**
  * @brief One selected tag value, human text plus single-key JSON dump.
@@ -106,7 +106,7 @@ struct TrackList {
  * @ingroup caudio_app
  * @see caudio::config::Config
  */
-class App {
+class CAUDIO_API App {
   public:
     /**
      * @brief Binds the orchestrator to a config.

@@ -24,7 +24,7 @@ namespace caudio::utils {
  * @see makeError
  * @see Expected
  */
-struct Error {
+struct CAUDIO_API Error {
     StatusCode code{StatusCode::Ok}; ///< Machine-readable error code.
     std::string message{};           ///< Human-readable context; may be empty.
 
@@ -59,7 +59,7 @@ struct Error {
  * @return Error instance with code and copied message.
  * @see Error
  */
-Error makeError(StatusCode c, std::string_view msg = {});
+CAUDIO_API Error makeError(StatusCode c, std::string_view msg = {});
 
 } // namespace caudio::utils
 

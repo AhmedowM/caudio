@@ -31,5 +31,6 @@ target_link_libraries(db PRIVATE caudio::sqlite3)
 ca_set_module_warnings(db)
 
 if(CAUDIO_BUILD_SHARED)
-  caudio_add_shared_variant(db EXTRA_DEPS caudio::utils_shared Threads::Threads)
+  caudio_add_shared_variant(db EXTRA_DEPS caudio::utils_shared caudio::media_shared Threads::Threads)
+  target_link_libraries(db_shared PRIVATE caudio::sqlite3)
 endif()

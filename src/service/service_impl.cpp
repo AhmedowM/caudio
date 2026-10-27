@@ -8,6 +8,7 @@
 #include <atomic>
 #include <caudio/config.hpp>
 #include <caudio/contracts/database.hpp>
+#include <caudio/db/types.hpp>
 #include <caudio/engine/types.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>

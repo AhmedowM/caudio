@@ -54,6 +54,7 @@ DEFAULT_CACHE = {
     "CAUDIO_USE_TRIMMED_FFMPEG": "OFF",
     "CAUDIO_ALLOW_UNSUPPORTED_COMPILER": "OFF",
     "CAUDIO_LINK_SECTION_GC": "OFF",
+    "CAUDIO_BUILD_SHARED": "OFF",
     "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "OFF",
 }
 
@@ -401,6 +402,8 @@ def build_cache(args: argparse.Namespace, intent: str,
         cache["CAUDIO_ENABLE_MODULES"] = "ON"
     if args.trimmed_ffmpeg:
         cache["CAUDIO_USE_TRIMMED_FFMPEG"] = "ON"
+    if args.shared:
+        cache["CAUDIO_BUILD_SHARED"] = "ON"
     if args.require_git_version:
         cache["CAUDIO_REQUIRE_GIT_VERSION"] = "ON"
     if args.allow_unsupported_compiler:
@@ -564,6 +567,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="CAUDIO_ENABLE_MODULES=ON (does not disable the CLI)")
     parser.add_argument("--trimmed-ffmpeg", action="store_true",
                         help="CAUDIO_USE_TRIMMED_FFMPEG=ON")
+    parser.add_argument("--shared", action="store_true",
+                        help="CAUDIO_BUILD_SHARED=ON (shared *_shared variants)")
     parser.add_argument("--require-git-version", action="store_true",
                         help="CAUDIO_REQUIRE_GIT_VERSION=ON")
     parser.add_argument("--allow-unsupported-compiler", action="store_true",

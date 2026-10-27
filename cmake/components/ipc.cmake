@@ -13,3 +13,6 @@ set(CAUDIO_IPC_SOURCES
 )
 caudio_add_component(ipc SOURCES ${CAUDIO_IPC_SOURCES} MODULE_SOURCES ${CAUDIO_IPC_MODULE_SOURCES} DEPS caudio::config caudio::utils Threads::Threads)
 ca_set_module_warnings(ipc)
+if(CAUDIO_BUILD_SHARED)
+  caudio_add_shared_variant(ipc EXTRA_DEPS caudio::config_shared caudio::utils_shared Threads::Threads)
+endif()

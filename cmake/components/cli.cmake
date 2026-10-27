@@ -12,7 +12,6 @@ add_executable(caudio_cli
 set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp cli/src/shell/output_formatter.cpp cli/src/shell/preview.cpp)
 target_include_directories(caudio_cli PRIVATE cli/src/shell)
-target_include_directories(caudio_cli SYSTEM PRIVATE vendor)
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc caudio::db caudio::player CLI11::CLI11 Threads::Threads)
 # FFmpeg is not linked here directly: caudio::media links it PRIVATE (see

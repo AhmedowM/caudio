@@ -54,12 +54,54 @@ function(caudio_add_component NAME)
   if(NOT ARG_SOURCES AND NOT ARG_MODULE_SOURCES)
     message(FATAL_ERROR "caudio_add_component(${NAME}): SOURCES or MODULE_SOURCES required")
   endif()
-  add_library(${NAME} STATIC)
+
+  # --- Object library: PIC-compiled sources, used ONLY by shared variants ---
+  # Static libs compile sources directly (see below). Object libraries let
+  # shared targets link the same object files without WHOLE_ARCHIVE, avoiding
+  # duplicate symbols from overlapping transitive deps.
+  if(ARG_SOURCES)
+    add_library(${NAME}_objects OBJECT ${ARG_SOURCES})
+    add_library(caudio::${NAME}_objects ALIAS ${NAME}_objects)
+    set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME}_objects)
+    target_include_directories(${NAME}_objects PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
+    target_include_directories(${NAME}_objects PRIVATE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
+    if(ARG_INCLUDES)
+      target_include_directories(${NAME}_objects SYSTEM PRIVATE ${ARG_INCLUDES})
+    endif()
+    if(CAUDIO_NLOHMANN_PRIVATE_INCLUDE)
+      target_include_directories(${NAME}_objects SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
+    endif()
+    if(CAUDIO_BUILD_SHARED)
+      target_compile_definitions(${NAME}_objects PRIVATE CAUDIO_BUILDING_DLL)
+      if(MSVC)
+        target_compile_options(${NAME}_objects PRIVATE /wd4251 /wd4275)
+      endif()
+    endif()
+    # Propagate include dirs from all deps (PUBLIC and PRIVATE) to the object
+    # library so it can compile the same sources as the static library. INTERFACE
+    # links only propagate headers/defines, no binary output, so no duplicate
+    # symbols can arise.
+    if(ARG_DEPS)
+      target_link_libraries(${NAME}_objects INTERFACE ${ARG_DEPS})
+    endif()
+    if(ARG_PRIVATE_DEPS)
+      target_link_libraries(${NAME}_objects INTERFACE ${ARG_PRIVATE_DEPS})
+    endif()
+    target_compile_features(${NAME}_objects PUBLIC cxx_std_23)
+    ca_set_warnings(${NAME}_objects)
+    caudio_apply_extra_flags(${NAME}_objects)
+    if(CAUDIO_ENABLE_SANITIZERS)
+      caudio_apply_sanitizers(${NAME}_objects)
+    endif()
+  endif()
+
+  # --- Static library: sources compiled directly into the archive ---
+  add_library(${NAME} STATIC ${ARG_SOURCES})
   add_library(caudio::${NAME} ALIAS ${NAME})
   set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME})
-  if(ARG_SOURCES)
-    target_sources(${NAME} PRIVATE ${ARG_SOURCES})
-  endif()
   if(ARG_MODULE_SOURCES AND CAUDIO_ENABLE_MODULES)
     # BASE_DIRS strips the leading modules/ so the install tree gets
     # <prefix>/modules/<component>/*.cppm (not modules/modules/...).
@@ -72,14 +114,8 @@ function(caudio_add_component NAME)
   target_include_directories(${NAME} PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
   if(ARG_INCLUDES)
-    # SYSTEM: INCLUDES is always vendored third-party (vendor/) -- its
-    # headers must not inherit our -Wall -Wextra -Wpedantic noise (notably
-    # Clang's -Wlanguage-extension-token in sqlite3.h).
     target_include_directories(${NAME} SYSTEM PRIVATE ${ARG_INCLUDES})
   endif()
-  # nlohmann is the opaque Json backend (vendor/, private include only). Every
-  # component gets the same SYSTEM -I here so no component has to restate it;
-  # linking it as a target would force it into install(EXPORT).
   if(CAUDIO_NLOHMANN_PRIVATE_INCLUDE)
     target_include_directories(${NAME} SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
   endif()
@@ -94,9 +130,6 @@ function(caudio_add_component NAME)
   # must compile at C++23 or newer.
   target_compile_features(${NAME} PUBLIC cxx_std_23)
   # PUBLIC_HEADER: one source of truth for installed headers per target.
-  # Component root header (include/caudio/<NAME>.hpp) plus subdirectory
-  # headers (include/caudio/<NAME>/*.hpp). Complements the directory install
-  # which still covers headers not tied to a component (fwd.hpp, etc.).
   set(_pub_hdrs "")
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include/caudio/${NAME}.hpp")
     list(APPEND _pub_hdrs "${CMAKE_CURRENT_SOURCE_DIR}/include/caudio/${NAME}.hpp")
@@ -163,13 +196,33 @@ endfunction()
 function(caudio_add_shared_variant NAME)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "EXTRA_DEPS")
   add_library(${NAME}_shared SHARED)
-  set_target_properties(${NAME}_shared PROPERTIES OUTPUT_NAME ${NAME})
+  set_target_properties(${NAME}_shared PROPERTIES OUTPUT_NAME ${NAME}_shared)
   add_library(caudio::${NAME}_shared ALIAS ${NAME}_shared)
   set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME}_shared)
   target_sources(${NAME}_shared PRIVATE src/_stub/shared_stub.cpp)
-  target_link_libraries(${NAME}_shared PUBLIC ${ARG_EXTRA_DEPS})
-  target_link_libraries(${NAME}_shared PRIVATE $<LINK_LIBRARY:WHOLE_ARCHIVE,caudio::${NAME}>)
-  target_link_options(${NAME}_shared PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Darwin>>>:-Wl,--allow-multiple-definition>)
+  # Define CAUDIO_BUILDING_DLL so CAUDIO_API expands to dllexport on Windows.
+  target_compile_definitions(${NAME}_shared PRIVATE CAUDIO_BUILDING_DLL)
+  # MSVC C4251/C4275: STL types in dllexport classes. Suppress for shared builds;
+  # these are well-known and unavoidable when exporting classes with STL members.
+  if(MSVC)
+    target_compile_options(${NAME}_shared PRIVATE /wd4251 /wd4275)
+  endif()
+  # Link the PIC-compiled object files directly instead of WHOLE_ARCHIVE-ing
+  # the static archive. WHOLE_ARCHIVE pulls every object file from every
+  # transitive static dep, causing duplicate symbols across overlapping
+  # dependencies (player->media, db->media, engine->player+media+utils, all->utils).
+  target_link_libraries(${NAME}_shared PRIVATE caudio::${NAME}_objects)
+  # Link shared dependencies (their object files) so the shared linker
+  # resolves transitive symbols once, not per static archive.
+  if(ARG_EXTRA_DEPS)
+    target_link_libraries(${NAME}_shared PUBLIC ${ARG_EXTRA_DEPS})
+  endif()
+  # Versioned soname for every shared target, not just combined.
+  set_target_properties(${NAME}_shared PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR})
+  # No --allow-multiple-definition needed: we link object files directly,
+  # not whole-archived static archives, so there are no duplicate symbols.
   if(CAUDIO_ENABLE_SANITIZERS)
     caudio_apply_sanitizers(${NAME}_shared)
   endif()

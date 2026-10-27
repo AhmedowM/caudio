@@ -46,7 +46,7 @@ namespace caudio::service {
  * destructor. Uses RAII for all resources (DB, Engine, IPC server, PID file, lock file, shared
  * memory).
  */
-class Service final {
+class CAUDIO_API Service final {
   public:
     using ExpectedService = std::expected<std::unique_ptr<Service>, caudio::utils::Error>;
 

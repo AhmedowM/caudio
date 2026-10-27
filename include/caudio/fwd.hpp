@@ -17,7 +17,17 @@
 #include <expected>
 #include <type_traits>
 
-#include "caudio/db/types.hpp"
+#if defined(_WIN32)
+  #if defined(CAUDIO_BUILDING_DLL)
+    #define CAUDIO_API __declspec(dllexport)
+  #else
+    #define CAUDIO_API
+  #endif
+#elif defined(__GNUC__) || defined(__clang__)
+  #define CAUDIO_API __attribute__((visibility("default")))
+#else
+  #define CAUDIO_API
+#endif
 
 struct sqlite3;
 struct sqlite3_stmt;

@@ -19,6 +19,7 @@
  */
 
 #include <atomic>
+#include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -34,7 +35,7 @@ namespace caudio::ipc {
  * @details Strings are fixed `char` arrays (atomics can't hold them);
  * writers publish under an odd seqlock sequence, readers retry on mismatch.
  */
-struct ShmStatus {
+struct CAUDIO_API ShmStatus {
     uint64_t seq{0};      // seqlock writer: odd=writing, even=done
     double position{0.0}; // current playback position in seconds
     double duration{0.0}; // track duration in seconds
@@ -54,7 +55,7 @@ struct ShmStatus {
  * these fields; `ipc` never sees the engine). `title`/`artist` are views into
  * caller-owned storage, copied into the fixed arrays under the seqlock.
  */
-struct ShmStatusUpdate final {
+struct CAUDIO_API ShmStatusUpdate final {
     double position{0.0}; // current playback position in seconds
     float volume{1.0f};   // volume 0.0-1.0
     bool muted{false};    // muted flag
@@ -69,7 +70,7 @@ struct ShmStatusUpdate final {
  * @ingroup caudio_ipc
  * @details Cache-line aligned; fits one page (static_assert below).
  */
-struct alignas(64) AtomicShmStatus {
+struct CAUDIO_API alignas(64) AtomicShmStatus {
     std::atomic<uint64_t> seq{0};
     std::atomic<uint64_t> position{0}; // bit_cast<double>
     std::atomic<uint64_t> duration{0}; // bit_cast<double>
@@ -102,7 +103,7 @@ inline void atomicStoreFloat(std::atomic<uint32_t>& a, float v) noexcept;
  * @ingroup caudio_ipc
  * @details Exposes only snapshot reads.
  */
-class ShmStatusReader {
+class CAUDIO_API ShmStatusReader {
   public:
     /** @brief Result of opening a segment. */
     using ExpectedShm = std::expected<ShmStatusReader, caudio::utils::Error>;
@@ -149,7 +150,7 @@ class ShmStatusReader {
  * @ingroup caudio_ipc
  * @details Exposes only publishing.
  */
-class ShmStatusWriter {
+class CAUDIO_API ShmStatusWriter {
   public:
     /** @brief Result of creating a segment. */
     using ExpectedShm = std::expected<ShmStatusWriter, caudio::utils::Error>;

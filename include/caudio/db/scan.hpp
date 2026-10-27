@@ -48,7 +48,7 @@ namespace caudio::db {
  * @see Database::findByPathLocked
  * @see Database::findByFingerprintLocked
  */
-std::expected<void, caudio::utils::Error>
+CAUDIO_API std::expected<void, caudio::utils::Error>
 scanLibrary(contracts::IDatabase& db, int64_t libraryId,
             std::function<void(int64_t, int64_t, std::string_view)> progress = {},
             caudio::media::ScanMode mode = caudio::media::ScanMode::Sampled);

@@ -25,7 +25,7 @@ namespace caudio::client {
  * default is part of this type's contract. Persisted configuration remains
  * `caudio::config::Config`.
  */
-struct Config final {
+struct CAUDIO_API Config final {
     std::filesystem::path dbPath{"library.db"};
     std::string socketPath{};
 
@@ -37,7 +37,7 @@ struct Config final {
         : dbPath(cfg.dbPath), socketPath(cfg.socketPath) {}
 };
 
-class Client {
+class CAUDIO_API Client {
     Config config_;
 
   public:

@@ -42,7 +42,7 @@ enum class ScanMode {
  * @see ScanMode
  * @see scanTracksToVector
  */
-caudio::utils::Generator<caudio::types::Track> scanTracks(const std::filesystem::path& root,
+CAUDIO_API caudio::utils::Generator<caudio::types::Track> scanTracks(const std::filesystem::path& root,
                                                           ScanMode mode = ScanMode::Sampled);
 
 /**
@@ -55,7 +55,7 @@ caudio::utils::Generator<caudio::types::Track> scanTracks(const std::filesystem:
  * Re-entrant; not thread-safe with concurrent filesystem mutation.
  * @see scanTracks
  */
-std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
+CAUDIO_API std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
 scanTracksToVector(const std::filesystem::path& root, ScanMode mode = ScanMode::Sampled);
 
 } // namespace caudio::media

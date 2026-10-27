@@ -34,18 +34,18 @@ namespace caudio::utils {
  * out of range, key access on non-object).
  * @ingroup caudio_utils
  */
-class JsonError : public std::runtime_error {
+class CAUDIO_API JsonError : public std::runtime_error {
   public:
     using std::runtime_error::runtime_error;
 };
 
-class JsonRef;
+class CAUDIO_API JsonRef;
 
 /**
  * @brief Opaque ordered JSON value with value semantics.
  * @ingroup caudio_utils
  */
-class Json {
+class CAUDIO_API Json {
   public:
     /// @brief Constructs null. @ingroup caudio_utils
     Json();
@@ -234,7 +234,7 @@ class Json {
  * @details Convert to `Json` (snapshot) to pass into read APIs. Do not
  * store: bound to the parent's lifetime, like a container reference.
  */
-class JsonRef {
+class CAUDIO_API JsonRef {
   public:
     /// @brief Assign a JSON value (deep copy). @ingroup caudio_utils
     JsonRef& operator=(const Json& v);
