@@ -38,5 +38,7 @@ endif()
 
 if(CAUDIO_BUILD_SHARED)
   caudio_add_shared_variant(media EXTRA_DEPS caudio::utils_shared)
-  target_link_libraries(media_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample blake3)
+  if(CAUDIO_BUILD_STATIC)
+    target_link_libraries(media_shared PRIVATE FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample blake3)
+  endif()
 endif()

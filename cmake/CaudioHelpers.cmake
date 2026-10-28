@@ -50,15 +50,12 @@ function(caudio_apply_extra_flags tgt)
 endfunction()
 
 function(caudio_add_component NAME)
-  cmake_parse_arguments(PARSE_ARGV 1 ARG "" "PRIVATE_DEPS" "SOURCES;MODULE_SOURCES;DEPS;INCLUDES")
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "SOURCES;MODULE_SOURCES;DEPS;PRIVATE_DEPS;INCLUDES")
   if(NOT ARG_SOURCES AND NOT ARG_MODULE_SOURCES)
     message(FATAL_ERROR "caudio_add_component(${NAME}): SOURCES or MODULE_SOURCES required")
   endif()
 
-  # --- Object library: PIC-compiled sources, used ONLY by shared variants ---
-  # Static libs compile sources directly (see below). Object libraries let
-  # shared targets link the same object files without WHOLE_ARCHIVE, avoiding
-  # duplicate symbols from overlapping transitive deps.
+  # --- Object library: sources shared by static and shared targets ---
   if(ARG_SOURCES)
     add_library(${NAME}_objects OBJECT ${ARG_SOURCES})
     add_library(caudio::${NAME}_objects ALIAS ${NAME}_objects)
@@ -75,7 +72,6 @@ function(caudio_add_component NAME)
       target_include_directories(${NAME}_objects SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
     endif()
     if(CAUDIO_BUILD_SHARED)
-      target_compile_definitions(${NAME}_objects PRIVATE CAUDIO_BUILDING_DLL)
       if(MSVC)
         target_compile_options(${NAME}_objects PRIVATE /wd4251 /wd4275)
       endif()
@@ -85,10 +81,10 @@ function(caudio_add_component NAME)
     # links only propagate headers/defines, no binary output, so no duplicate
     # symbols can arise.
     if(ARG_DEPS)
-      target_link_libraries(${NAME}_objects INTERFACE ${ARG_DEPS})
+      target_link_libraries(${NAME}_objects PRIVATE ${ARG_DEPS})
     endif()
     if(ARG_PRIVATE_DEPS)
-      target_link_libraries(${NAME}_objects INTERFACE ${ARG_PRIVATE_DEPS})
+      target_link_libraries(${NAME}_objects PRIVATE ${ARG_PRIVATE_DEPS})
     endif()
     target_compile_features(${NAME}_objects PUBLIC cxx_std_23)
     ca_set_warnings(${NAME}_objects)
@@ -98,8 +94,19 @@ function(caudio_add_component NAME)
     endif()
   endif()
 
-  # --- Static library: sources compiled directly into the archive ---
-  add_library(${NAME} STATIC ${ARG_SOURCES})
+  # --- Component library ---
+  if(CAUDIO_BUILD_STATIC)
+    add_library(${NAME} STATIC ${ARG_SOURCES})
+  else()
+    add_library(${NAME} SHARED src/_stub/shared_stub.cpp)
+    set_target_properties(${NAME} PROPERTIES
+      OUTPUT_NAME ${NAME}
+      ARCHIVE_OUTPUT_NAME ${NAME}_shared
+      WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    if(ARG_SOURCES)
+      target_sources(${NAME} PRIVATE $<TARGET_OBJECTS:${NAME}_objects>)
+    endif()
+  endif()
   add_library(caudio::${NAME} ALIAS ${NAME})
   set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME})
   if(ARG_MODULE_SOURCES AND CAUDIO_ENABLE_MODULES)
@@ -195,10 +202,25 @@ endfunction()
 
 function(caudio_add_shared_variant NAME)
   cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "EXTRA_DEPS")
+  if(NOT CAUDIO_BUILD_STATIC)
+    add_library(${NAME}_shared ALIAS ${NAME})
+    add_library(caudio::${NAME}_shared ALIAS ${NAME})
+    return()
+  endif()
   add_library(${NAME}_shared SHARED)
-  set_target_properties(${NAME}_shared PROPERTIES OUTPUT_NAME ${NAME}_shared)
+  # On Windows, SHARED targets also emit an import library. Keep the DLL's
+  # runtime name stable while avoiding a collision with the static ${NAME}.lib.
+  set_target_properties(${NAME}_shared PROPERTIES
+    OUTPUT_NAME ${NAME}
+    ARCHIVE_OUTPUT_NAME ${NAME}_shared
+    WINDOWS_EXPORT_ALL_SYMBOLS ON)
   add_library(caudio::${NAME}_shared ALIAS ${NAME}_shared)
   set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME}_shared)
+  target_include_directories(${NAME}_shared PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_compile_features(${NAME}_shared PUBLIC cxx_std_23)
   target_sources(${NAME}_shared PRIVATE src/_stub/shared_stub.cpp)
   # Define CAUDIO_BUILDING_DLL so CAUDIO_API expands to dllexport on Windows.
   target_compile_definitions(${NAME}_shared PRIVATE CAUDIO_BUILDING_DLL)

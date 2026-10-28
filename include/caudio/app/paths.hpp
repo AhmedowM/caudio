@@ -10,6 +10,7 @@
  * app-internal (`src/app/paths_internal.hpp`).
  */
 
+#include <caudio/fwd.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,7 +21,7 @@ namespace caudio::app {
  * @brief Checks for glob characters (`*` or `?`).
  * @ingroup caudio_app
  */
-bool hasGlobChars(std::string_view s);
+CAUDIO_API bool hasGlobChars(std::string_view s);
 
 /**
  * @brief Expands one add token into files.
@@ -33,7 +34,8 @@ bool hasGlobChars(std::string_view s);
  * folders yield top-level (or recursive) audio files; anything else lands
  * in `unmatched`.
  */
-void expandAddToken(const std::string& token, bool recursive, std::vector<std::string>& files,
-                    std::vector<std::string>& unmatched);
+CAUDIO_API void expandAddToken(const std::string& token, bool recursive,
+                               std::vector<std::string>& files,
+                               std::vector<std::string>& unmatched);
 
 } // namespace caudio::app

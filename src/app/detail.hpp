@@ -1,5 +1,6 @@
 #pragma once
 
+#include <caudio/fwd.hpp>
 #include <caudio/ipc/result.hpp>
 #include <cstdint>
 #include <set>
@@ -46,6 +47,6 @@ void countLineText(int added, std::string& out);
  * @details Single implementation shared by batch loops and the shell
  * error path, so both render byte-identical text.
  */
-void renderErrorInto(std::string& err, const caudio::utils::Error& e);
+CAUDIO_API void renderErrorInto(std::string& err, const caudio::utils::Error& e);
 
 } // namespace caudio::app::detail

@@ -7,61 +7,72 @@ if(NOT CAUDIO_INSTALL_LIBS)
   set(CAUDIO_INSTALL_LIBS "")
 endif()
 
-# Split into static, shared, and object libraries. Object libraries are build
-# intermediates only -- never installed. Static libs ship for static linking.
-# Shared libs ship for dynamic linking.
+# Split targets: shared DLLs go to runtime (alongside caudio.exe),
+# static libs and import libs go to dev.
 set(_caudio_static "")
 set(_caudio_shared "")
 set(_caudio_objects "")
-foreach(_tgt IN LISTS CAUDIO_INSTALL_LIBS)
-  if(_tgt MATCHES "_objects$")
-    list(APPEND _caudio_objects ${_tgt})
-  elseif(_tgt MATCHES "_shared$")
-    list(APPEND _caudio_shared ${_tgt})
-  else()
-    list(APPEND _caudio_static ${_tgt})
+if(CAUDIO_BUILD_STATIC)
+  foreach(_tgt IN LISTS CAUDIO_INSTALL_LIBS)
+    get_target_property(_type ${_tgt} TYPE)
+    if(_type STREQUAL "OBJECT_LIBRARY")
+      list(APPEND _caudio_objects ${_tgt})
+    elseif(_type STREQUAL "SHARED_LIBRARY")
+      list(APPEND _caudio_shared ${_tgt})
+    else()
+      list(APPEND _caudio_static ${_tgt})
+    endif()
+  endforeach()
+  if(TARGET combined)
+    list(APPEND _caudio_shared combined)
   endif()
-endforeach()
+else()
+  foreach(_tgt IN LISTS CAUDIO_INSTALL_LIBS)
+    get_target_property(_type ${_tgt} TYPE)
+    if(_type STREQUAL "SHARED_LIBRARY")
+      list(APPEND _caudio_shared ${_tgt})
+    elseif(_type STREQUAL "INTERFACE_LIBRARY")
+      list(APPEND _caudio_static ${_tgt})
+    endif()
+  endforeach()
+endif()
 set(CAUDIO_INSTALL_LIBS ${_caudio_static})
 unset(_caudio_static)
 unset(_caudio_objects)
 
-# Vendor libs are not registered via caudio_add_component -- add them manually.
-list(APPEND CAUDIO_INSTALL_LIBS sqlite3 blake3 tag)
-
-# Shared variants install alongside static libs.
-list(APPEND CAUDIO_INSTALL_LIBS ${_caudio_shared})
-unset(_caudio_shared)
-
-# combined is the shared libcaudio umbrella (not registered via caudio_add_*).
-if(CAUDIO_BUILD_SHARED)
-  list(APPEND CAUDIO_INSTALL_LIBS combined)
+# Vendor libs are needed as installable dependencies only for static builds.
+if(CAUDIO_BUILD_STATIC)
+  list(APPEND CAUDIO_INSTALL_LIBS sqlite3 blake3 tag)
 endif()
 
-if(CAUDIO_ENABLE_MODULES)
-  list(APPEND CAUDIO_INSTALL_LIBS caudio_umbrella)
-endif()
+# Install static libs + import libs as dev.
+install(
+  TARGETS ${CAUDIO_INSTALL_LIBS}
+  EXPORT caudioTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
-if(CAUDIO_ENABLE_MODULES)
+# Install shared DLLs as runtime (beside caudio.exe).
+if(_caudio_shared)
   install(
-    TARGETS ${CAUDIO_INSTALL_LIBS}
+    TARGETS ${_caudio_shared}
     EXPORT caudioTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    # Module sources live at <prefix>/modules/ (NOT under include/):
-    # they are build inputs for BMI consumers, not C++ headers.
-    FILE_SET CXX_MODULES DESTINATION modules COMPONENT dev
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev
   )
-else()
+endif()
+
+# Modules-only umbrella: install its BMI files separately.
+if(CAUDIO_ENABLE_MODULES)
   install(
-    TARGETS ${CAUDIO_INSTALL_LIBS}
+    TARGETS caudio_umbrella
     EXPORT caudioTargets
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILE_SET CXX_MODULES DESTINATION modules COMPONENT dev
   )
 endif()
 

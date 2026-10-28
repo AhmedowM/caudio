@@ -49,11 +49,16 @@ option(CAUDIO_BUILD_DOCS "Build Doxygen documentation" OFF)
 option(CAUDIO_TEST_NOAUDIO "skip audio device tests (no beep) for headless CI" OFF)
 option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" ON)
-# Shared variants (*_shared + combined) use WHOLE_ARCHIVE + --allow-multiple-definition
-# to work around duplicate-symbol/ODR issues from merged static twins. Static +
-# header-only is the default; opt in only if you need shared libs.
-# Status: EXPERIMENTAL and OFF by default — no shipped artifact uses shared libs.
-option(CAUDIO_BUILD_SHARED "build shared *_shared variants + combined libcaudio" OFF)
+# Shared mode builds per-component DLLs/import libraries by default.
+# CAUDIO_BUILD_STATIC can be enabled to build the static component libraries too.
+option(CAUDIO_BUILD_SHARED "build per-component shared libraries" OFF)
+if(CAUDIO_BUILD_SHARED)
+  set(_caudio_build_static_default OFF)
+else()
+  set(_caudio_build_static_default ON)
+endif()
+option(CAUDIO_BUILD_STATIC "build static component libraries" ${_caudio_build_static_default})
+unset(_caudio_build_static_default)
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" ON)
 # Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
 # compiler validation, so presets carry only the intent and the per-linker
@@ -320,9 +325,9 @@ set(CAUDIO_COMPONENTS
   ipc
   service
   client
-  cli
   app
   combined
+  cli
 )
 foreach(_comp IN LISTS CAUDIO_COMPONENTS)
   include(cmake/components/${_comp}.cmake)
