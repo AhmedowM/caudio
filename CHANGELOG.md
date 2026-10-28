@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Database::libraryStats()` with optional most-played tracks, and
   `types::LibraryStats` as the single stats shape (`38e68e3`)
 - `App::status`, `App::info`, `App::setVolume`, and `Client::probe` (`f76f6cf`)
+- `scripts/configure.py` intent resolver (`dev`, `ci`, `release`,
+  `release-lto`, `minsize`, `minsize-lto`, `modules`, `default`) with
+  `--toolchain auto|gcc|clang|msvc|apple`, `--arch`, `--generator` and
+  `--build`/`--test`/`--install`/`--package` actions; CI drives builds
+  through it (`89413d6`)
+- CMake build presets mirroring every intent (`4f8d23e`)
+- `CAUDIO_API` export macro on installed public classes and free functions;
+  component DLLs export exactly that surface (`ac04be4`)
+- Vendor runtime DLLs (`sqlite3`, `blake3`, `tag`) ship beside `caudio.exe`
+  so a process uses one copy of each (`5b60c83`)
+- `caudio::contracts::IDatabase` implemented by `Database`; `Service::create()`
+  and `Service::attachDatabase()` take a `std::shared_ptr<IDatabase>`
+  (`4c8ecd3`, `723e10f`, `cee5940`, `19ff24d`)
 
 ### Changed
 - Public headers grouped by domain (`types/`, `media/`, `ipc/command/`,
@@ -44,19 +57,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split at the `media`/`db` seam (`7348165`, `6eedbf8`)
 - `IpcServer`, the file log sink, write thread, MPSC queue, move-only
   function and engine runtime state are internal (`cda41ff`, `0902275`)
-
-### Deprecated
-- Old member spellings (`App::doPlay`, `App::queues`, `App::switchQueue`,
-  `Database::{queueList,historyList,bookmarkList,libraryList}`,
-  `Engine::getStats`, `Engine::lastError`, `Player::lastError`), option
-  aliases (`DbOpts`, `PlayerOpts`, `kTagFields`), `caudio/<comp>/core.hpp`
-  wrappers, newly moved `player`/`ipc`/`db` record aliases (`DeviceInfo`,
-  `DeviceList`, `TrackMetadata`, `LibraryStatsData`,
-  `LibraryStatsDetailedData`, `ScanMode` and scan forwarders),
-  `LibraryStatsDetailed`, and `ShmStatusHandle`/`createShmStatus`. All are
-  removed in v2.0.0.
+- Shared builds are the default: per-component DLLs without a `_shared`
+  suffix plus the vendor DLLs, with static archives opting in through
+  `CAUDIO_BUILD_STATIC`/`configure.py --static`; tests always link the static
+  flavour (`ac04be4`, `b7bc553`, `5b60c83`)
+- Component DLLs link each other's object files directly instead of
+  whole-archive static copies, so transitive duplicates and
+  `--allow-multiple-definition` are gone (`ac04be4`)
+- Install splits runtime (DLLs) from dev (import/static libs), reads
+  component targets from a directory property instead of a hand-maintained
+  list, and always installs `combined` (`a879a9b`, `412c4ec`, `5b60c83`)
+- Root `CMakeLists.txt` is split into `cmake/Install.cmake`,
+  `BundleFFmpeg.cmake`, `Packaging.cmake`, `Tests.cmake` and
+  `Version.cmake` (`c9cb685`, `a98de0c`, `853eecd`)
+- Component dependency edges are `PRIVATE` (`player`→`media`,
+  `engine`→`db`, `service`→engine/db/media/player, `app`→client/ipc/media),
+  so consumers no longer inherit them (`a99cf27`, `627673c`, `7e80137`,
+  `0dcee28`, `af52655`)
+- `Database`/`App` private members and helpers moved into `Impl`, internal
+  headers inlined or moved into `.cpp`, precompiled headers removed and the
+  header self-containment gate made opt-in (`b294445`, `f028047`, `c06e1ec`,
+  `2548fb6`, `44a1ae0`)
+- `App::setDaemonHost`/`setPreviewHost` renamed `attachDaemonHost`/
+  `attachPreviewHost`; `fmtClock` is now `caudio::utils::formatClock`;
+  k-prefixed constants renamed to camelCase (`19ff24d`, `c06e1ec`,
+  `ac3ecd6`)
+- Trimmed FFmpeg is consumed as a prebuilt prefix (`FFmpeg_ROOT`/
+  `CAUDIO_TRIMMED_ROOT`); `scripts/build-ffmpeg.py` (renamed from
+  `build-trimmed.py`) defaults to `build/ffmpeg`, and the trim flags live in
+  `cmake/ffmpeg_trimmed_flags.txt` (`849aeac`, `3b37a93`, `6cb8fa1`)
+- Warnings are errors (`-Werror`/`/WX`) for first-party code, while
+  third-party targets build quietly (`21514ee`, `4f8d23e`)
+- `Track`, the wire enums and engine events are packed smaller (8-bit enums,
+  reordered `Track`), and `SpscRing` masks instead of dividing for
+  power-of-two capacities (`2024f09`)
 
 ### Removed
+- Deprecated spellings deleted ahead of v2.0.0:
+  `include/caudio/legacy_aliases.hpp`, the `caudio/<comp>/core.hpp`
+  wrappers, old `App`/`Database`/`Engine`/`Player` member spellings,
+  `DbOpts`/`PlayerOpts`/`kTagFields`, the moved record aliases
+  (`DeviceInfo`, `DeviceList`, `TrackMetadata`, `LibraryStatsData`,
+  `LibraryStatsDetailedData`, `ScanMode` and the scan forwarders),
+  `LibraryStatsDetailed`, `ShmStatusHandle`/`createShmStatus`, and the
+  `ipc::{BookmarkEntry,DeviceInfo,HistoryEntry}` result aliases
+  (`b1d0379`, `53bcce8`, `e52c5aa`)
+- `Service::shmHandle()` (`e52c5aa`)
 - Dead public API: `Client::snapshotStatus`, `AudioOutput::isPlaying`,
   `Database::queuePeek*`, and the `IpcChannel`/`frameMessage`/
   `deframeMessage` framing layer; `fillFromRing` moved to an internal
@@ -75,6 +121,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`120a928`)
 - Shared-memory status segments use POSIX-compliant names and `shm_open`
   flags, so the reader/writer round-trip works on macOS
+- A queue that ends naturally with repeat off now clears its persisted
+  resume position, so the next `play` starts the queue instead of seeking to
+  the end and looping play/stop (`19ff24d`)
+- macOS CI builds select AppleClang through `apple.cmake` and honor
+  `CAUDIO_ALLOW_UNSUPPORTED_COMPILER` (`959caab`, `c065b16`)
 
 ## [v1.8.0] - 2026-10-19
 
