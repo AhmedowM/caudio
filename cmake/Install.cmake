@@ -58,6 +58,29 @@ foreach(_vendor IN ITEMS sqlite3 blake3 tag)
 endforeach()
 unset(_vendor_type)
 
+# Relocatable install tree: every shared library lands in one directory, so
+# each one resolves its siblings relative to itself while the CLI resolves
+# them from bin/ one level up. A DT_RUNPATH is not inherited by dependencies,
+# so per-library RPATHs are what make bin/caudio run from an unpacked runtime
+# archive without LD_LIBRARY_PATH (verified by .github/workflows/shared-abi.yml;
+# before this the loader only found the CLI's direct NEEDED entries and died on
+# libengine.so.1).
+if(UNIX)
+  if(APPLE)
+    set(_caudio_lib_rpath "@loader_path")
+    set(_caudio_bin_rpath "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+  else()
+    set(_caudio_lib_rpath "$ORIGIN")
+    set(_caudio_bin_rpath "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+  endif()
+  if(_caudio_shared)
+    set_target_properties(${_caudio_shared} PROPERTIES INSTALL_RPATH "${_caudio_lib_rpath}")
+  endif()
+  if(TARGET caudio_cli)
+    set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_caudio_bin_rpath}")
+  endif()
+endif()
+
 # Install static libs + import libs as dev.
 install(
   TARGETS ${CAUDIO_INSTALL_LIBS}
@@ -68,14 +91,17 @@ install(
   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# Install shared DLLs as runtime (beside caudio.exe).
+# Install shared libraries as runtime: DLLs beside caudio.exe (the import
+# libs stay dev), and on Unix the .so/.dylib files the binary loads. The Unix
+# halves used to land in dev, which left the runtime archive with only
+# bin/caudio and could not run on its own.
 if(_caudio_shared)
   install(
     TARGETS ${_caudio_shared}
     EXPORT caudioTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev
   )
 endif()

@@ -337,6 +337,13 @@ unset(WITH_ZLIB)
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
+if(APPLE AND CAUDIO_BUILD_SHARED)
+  # TagLib bakes the configure-time prefix into its install name
+  # (/usr/local/lib/libtag.2.dylib), which a relocated archive cannot resolve.
+  # @rpath puts it beside our own dylibs, which find siblings via @loader_path
+  # (cmake/Install.cmake).
+  set_target_properties(tag PROPERTIES MACOSX_RPATH ON INSTALL_NAME_DIR "@rpath")
+endif()
 if(CAUDIO_BUILD_SHARED)
   # TagLib builds in _deps/taglib-build; keep its DLL beside our binaries so
   # build-tree runs (ctest, soak_daemon.py, caudio.exe) resolve it without

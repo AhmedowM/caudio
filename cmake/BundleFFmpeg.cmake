@@ -33,11 +33,10 @@ if(WIN32 AND CAUDIO_BUILD_CLI)
 endif()
 
 if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
-  # Ship the versioned .so files (SONAME links
-  # included -- the loader asks for libavcodec.so.62 by exact name) in lib/
-  # with an $ORIGIN-relative RPATH. The RPATH goes on the target property:
-  # CMAKE_INSTALL_RPATH is consumed at target creation, so the variable is
-  # too late here.
+  # Ship the versioned .so files (SONAME links included -- the loader asks for
+  # libavcodec.so.62 by exact name) in lib/. RPATHs are cmake/Install.cmake's
+  # job (target properties, not CMAKE_INSTALL_RPATH: the variable is consumed
+  # at target creation and this file runs after the targets exist).
   get_filename_component(_ff_libdir "${FFmpeg_AVCODEC_LIBRARY}" DIRECTORY)
   set(_ff_sos "")
   foreach(_lib avcodec avformat avutil swresample)
@@ -51,12 +50,6 @@ if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
     endif()
   else()
     install(FILES ${_ff_sos} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-    get_target_property(_cli_rpath caudio_cli INSTALL_RPATH)
-    if(_cli_rpath STREQUAL "_cli_rpath-NOTFOUND")
-      set(_cli_rpath "")
-    endif()
-    list(APPEND _cli_rpath "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
-    set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_cli_rpath}")
   endif()
 endif()
 
@@ -77,13 +70,6 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
     message(WARNING "CAUDIO_BUNDLE_FFMPEG_MACOS requested but no versioned FFmpeg dylibs near ${FFmpeg_AVCODEC_LIBRARY}")
   else()
     install(FILES ${_ff_dylibs} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-    # Same target-property RPATH ordering as the Linux block.
-    get_target_property(_cli_rpath caudio_cli INSTALL_RPATH)
-    if(_cli_rpath STREQUAL "_cli_rpath-NOTFOUND")
-      set(_cli_rpath "")
-    endif()
-    list(APPEND _cli_rpath "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
-    set_target_properties(caudio_cli PROPERTIES INSTALL_RPATH "${_cli_rpath}")
     set(_ff_dylib_names "")
     foreach(_f IN LISTS _ff_dylibs)
       get_filename_component(_n "${_f}" NAME)
@@ -109,6 +95,12 @@ if(APPLE AND CAUDIO_BUILD_CLI AND CAUDIO_BUNDLE_FFMPEG_MACOS)
           message(FATAL_ERROR \"FFmpeg bundle: install_name_tool -id failed for \${_n} (exit \${_rc_id})\\n\${_id_out}\\n\${_id_err}\")
         endif()
       endforeach()
+      # Every installed own dylib too, not just the executable: a component
+      # library that links brew FFmpeg (media) keeps the build-host path in its
+      # load commands otherwise, which breaks relocating the runtime archive.
+      file(GLOB _own \"\${_libdir}/*.dylib\")
+      list(APPEND _bins \${_own})
+      list(REMOVE_DUPLICATES _bins)
       foreach(_b IN LISTS _bins)
         # Links share their target's load commands (already handled via the
         # real file): processing both would re-change @rpath refs onto

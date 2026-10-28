@@ -11,14 +11,13 @@
 #   - build + ctest with CAUDIO_TEST_NOAUDIO=1
 #   - every component lib exports caudio symbols and no vendor symbols
 #   - the vendor libs (sqlite3, blake3, tag) still export their own ABI
-#   - the installed tree runs with an explicit loader path
+#   - the installed tree runs, with and without an explicit loader path
 #   - a downstream find_package(caudio) consumer links caudio::app and runs
 #   - no staged binary references the build tree
+#   - the runtime archive carries every component lib the CLI needs
 # Informational (::warning + step summary, never fatal):
-#   - the installed tree without LD_LIBRARY_PATH / DYLD_LIBRARY_PATH
-#   - brew-prefix references left in staged component libs
-#   - runtime archive self-containment (Install.cmake files Unix component
-#     libs under the dev component, and only caudio_cli gets an RPATH)
+#   - brew-prefix references left in staged component libs (brew libc++)
+#   - bundled FFmpeg libs with no $ORIGIN RUNPATH (their own NEEDED chain)
 #
 # Legs mirror the shipping (release.yml) and dev (ci.yml) toolchains so both
 # halves are covered: clang-21 + gcc-16 on Linux, AppleClang + brew LLVM on
@@ -280,14 +279,16 @@ jobs:
           echo "=== caudio --version (explicit loader path: gate) ==="
           $LOADER "$BIN" --version
 
-          # Informational: a self-contained RPATH would make this pass. Only
-          # caudio_cli gets one today (cmake/BundleFFmpeg.cmake).
-          echo "=== caudio --version (no loader path: informational) ==="
+          # Relocatability gate: the runtime archive has to work unpacked, so
+          # the installed libs must resolve each other without a loader path
+          # (cmake/Install.cmake sets the RPATHs).
+          echo "=== caudio --version (no loader path: gate) ==="
           if $BARE "$BIN" --version; then
             echo "- installed tree resolves its own libraries without a loader path" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "::warning::installed tree needs LD_LIBRARY_PATH/DYLD_LIBRARY_PATH (RPATH gap)"
+            echo "::error::installed tree does not resolve its libraries without LD_LIBRARY_PATH/DYLD_LIBRARY_PATH"
             echo "- installed tree needs an explicit loader path (RPATH/RUNPATH gap)" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
           echo "=== dynamic references ==="
@@ -327,6 +328,21 @@ jobs:
             echo "::warning::staged binaries carry brew-prefix references"
             grep -E '/opt/homebrew/|/usr/local/' "$refsfile" | head -n 10 || true
             echo "- staged binaries carry brew-prefix references (brew libc++ and/or unfixed FFmpeg refs in component libs)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Bundled FFmpeg libraries keep their own NEEDED chain. Without an
+          # $ORIGIN RUNPATH they resolve only through the host loader cache, so
+          # a machine with no FFmpeg installed can still fail. Informational:
+          # those files come from FFmpeg's build, not ours.
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            for f in "$STAGE"/lib/libav*.so.* "$STAGE"/lib/libsw*.so.*; do
+              [ -e "$f" ] || continue
+              if ! readelf -d "$f" | grep -qE 'RUNPATH|RPATH'; then
+                echo "::warning::$(basename "$f") carries no RUNPATH; bundled FFmpeg resolves via the host loader cache"
+                echo "- bundled FFmpeg libs have no \$ORIGIN RUNPATH (host FFmpeg expected)" >> "$GITHUB_STEP_SUMMARY"
+                break
+              fi
+            done
           fi
 
       - name: Downstream consumer smoke
@@ -372,7 +388,28 @@ jobs:
           # Make GNU ld resolve the component NEEDED chain while linking.
           export LD_LIBRARY_PATH="$STAGE/lib"
 
+          # Build the consumer with the compiler the leg actually shipped:
+          # the default c++ on ubuntu-24.04 is GCC 13, which has no <print>.
+          case "${{ matrix.toolchain }}" in
+            gcc)   CXX_BIN="$(command -v g++-16)" ;;
+            apple) CXX_BIN="$(xcrun -f clang++)" ;;
+            clang)
+              if [ "$RUNNER_OS" = "macOS" ]; then
+                CXX_BIN="$(brew --prefix llvm)/bin/clang++"
+              else
+                CXX_BIN="$(command -v clang++)"
+              fi ;;
+            *) echo "::error::no consumer compiler mapping for ${{ matrix.toolchain }}"; exit 1 ;;
+          esac
+          if [ ! -x "$CXX_BIN" ]; then
+            echo "::error::consumer compiler not found: $CXX_BIN"
+            exit 1
+          fi
+          echo "=== consumer compiler ==="
+          "$CXX_BIN" --version | head -n 1
+
           cmake -S "$CONSUMER" -B "$CONSUMER/build" -G Ninja \
+            -DCMAKE_CXX_COMPILER="$CXX_BIN" \
             -DCMAKE_PREFIX_PATH="$STAGE" \
             -DCMAKE_BUILD_RPATH="$STAGE/lib" \
             -DCMAKE_CXX_STANDARD=23
@@ -396,28 +433,43 @@ jobs:
           # List once; `tar | grep -q` would SIGPIPE tar and, under pipefail,
           # report a false "missing" for the first match.
           rtlist="$RUNNER_TEMP/runtime-archive.txt"
+          devlist="$RUNNER_TEMP/dev-archive.txt"
           tar -tzf "$RT" | sort | tee "$rtlist"
           if [ -n "$DEV" ]; then
             echo "=== dev archive ==="
-            tar -tzf "$DEV" | sort
+            tar -tzf "$DEV" | sort | tee "$devlist"
           fi
 
-          # Self-containment is a packaging decision, not an ABI one: report
-          # the gap, do not gate on it. Install.cmake files Unix component
-          # libs under the dev component, so the runtime archive has only the
-          # executable (plus bundled FFmpeg).
+          # The runtime archive is what a user unpacks: it must carry the
+          # component libraries the CLI loads (Install.cmake installs shared
+          # targets into the runtime component), the vendor libs it links and
+          # the bundled FFmpeg.
           missing=""
-          for name in utils config media player db engine ipc client service app caudio; do
-            if ! grep -qE "lib${name}\.(so|dylib)" "$rtlist"; then
+          for name in utils config media player db engine ipc client service app caudio sqlite3 blake3 tag; do
+            if ! grep -qE "lib${name}\.(so|dylib|[0-9])" "$rtlist"; then
               missing="$missing $name"
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::warning::runtime archive is not self-contained; missing component libs:$missing"
-            echo "- runtime archive is not self-contained (component libs live in the dev archive):$missing" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- runtime archive contains every component lib" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::runtime archive is missing libraries:$missing"
+            echo "- runtime archive is missing libraries:$missing" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
+          echo "- runtime archive contains every component and vendor library" >> "$GITHUB_STEP_SUMMARY"
+
+          # ... and the dev archive keeps being the SDK half: no runnable
+          # payload required, but headers + the cmake package must be there.
+          if [ -z "$DEV" ]; then
+            echo "::error::no dev archive was produced"
+            exit 1
+          fi
+          for want in "include/caudio/version.hpp" "lib/cmake/caudio/caudioConfig.cmake"; do
+            if ! grep -qE "^${want}\$" "$devlist"; then
+              echo "::error::dev archive is missing ${want}"
+              exit 1
+            fi
+          done
+          echo "- dev archive carries headers and the cmake package" >> "$GITHUB_STEP_SUMMARY"
           echo "- runtime archive: $(basename "$RT") ($(wc -c < "$RT" | tr -d ' ') bytes)" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload logs
