@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helper (`d8e4b48`)
 
 ### Fixed
+- Daemon teardown of a playing track (`next`/`prev`/`play` of another
+  track) no longer races the decode thread, which crashed the daemon under
+  loop load (`021222a`)
 - The IPC accept loop recovers from a broken pipe instead of terminating
   (`71c704d`)
 - Windows config-directory resolution now matches the other platforms
