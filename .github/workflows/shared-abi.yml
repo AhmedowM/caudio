@@ -1,0 +1,434 @@
+# Shared ABI (ELF / Mach-O) verification.
+#
+# Windows shared builds are verified locally (clang / MinGW GCC / MSVC) and in
+# ci.yml. The ELF and Mach-O halves of the shared-by-default build need a real
+# Linux/macOS host, which this workflow provides. Each leg builds the shipping
+# intent (minsize -- shared is the default) with tests on, then checks the
+# things that only exist on Unix: the explicit CAUDIO_API export boundary and
+# the installed tree.
+#
+# Gates (fatal):
+#   - build + ctest with CAUDIO_TEST_NOAUDIO=1
+#   - every component lib exports caudio symbols and no vendor symbols
+#   - the vendor libs (sqlite3, blake3, tag) still export their own ABI
+#   - the installed tree runs with an explicit loader path
+#   - a downstream find_package(caudio) consumer links caudio::app and runs
+#   - no staged binary references the build tree
+# Informational (::warning + step summary, never fatal):
+#   - the installed tree without LD_LIBRARY_PATH / DYLD_LIBRARY_PATH
+#   - brew-prefix references left in staged component libs
+#   - runtime archive self-containment (Install.cmake files Unix component
+#     libs under the dev component, and only caudio_cli gets an RPATH)
+#
+# Legs mirror the shipping (release.yml) and dev (ci.yml) toolchains so both
+# halves are covered: clang-21 + gcc-16 on Linux, AppleClang + brew LLVM on
+# macOS. Tests force CAUDIO_BUILD_STATIC=ON, so one build covers both flavours.
+
+name: Shared ABI
+
+"on":
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "scripts/configure.py"
+      - "include/caudio/**"
+      - ".github/workflows/shared-abi.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "scripts/configure.py"
+      - "include/caudio/**"
+      - ".github/workflows/shared-abi.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shared-abi:
+    name: shared ABI (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      BUILD_DIR: build/${{ matrix.label }}
+      # Identical args for configure/build/test: configure.py always emits the
+      # intent defaults, so repeating the same flags is idempotent.
+      CFG: >-
+        minsize --toolchain ${{ matrix.toolchain }}
+        --build-dir build/${{ matrix.label }}
+        --define CAUDIO_BUILD_SHARED=ON
+        --define CAUDIO_ENABLE_TESTS=ON
+        ${{ matrix.bundled }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # `setup` selects the compiler install step; `toolchain` is what
+        # configure.py resolves; `bundled` carries per-leg configure extras.
+        include:
+          # Shipping Linux toolchain (release.yml), verified by the bake-off.
+          - { os: ubuntu-24.04, label: linux-clang21, toolchain: clang, setup: llvm-linux, bundled: "" }
+          # CI/dev Linux toolchain (ci.yml).
+          - { os: ubuntu-24.04, label: linux-gcc16, toolchain: gcc, setup: gcc, bundled: "" }
+          # Shipping macOS toolchain: AppleClang via xcrun (release.yml).
+          - { os: macos-15, label: macos-apple, toolchain: apple, setup: apple, bundled: "--allow-unsupported-compiler" }
+          # Dev macOS toolchain: brew LLVM Clang (ci.yml / --toolchain auto).
+          - { os: macos-15, label: macos-clang, toolchain: clang, setup: llvm-macos, bundled: "" }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC 16 (Linux)
+        if: matrix.setup == 'gcc'
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt-get update
+          sudo apt-get install -y gcc-16 g++-16
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 --slave /usr/bin/g++ g++ /usr/bin/g++-16 --slave /usr/bin/gcov gcov /usr/bin/gcov-16 || true
+          sudo update-alternatives --set gcc /usr/bin/gcc-16 || true
+          gcc --version | head -n 1
+          g++ --version | head -n 1
+
+      - name: Setup LLVM Clang 21 (Linux)
+        if: matrix.setup == 'llvm-linux'
+        run: |
+          # Same installer as release.yml / the bake-off.
+          sudo apt-get update
+          sudo apt-get install -y lsb-release wget gnupg
+          CODENAME="$(lsb_release -cs)"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt-llvm-org.asc > /dev/null
+          echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-21 main" | sudo tee /etc/apt/sources.list.d/llvm-21.list
+          for i in 1 2 3; do sudo apt-get update && break || sleep 10; done
+          sudo apt-get install -y clang-21 lld-21
+          sudo ln -sf /usr/bin/clang-21 /usr/local/bin/clang
+          sudo ln -sf /usr/bin/clang++-21 /usr/local/bin/clang++
+          hash -r
+          clang --version | head -n 1
+          clang++ --version | head -n 1
+
+      - name: Select Xcode 26 (macOS / apple)
+        if: matrix.setup == 'apple'
+        run: |
+          # AppleClang only (--toolchain apple); brew LLVM is deliberately
+          # absent from release builds. Pin Xcode 26 when the image ships it.
+          XC="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -n "$XC" ]; then sudo xcode-select -s "$XC"; fi
+          xcode-select -p
+          xcodebuild -version || true
+          xcrun clang --version | head -n 1
+
+      - name: Setup LLVM Clang (macOS)
+        if: matrix.setup == 'llvm-macos'
+        run: |
+          # Policy: LLVM Clang only on Apple (brew `llvm` is keg-only, so it
+          # never shadows system clang -- the toolchain resolves
+          # "$(brew --prefix llvm)/bin/clang" explicitly).
+          brew update || echo "brew update failed, continuing with snapshot"
+          brew install llvm || brew upgrade llvm
+          LLVM_PREFIX="$(brew --prefix llvm)"
+          echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+          "$LLVM_PREFIX/bin/clang" --version | head -n 1
+          LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
+          test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline: $LLVM_MAJOR" && exit 1)
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev libswscale-dev binutils
+          ffmpeg -version | head -n 1 || true
+          cmake --version | head -n 1
+          ninja --version
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja ffmpeg || brew upgrade ninja ffmpeg || true
+          ffmpeg -version | head -n 1 || true
+          cmake --version | head -n 1
+          ninja --version
+
+      - name: Configure
+        run: |
+          set -o pipefail
+          python scripts/configure.py $CFG --print
+          python scripts/configure.py $CFG 2>&1 | tee configure.log
+
+      - name: Build
+        run: |
+          set -o pipefail
+          python scripts/configure.py $CFG --build 2>&1 | tee build.log
+
+      - name: Test
+        run: python scripts/configure.py $CFG --test
+
+      - name: Check exported ABI surface
+        run: |
+          set -o pipefail
+          ext=so
+          if [ "$RUNNER_OS" = "macOS" ]; then ext=dylib; fi
+
+          # Mach-O: -g external + -U defined only.
+          # ELF: the dynamic symbol table, defined entries only.
+          nm_symbols() {
+            if [ "$RUNNER_OS" = "macOS" ]; then
+              nm -gU "$1" | awk 'NF > 1 { print $NF }'
+            else
+              nm -D --defined-only "$1" | awk 'NF > 1 { print $NF }'
+            fi
+          }
+
+          {
+            echo "### Exported ABI surface (${{ matrix.label }})"
+            echo
+            echo "| library | exported | caudio | notes |"
+            echo "|---|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          # Components plus the combined libcaudio. Vendor libs are checked
+          # below: they are separate shared objects that keep their own ABI.
+          for name in utils config media player db engine ipc client service app caudio; do
+            lib="$BUILD_DIR/lib${name}.${ext}"
+            if [ ! -e "$lib" ]; then
+              echo "::error::missing shared library: $lib"
+              failed=1
+              continue
+            fi
+            symbols="$(nm_symbols "$lib" || true)"
+            total="$(printf '%s\n' "$symbols" | grep -c . || true)"
+            caudio="$(printf '%s\n' "$symbols" | grep -c 'caudio' || true)"
+            # CAUDIO_API is the whole ABI. A vendor symbol (or a hidden
+            # helper) escaping a component lib means the visibility preset
+            # stopped applying, so the surface is no longer deliberate.
+            leaks="$(printf '%s\n' "$symbols" | grep -E '^_?(sqlite3_|blake3_|avcodec_|avformat_|avutil_|swr_|swresample_|ma_)|TagLib' || true)"
+            leak_count="$(printf '%s\n' "$leaks" | grep -c . || true)"
+            echo "| lib${name}.${ext} | ${total} | ${caudio} | ${leak_count} vendor |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$caudio" -lt 1 ]; then
+              echo "::error::lib${name}.${ext} exports no caudio symbols (CAUDIO_API boundary lost)"
+              failed=1
+            fi
+            if [ "$leak_count" -ne 0 ]; then
+              echo "::error::lib${name}.${ext} exports non-caudio symbols:"
+              printf '%s\n' "$leaks" | head -n 10 || true
+              failed=1
+            fi
+          done
+
+          # Vendor libs must keep exporting their own ABI: if they stop, the
+          # vendor symbols above were inlined into a component instead.
+          check_vendor() { # $1 = lib basename, $2 = symbol regex, $3 = label
+            found=""
+            for cand in "$BUILD_DIR/lib$1.${ext}" "$BUILD_DIR/lib$1".*".${ext}" "$BUILD_DIR/lib$1.${ext}".*; do
+              if [ -e "$cand" ]; then found="$cand"; break; fi
+            done
+            if [ -z "$found" ]; then
+              echo "::error::vendor library not found: lib$1.${ext}"
+              failed=1
+              return 0
+            fi
+            n="$(nm_symbols "$found" | grep -cE "$2" || true)"
+            echo "| $(basename "$found") | $(nm_symbols "$found" | grep -c . || true) | 0 | vendor $3: $n |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$n" -lt 1 ]; then
+              echo "::error::$(basename "$found") does not export $3"
+              failed=1
+            fi
+          }
+          check_vendor sqlite3 '^_?sqlite3_' 'sqlite3_*'
+          check_vendor blake3 '^_?blake3_' 'blake3_*'
+          check_vendor tag 'TagLib' 'TagLib'
+
+          echo "=== sample exports (bench: the surface is caudio:: only) ==="
+          nm_symbols "$BUILD_DIR/libutils.${ext}" | head -n 5 || true
+
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+
+      - name: Install + loader smoke
+        run: |
+          set -o pipefail
+          STAGE="$RUNNER_TEMP/stage"
+          rm -rf "$STAGE"
+          cmake --install "$BUILD_DIR" --prefix "$STAGE" 2>&1 | tee install.log
+
+          echo "=== staged tree ==="
+          find "$STAGE" -type f | sort
+
+          BIN="$STAGE/bin/caudio"
+          if [ ! -x "$BIN" ]; then
+            echo "::error::staged caudio binary is missing or not executable"
+            exit 1
+          fi
+
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            LOADER="env DYLD_LIBRARY_PATH=$STAGE/lib DYLD_FALLBACK_LIBRARY_PATH=$STAGE/lib"
+            BARE="env -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH"
+          else
+            LOADER="env LD_LIBRARY_PATH=$STAGE/lib"
+            BARE="env -u LD_LIBRARY_PATH"
+          fi
+
+          echo "=== caudio --version (explicit loader path: gate) ==="
+          $LOADER "$BIN" --version
+
+          # Informational: a self-contained RPATH would make this pass. Only
+          # caudio_cli gets one today (cmake/BundleFFmpeg.cmake).
+          echo "=== caudio --version (no loader path: informational) ==="
+          if $BARE "$BIN" --version; then
+            echo "- installed tree resolves its own libraries without a loader path" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::installed tree needs LD_LIBRARY_PATH/DYLD_LIBRARY_PATH (RPATH gap)"
+            echo "- installed tree needs an explicit loader path (RPATH/RUNPATH gap)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "=== dynamic references ==="
+          refsfile="$RUNNER_TEMP/dynamic-refs.txt"
+          : > "$refsfile"
+          dump_refs() { # $1 = installed binary
+            echo "--- $1"
+            if [ "$RUNNER_OS" = "macOS" ]; then
+              otool -L "$1" || true
+              otool -L "$1" >> "$refsfile" 2>/dev/null || true
+            else
+              readelf -d "$1" | grep -E 'NEEDED|RPATH|RUNPATH' || true
+              readelf -d "$1" >> "$refsfile" 2>/dev/null || true
+            fi
+          }
+          dump_refs "$BIN"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            for f in "$STAGE"/lib/*.dylib; do
+              if [ -e "$f" ]; then dump_refs "$f"; fi
+            done
+          else
+            for f in "$STAGE"/lib/*.so; do
+              if [ -e "$f" ]; then dump_refs "$f"; fi
+            done
+          fi
+
+          # An installed binary must never point back at the build tree.
+          if grep -qF "$GITHUB_WORKSPACE" "$refsfile"; then
+            echo "::error::staged binaries reference the build tree:"
+            grep -F "$GITHUB_WORKSPACE" "$refsfile" | head -n 10 || true
+            exit 1
+          fi
+          # Known open gaps, reported not gated: brew libc++ keeps an absolute
+          # install name (issue #2) and the FFmpeg fixup only rewrites the
+          # executable, not the component libs.
+          if grep -qE '/opt/homebrew/|/usr/local/' "$refsfile"; then
+            echo "::warning::staged binaries carry brew-prefix references"
+            grep -E '/opt/homebrew/|/usr/local/' "$refsfile" | head -n 10 || true
+            echo "- staged binaries carry brew-prefix references (brew libc++ and/or unfixed FFmpeg refs in component libs)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Downstream consumer smoke
+        run: |
+          set -o pipefail
+          STAGE="$RUNNER_TEMP/stage"
+          CONSUMER="$RUNNER_TEMP/consumer"
+          rm -rf "$CONSUMER"
+          mkdir -p "$CONSUMER"
+
+          cat > "$CONSUMER/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(caudio_shared_abi_smoke CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(caudio CONFIG REQUIRED)
+          add_executable(smoke main.cpp)
+          target_link_libraries(smoke PRIVATE caudio::app caudio::utils)
+          EOF
+
+          # Calls one exported function per linked component, so the boundary
+          # is exercised at link and at run time.
+          cat > "$CONSUMER/main.cpp" <<'EOF'
+          #include <caudio/app/paths.hpp>
+          #include <caudio/utils/error.hpp>
+          #include <caudio/utils/result.hpp>
+          #include <caudio/version.hpp>
+          #include <print>
+
+          int main() {
+              const auto err = caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "shared-abi-smoke");
+              const bool glob = caudio::app::hasGlobChars("*.mp3");
+              std::println("caudio shared ABI smoke: {} glob={} error={}", caudio::version::shortVersion(), glob, err);
+              return glob ? 0 : 1;
+          }
+          EOF
+
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            LOADER="env DYLD_LIBRARY_PATH=$STAGE/lib DYLD_FALLBACK_LIBRARY_PATH=$STAGE/lib"
+          else
+            LOADER="env LD_LIBRARY_PATH=$STAGE/lib"
+          fi
+          # Make GNU ld resolve the component NEEDED chain while linking.
+          export LD_LIBRARY_PATH="$STAGE/lib"
+
+          cmake -S "$CONSUMER" -B "$CONSUMER/build" -G Ninja \
+            -DCMAKE_PREFIX_PATH="$STAGE" \
+            -DCMAKE_BUILD_RPATH="$STAGE/lib" \
+            -DCMAKE_CXX_STANDARD=23
+          cmake --build "$CONSUMER/build"
+          $LOADER "$CONSUMER/build/smoke"
+          echo "- downstream find_package(caudio) consumer linked caudio::app and ran" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Package and inspect archives
+        run: |
+          set -o pipefail
+          cmake --build "$BUILD_DIR" --target package 2>&1 | tee package.log
+
+          RT="$(ls "$BUILD_DIR"/*runtime.tar.gz 2>/dev/null | head -n 1 || true)"
+          DEV="$(ls "$BUILD_DIR"/*dev.tar.gz 2>/dev/null | head -n 1 || true)"
+          if [ -z "$RT" ]; then
+            echo "::error::no runtime archive was produced"
+            exit 1
+          fi
+          ls -lh "$BUILD_DIR"/*.tar.gz
+
+          # List once; `tar | grep -q` would SIGPIPE tar and, under pipefail,
+          # report a false "missing" for the first match.
+          rtlist="$RUNNER_TEMP/runtime-archive.txt"
+          tar -tzf "$RT" | sort | tee "$rtlist"
+          if [ -n "$DEV" ]; then
+            echo "=== dev archive ==="
+            tar -tzf "$DEV" | sort
+          fi
+
+          # Self-containment is a packaging decision, not an ABI one: report
+          # the gap, do not gate on it. Install.cmake files Unix component
+          # libs under the dev component, so the runtime archive has only the
+          # executable (plus bundled FFmpeg).
+          missing=""
+          for name in utils config media player db engine ipc client service app caudio; do
+            if ! grep -qE "lib${name}\.(so|dylib)" "$rtlist"; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::runtime archive is not self-contained; missing component libs:$missing"
+            echo "- runtime archive is not self-contained (component libs live in the dev archive):$missing" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- runtime archive contains every component lib" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "- runtime archive: $(basename "$RT") ($(wc -c < "$RT" | tr -d ' ') bytes)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-abi-logs-${{ matrix.label }}
+          path: |
+            configure.log
+            build.log
+            install.log
+            package.log
+          if-no-files-found: ignore
+          retention-days: 7
