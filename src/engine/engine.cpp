@@ -1423,14 +1423,21 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::
 std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::types::Track& t) {
     // try to open decoder path
     std::string path = t.path;
-    // reset previous
-    decoder_.reset();
-    reader_.reset();
-    ring_.reset();
+    // Teardown and reopen must serialize with decodeLoop (decoder_->decode /
+    // ring_->write hold decodeMtx_) and with the audio callback, which keeps
+    // cfg.ring raw. Freeing those without the lock is a use-after-free (ASan:
+    // convertFrameBuffered while doPlayTrack reset decoder_); stopping the
+    // device first also quiesces the callback before the ring goes away.
+    // Lock order queue-to-decodeMtx_ matches stop()/suspendCurrentTrack();
+    // every caller already holds the queue lock.
+    std::unique_lock<std::mutex> lk(decodeMtx_);
     if (output_) {
         output_->stop();
         output_.reset();
     }
+    decoder_.reset();
+    reader_.reset();
+    ring_.reset();
 
     // attempt to open reader & decoder; without allowSimulatedPlayback an
     // unplayable track is an error, never silent timer playback
@@ -1709,8 +1716,25 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
     std::vector<float> scratch;
     scratch.reserve(maxChunkFrames * 8);
     while (!st.stop_requested() && decodeRun_.load(std::memory_order_acquire)) {
-        auto ps = playbackState_.load(std::memory_order_acquire);
-        if (ps != caudio::types::PlaybackState::Playing || !decoder_ || !ring_) {
+        // Sample the producer state under decodeMtx_: doPlayTrack() frees
+        // decoder_/ring_ while holding it, so dereferencing them unlocked here
+        // is a use-after-free.
+        bool ready = false;
+        size_t avail = 0;
+        uint32_t ch = 2;
+        {
+            std::unique_lock<std::mutex> lk(decodeMtx_);
+            if (playbackState_.load(std::memory_order_acquire) ==
+                    caudio::types::PlaybackState::Playing &&
+                decoder_ && ring_) {
+                avail = ring_->availableWrite();
+                ch = decoder_->channels();
+                if (ch == 0)
+                    ch = 2;
+                ready = true;
+            }
+        }
+        if (!ready) {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Idle backoff (C-1): woken immediately by decodeCv_ on
             // play/seek/resume, so the longer timeout costs no latency.
@@ -1720,14 +1744,10 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
             });
             continue;
         }
-        size_t avail = ring_->availableWrite();
         if (avail == 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
-        uint32_t ch = decoder_->channels();
-        if (ch == 0)
-            ch = 2;
         size_t maxFrames = avail / ch;
         if (maxFrames > maxChunkFrames)
             maxFrames = maxChunkFrames;
@@ -1745,8 +1765,14 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek()
             if (playbackState_.load(std::memory_order_acquire) !=
-                caudio::types::PlaybackState::Playing)
+                    caudio::types::PlaybackState::Playing ||
+                !decoder_)
                 continue;
+            // A track switch may have swapped the decoder for one with a
+            // different channel count since the chunk was sized.
+            ch = decoder_->channels();
+            if (ch == 0)
+                ch = 2;
             frames = decoder_->decode(chunk);
         }
         if (frames == 0) {
@@ -1760,7 +1786,8 @@ void Engine::Impl::decodeLoop(std::stop_token st) {
             std::unique_lock<std::mutex> lk(decodeMtx_);
             // Re-check state under lock to avoid race with seek() ring reset
             if (playbackState_.load(std::memory_order_acquire) !=
-                caudio::types::PlaybackState::Playing)
+                    caudio::types::PlaybackState::Playing ||
+                !ring_)
                 continue;
             writtenFrames = ring_->write(std::span<float>(scratch.data(), samples));
         }
