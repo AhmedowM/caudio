@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `caudio::contracts::IDatabase` implemented by `Database`; `Service::create()`
   and `Service::attachDatabase()` take a `std::shared_ptr<IDatabase>`
   (`4c8ecd3`, `723e10f`, `cee5940`, `19ff24d`)
+- `shared-abi` workflow covers the ELF/Mach-O halves of the shared build:
+  per-component export surface, installed tree, downstream
+  `find_package(caudio)` consumer and package contents (`c4ac853`)
 
 ### Changed
 - Public headers grouped by domain (`types/`, `media/`, `ipc/command/`,
