@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   helper (`d8e4b48`)
 
 ### Fixed
+- Resumed playback starts at the persisted position: the engine seeks the
+  decoder before the output ring is prerolled, instead of playing ~100 ms of
+  the track head until the client-side seek arrives (`8a3a2fa`)
 - Daemon teardown of a playing track (`next`/`prev`/`play` of another
   track) no longer races the decode thread, which crashed the daemon under
   loop load (`021222a`)
