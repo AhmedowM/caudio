@@ -23,9 +23,6 @@ if(CAUDIO_BUILD_STATIC)
       list(APPEND _caudio_static ${_tgt})
     endif()
   endforeach()
-  if(TARGET combined)
-    list(APPEND _caudio_shared combined)
-  endif()
 else()
   foreach(_tgt IN LISTS CAUDIO_INSTALL_LIBS)
     get_target_property(_type ${_tgt} TYPE)
@@ -36,14 +33,30 @@ else()
     endif()
   endforeach()
 endif()
+# combined owns no component sources of its own, so it is never registered in
+# CAUDIO_TARGETS; opt it into the shared set explicitly in both flavours.
+if(TARGET combined)
+  list(APPEND _caudio_shared combined)
+endif()
 set(CAUDIO_INSTALL_LIBS ${_caudio_static})
 unset(_caudio_static)
 unset(_caudio_objects)
 
-# Vendor libs are needed as installable dependencies only for static builds.
-if(CAUDIO_BUILD_STATIC)
-  list(APPEND CAUDIO_INSTALL_LIBS sqlite3 blake3 tag)
-endif()
+# Vendor libs ship as archives for static builds; in shared mode they are
+# DLLs and join the shared install set (DLL -> runtime, import lib -> dev).
+# Their headers still never ship: no public header references them.
+foreach(_vendor IN ITEMS sqlite3 blake3 tag)
+  if(NOT TARGET ${_vendor})
+    continue()
+  endif()
+  get_target_property(_vendor_type ${_vendor} TYPE)
+  if(_vendor_type STREQUAL "SHARED_LIBRARY")
+    list(APPEND _caudio_shared ${_vendor})
+  else()
+    list(APPEND CAUDIO_INSTALL_LIBS ${_vendor})
+  endif()
+endforeach()
+unset(_vendor_type)
 
 # Install static libs + import libs as dev.
 install(

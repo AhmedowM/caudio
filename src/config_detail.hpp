@@ -56,8 +56,9 @@ namespace caudio::config::detail_paths {
  * Uses std::hash on dbPath.generic_string(), folded to 32 bits, formatted as 8-char hex.
  * @param dbPath Database path.
  * @return 8-character lowercase hex string.
+ * @note CAUDIO_API: service.dll derives socket/SHM names through config.dll.
  */
-std::string hex8ForDb(const std::filesystem::path& dbPath);
+CAUDIO_API std::string hex8ForDb(const std::filesystem::path& dbPath);
 
 /**
  * @brief Get base directory for socket/pid/lock files.

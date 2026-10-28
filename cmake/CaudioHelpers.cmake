@@ -72,6 +72,15 @@ function(caudio_add_component NAME)
       target_include_directories(${NAME}_objects SYSTEM PRIVATE ${CAUDIO_NLOHMANN_PRIVATE_INCLUDE})
     endif()
     if(CAUDIO_BUILD_SHARED)
+      target_compile_definitions(${NAME}_objects PRIVATE CAUDIO_BUILDING_DLL)
+      # Same explicit ABI boundary the Windows build gets from
+      # __declspec(dllexport): only CAUDIO_API entities leave the shared object.
+      # Windows needs no visibility flags, so this is Unix-only.
+      if(NOT WIN32)
+        set_target_properties(${NAME}_objects PROPERTIES
+          CXX_VISIBILITY_PRESET hidden
+          VISIBILITY_INLINES_HIDDEN ON)
+      endif()
       if(MSVC)
         target_compile_options(${NAME}_objects PRIVATE /wd4251 /wd4275)
       endif()
@@ -97,12 +106,12 @@ function(caudio_add_component NAME)
   # --- Component library ---
   if(CAUDIO_BUILD_STATIC)
     add_library(${NAME} STATIC ${ARG_SOURCES})
+    set_target_properties(${NAME} PROPERTIES OUTPUT_NAME ${NAME}_static)
   else()
     add_library(${NAME} SHARED src/_stub/shared_stub.cpp)
     set_target_properties(${NAME} PROPERTIES
       OUTPUT_NAME ${NAME}
-      ARCHIVE_OUTPUT_NAME ${NAME}_shared
-      WINDOWS_EXPORT_ALL_SYMBOLS ON)
+      ARCHIVE_OUTPUT_NAME ${NAME})
     if(ARG_SOURCES)
       target_sources(${NAME} PRIVATE $<TARGET_OBJECTS:${NAME}_objects>)
     endif()
@@ -212,8 +221,7 @@ function(caudio_add_shared_variant NAME)
   # runtime name stable while avoiding a collision with the static ${NAME}.lib.
   set_target_properties(${NAME}_shared PROPERTIES
     OUTPUT_NAME ${NAME}
-    ARCHIVE_OUTPUT_NAME ${NAME}_shared
-    WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    ARCHIVE_OUTPUT_NAME ${NAME})
   add_library(caudio::${NAME}_shared ALIAS ${NAME}_shared)
   set_property(DIRECTORY APPEND PROPERTY CAUDIO_TARGETS ${NAME}_shared)
   target_include_directories(${NAME}_shared PUBLIC
@@ -229,13 +237,13 @@ function(caudio_add_shared_variant NAME)
   if(MSVC)
     target_compile_options(${NAME}_shared PRIVATE /wd4251 /wd4275)
   endif()
-  # Link the PIC-compiled object files directly instead of WHOLE_ARCHIVE-ing
-  # the static archive. WHOLE_ARCHIVE pulls every object file from every
-  # transitive static dep, causing duplicate symbols across overlapping
-  # dependencies (player->media, db->media, engine->player+media+utils, all->utils).
-  target_link_libraries(${NAME}_shared PRIVATE caudio::${NAME}_objects)
-  # Link shared dependencies (their object files) so the shared linker
-  # resolves transitive symbols once, not per static archive.
+  # Add the PIC-compiled object files without inheriting their link interface:
+  # the object library records its own (static) component deps as
+  # $<LINK_ONLY:...>, so linking the target would pull a second, static copy of
+  # every dependency into this DLL. The shared deps are listed in EXTRA_DEPS.
+  target_sources(${NAME}_shared PRIVATE $<TARGET_OBJECTS:${NAME}_objects>)
+  # Link the shared component flavour (EXTRA_DEPS) so the linker resolves
+  # cross-component symbols once, through the import libraries.
   if(ARG_EXTRA_DEPS)
     target_link_libraries(${NAME}_shared PUBLIC ${ARG_EXTRA_DEPS})
   endif()

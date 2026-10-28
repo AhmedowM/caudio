@@ -25,7 +25,9 @@ target_include_directories(service SYSTEM PRIVATE ${CAUDIO_TAGLIB_BUILD_INCLUDES
 # includes. Needed in both static and shared builds because service_objects
 # compiles the same sources as the static service library.
 target_include_directories(service_objects SYSTEM PRIVATE ${CAUDIO_TAGLIB_BUILD_INCLUDES})
-target_compile_definitions(service_objects PRIVATE TAGLIB_STATIC)
+if(NOT CAUDIO_BUILD_SHARED)
+  target_compile_definitions(service_objects PRIVATE TAGLIB_STATIC)
+endif()
 
 # Link rt by name PRIVATE: a find_library() absolute path would be copied into
 # the installed caudioTargets.cmake and break relocation. glibc >= 2.34 has the

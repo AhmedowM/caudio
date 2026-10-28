@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <caudio/db/database.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
@@ -9,6 +10,7 @@
 #include <string>
 #include <thread>
 
+#include "../src/db/database_access.hpp"
 #include "../src/db/write_thread.hpp"
 #include "../src/utils/mpsc_queue.hpp"
 
@@ -63,13 +65,19 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
     }
     // After open, flush drains within 200ms (worker processes)
     {
-        sqlite3* db = nullptr;
-        REQUIRE(sqlite3_open_v2(":memory:", &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                                nullptr) == SQLITE_OK);
-        REQUIRE(sqlite3_exec(db, "CREATE TABLE t(id INTEGER)", nullptr, nullptr, nullptr) ==
-                SQLITE_OK);
+        // Take the handle from the db component (Database::open +
+        // DatabaseAccess) instead of calling sqlite3_open_v2 here: the writer
+        // thread must run on a handle owned by the SQLite copy the db
+        // component links. Shared builds enforce one copy via sqlite3.dll;
+        // the ownership rule keeps the test valid for static builds too.
+        auto opened = caudio::db::Database::open(":memory:");
+        REQUIRE(opened.has_value());
+        sqlite3* db = caudio::db::DatabaseAccess::handle(**opened);
+        REQUIRE(db != nullptr);
         caudio::db::WriterThread wt(4);
         wt.open(db);
+        auto prCreate = wt.push("CREATE TABLE t(id INTEGER)", {});
+        REQUIRE(prCreate.has_value());
         // push an insert using SQL string (stmt=nullptr)
         std::atomic<bool> cbCalled{false};
         auto pr = wt.push("INSERT INTO t(id) VALUES (1)",
@@ -87,6 +95,5 @@ TEST_CASE("WriterThread bounded full BUSY and flush timeout 200ms", "[db][writer
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         REQUIRE(cbCalled.load());
         wt.close();
-        sqlite3_close(db);
     }
 }

@@ -95,7 +95,10 @@ std::expected<void, caudio::utils::Error> WriterThread::push(
     auto r = impl_->queue_->push(std::move(op));
     if (!r)
         return std::unexpected{r.error()};
-    impl_->cv_.notify_one();
+    {
+        std::scoped_lock lk(impl_->mtx_);
+        impl_->cv_.notify_one();
+    }
     return {};
 }
 

@@ -1,16 +1,16 @@
 # combined is the opt-in shared libcaudio: utils/player/db/engine/media
 # linked into a single shared lib. ipc/service/client/app/config ship
 # as separate *_shared targets (daemon IPC has no shared ABI); config sources
-# compile into ipc statically. Gated on CAUDIO_BUILD_SHARED (OFF by default).
+# compile into ipc statically. Built whenever CAUDIO_BUILD_SHARED is on.
 #
 # Links component object files directly instead of WHOLE_ARCHIVE-ing static
 # archives. This avoids duplicate symbols from overlapping transitive deps
 # (player->media, db->media, engine->player+media+utils, all->utils) and
 # removes the need for --allow-multiple-definition.
-if(CAUDIO_BUILD_SHARED AND CAUDIO_BUILD_STATIC)
+if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
   add_library(caudio::combined ALIAS combined)
-  set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR} PDB_NAME caudio_shared)
+  set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR} PDB_NAME caudio_)
   target_include_directories(combined PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

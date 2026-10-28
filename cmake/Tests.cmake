@@ -55,9 +55,9 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_utils_thread tests/test_utils_thread.cpp LIBS caudio::utils)
   caudio_add_catch_test(test_utils_log tests/test_utils_log.cpp LIBS caudio::utils)
 
-  caudio_add_catch_test(test_reader tests/test_reader.cpp LIBS caudio::player caudio::utils)
-  caudio_add_catch_test(test_decoder tests/test_decoder.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
-  caudio_add_catch_test(test_ffmpeg tests/test_ffmpeg.cpp LIBS caudio::player caudio::utils WITH_TEST_DATA)
+  caudio_add_catch_test(test_reader tests/test_reader.cpp LIBS caudio::player caudio::media caudio::utils)
+  caudio_add_catch_test(test_decoder tests/test_decoder.cpp LIBS caudio::player caudio::media caudio::utils WITH_TEST_DATA)
+  caudio_add_catch_test(test_ffmpeg tests/test_ffmpeg.cpp LIBS caudio::player caudio::media caudio::utils WITH_TEST_DATA)
 
   caudio_add_catch_test(test_db tests/test_db.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
   caudio_add_catch_test(test_write_thread tests/test_write_thread.cpp LIBS caudio::db caudio::utils caudio::sqlite3)

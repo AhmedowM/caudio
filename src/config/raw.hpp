@@ -27,14 +27,17 @@ struct RawConfigValue {
     std::string value{};
 };
 
+// CAUDIO_API below is the one deliberate exception to "only public headers are
+// exported": app.dll and service.dll call these through config.dll. Keep the
+// annotated set minimal -- everything else in src/ stays DLL-internal.
 /**
  * @brief Get a raw config value by key from JSON file.
  * @param p Config file path.
  * @param key Key to read.
  * @return Value string (JSON string, "null", or JSON dump) on success, Error on failure.
  */
-caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
-                                                  std::string_view key);
+CAUDIO_API caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p,
+                                                             std::string_view key);
 
 /**
  * @brief Set a raw config value in JSON file.
@@ -45,8 +48,8 @@ caudio::utils::Expected<std::string> configGetRaw(const std::filesystem::path& p
  * @param value Value to write (JSON-parsed if valid JSON).
  * @return void on success, Error on failure.
  */
-caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::string_view key,
-                                           std::string_view value);
+CAUDIO_API caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p,
+                                                      std::string_view key, std::string_view value);
 
 /**
  * @brief List all config key-value pairs from JSON file.
@@ -54,7 +57,8 @@ caudio::utils::Expected<void> configSetRaw(const std::filesystem::path& p, std::
  * @param p Config file path.
  * @return Vector of RawConfigValue on success, Error on failure.
  */
-caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::filesystem::path& p);
+CAUDIO_API caudio::utils::Expected<std::vector<RawConfigValue>>
+configListRaw(const std::filesystem::path& p);
 
 /**
  * @brief Delete a config key from JSON file.
@@ -62,13 +66,14 @@ caudio::utils::Expected<std::vector<RawConfigValue>> configListRaw(const std::fi
  * @param key Key to delete.
  * @return void on success, Error on failure (not found, corrupt, IO).
  */
-caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p, std::string_view key);
+CAUDIO_API caudio::utils::Expected<void> configDeleteRaw(const std::filesystem::path& p,
+                                                         std::string_view key);
 
 /**
  * @brief Reset entire config (delete config file).
  * @param p Config file path.
  * @return void on success, Error on failure.
  */
-caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
+CAUDIO_API caudio::utils::Expected<void> configResetAllRaw(const std::filesystem::path& p);
 
 } // namespace caudio::config::detail

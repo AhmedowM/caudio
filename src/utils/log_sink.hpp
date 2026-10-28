@@ -41,8 +41,10 @@ struct FileSinkOptions {
  * @ingroup caudio_utils
  * @details Create with open() (shared ownership — the Logger callback holds
  * a copy, so the sink outlives any ordering concerns). Not copyable.
+ * @note CAUDIO_API: service.dll installs this sink across the utils.dll
+ * boundary.
  */
-class FileLogSink : public std::enable_shared_from_this<FileLogSink> {
+class CAUDIO_API FileLogSink : public std::enable_shared_from_this<FileLogSink> {
   public:
     /**
      * @brief Opens (or creates) the log file for append.

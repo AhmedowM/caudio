@@ -51,7 +51,7 @@ option(CAUDIO_ENABLE_CLANG_TIDY "enable clang-tidy checks during build" OFF)
 option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" ON)
 # Shared mode builds per-component DLLs/import libraries by default.
 # CAUDIO_BUILD_STATIC can be enabled to build the static component libraries too.
-option(CAUDIO_BUILD_SHARED "build per-component shared libraries" OFF)
+option(CAUDIO_BUILD_SHARED "build per-component shared libraries" ON)
 if(CAUDIO_BUILD_SHARED)
   set(_caudio_build_static_default OFF)
 else()
@@ -59,6 +59,14 @@ else()
 endif()
 option(CAUDIO_BUILD_STATIC "build static component libraries" ${_caudio_build_static_default})
 unset(_caudio_build_static_default)
+# White-box tests include src/ headers, so they need symbols that are not part
+# of the DLL ABI. They link the static component flavour; the CLI and daemon
+# link the shared one, so both paths are exercised. Forced rather than
+# inherited: a shared-only build must not silently lose white-box coverage.
+if(CAUDIO_BUILD_SHARED AND CAUDIO_ENABLE_TESTS AND NOT CAUDIO_BUILD_STATIC)
+  set(CAUDIO_BUILD_STATIC ON CACHE BOOL "build static component libraries" FORCE)
+  message(STATUS "Tests enabled: CAUDIO_BUILD_STATIC forced ON (tests link static libs)")
+endif()
 option(CAUDIO_BUNDLE_FFMPEG_MACOS "bundle brew FFmpeg dylibs with @rpath fixup (standalone mac archives)" ON)
 # Section GC for the minsize-lto presets. Apple ld rejects --gc-sections at
 # compiler validation, so presets carry only the intent and the per-linker
@@ -202,10 +210,25 @@ configure_file(
   @ONLY
 )
 
-# Vendor: sqlite3 STATIC (libsqlite3.a -- sqlite3 amalgamation, SQLITE_ENABLE_FTS5=1)
+# Vendor: sqlite3 (sqlite3 amalgamation, SQLITE_ENABLE_FTS5=1). Built STATIC
+# for static builds; in shared mode it is a DLL so the process has exactly one
+# SQLite copy (two static copies -- one per component DLL -- corrupt handles:
+# each copy has its own sqlite3GlobalConfig and mutex table).
 # Content-named like blake3 below; the only artifact called "caudio" is the
 # opt-in shared umbrella (combined -> libcaudio).
-add_library(sqlite3 STATIC vendor/sqlite3.c)
+if(CAUDIO_BUILD_SHARED)
+  add_library(sqlite3 SHARED vendor/sqlite3.c)
+  # Vendor target only: CMake's compile-definition parser mangles
+  # "SQLITE_API=__declspec(dllexport)" (it splits at the parentheses), so the
+  # amalgamation's own macro is left empty and the export table is generated
+  # from the object file instead. sqlite3.c has no external-linkage internals
+  # (everything but the API is static) and caudio references no sqlite3 data
+  # symbols, so this exports exactly the API. Our own component DLLs do NOT
+  # use this property: they export CAUDIO_API only.
+  set_target_properties(sqlite3 PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+else()
+  add_library(sqlite3 STATIC vendor/sqlite3.c)
+endif()
 add_library(caudio::sqlite3 ALIAS sqlite3)
 target_include_directories(sqlite3 SYSTEM PRIVATE vendor)
 # BUILD_INTERFACE only: vendor headers are NOT installed (nothing installed
@@ -229,8 +252,18 @@ target_compile_definitions(sqlite3 PUBLIC
   SQLITE_OMIT_JSON=1
 )
 
-# Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON)
-add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
+# Vendor: BLAKE3 C core (portable only - no AVX/SSE/NEON). Shared alongside
+# the components in shared mode; vendor/blake3.h already carries the
+# BLAKE3_DLL/BLAKE3_DLL_EXPORTS switch for the DLL boundary.
+if(CAUDIO_BUILD_SHARED)
+  add_library(blake3 SHARED vendor/blake3.c vendor/blake3_portable.c)
+  if(WIN32)
+    target_compile_definitions(blake3 PRIVATE BLAKE3_DLL BLAKE3_DLL_EXPORTS)
+    target_compile_definitions(blake3 INTERFACE BLAKE3_DLL)
+  endif()
+else()
+  add_library(blake3 STATIC vendor/blake3.c vendor/blake3_portable.c)
+endif()
 target_include_directories(blake3 SYSTEM PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/vendor>)
 target_compile_definitions(blake3 PRIVATE BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0)
 target_compile_options(blake3 PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
@@ -284,7 +317,16 @@ set(CMAKE_DISABLE_FIND_PACKAGE_CppUnit TRUE)
 # silently vary by host. Compressed ID3v2 frames are rare; builds without
 # them read such frames as absent. Deterministic everywhere.
 set(WITH_ZLIB OFF)
+# TagLib is a DLL in shared mode (same one-copy argument as sqlite3, plus LGPL
+# distribution friendliness). BUILD_SHARED_LIBS is scoped to this fetch: it is
+# a global option that would also turn Catch2/CLI11 into DLLs.
+set(_caudio_saved_build_shared_libs "${BUILD_SHARED_LIBS}")
+if(CAUDIO_BUILD_SHARED)
+  set(BUILD_SHARED_LIBS ON)
+endif()
 FetchContent_MakeAvailable(TagLib)
+set(BUILD_SHARED_LIBS "${_caudio_saved_build_shared_libs}")
+unset(_caudio_saved_build_shared_libs)
 message(STATUS "TagLib fetched (v2.3.2): file tag writing enabled")
 unset(BUILD_TESTS)
 unset(BUILD_EXAMPLES)
@@ -295,8 +337,20 @@ unset(WITH_ZLIB)
 # Headers stay private (like sqlite3.h/blake3.h): clear the PUBLIC_HEADER
 # property so install() ships the archive only, without warnings.
 set_target_properties(tag PROPERTIES PUBLIC_HEADER "")
+if(CAUDIO_BUILD_SHARED)
+  # TagLib builds in _deps/taglib-build; keep its DLL beside our binaries so
+  # build-tree runs (ctest, soak_daemon.py, caudio.exe) resolve it without
+  # PATH changes.
+  set_target_properties(tag PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 add_library(caudio::tag ALIAS tag)
-target_compile_definitions(tag PRIVATE TAGLIB_STATIC)
+# TAGLIB_STATIC suppresses TAGLIB_EXPORT's dllimport branch; only valid when
+# the archive is linked directly (static builds).
+if(NOT CAUDIO_BUILD_SHARED)
+  target_compile_definitions(tag PRIVATE TAGLIB_STATIC)
+endif()
 target_compile_options(tag PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/W0> $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>)
 # TagLib's `tag` target exports install includes only; consumers use flat
 # per-subdir includes (`#include <apetag.h>`). Derive every header dir

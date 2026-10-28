@@ -13,7 +13,18 @@ set_target_properties(caudio_cli PROPERTIES OUTPUT_NAME caudio)
 target_sources(caudio_cli PRIVATE cli/src/shell/shell.cpp cli/src/shell/output_formatter.cpp cli/src/shell/preview.cpp)
 target_include_directories(caudio_cli PRIVATE cli/src/shell)
 target_include_directories(caudio_cli PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(caudio_cli PRIVATE caudio::app caudio::service caudio::client caudio::ipc caudio::db caudio::player CLI11::CLI11 Threads::Threads)
+# Link the DLL flavour when it exists (dual builds keep the static libs for
+# the white-box tests); a pure static build falls back to the static targets.
+set(_caudio_cli_libs "")
+foreach(_cli_dep IN ITEMS app service client ipc db player)
+  if(TARGET caudio::${_cli_dep}_shared)
+    list(APPEND _caudio_cli_libs caudio::${_cli_dep}_shared)
+  else()
+    list(APPEND _caudio_cli_libs caudio::${_cli_dep})
+  endif()
+endforeach()
+unset(_cli_dep)
+target_link_libraries(caudio_cli PRIVATE ${_caudio_cli_libs} CLI11::CLI11 Threads::Threads)
 # FFmpeg is not linked here directly: caudio::media links it PRIVATE (see
 # media.cmake) and that propagates as $<LINK_ONLY:...> through cli -> player -> media.
 ca_set_warnings(caudio_cli)
