@@ -153,7 +153,8 @@ struct Engine::Impl {
     // queue traversal
     std::expected<void, caudio::utils::Error> queueNextLocked(caudio::types::Track& out);
     std::expected<void, caudio::utils::Error> queuePrevLocked(caudio::types::Track& out);
-    std::expected<void, caudio::utils::Error> doPlayTrack(caudio::types::Track& t);
+    std::expected<void, caudio::utils::Error> doPlayTrack(caudio::types::Track& t,
+                                                          double startSec = 0.0);
     void preroll();
 
     // callbacks / events
@@ -476,16 +477,8 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
             queue_.cursor = *idx;
             auto r = queueNextLocked(t);
             if (r) {
-                auto pr = doPlayTrack(t);
+                auto pr = doPlayTrack(t, (double)state_.positionMs / 1000.0);
                 if (pr) {
-                    // Restore persisted position directly
-                    double seekPos = (double)state_.positionMs / 1000.0;
-                    pausePos_ = seekPos;
-                    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::duration<double>(seekPos));
-                    playStart_ = std::chrono::steady_clock::now() - ns;
-                    if (hasDb())
-                        (void)saveState();
                     unlockQueue();
                     return {};
                 }
@@ -498,7 +491,14 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
         unlockQueue();
         return std::unexpected(r.error());
     }
-    auto pr = doPlayTrack(t);
+    // A restart can land on the persisted track again (single-track queue, or
+    // a cursor parked on it). Start at the persisted offset instead of letting
+    // the device play the head until a client-side seek arrives; an explicit
+    // stop zeroes positionMs, so this never resurrects a stopped position.
+    double from = 0.0;
+    if (t.id == state_.currentTrackId && state_.positionMs > 0)
+        from = (double)state_.positionMs / 1000.0;
+    auto pr = doPlayTrack(t, from);
     unlockQueue();
     if (!pr)
         return std::unexpected(pr.error());
@@ -705,19 +705,14 @@ Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::types::Trac
     }
     bool marked = markedPlayed_.load(std::memory_order_acquire);
     caudio::types::Track reopen = t;
-    auto r = doPlayTrack(reopen);
+    auto r = doPlayTrack(reopen, pos);
     markedPlayed_.store(marked, std::memory_order_release);
     if (!r) {
         unlockQueue();
         return std::unexpected(r.error());
     }
-    // doPlayTrack starts at 0/Playing; restore position (seek clamps to
-    // duration and ends Playing), then restore the prior paused state.
-    auto sr = seek(pos);
-    if (!sr) {
-        unlockQueue();
-        return std::unexpected(sr.error());
-    }
+    // doPlayTrack seeks before preroll and starts Playing at `pos`; only the
+    // prior paused state is left to restore.
     if (wasPaused) {
         auto pr = pause();
         if (!pr) {
@@ -1420,9 +1415,12 @@ std::expected<void, caudio::utils::Error> Engine::Impl::queuePrevLocked(caudio::
     return {};
 }
 
-std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::types::Track& t) {
+std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::types::Track& t,
+                                                                    double startSec) {
     // try to open decoder path
     std::string path = t.path;
+    if (!std::isfinite(startSec) || startSec < 0.0)
+        startSec = 0.0;
     // Teardown and reopen must serialize with decodeLoop (decoder_->decode /
     // ring_->write hold decodeMtx_) and with the audio callback, which keeps
     // cfg.ring raw. Freeing those without the lock is a use-after-free (ASan:
@@ -1455,6 +1453,24 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
                                 : t.duration;
                 if (duration_ <= 0)
                     duration_ = t.duration > 0 ? t.duration : 1.0;
+                // Resume: seek before the ring exists and is prerolled, so the
+                // device starts at the requested offset. Seeking after
+                // output_->start() leaks the ring's preroll (4096 frames,
+                // ~93 ms) of the track head into playback.
+                if (startSec > 0.0) {
+                    double target = startSec;
+                    if (duration_ > 0 && target > duration_)
+                        target = duration_;
+                    auto sRes = decoder_->seek(target);
+                    if (!sRes) {
+                        if (cfg_.logger)
+                            cfg_.logger->warn("resume seek failed file={} pos={} err={}", path,
+                                              target, sRes.error().message);
+                        startSec = 0.0;
+                    } else if (cfg_.logger) {
+                        cfg_.logger->debug("resume seek pos={} file={}", target, path);
+                    }
+                }
                 // create ring and output
                 // NOTE (2026-10-05): kept at 8192*ch -- a flat 8192-frame cap
                 // measured +9 MB daemon RSS on an mp3 with an attached mjpeg
@@ -1527,8 +1543,12 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
     state_.currentTrackId = t.id;
     state_.cursorPos = (int64_t)queue_.cursor;
     playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
+    // Position tracking starts at the resumed offset (0 for next/prev);
+    // saveState() below then persists that offset instead of a transient 0.
+    // pausePos_ already holds the offset, so playStart_ must be "now" --
+    // shifting it back too would count the offset twice.
+    pausePos_ = startSec;
     playStart_ = std::chrono::steady_clock::now();
-    pausePos_ = 0;
     if (hasDb())
         (void)saveState();
     EngineEvent ev;

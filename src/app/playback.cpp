@@ -58,16 +58,22 @@ AppResult App::play() {
         return std::unexpected{res.error()};
     if (auto* st = std::get_if<caudio::ipc::Status>(&*res)) {
         // Session restore: after a restart the persisted track/position is
-        // reported while stopped. Seek only when play picked the same track
-        // (a crashed session may have advanced the cursor).
+        // reported while stopped. The daemon seeks its decoder before output
+        // starts, so the status Play returned is already at the resume point;
+        // an explicit Seek then would only reset the ring a second time.
         bool restored = false;
         if (wasStopped && priorTrack != 0 && priorPos > 0.0 && st->track_id == priorTrack) {
-            if (auto seekRes = impl_->sendRaw(caudio::ipc::Command{caudio::ipc::Seek{priorPos}})) {
-                if (auto fresh = impl_->sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
-                    if (std::holds_alternative<caudio::ipc::Status>(*fresh))
-                        res = std::move(fresh);
+            restored = st->pos >= priorPos - 0.5 && st->pos <= priorPos + 0.5;
+            if (!restored) {
+                if (auto seekRes =
+                        impl_->sendRaw(caudio::ipc::Command{caudio::ipc::Seek{priorPos}})) {
+                    if (auto fresh =
+                            impl_->sendRaw(caudio::ipc::Command{caudio::ipc::StatusReq{}})) {
+                        if (std::holds_alternative<caudio::ipc::Status>(*fresh))
+                            res = std::move(fresh);
+                    }
+                    restored = true;
                 }
-                restored = true;
             }
         }
         std::string who = impl_->transportWho(res);
