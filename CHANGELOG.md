@@ -129,6 +129,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the end and looping play/stop (`19ff24d`)
 - macOS CI builds select AppleClang through `apple.cmake` and honor
   `CAUDIO_ALLOW_UNSUPPORTED_COMPILER` (`959caab`, `c065b16`)
+- Unix shared installs put the per-component `.so`/`.dylib` and vendor libs
+  in the runtime archive under `lib/` and give every installed library a
+  relative RPATH, so `bin/caudio` runs from an unpacked runtime archive
+  without `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`; macOS additionally sets
+  TagLib's install name to `@rpath` and rewrites FFmpeg references inside
+  component dylibs (`44f5186`)
 
 ## [v1.8.0] - 2026-10-19
 
