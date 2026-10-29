@@ -287,6 +287,14 @@ jobs:
           ninja --version
         shell: bash
 
+      - name: Download FFmpeg (Windows MSVC fallback)
+        shell: pwsh
+        run: |
+          python scripts/download-ffmpeg.py
+          $root = python scripts/download-ffmpeg.py --print-root
+          echo "FFmpeg_ROOT=$root" >> $env:GITHUB_ENV
+          echo "$root/bin" >> $env:GITHUB_PATH
+  
       - name: Configure (modules, Windows Clang)
         run: |
           TESTS=""
