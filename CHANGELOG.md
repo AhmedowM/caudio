@@ -139,6 +139,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at their versioned real file with a relative target, so `@rpath/<soname>`
   resolves in an unpacked runtime archive instead of dangling on brew's
   absolute-target symlink
+- On Unix shared builds the `.so`/`.dylib` (no separate import lib exists) is
+  installed into both the runtime and dev archives: the runtime archive stays
+  self-contained to run, and the dev archive carries the libraries a
+  `find_package(caudio)` consumer needs to link, mirroring the Windows
+  `.dll`→runtime / `.lib`→dev split
 
 ## [v1.8.0] - 2026-10-19
 

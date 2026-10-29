@@ -95,6 +95,12 @@ install(
 # libs stay dev), and on Unix the .so/.dylib files the binary loads. The Unix
 # halves used to land in dev, which left the runtime archive with only
 # bin/caudio and could not run on its own.
+# On Unix there is no separate import lib: the .so/.dylib is needed both at
+# link time and at run time. Ship it in both archives so the dev archive is a
+# standalone SDK (like the Windows .lib) and the runtime archive stays
+# self-contained. The same file is tagged for both components; CPack splits
+# them into separate archives. On Windows this is a no-op: DLLs are RUNTIME
+# artifacts and the import lib is the ARCHIVE, which already goes to dev.
 if(_caudio_shared)
   install(
     TARGETS ${_caudio_shared}
@@ -103,6 +109,10 @@ if(_caudio_shared)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev
+  )
+  install(
+    TARGETS ${_caudio_shared}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
   )
 endif()
 
