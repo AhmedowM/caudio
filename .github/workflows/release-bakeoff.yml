@@ -73,6 +73,11 @@ jobs:
         compiler: [brew, apple]
         family: [release, release-lto, minsize, minsize-lto]
         arch: [arm64, x86_64]
+        # brew LLVM on macOS Intel compiles from source (no Homebrew bottles
+        # for x86_64), taking 2+ hours just for deps. AppleClang (apple leg)
+        # already covers Intel. Keep brew on arm64 where bottles exist.
+        exclude:
+          - { compiler: brew, arch: x86_64 }
     env:
       CAUDIO_TEST_NOAUDIO: 1
       DEPS_REPO: "AhmedowM/deps-private"

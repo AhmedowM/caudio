@@ -218,14 +218,15 @@ configure_file(
 # opt-in shared umbrella (combined -> libcaudio).
 if(CAUDIO_BUILD_SHARED)
   add_library(sqlite3 SHARED vendor/sqlite3.c)
-  # Vendor target only: CMake's compile-definition parser mangles
-  # "SQLITE_API=__declspec(dllexport)" (it splits at the parentheses), so the
-  # amalgamation's own macro is left empty and the export table is generated
-  # from the object file instead. sqlite3.c has no external-linkage internals
-  # (everything but the API is static) and caudio references no sqlite3 data
-  # symbols, so this exports exactly the API. Our own component DLLs do NOT
-  # use this property: they export CAUDIO_API only.
-  set_target_properties(sqlite3 PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+  # WINDOWS_EXPORT_ALL_SYMBOLS makes CMake scan the object file with
+  # __create_def to build the export table. __create_def can't parse /GL
+  # bitcode objects, so exempt sqlite3 from LTCG while keeping interprocedural
+  # optimization on for all caudio code (the release-lto/minsize-lto presets
+  # still exercise LTO where it matters).
+  set_target_properties(sqlite3 PROPERTIES
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
+    INTERPROCEDURAL_OPTIMIZATION OFF
+  )
 else()
   add_library(sqlite3 STATIC vendor/sqlite3.c)
 endif()

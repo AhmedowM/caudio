@@ -273,6 +273,14 @@ jobs:
           ninja --version
         shell: bash
 
+      - name: Download FFmpeg (Windows MSVC fallback)
+        shell: pwsh
+        run: |
+          python scripts/download-ffmpeg.py
+          $root = python scripts/download-ffmpeg.py --print-root
+          echo "FFmpeg_ROOT=$root" >> $env:GITHUB_ENV
+          echo "$root/bin" >> $env:GITHUB_PATH
+
       - name: Configure (ci, Windows Clang)
         # clang++ from PATH, MSVC ABI target; lld-link consumes the same
         # .dll.a FFmpeg import libs as the MinGW builds.
