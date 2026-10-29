@@ -50,6 +50,29 @@ if(UNIX AND NOT APPLE AND CAUDIO_BUILD_CLI)
     endif()
   else()
     install(FILES ${_ff_sos} DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+    # Give bundled FFmpeg .so files a $ORIGIN RUNPATH so they resolve each
+    # other inside an unpacked runtime archive without relying on ldconfig
+    # or LD_LIBRARY_PATH on the host machine. install(CODE) runs after
+    # install(FILES) copies the files into the staging dir.
+    find_program(_patchelf patchelf)
+    if(_patchelf)
+      set(_ff_sonames "")
+      foreach(_f IN LISTS _ff_sos)
+        get_filename_component(_n "${_f}" NAME)
+        list(APPEND _ff_sonames "${_n}")
+      endforeach()
+      install(CODE "
+        set(_libdir \"\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}\")
+        foreach(_n ${_ff_sonames})
+          execute_process(COMMAND ${_patchelf} --set-rpath \"\\\$ORIGIN\" \"\${_libdir}/\${_n}\" RESULT_VARIABLE _rc_p OUTPUT_QUIET ERROR_QUIET)
+          if(NOT _rc_p EQUAL 0)
+            message(WARNING \"FFmpeg bundle: patchelf --set-rpath \\\$ORIGIN failed for \\${_n}\")
+          endif()
+        endforeach()
+      ")
+    else()
+      message(WARNING "patchelf not found -- bundled FFmpeg .so files carry no \$ORIGIN RUNPATH and resolve via the host loader cache")
+    endif()
   endif()
 endif()
 

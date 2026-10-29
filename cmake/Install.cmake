@@ -82,6 +82,11 @@ if(UNIX)
 endif()
 
 # Install static libs + import libs as dev.
+if(CAUDIO_ENABLE_MODULES)
+  set(_caudio_module_fs "FILE_SET;CXX_MODULES;DESTINATION;modules;COMPONENT;dev")
+else()
+  set(_caudio_module_fs "")
+endif()
 install(
   TARGETS ${CAUDIO_INSTALL_LIBS}
   EXPORT caudioTargets
@@ -89,6 +94,7 @@ install(
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT dev
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT dev
   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  ${_caudio_module_fs}
 )
 
 # Install shared libraries as runtime: DLLs beside caudio.exe (the import
@@ -109,6 +115,7 @@ if(_caudio_shared)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT dev
+    ${_caudio_module_fs}
   )
   install(
     TARGETS ${_caudio_shared}
