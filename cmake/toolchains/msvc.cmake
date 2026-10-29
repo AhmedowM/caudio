@@ -2,8 +2,12 @@
 # Ninja + MSVC needs vcvars: scripts/configure.py discovers and runs it (or
 # accepts --vcvars). Raw cmake invocations are checked below with a readable
 # error. --generator vs remains the escape hatch when no vcvars is available.
-set(CMAKE_C_COMPILER cl)
-set(CMAKE_CXX_COMPILER cl)
+if (NOT DEFINED CMAKE_C_COMPILER)
+    set(CMAKE_C_COMPILER cl)
+endif()
+if (NOT DEFINED CMAKE_CXX_COMPILER)
+    set(CMAKE_CXX_COMPILER cl)
+endif()
 
 if(CMAKE_GENERATOR MATCHES "Ninja")
   # vcvars64.bat exports both variables; either one means the environment is

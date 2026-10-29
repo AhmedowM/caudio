@@ -53,13 +53,19 @@ jobs:
             # System FFmpeg is the fallback if the trimmed asset is unavailable.
             pkg install -y ffmpeg
           run: |
-            # Select compiler: GCC from ports, or base-system Clang.
+            # Select compiler: GCC from ports, or LLVM 21. The CMake toolchain
+            # resolves the bare names, so make the versioned LLVM binaries win
+            # on PATH instead of relying on CC/CXX (which it intentionally
+            # does not use for toolchain selection).
             if [ "${{ matrix.compiler }}" = "gcc" ]; then
               export CC=gcc
               export CXX=g++
             else
-              export CC=clang21
-              export CXX=clang++21
+              ln -sf "$(command -v clang21)" /usr/local/bin/clang
+              ln -sf "$(command -v clang++21)" /usr/local/bin/clang++
+              hash -r
+              clang21 --version
+              clang++21 --version
             fi
 
             BUILD_DIR="build/freebsd-${{ matrix.compiler }}-${{ matrix.arch }}"
@@ -77,8 +83,15 @@ jobs:
               echo "::warning::Trimmed FFmpeg not available for FreeBSD/${{ matrix.arch }}; using system FFmpeg"
             fi
 
+            if [ "${{ matrix.compiler }}" = "gcc" ]; then
+              export CC=gcc
+              export CXX=g++
+            else
+              export CC=clang21
+              export CXX=clang++21
+            fi
             python3 scripts/configure.py ci --toolchain ${{ matrix.compiler }} \
-              --build-dir "$BUILD_DIR" $TRIMMED --build 2>&1 | tee build.log
+              --build-dir "$BUILD_DIR" $TRIMMED --define CMAKE_C_COMPILER=$CC --define CMAKE_CXX_COMPILER=$CXX --build 2>&1 | tee build.log
 
       - name: Upload logs
         if: always()
