@@ -229,6 +229,7 @@ std::expected<void, std::uint32_t> App::Impl::spawnDaemon(const caudio::config::
                 exePath = "./caudio";
             }
         }
+    }
 #endif
     if (!cfg.configPath.empty()) {
         std::string cfgStr = cfg.configPath.generic_string();

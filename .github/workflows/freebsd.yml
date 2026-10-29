@@ -1,0 +1,90 @@
+# FreeBSD builds (manual).
+#
+# Verifies caudio builds on FreeBSD with both GCC and Clang, on x64 and
+# arm64. Downloads the trimmed FFmpeg asset inside the VM when available
+# for the platform/arch, otherwise falls back to the system FFmpeg package.
+#
+# Uses vmactions/freebsd-vm@v1 which boots a real FreeBSD VM under QEMU
+# inside an ubuntu-latest runner and runs the build inside the guest.
+
+name: FreeBSD builds (manual)
+
+"on":
+  workflow_dispatch:
+    inputs:
+      deps_tag:
+        required: false
+        type: string
+        description: 'deps-private trimmed FFmpeg release tag'
+        default: 'ffmpeg-trimmed-8.1.2-2'
+
+jobs:
+  freebsd:
+    name: freebsd ${{ matrix.compiler }} / ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        arch: [x86_64, arm64]
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+      DEPS_REPO: "AhmedowM/deps-private"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build inside FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '15.1'
+          arch: ${{ matrix.arch }}
+          prepare: |
+            pkg update -f
+            pkg install -y cmake ninja git curl python3
+            if [ "${{ matrix.compiler }}" = "gcc" ]; then
+              pkg install -y gcc
+            else
+              pkg install -y llvm21
+            fi
+            # System FFmpeg is the fallback if the trimmed asset is unavailable.
+            pkg install -y ffmpeg
+          run: |
+            # Select compiler: GCC from ports, or base-system Clang.
+            if [ "${{ matrix.compiler }}" = "gcc" ]; then
+              export CC=gcc
+              export CXX=g++
+            else
+              export CC=clang21
+              export CXX=clang++21
+            fi
+
+            BUILD_DIR="build/freebsd-${{ matrix.compiler }}-${{ matrix.arch }}"
+
+            # Try downloading trimmed FFmpeg; fall back to system FFmpeg.
+            TRIMMED=""
+            DEPS_TAG="${{ inputs.deps_tag }}"
+            if curl -fsSL -o /tmp/ffmpeg-trimmed.tar.gz \
+              "https://github.com/${{ env.DEPS_REPO }}/releases/download/${DEPS_TAG}/ffmpeg-trimmed-8.1.2-freebsd-${{ matrix.arch }}.tar.gz"; then
+              mkdir -p /tmp/ffmpeg-trimmed
+              tar -xzf /tmp/ffmpeg-trimmed.tar.gz -C /tmp/ffmpeg-trimmed
+              TRIMMED="--trimmed-ffmpeg --ffmpeg-root /tmp/ffmpeg-trimmed"
+              echo "Using trimmed FFmpeg"
+            else
+              echo "::warning::Trimmed FFmpeg not available for FreeBSD/${{ matrix.arch }}; using system FFmpeg"
+            fi
+
+            python3 scripts/configure.py ci --toolchain ${{ matrix.compiler }} \
+              --build-dir "$BUILD_DIR" $TRIMMED --build 2>&1 | tee build.log
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: freebsd-${{ matrix.compiler }}-${{ matrix.arch }}-logs
+          path: |
+            build.log
+          if-no-files-found: warn
