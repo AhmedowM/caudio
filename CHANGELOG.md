@@ -135,6 +135,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH`; macOS additionally sets
   TagLib's install name to `@rpath` and rewrites FFmpeg references inside
   component dylibs (`44f5186`)
+- macOS FFmpeg bundle re-points SONAME symlinks (e.g. `libavcodec.63.dylib`)
+  at their versioned real file with a relative target, so `@rpath/<soname>`
+  resolves in an unpacked runtime archive instead of dangling on brew's
+  absolute-target symlink
 
 ## [v1.8.0] - 2026-10-19
 
