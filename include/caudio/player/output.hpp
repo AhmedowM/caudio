@@ -89,7 +89,8 @@ CAUDIO_API caudio::types::DeviceList enumerateDevices();
  * - Changes take effect on next audio callback
  *
  * Lifecycle:
- *   create() -> init() -> start() -> (playback) -> stop() -> shutdown()
+ *   create() (which calls init()) -> start() -> (playback) -> stop() -> shutdown()
+ *   A default-constructed object may call init() explicitly.
  *   Destructor calls shutdown() automatically.
  */
 class CAUDIO_API AudioOutput {
@@ -125,8 +126,8 @@ class CAUDIO_API AudioOutput {
      * @param cfg Configuration for the audio output
      * @return Expected containing AudioOutput on success, Error on failure
      *
-     * Factory method that creates an AudioOutput and initializes the
-     * miniaudio device. Returns an error if device initialization fails.
+     * Factory method that creates an AudioOutput and calls init() to initialize
+     * the miniaudio device. Returns an error if device initialization fails.
      *
      * @retval StatusCode::Device miniaudio device init failed
      * @retval StatusCode::InvalidArg Invalid config (0 channels, 0 sample rate, null ring)
@@ -161,7 +162,7 @@ class CAUDIO_API AudioOutput {
      * to ensure only one start transition occurs.
      *
      * Thread Safety: Thread-safe (atomic compare_exchange)
-     * Precondition: init() must have been called successfully
+     * Precondition: init() must have completed successfully (create() calls it automatically)
      */
     void start();
 
@@ -191,6 +192,8 @@ class CAUDIO_API AudioOutput {
      * @return true on success, false on failure
      *
      * Configures and initializes the miniaudio device with float32 format.
+     * This is normally called by create(); call it directly only on a
+     * default-constructed or shut-down object.
      * Sets up the data callback for lock-free ring buffer consumption.
      * Device starts in stopped state; caller must call start() after preroll.
      *
