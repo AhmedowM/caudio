@@ -1,5 +1,6 @@
 #pragma once
 
+// Lifecycle
 /**
  * @file engine.hpp
  * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
@@ -155,7 +156,7 @@ class CAUDIO_API Engine final {
      * @see resume
      * @see stop
      */
-    // Playback
+    // Playback transport
     ExpectedVoid play(int64_t queueId = 1);
 
     /**
@@ -227,6 +228,7 @@ class CAUDIO_API Engine final {
      */
     ExpectedVoid setVolume(float g);
 
+    // Playback state
     /** @brief Returns current volume [0,1]. @ingroup caudio_engine
      * @return Volume level (atomic load, relaxed). */
     float volume() const noexcept;
@@ -252,6 +254,7 @@ class CAUDIO_API Engine final {
      * @return RepeatMode (Off/All/One). */
     caudio::types::RepeatMode repeat() const noexcept;
 
+    // Database-backed history and statistics
     /**
      * @brief Returns database statistics.
      * @ingroup caudio_engine
@@ -285,6 +288,7 @@ class CAUDIO_API Engine final {
      */
     std::expected<void, caudio::utils::Error> clearHistory();
 
+    // Queue selection and navigation
     /**
      * @brief Enables or disables shuffle.
      * @ingroup caudio_engine
@@ -367,6 +371,7 @@ class CAUDIO_API Engine final {
      */
     ExpectedVoid prev();
 
+    // Event delivery
     /**
      * @brief Sets runtime callbacks.
      * @ingroup caudio_engine

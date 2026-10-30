@@ -51,6 +51,7 @@ struct DatabaseOptions {
  */
 class CAUDIO_API Database final : public caudio::contracts::IDatabase {
   public:
+    // Lifecycle and connection management
     /**
      * @brief Default-constructs an empty (not open) Database.
      * @ingroup caudio_db
@@ -90,6 +91,14 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     static std::expected<std::unique_ptr<Database>, caudio::utils::Error>
     open(std::string_view path, const DatabaseOptions& opts = {});
     /**
+     * @brief Reports whether the SQLite handle is open.
+     * @ingroup caudio_db
+     * @return True when the database is ready for operations.
+     * @par Thread safety
+     * Thread-safe; reads the immutable open-state flag.
+     */
+    bool isOpen() const noexcept override;
+    /**
      * @brief Returns the non-owning logger from DatabaseOptions (may be null).
      * @ingroup caudio_db
      * @details For free functions (scan) that act on the database but take
@@ -104,8 +113,6 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      * Thread-safe; delegates to the writer's flush().
      */
     std::expected<void, caudio::utils::Error> flush();
-
-    bool isOpen() const noexcept override;
 
     /**
      * @brief Enqueues multiple tracks atomically (single transaction).
@@ -145,6 +152,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     std::unique_ptr<Impl> impl_;
 
   public:
+    // Track CRUD and search
     /**
      * @brief Track CRUD -- inserts, updates, deletes and queries tracks.
      * @ingroup caudio_db
@@ -232,6 +240,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     std::expected<void, caudio::utils::Error> setDirty(int64_t id, int dirty);
 
     // Playlists
+    // Queue operations
     /**
      * @brief Creates a playlist.
      * @ingroup caudio_db
@@ -493,7 +502,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      */
     std::expected<void, caudio::utils::Error> bookmarkRemove(int64_t id) override;
 
-    // Libraries
+    // Libraries and aggregate statistics
     /**
      * @brief Adds a library.
      * @ingroup caudio_db
@@ -538,6 +547,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     std::expected<caudio::types::LibraryStats, caudio::utils::Error>
     libraryStats(std::optional<int> mostPlayed = std::nullopt) override;
 
+    // Persisted engine state and playback history
     std::expected<caudio::types::EngineState, caudio::utils::Error>
     loadEngineState() override;
     std::expected<void, caudio::utils::Error>
