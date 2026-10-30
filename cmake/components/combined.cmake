@@ -42,7 +42,7 @@ if(CAUDIO_BUILD_SHARED)
     tag
     FFmpeg::avcodec FFmpeg::avformat FFmpeg::avutil FFmpeg::swresample
     Threads::Threads)
-  if(UNIX AND NOT APPLE)
+  if(UNIX AND NOT APPLE AND NOT ANDROID)
     target_link_libraries(combined PRIVATE rt)
   endif()
   if(CAUDIO_ENABLE_SANITIZERS)

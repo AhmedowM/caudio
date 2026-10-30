@@ -219,7 +219,7 @@ std::string hex8ForDb(const std::filesystem::path& dbPath) {
     std::string input = dbPath.generic_string();
     if (input.empty())
         input = dbPath.string();
-    std::size_t raw = std::hash<std::string>{}(input);
+    const std::uint64_t raw = static_cast<std::uint64_t>(std::hash<std::string>{}(input));
     std::uint32_t hv = static_cast<std::uint32_t>(raw & 0xFFFFFFFFu);
     hv ^= static_cast<std::uint32_t>((raw >> 32) & 0xFFFFFFFFu);
     return std::format("{:08x}", hv);

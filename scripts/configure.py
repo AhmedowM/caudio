@@ -10,6 +10,7 @@ Examples:
     python scripts/configure.py dev --toolchain gcc --build-dir build/dev-gcc
     python scripts/configure.py ci --toolchain clang --test
     python scripts/configure.py release-lto --toolchain gcc --build --package
+    python scripts/configure.py android --ndk D:\android-ndk-r30 --build
 
 --cc/--cxx are exported as CC/CXX for the configure process. The toolchain
 files still pin bare compiler names (gcc/g++/clang/cl/cl), so version
@@ -28,7 +29,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-TOOLCHAINS = ("auto", "gcc", "clang", "msvc", "apple")
+TOOLCHAINS = ("auto", "gcc", "clang", "msvc", "apple", "android")
 GENERATORS = ("ninja", "vs")
 INTENTS = (
     "dev",
@@ -38,6 +39,7 @@ INTENTS = (
     "minsize",
     "minsize-lto",
     "modules",
+    "android",
     "default",
 )
 
@@ -90,6 +92,16 @@ INTENT_CACHE = {
         "CAUDIO_BUILD_CLI": "OFF",
         "CAUDIO_ENABLE_TESTS": "OFF",
         "CAUDIO_ENABLE_EXAMPLES": "OFF",
+    },
+    "android": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CAUDIO_BUILD_CLI": "OFF",
+        "CAUDIO_BUILD_STATIC": "OFF",
+        "CAUDIO_ENABLE_TESTS": "OFF",
+        "CAUDIO_ENABLE_EXAMPLES": "OFF",
+        "CAUDIO_ENABLE_MODULES": "OFF",
+        "CAUDIO_BUILD_DOCS": "OFF",
+        "CAUDIO_BUILD_SHARED": "ON",
     },
     "default": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -431,14 +443,28 @@ def configure_command(args: argparse.Namespace, toolchain: str,
     ]
     if generator == "vs":
         cmd += ["-A", VS_ARCH.get(arch, arch)]
-    cmd += [
-        f"-DCMAKE_TOOLCHAIN_FILE={root / 'cmake' / 'toolchain.cmake'}",
-        f"-DCAUDIO_TOOLCHAIN={toolchain}",
-    ]
+    if toolchain == "android":
+        cmd.append(f"-DCMAKE_TOOLCHAIN_FILE={root / 'cmake' / 'android.cmake'}")
+        if args.ndk:
+            cmd.append(f"-DCMAKE_ANDROID_NDK={args.ndk}")
+        cmd.append(f"-DANDROID_ABI={args.android_abi}")
+        cmd.append(f"-DANDROID_PLATFORM=android-{args.android_api}")
+    else:
+        cmd += [
+            f"-DCMAKE_TOOLCHAIN_FILE={root / 'cmake' / 'toolchain.cmake'}",
+            f"-DCAUDIO_TOOLCHAIN={toolchain}",
+        ]
     for key, value in cache.items():
         cmd.append(f"-D{key}={value}")
     if args.ffmpeg_root:
-        cmd.append(f"-DFFmpeg_ROOT={args.ffmpeg_root}")
+        ffmpeg_root = Path(args.ffmpeg_root)
+        if not ffmpeg_root.is_absolute():
+            ffmpeg_root = repo_root() / ffmpeg_root
+        ffmpeg_root = ffmpeg_root.resolve()
+        cmd += [
+            f"-DFFmpeg_ROOT={ffmpeg_root}",
+            f"-DCMAKE_PREFIX_PATH={ffmpeg_root}",
+        ]
     for define in args.define:
         cmd.append(f"-D{define}")
     if platform.system() == "Darwin":
@@ -522,7 +548,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--intent", dest="intent_flag", metavar="INTENT",
                         help="build intent (alternative to the positional)")
     parser.add_argument("--toolchain", default="auto",
-                        help="auto|gcc|clang|msvc|apple (default: auto)")
+                        help="auto|gcc|clang|msvc|apple|android (default: auto)")
     parser.add_argument("--generator", default="ninja",
                         help="ninja|vs (default: ninja)")
     parser.add_argument("--arch", default=host_arch(),
@@ -536,6 +562,13 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
                         help="CC for the configure process (bare name; see epilog)")
     parser.add_argument("--cxx", default=None,
                         help="CXX for the configure process (bare name; see epilog)")
+    parser.add_argument("--ndk", default=None, metavar="PATH",
+                        help="Android NDK root (android intent; otherwise "
+                             "ANDROID_NDK_ROOT is used)")
+    parser.add_argument("--android-abi", default="arm64-v8a",
+                        help="Android ABI (default: arm64-v8a)")
+    parser.add_argument("--android-api", type=int, default=24,
+                        help="Android API level (default: 24)")
     parser.add_argument("--vcvars", default=None, metavar="PATH",
                         help="vcvars batch file or its directory (MSVC + Ninja)")
     parser.add_argument("--ffmpeg-root", default=None, metavar="PATH",
@@ -604,13 +637,20 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
             parser.error(f"--define expects KEY=VALUE, got {define!r}")
     if args.generator == "vs" and not is_windows():
         parser.error("--generator vs is only available on Windows")
+    if args.intent == "android" and args.toolchain not in ("auto", "android"):
+        parser.error("android intent requires --toolchain android (or auto)")
+    if args.toolchain == "android" and args.intent != "android":
+        parser.error("--toolchain android requires the android intent")
+    if args.intent == "android" and args.android_api < 21:
+        parser.error("--android-api must be >= 21")
     return args
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
-    toolchain = resolve_toolchain(args.toolchain, args.generator)
+    toolchain = "android" if args.intent == "android" else resolve_toolchain(
+        args.toolchain, args.generator)
     if args.generator == "vs" and toolchain != "msvc":
         fail("--generator vs requires --toolchain msvc (or auto on Windows)")
     if args.vcvars and toolchain != "msvc":
@@ -634,8 +674,9 @@ def main(argv: list[str] | None = None) -> int:
         if not build_dir.is_absolute():
             build_dir = repo_root() / build_dir
     else:
+        build_arch = args.android_abi if toolchain == "android" else arch
         build_dir = repo_root() / "build" / (
-            f"{args.intent}-{toolchain}-{args.generator}-{arch}")
+            f"{args.intent}-{toolchain}-{args.generator}-{build_arch}")
     build_dir = build_dir.resolve()
 
     cache = build_cache(args, args.intent, toolchain)

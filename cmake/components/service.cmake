@@ -34,7 +34,7 @@ endif()
 # shm/clock symbols in libc; older Linux still needs -lrt, which stays a
 # link-only (relocatable) name in the export.
 function(_caudio_service_link_rt tgt)
-  if(UNIX AND NOT APPLE)
+  if(UNIX AND NOT APPLE AND NOT ANDROID)
     target_link_libraries(${tgt} PRIVATE rt)
   endif()
 endfunction()

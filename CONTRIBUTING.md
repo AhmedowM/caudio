@@ -35,6 +35,12 @@ python scripts/configure.py dev --toolchain clang --jobs 4 --build --test
 
 # Optional modules build (GCC 14+, LLVM Clang 19+, or MSVC 2022)
 python scripts/configure.py modules --toolchain clang --build
+
+# Build the Android FFmpeg dependency, then the native caudio library
+python scripts/build-ffmpeg.py --android-ndk D:\android-ndk-r30 `
+  --android-abi arm64-v8a --android-api 24 --prefix build\ffmpeg-android-arm64
+python scripts/configure.py android --ndk D:\android-ndk-r30 `
+  --ffmpeg-root build\ffmpeg-android-arm64 --build
 ```
 
 Inspect all wrapper options with:
@@ -43,6 +49,12 @@ Inspect all wrapper options with:
 python scripts/configure.py --help
 python scripts/configure.py dev --help
 ```
+
+Android builds require an NDK-built FFmpeg prefix supplied with
+`--ffmpeg-root` (or `FFmpeg_ROOT`). The Android intent produces native
+libraries only; Java/Kotlin code is outside this repository's C++ build.
+The Android x86 FFmpeg variant disables assembly because FFmpeg's 32-bit x86
+assembly is not position-independent when linked into Android shared libraries.
 
 Use CMake presets when the compiler is already configured in the environment:
 

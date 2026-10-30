@@ -13,7 +13,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__ANDROID__)
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -51,11 +51,13 @@ struct ShmRaw {
 std::string openShmRaw(const std::string& name, bool create, ShmRaw& raw) {
 #ifdef _WIN32
     std::string fullName = "caudio-" + name + "-status";
+#elif defined(__ANDROID__)
+    (void)name;
+    (void)create;
+    (void)raw;
+    return "shared memory status is unavailable on Android";
 #else
     std::string fullName = "/caudio-" + name + "-status";
-#endif
-
-#ifndef _WIN32
     int flags = O_RDWR;
     if (create)
         flags |= O_CREAT;
@@ -82,7 +84,9 @@ std::string openShmRaw(const std::string& name, bool create, ShmRaw& raw) {
     raw.map = static_cast<AtomicShmStatus*>(ptr);
     raw.size = sizeof(AtomicShmStatus);
     raw.handle = fd;
-#else
+#endif
+
+#ifdef _WIN32
     std::wstring wname;
     wname.reserve(fullName.size());
     for (char c : fullName)
@@ -113,7 +117,9 @@ std::string openShmRaw(const std::string& name, bool create, ShmRaw& raw) {
     raw.handle = reinterpret_cast<std::intptr_t>(hMap);
 #endif
 
+#ifndef __ANDROID__
     raw.name = std::move(fullName);
+#endif
     return "";
 }
 
@@ -124,7 +130,7 @@ void closeShmRaw(AtomicShmStatus*& map, std::size_t& size, std::intptr_t& handle
     (void)created;
     (void)name;
     if (map) {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__ANDROID__)
         ::munmap(map, size);
         map = nullptr;
         if (handle >= 0) {
@@ -134,13 +140,17 @@ void closeShmRaw(AtomicShmStatus*& map, std::size_t& size, std::intptr_t& handle
             ::close(static_cast<int>(handle));
             handle = -1;
         }
-#else
+#elif defined(_WIN32)
         ::UnmapViewOfFile(map);
         map = nullptr;
         if (handle != -1) {
             ::CloseHandle(reinterpret_cast<HANDLE>(handle));
             handle = -1;
         }
+#else
+        map = nullptr;
+        size = 0;
+        handle = -1;
 #endif
     }
 }

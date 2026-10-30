@@ -185,6 +185,12 @@ list of project options, inspect the [configuration reference](#configuration).
 - **Windows:** use a Ninja shell with Visual Studio environment variables for
   MSVC, or use LLVM Clang targeting the MSVC ABI. MinGW GCC is also supported.
 - **FreeBSD:** the tested path is FreeBSD 15.1 with GCC 14 and system FFmpeg.
+- **Android:** configure the native shared-library target with
+  `python scripts/build-ffmpeg.py --android-ndk <path>` followed by
+  `python scripts/configure.py android --ndk <path> --ffmpeg-root <prefix>`.
+  The current target does not include Java/Kotlin or application lifecycle
+  code. The x86 variant automatically disables FFmpeg assembly because its
+  32-bit assembly is not PIC-compatible with Android shared libraries.
 
 Headless test runs can avoid opening an audio device:
 

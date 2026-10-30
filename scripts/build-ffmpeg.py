@@ -14,8 +14,8 @@ Configure flags and the pinned version are parsed from
 cmake/FFmpegTrimmed.cmake (single source of truth -- the module's list
 items contain no spaces, so token extraction is exact). Produces a shared-
 only install tree (<prefix>/bin, include, lib) suitable for
-CAUDIO_TRIMMED_ROOT. Host-arch only: for another arch, run on that arch
-(CI runners) -- FFmpeg cross-compiles need per-OS toolchains, out of scope.
+CAUDIO_TRIMMED_ROOT. Host-arch only by default; Android cross-compiles are
+supported with --android-ndk, --android-abi, and --android-api.
 
 --pack tars the prefix for deps-private upload. The asset name encodes the
 host OS/arch (ffmpeg-trimmed-<ver>-<os>-<arch>.tar.gz); name it honestly --
@@ -78,13 +78,63 @@ def read_trim_flags() -> list[str]:
     return flags
 
 
-def asset_name(version: str) -> str:
+def asset_name(version: str, android_abi: str | None = None) -> str:
+    if android_abi:
+        return f"ffmpeg-trimmed-{version}-android-{android_abi}.tar.gz"
     os_name = {"Linux": "linux", "Darwin": "macos", "Windows": "windows"}.get(
         platform.system(), platform.system().lower())
     machine = platform.machine().lower()
     arch = {"x86_64": "x86_64", "amd64": "x86_64",
             "aarch64": "arm64", "arm64": "arm64"}.get(machine, machine)
     return f"ffmpeg-trimmed-{version}-{os_name}-{arch}.tar.gz"
+
+
+ANDROID_ABIS = {
+    "arm64-v8a": ("aarch64", "armv8-a", "aarch64-linux-android"),
+    "armeabi-v7a": ("arm", "armv7-a", "armv7a-linux-androideabi"),
+    "x86_64": ("x86_64", "x86-64", "x86_64-linux-android"),
+    "x86": ("x86", "i686", "i686-linux-android"),
+}
+
+
+def android_tools(ndk: Path, abi: str, api: int) -> tuple[list[str], str]:
+    """Return FFmpeg configure arguments and the NDK C compiler path."""
+    host_tag = {
+        "Windows": "windows-x86_64",
+        "Linux": "linux-x86_64",
+        "Darwin": "darwin-x86_64",
+    }.get(platform.system())
+    if not host_tag:
+        print(f"[ERROR] unsupported host for Android NDK: {platform.system()}",
+              file=sys.stderr)
+        sys.exit(2)
+    arch, cpu, triple = ANDROID_ABIS[abi]
+    tool_dir = ndk / "toolchains" / "llvm" / "prebuilt" / host_tag / "bin"
+    compiler_suffix = ""
+    tool_suffix = ".exe" if platform.system() == "Windows" else ""
+    tools = {
+        "cc": tool_dir / f"{triple}{api}-clang{compiler_suffix}",
+        "cxx": tool_dir / f"{triple}{api}-clang++{compiler_suffix}",
+        "strip": tool_dir / f"llvm-strip{tool_suffix}",
+        "nm": tool_dir / f"llvm-nm{tool_suffix}",
+        "ar": tool_dir / f"llvm-ar{tool_suffix}",
+        "ranlib": tool_dir / f"llvm-ranlib{tool_suffix}",
+    }
+    missing = [str(path) for path in tools.values() if not path.is_file()]
+    if missing:
+        print("[ERROR] Android NDK tools not found:\n  " + "\n  ".join(missing),
+              file=sys.stderr)
+        sys.exit(1)
+    flags = [
+        "--enable-cross-compile", "--target-os=android",
+        f"--arch={arch}", f"--cpu={cpu}",
+        *[f"--{name}={path.as_posix()}" for name, path in tools.items()],
+    ]
+    if abi == "x86":
+        # FFmpeg's 32-bit x86 assembly uses absolute relocations that cannot
+        # be linked into Android shared libraries as position-independent code.
+        flags.append("--disable-asm")
+    return flags, str(tools["cc"])
 
 
 def _bash_has(bash: str, prog: str) -> bool:
@@ -177,6 +227,13 @@ def main() -> None:
     ap.add_argument("--toolchain", default="",
                     help="FFmpeg --toolchain value (default: auto-detect; "
                          "use msvc with clang-cl on Windows)")
+    ap.add_argument("--android-ndk", type=Path, default=None, metavar="PATH",
+                    help="Android NDK root (ANDROID_NDK_ROOT is used when omitted)")
+    ap.add_argument("--android-abi", default="arm64-v8a",
+                    choices=sorted(ANDROID_ABIS),
+                    help="Android ABI (default: arm64-v8a)")
+    ap.add_argument("--android-api", type=int, default=24,
+                    help="Android API level (default: 24)")
     ap.add_argument("--bash", default=None,
                     help="bash binary for running configure on Windows "
                          "(default: well-known MSYS2/Cygwin roots, then PATH "
@@ -191,6 +248,23 @@ def main() -> None:
                     help="force rebuild even if prefix directory exists")
     args = ap.parse_args()
 
+    if args.android_api < 21:
+        ap.error("--android-api must be >= 21")
+    android_ndk = args.android_ndk
+    if android_ndk is None:
+        ndk_env = (os.environ.get("ANDROID_NDK_ROOT")
+                   or os.environ.get("ANDROID_NDK_HOME"))
+        if ndk_env:
+            android_ndk = Path(ndk_env)
+    android = android_ndk is not None
+    if android and args.toolchain:
+        ap.error("--toolchain cannot be combined with Android options")
+    if android:
+        android_flags, android_cc = android_tools(
+            android_ndk.resolve(), args.android_abi, args.android_api)
+    else:
+        android_flags, android_cc = [], ""
+
     text = cmake_module().read_text(encoding="utf-8")
     pinned_version = parse_trim_version(text)
     flags = read_trim_flags()
@@ -202,7 +276,8 @@ def main() -> None:
 
     # Set default prefix
     if not args.prefix:
-        args.prefix = Path("./build/ffmpeg").resolve()
+        suffix = f"-android-{args.android_abi}" if android else ""
+        args.prefix = Path(f"./build/ffmpeg{suffix}").resolve()
 
     # Skip rebuild if directory exists and --force is not specified
     if args.prefix.exists() and not args.force:
@@ -213,10 +288,15 @@ def main() -> None:
     if not args.dry_run:
         # Dry runs print commands without touching the machine, so tool
         # presence is checked only for real builds.
-        cc = os.environ.get("CC") or "cc"
+        cc = android_cc or os.environ.get("CC") or "cc"
         if platform.system() == "Windows":
             bash = find_bash(args.bash)
-            missing = [p for p in ("make", cc.split()[0]) if not _bash_has(bash, p)]
+            missing = ["make"] if not _bash_has(bash, "make") else []
+            if android:
+                if not Path(cc).is_file():
+                    missing.append(cc)
+            elif not _bash_has(bash, cc.split()[0]):
+                missing.append(cc.split()[0])
             if missing:
                 print(f"[ERROR] not found via {bash}: {', '.join(missing)} -- "
                       "Windows builds need MSYS2 tooling on PATH",
@@ -261,12 +341,17 @@ def main() -> None:
             build.mkdir()
         # POSIX forms: on Windows these cross into bash (which would eat
         # backslashes), while Path-as-cwd stays native for subprocess.
-        configure = [(src / "configure").as_posix(), f"--prefix={prefix.as_posix()}", *flags]
+        configure = [
+            (src / "configure").as_posix(),
+            f"--prefix={prefix.as_posix()}",
+            *flags,
+            *android_flags,
+        ]
         if args.toolchain:
             configure.append(f"--toolchain={args.toolchain}")
         if args.extra_configure_args:
             configure.extend(shlex.split(args.extra_configure_args))
-        cc_env = os.environ.get("CC")
+        cc_env = os.environ.get("CC") if not android else None
         if cc_env:
             # Explicit --cc: FFmpeg configure does not reliably honor a bare
             # $CC from the environment (observed: cross-target CC silently
@@ -292,7 +377,8 @@ def main() -> None:
     print(f"trimmed FFmpeg {version} installed to {prefix}")
     print(f"configure with: -DCAUDIO_TRIMMED_ROOT={prefix}")
     if args.pack:
-        out = args.pack if args.pack != "auto" else str(prefix.parent / asset_name(version))
+        out = (args.pack if args.pack != "auto" else
+               str(prefix.parent / asset_name(version, args.android_abi if android else None)))
         print(f"+ pack {prefix} -> {out}")
         if not args.dry_run:
             # Contents at the tar root (same layout as `tar -C prefix .`),

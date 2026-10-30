@@ -42,6 +42,7 @@ foreach(_entry IN LISTS _ffmpeg_libs)
     PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} $ENV{FFmpeg_ROOT} ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES include
     NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH
   )
   if(NOT ${_inc_var})
     find_path(${_inc_var}
@@ -55,6 +56,7 @@ foreach(_entry IN LISTS _ffmpeg_libs)
     PATHS ${CMAKE_PREFIX_PATH} ${FFmpeg_ROOT} $ENV{FFmpeg_ROOT} ${_FFmpeg_SEARCH_HINTS}
     PATH_SUFFIXES lib bin
     NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH
   )
   if(NOT ${_lib_var})
     find_library(${_lib_var}
