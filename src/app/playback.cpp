@@ -11,7 +11,7 @@
 #include <app/format_internal.hpp>
 #include <caudio/app/app.hpp>
 #include <caudio/client/client.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/utils/error.hpp>

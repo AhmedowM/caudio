@@ -2,7 +2,7 @@
 
 #include <array>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -223,8 +223,8 @@ struct Database::Impl {
     std::expected<void, caudio::utils::Error> updateTrackLocked(const caudio::types::Track& t);
     std::expected<void, caudio::utils::Error> deleteTrackLocked(int64_t id);
     std::expected<caudio::types::Track, caudio::utils::Error> getTrackLocked(int64_t id);
-    std::expected<std::vector<Library>, caudio::utils::Error> libraryListLocked();
-    std::expected<void, caudio::utils::Error> libraryUpdateLocked(const Library& l);
+    std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> libraryListLocked();
+    std::expected<void, caudio::utils::Error> libraryUpdateLocked(const caudio::types::Library& l);
 
     // Playlist / queue locked helpers
     std::expected<int64_t, caudio::utils::Error>
@@ -566,7 +566,7 @@ std::expected<void, caudio::utils::Error> Database::Impl::deleteTrackLocked(int6
     return {};
 }
 
-std::expected<std::vector<Library>, caudio::utils::Error> Database::Impl::libraryListLocked() {
+std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> Database::Impl::libraryListLocked() {
     if (!db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -576,9 +576,9 @@ std::expected<std::vector<Library>, caudio::utils::Error> Database::Impl::librar
                                   "recursive, extensions FROM libraries ORDER BY id");
         !e)
         return std::unexpected{e.error()};
-    std::vector<Library> out;
+    std::vector<caudio::types::Library> out;
     while (st.step()) {
-        Library l;
+        caudio::types::Library l;
         l.id = st.columnInt(0);
         l.path = st.columnText(1);
         l.name = st.columnText(2);
@@ -592,7 +592,7 @@ std::expected<std::vector<Library>, caudio::utils::Error> Database::Impl::librar
     return out;
 }
 
-std::expected<void, caudio::utils::Error> Database::Impl::libraryUpdateLocked(const Library& l) {
+std::expected<void, caudio::utils::Error> Database::Impl::libraryUpdateLocked(const caudio::types::Library& l) {
     if (l.id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db_)
@@ -780,7 +780,7 @@ Database::findByPath(std::string_view path) {
 }
 
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-Database::listTracks(const TrackQuery* q) {
+Database::listTracks(const caudio::types::TrackQuery* q) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -1337,14 +1337,14 @@ Database::listQueueItems(int64_t qid) {
     return caudio::db::queueListLocked(impl_->db_.get(), qid);
 }
 
-std::expected<Queue, caudio::utils::Error> Database::getQueue(int64_t qid) {
+std::expected<caudio::types::Queue, caudio::utils::Error> Database::getQueue(int64_t qid) {
     if (qid == 0)
         qid = 1;
     std::shared_lock lk{impl_->dbMutex_};
     return caudio::db::getQueueLocked(impl_->db_.get(), qid);
 }
 
-std::expected<std::vector<Queue>, caudio::utils::Error> Database::listQueues() {
+std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> Database::listQueues() {
     std::shared_lock lk{impl_->dbMutex_};
     return caudio::db::listQueuesLocked(impl_->db_.get());
 }
@@ -1429,7 +1429,7 @@ Database::historyAdd(const caudio::types::HistoryEntry& e) {
 }
 
 std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
-Database::listHistory(const HistoryQuery* q) {
+Database::listHistory(const caudio::types::HistoryQuery* q) {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
@@ -1622,12 +1622,12 @@ std::expected<int64_t, caudio::utils::Error> Database::libraryAdd(std::string_vi
     return sqlite3_last_insert_rowid(impl_->db_.get());
 }
 
-std::expected<std::vector<Library>, caudio::utils::Error> Database::listLibraries() {
+std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> Database::listLibraries() {
     std::shared_lock lk{impl_->dbMutex_};
     return impl_->libraryListLocked();
 }
 
-std::expected<void, caudio::utils::Error> Database::libraryUpdate(const Library& l) {
+std::expected<void, caudio::utils::Error> Database::libraryUpdate(const caudio::types::Library& l) {
     std::unique_lock lk{impl_->dbMutex_};
     return impl_->libraryUpdateLocked(l);
 }
@@ -1652,12 +1652,12 @@ std::expected<void, caudio::utils::Error> Database::libraryDelete(int64_t id) {
     return {};
 }
 
-std::expected<DbStats, caudio::utils::Error> Database::getStats() {
+std::expected<caudio::types::PlaybackStats, caudio::utils::Error> Database::getStats() {
     std::shared_lock lk{impl_->dbMutex_};
     if (!impl_->db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
-    DbStats s;
+    caudio::types::PlaybackStats s;
     std::unique_lock cacheLk{impl_->cacheMutex_};
     auto one = [&](std::string_view sql, int64_t& out) {
         auto sRes = impl_->getCachedForUse(sql);
@@ -1801,13 +1801,13 @@ std::expected<void, caudio::utils::Error> DatabaseAccess::deleteTrackLocked(Data
     return db.impl_->deleteTrackLocked(id);
 }
 
-std::expected<std::vector<Library>, caudio::utils::Error>
+std::expected<std::vector<caudio::types::Library>, caudio::utils::Error>
 DatabaseAccess::libraryListLocked(Database& db) {
     return db.impl_->libraryListLocked();
 }
 
 std::expected<void, caudio::utils::Error> DatabaseAccess::libraryUpdateLocked(Database& db,
-                                                                              const Library& l) {
+                                                                              const caudio::types::Library& l) {
     return db.impl_->libraryUpdateLocked(l);
 }
 

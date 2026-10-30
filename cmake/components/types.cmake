@@ -8,6 +8,8 @@ set(CAUDIO_TYPES_MODULE_SOURCES
   modules/caudio/types/format.cppm
   modules/caudio/types/parse.cppm
   modules/caudio/types/record.cppm
+  modules/caudio/types/db.cppm
+  modules/caudio/types/engine.cppm
 )
 add_library(types INTERFACE)
 add_library(caudio::types ALIAS types)

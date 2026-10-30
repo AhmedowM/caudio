@@ -3,7 +3,7 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -111,7 +111,7 @@ TEST_CASE("listTracks pagination limit/offset", "[db]") {
         auto r = db->insertTrack(t);
         REQUIRE(r.has_value());
     }
-    TrackQuery q;
+    caudio::types::TrackQuery q;
     q.limit = 2;
     q.offset = 0;
     auto l1 = db->listTracks(&q);
@@ -314,7 +314,7 @@ TEST_CASE("history completion_pct round-trip 0/50/100", "[db]") {
         REQUIRE(db->historyAdd(e).has_value());
     }
 
-    caudio::db::HistoryQuery q;
+    caudio::types::HistoryQuery q;
     q.track_id = *tr;
     auto list = db->listHistory(&q);
     REQUIRE(list.has_value());

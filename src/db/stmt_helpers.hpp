@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <string_view>
 
 /**

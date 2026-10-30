@@ -50,7 +50,9 @@ class CAUDIO_API Client {
     /** @brief Constructs from a loaded app config. */
     explicit Client(const caudio::config::Config& cfg);
 
+    /** @brief Returns the transport configuration used by this client. */
     const Config& config() const noexcept;
+    /** @brief Returns the configured database path. */
     std::filesystem::path dbPath() const noexcept;
 
     /**
@@ -59,6 +61,12 @@ class CAUDIO_API Client {
      */
     bool probe() const;
 
+    /**
+     * @brief Sends one command to the daemon and waits for its result.
+     * @param cmd Command to serialize and transmit synchronously.
+     * @param timeout Maximum time to wait for connection and response.
+     * @return Command result, or a transport/timeout error.
+     */
     caudio::utils::Expected<caudio::ipc::Result>
     send(const caudio::ipc::Command& cmd,
          std::chrono::milliseconds timeout = std::chrono::milliseconds{2000});

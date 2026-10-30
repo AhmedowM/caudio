@@ -8,8 +8,8 @@
 #include <atomic>
 #include <caudio/config.hpp>
 #include <caudio/contracts/database.hpp>
-#include <caudio/db/types.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/db.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
@@ -145,7 +145,7 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg,
     // std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
 
     // create Engine
-    caudio::engine::EngineConfig ecfg{};
+    caudio::types::EngineConfig ecfg{};
     ecfg.logger = logger;
     ecfg.autoResumeOnPlay = cfg.autoResumeOnPlay;
     auto engRes = caudio::engine::Engine::create(ecfg);

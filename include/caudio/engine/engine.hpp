@@ -1,5 +1,6 @@
 #pragma once
 
+// Lifecycle
 /**
  * @file engine.hpp
  * @brief Playback engine -- state machine, gapless, decode/monitor loops and persistence.
@@ -35,7 +36,8 @@
  * cheap; the public API is unchanged.
  */
 
-#include <caudio/engine/types.hpp>
+#include <caudio/types/db.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/fwd.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
@@ -79,8 +81,8 @@ struct ServiceAccess;
  * under the documented locks; `queueMutex_` is try_lock on fast paths and
  * bounded-wait on transport commands, so callers must still handle Busy
  * (budget exceeded).
- * @see PlaybackState
- * @see EngineConfig
+ * @see caudio::types::PlaybackState
+ * @see caudio::types::EngineConfig
  */
 class CAUDIO_API Engine final {
   public:
@@ -99,7 +101,7 @@ class CAUDIO_API Engine final {
      * Thread-safe; constructs internal atomics/threads.
      * @see attachDatabase
      */
-    static ExpectedEngine create(const EngineConfig& cfg = {});
+    static ExpectedEngine create(const caudio::types::EngineConfig& cfg = {});
 
     /**
      * @brief Attaches an already-open database implementation.
@@ -154,7 +156,7 @@ class CAUDIO_API Engine final {
      * @see resume
      * @see stop
      */
-    // Playback
+    // Playback transport
     ExpectedVoid play(int64_t queueId = 1);
 
     /**
@@ -226,6 +228,7 @@ class CAUDIO_API Engine final {
      */
     ExpectedVoid setVolume(float g);
 
+    // Playback state
     /** @brief Returns current volume [0,1]. @ingroup caudio_engine
      * @return Volume level (atomic load, relaxed). */
     float volume() const noexcept;
@@ -251,16 +254,17 @@ class CAUDIO_API Engine final {
      * @return RepeatMode (Off/All/One). */
     caudio::types::RepeatMode repeat() const noexcept;
 
+    // Database-backed history and statistics
     /**
      * @brief Returns database statistics.
      * @ingroup caudio_engine
-     * @return `std::expected<DbStats, Error>` -- stats on success, State if no db.
+     * @return `std::expected<types::PlaybackStats, Error>` -- stats on success, Error if no db.
      * @par Thread safety
      * Thread-safe; delegates to Database::getStats() which takes shared_lock.
      * @see caudio::db::Database::getStats
-     * @see caudio::db::DbStats
+     * @see caudio::types::PlaybackStats
      */
-    std::expected<caudio::engine::EngineStats, caudio::utils::Error> stats();
+    std::expected<caudio::types::PlaybackStats, caudio::utils::Error> stats();
 
     /**
      * @brief Lists history entries.
@@ -284,6 +288,7 @@ class CAUDIO_API Engine final {
      */
     std::expected<void, caudio::utils::Error> clearHistory();
 
+    // Queue selection and navigation
     /**
      * @brief Enables or disables shuffle.
      * @ingroup caudio_engine
@@ -366,29 +371,30 @@ class CAUDIO_API Engine final {
      */
     ExpectedVoid prev();
 
+    // Event delivery
     /**
      * @brief Sets runtime callbacks.
      * @ingroup caudio_engine
-     * @param cbs New EngineCallbacks struct (copied).
+     * @param cbs New caudio::types::EngineCallbacks struct (copied).
      * @return Success (always).
      * @par Thread safety
      * Thread-safe; locks cbMutex_.
-     * @see EngineCallbacks
+     * @see caudio::types::EngineCallbacks
      * @see pushEvent
      */
-    ExpectedVoid setCallbacks(const EngineCallbacks& cbs);
+    ExpectedVoid setCallbacks(const caudio::types::EngineCallbacks& cbs);
 
     /**
      * @brief Pops one event from the MPSC queue (non-blocking).
      * @ingroup caudio_engine
-     * @return `std::expected<EngineEvent, Error>` -- event on success, NotFound if queue empty.
+     * @return `std::expected<caudio::types::EngineEvent, Error>` -- event on success, NotFound if queue empty.
      * @par Thread safety
      * Thread-safe; the event queue is a bounded MPSC.
      * @see drainEvents
      * @see drainAll
-     * @see EngineEvent
+     * @see caudio::types::EngineEvent
      */
-    std::expected<EngineEvent, caudio::utils::Error> pollEvent();
+    std::expected<caudio::types::EngineEvent, caudio::utils::Error> pollEvent();
 
     /**
      * @brief Drains up to cap events into a caller-provided buffer.
@@ -402,9 +408,9 @@ class CAUDIO_API Engine final {
      * Thread-safe; pops from the event queue (bounded MPSC).
      * @see pollEvent
      * @see drainAll
-     * @see EngineEvent
+     * @see caudio::types::EngineEvent
      */
-    ExpectedVoid drainEvents(EngineEvent* buf, size_t cap, size_t* n);
+    ExpectedVoid drainEvents(caudio::types::EngineEvent* buf, size_t cap, size_t* n);
 
     /**
      * @brief Drains all queued events into a vector.
@@ -414,9 +420,9 @@ class CAUDIO_API Engine final {
      * Thread-safe; pops from the event queue (bounded MPSC).
      * @see pollEvent
      * @see drainEvents
-     * @see EngineEvent
+     * @see caudio::types::EngineEvent
      */
-    std::vector<EngineEvent> drainAll();
+    std::vector<caudio::types::EngineEvent> drainAll();
 
   private:
     // The members below are service-only: they are not part of the public
@@ -507,11 +513,11 @@ class CAUDIO_API Engine final {
     /**
      * @brief Constructs Engine with config defaults applied.
      * @ingroup caudio_engine
-     * @param cfg EngineConfig; zero poll/gapless/history values are replaced by defaults.
+     * @param cfg caudio::types::EngineConfig; zero poll/gapless/history values are replaced by defaults.
      * @details Applies defaults: pollMs 10, gaplessMs 300, historyThresholdPct 60,
      * historyThresholdSecs 90; initializes atomics and copies callbacks.
      */
-    explicit Engine(const EngineConfig& cfg);
+    explicit Engine(const caudio::types::EngineConfig& cfg);
 
     struct Impl;
     std::unique_ptr<Impl> impl_;

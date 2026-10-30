@@ -22,8 +22,8 @@
  * 6. On open failure, restore the original position
  *
  * Thread Safety: a Decoder instance is NOT thread-safe for concurrent calls.
- * The Player ensures decode() runs on a single decode thread while seek() may
- * arrive from the control thread; implementations synchronize internally.
+ * Callers must externally serialize decode() and seek(); the Player keeps
+ * decode() on its decode thread and coordinates control-thread seeks.
  * sampleRate(), channels() and totalFrames() are thread-safe (const noexcept).
  */
 
@@ -36,14 +36,6 @@
 #include <string_view>
 
 namespace caudio::media {
-
-/**
- * @brief Extracts metadata tags from an audio file.
- * @ingroup caudio_media
- * @param path Filesystem path to probe.
- * @return Metadata on success, Error on failure.
- */
-CAUDIO_API caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path);
 
 /**
  * @class Decoder
@@ -139,5 +131,13 @@ class CAUDIO_API Decoder final {
      */
     caudio::utils::Expected<void> init(Reader& reader);
 };
+
+/**
+ * @brief Extracts metadata tags from an audio file.
+ * @ingroup caudio_media
+ * @param path Filesystem path to probe.
+ * @return Metadata on success, Error on failure.
+ */
+CAUDIO_API caudio::utils::Expected<caudio::types::TrackMetadata> extractMetadata(std::string_view path);
 
 } // namespace caudio::media

@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/utils/error.hpp>
 #include <chrono>
 #include <common.hpp>
@@ -34,7 +34,7 @@ TEST_CASE("gapless CAS arms once via Engine", "[engine_gapless]") {
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
@@ -81,7 +81,7 @@ TEST_CASE("gapless 300ms lookahead triggers next once", "[engine_gapless]") {
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
@@ -129,7 +129,7 @@ TEST_CASE("gapless not triggered when remaining > gap", "[engine_gapless]") {
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;

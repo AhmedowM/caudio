@@ -135,12 +135,16 @@ class CAUDIO_API FileReader final : public Reader {
 
     ~FileReader() override;
 
+    /** @brief Reads bytes from the owned file; returns zero at EOF or on read error. */
     std::size_t read(std::span<std::byte> dst) override;
 
+    /** @brief Moves the file position, using the platform's 64-bit seek API. */
     [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override;
 
+    /** @brief Returns the current file position, or -1 on error. */
     [[nodiscard]] int64_t tell() noexcept override;
 
+    /** @brief Returns the cached file size, or -1 if unavailable. */
     [[nodiscard]] int64_t size() noexcept override;
 
   private:
@@ -198,11 +202,15 @@ class CAUDIO_API MemoryReader final : public Reader {
     static caudio::utils::Expected<std::unique_ptr<Reader>> open(const std::byte* data,
                                                                  std::size_t len);
 
+    /** @brief Reads bytes from the current in-memory position. */
     std::size_t read(std::span<std::byte> dst) override;
 
+    /** @brief Moves the in-memory position within the buffer. */
     [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override;
 
+    /** @brief Returns the current in-memory position. */
     [[nodiscard]] int64_t tell() noexcept override;
+    /** @brief Returns the size of the owned buffer. */
     [[nodiscard]] int64_t size() noexcept override;
 
   private:

@@ -2,7 +2,7 @@
 #include <caudio/contracts/database.hpp>
 #include <caudio/db/database.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstdint>
 #include <string>

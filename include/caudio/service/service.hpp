@@ -5,7 +5,7 @@
  * @brief Service: owns Engine, Database, Logger, IPC server, and dispatches
  * commands (daemon runtime used by the CLI service host).
  * @ingroup caudio_service
- * @details Command handlers, dispatch visitor and component ownership live in
+ * @details Command handlers, the internal dispatch visitor and component ownership live in
  * Service::Impl (defined in the non-installed src/service/service_impl.hpp),
  * so this header exposes only the public daemon surface.
  */
@@ -30,17 +30,13 @@ struct ServiceConfig : public caudio::config::Config {
     bool logToStderr{false};
 };
 
-} // namespace caudio::service
-
-namespace caudio::service {
-
 /**
  * @brief Main service class that owns core components and dispatches IPC commands.
  * @ingroup caudio_service
  *
  * Thread safety: Service is not thread-safe for concurrent method calls. The IPC server runs
- * on its own thread and calls dispatch() serially. External callers should not invoke
- * Service methods concurrently with server->run().
+ * on its own thread and invokes its internal dispatcher serially. External callers should not
+ * invoke Service methods concurrently with server->run().
  *
  * Lifetime: Created via create(), runs via run(stop_token), cleaned up via shutdown() in
  * destructor. Uses RAII for all resources (DB, Engine, IPC server, PID file, lock file, shared
@@ -77,9 +73,9 @@ class CAUDIO_API Service final {
      * @param st Stop token to request graceful shutdown.
      * @return void on success, Error if already running.
      *
-     * Starts the IPC server with a dispatcher that forwards commands to dispatch().
+     * Starts the IPC server with an internal dispatcher for incoming commands.
      * Blocks until stop_token signals or shutdown() is called.
-     * Thread safety: Must not be called concurrently with another run() or with dispatch().
+     * Thread safety: Must not be called concurrently with another run().
      */
     caudio::utils::Expected<void> run(std::stop_token st);
 

@@ -2,9 +2,9 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
@@ -113,7 +113,7 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
         auto ins = db->insertTrack(t);
         REQUIRE(ins.has_value());
         REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
-        EngineConfig cfg;
+        caudio::types::EngineConfig cfg;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
         REQUIRE(eRes.has_value());
@@ -148,7 +148,7 @@ TEST_CASE("player position time-based via Engine steady_clock", "[player_integra
 }
 
 TEST_CASE("player state transitions invalid", "[player_integration]") {
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
     REQUIRE(eRes.has_value());
@@ -188,7 +188,7 @@ TEST_CASE("player seek-while-playing race via Engine", "[player_integration][see
     auto ins = db->insertTrack(t);
     REQUIRE(ins.has_value());
     REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     auto eRes = Engine::create(cfg);
@@ -287,7 +287,7 @@ TEST_CASE("gapless via Player Engine 300ms lookahead", "[player_integration][gap
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.enableMonitorThread = true;
     cfg.pollMs = 10;
     cfg.gaplessMs = 300;

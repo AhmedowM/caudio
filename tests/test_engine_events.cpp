@@ -1,9 +1,9 @@
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <common.hpp>
@@ -23,16 +23,16 @@ using namespace caudio::db;
 using namespace caudio::test_helpers;
 
 TEST_CASE("MpscQueue push drop when full 64", "[engine_events]") {
-    MpscQueue<EngineEvent> q{64};
+    MpscQueue<caudio::types::EngineEvent> q{64};
     for (int i = 0; i < 64; ++i) {
-        EngineEvent ev;
-        ev.type = EngineEventType::Progress;
+        caudio::types::EngineEvent ev;
+        ev.type = caudio::types::EngineEventType::Progress;
         ev.track_id = i;
         auto r = q.push(ev);
         REQUIRE(r.has_value());
     }
-    EngineEvent extra;
-    extra.type = EngineEventType::Progress;
+    caudio::types::EngineEvent extra;
+    extra.type = caudio::types::EngineEventType::Progress;
     extra.track_id = 999;
     auto r = q.push(extra);
     REQUIRE(!r.has_value());
@@ -54,7 +54,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
     auto ins = db->insertTrack(t);
     REQUIRE(ins.has_value());
     REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
@@ -64,7 +64,7 @@ TEST_CASE("Engine pollEvent and drainEvents", "[engine_events]") {
     REQUIRE(eng->play(1).has_value());
     auto ev = eng->pollEvent();
     REQUIRE(ev.has_value());
-    REQUIRE(ev->type == EngineEventType::TrackStarted);
+    REQUIRE(ev->type == caudio::types::EngineEventType::TrackStarted);
     // after poll, queue empty -> poll returns NotFound
     auto ev2 = eng->pollEvent();
     REQUIRE(!ev2.has_value());
@@ -103,7 +103,7 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
         REQUIRE(ins.has_value());
         REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
@@ -113,12 +113,12 @@ TEST_CASE("Engine drainEvents batch", "[engine_events]") {
     REQUIRE(eng->play(1).has_value());
     REQUIRE(eng->next().has_value());
     // now we have 2 TrackStarted events
-    EngineEvent buf[64];
+    caudio::types::EngineEvent buf[64];
     size_t n = 0;
     REQUIRE(eng->drainEvents(buf, 64, &n).has_value());
     REQUIRE(n == 2);
-    REQUIRE(buf[0].type == EngineEventType::TrackStarted);
-    REQUIRE(buf[1].type == EngineEventType::TrackStarted);
+    REQUIRE(buf[0].type == caudio::types::EngineEventType::TrackStarted);
+    REQUIRE(buf[1].type == caudio::types::EngineEventType::TrackStarted);
     // drain again should be 0
     size_t n2 = 99;
     REQUIRE(eng->drainEvents(buf, 64, &n2).has_value());
@@ -147,12 +147,12 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
     REQUIRE(ins.has_value());
     REQUIRE(db->queueEnqueue(1, *ins, -1).has_value());
     std::atomic<int> startedCount{0};
-    EngineCallbacks cbs;
+    caudio::types::EngineCallbacks cbs;
     cbs.on_track_started = [&](int64_t tid) {
         startedCount.fetch_add(1);
         REQUIRE(tid == *ins);
     };
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     cfg.callbacks = cbs;
@@ -177,7 +177,7 @@ TEST_CASE("Engine callbacks dispatched outside lock", "[engine_events]") {
 }
 
 TEST_CASE("Engine drainEvents null checks", "[engine_events]") {
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);

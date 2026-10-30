@@ -6,7 +6,7 @@
  * @ingroup caudio_engine
  * @details `QueueState` and `EngineState` are members of `Engine::Impl`
  * only: nothing in the public API names them. They live here so the
- * installed `caudio/engine/types.hpp` stays limited to the types the
+ * installed `caudio/types/engine.hpp` stays limited to the types the
  * public surface actually exposes (`EngineConfig`, `EngineCallbacks`,
  * `EngineEvent`, `EngineEventType`).
  *

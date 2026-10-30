@@ -1,7 +1,7 @@
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <chrono>
@@ -149,13 +149,13 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.pollMs = 10;
     cfg.gaplessMs = 300;
     cfg.enableMonitorThread = true;
     cfg.historyThresholdPct = 60;
     cfg.historyThresholdSecs = 90;
-    EngineCallbacks cbs;
+    caudio::types::EngineCallbacks cbs;
     cbs.on_track_started = [](int64_t tid) {
         std::cout << "[engine_demo] callback onTrackStarted track " << tid << "\n";
     };
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
                       << " dur=" << ev->duration << " msg='" << ev->msg << "'\n";
         }
         if (i == 10) {
-            EngineEvent buf[64];
+            caudio::types::EngineEvent buf[64];
             size_t n = 0;
             (void)engine->drainEvents(buf, 64, &n);
             if (n > 0) {
@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
             }
         }
     }
-    EngineEvent buf[64];
+    caudio::types::EngineEvent buf[64];
     size_t n = 0;
     (void)engine->drainEvents(buf, 64, &n);
     std::cout << "[engine_demo] final drain " << n << " events\n";

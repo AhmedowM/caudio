@@ -1,43 +1,13 @@
 #pragma once
 
 /**
- * @file types.hpp
- * @brief Core value types for the caudio playback engine.
- * @ingroup caudio_engine
+ * @file engine.hpp
+ * @brief Playback value types shared across caudio components.
+ * @ingroup caudio_types
  *
- * @details The caudio_engine module group aggregates the playback state
- * machine, queue/shuffle permutation, gapless transition, history
- * thresholds, monitor/decode loops and SQLite-backed persistence.
- * All public symbols live in `caudio::engine` (headers are canonical;
- * the `caudio.engine` C++23 module mirrors them when enabled).
- *
- * Thread safety: Engine synchronizes queue state via `queueMutex_`
- * (try_lock pattern for public mutators), decode/ring access via
- * `decodeMtx_` + `decodeCv_`, and DB access via `Database::mutex()`
- * (shared_mutex). Persistence uses `engine_state` (see Engine::loadState
- * / saveState) with fallback for missing `active_queue_id`.
- *
- * State machine: `Stopped -> Playing -> Paused -> Playing`, with
- * `next()`/`prev()` advancing the internal queue cursor subject to
- * `RepeatMode` and the internal shuffle permutation (see
- * Engine::queueNextLocked / queuePrevLocked).
- *
- * Gapless: `Engine::engineTick` arms `gaplessArmed_` when
- * `remaining <= gaplessMs` (default 300 ms) and calls `next()` as
- * single-writer CAS; `decodeLoop` fills the `SpscRing<float>` and
- * `preroll()` pre-fills half the ring before `AudioOutput::start()`.
- *
- * Shuffle: the internal queue state holds a permutation of
- * `[0, queueCount)`; `detail::shufflePerm` shuffles via `std::mt19937`
- * seeded by `random_device` (production) or caller-supplied `mt19937`
- * (seed 42 for deterministic tests); persisted as BLOB `shuffle_perm`.
- *
- * History: `EngineConfig::historyThresholdPct` (default 60) and
- * `historyThresholdSecs` (default 90) feed
- * `detail::shouldMarkPlayed()`; `doHistoryMark()` does a single
- * `compare_exchange_strong` on `markedPlayed_` and a
- * `BEGIN IMMEDIATE` transaction that bumps `tracks.play_count` and
- * inserts into `history`.
+ * @details Contains the public event, callback, configuration and persisted
+ * state records used by the playback engine. The owning `Engine` class
+ * remains in `caudio::engine`.
  */
 
 #include <caudio/fwd.hpp>
@@ -47,14 +17,15 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
-namespace caudio::engine {
+namespace caudio::types {
 
 /**
  * @brief Engine event types emitted via the internal event queue.
- * @ingroup caudio_engine
+ * @ingroup caudio_types
  * @see EngineEvent
- * @see Engine::pollEvent
+ * @see caudio::engine::Engine::pollEvent
  */
 enum class EngineEventType : std::uint8_t {
     None = 0,         ///< No event.
@@ -67,7 +38,7 @@ enum class EngineEventType : std::uint8_t {
 
 /**
  * @brief Event payload queued to Engine::eventQueue_.
- * @ingroup caudio_engine
+ * @ingroup caudio_types
  * @details Produced by Engine::pushEvent and consumed via
  * Engine::pollEvent / drainEvents / drainAll. Progress events carry
  * position/duration; TrackStarted carries track_id/queue_id/duration.
@@ -83,7 +54,7 @@ struct EngineEvent {
 
 /**
  * @brief User callbacks invoked synchronously from pushEvent.
- * @ingroup caudio_engine
+ * @ingroup caudio_types
  * @details Callbacks are copied under `cbMutex_` then invoked outside
  * the event queue lock. Must be thread-safe if they touch shared state.
  * `on_track_ended` receives `(track_id, pct)` where pct is
@@ -100,7 +71,7 @@ struct EngineCallbacks {
 
 /**
  * @brief Configuration for Engine construction.
- * @ingroup caudio_engine
+ * @ingroup caudio_types
  * @details `pollMs` controls monitorLoop sleep (default 10 ms);
  * `gaplessMs` is the preroll window for gapless transition (default 300 ms);
  * `historyThresholdPct`/`historyThresholdSecs` are thresholds for
@@ -133,19 +104,21 @@ struct EngineConfig {
 };
 
 /**
- * @brief Engine statistics, independent of the database layer.
- * @ingroup caudio_engine
- * @details Mirror of `caudio::db::DbStats` without the SQLite dependency.
- * Returned by `Engine::stats()` so consumers do not need to link `caudio::db`.
+ * @brief Persisted playback-engine state.
+ * @ingroup caudio_types
+ * @details Stores the queue cursor, repeat/shuffle settings, volume and
+ * position needed to restore playback after restarting the service.
  */
-struct EngineStats {
-    int64_t num_tracks{};        ///< Number of live tracks.
-    int64_t num_playlists{};     ///< Number of playlists.
-    int64_t num_queue_items{};   ///< Number of queue items.
-    int64_t num_history{};       ///< Number of history entries.
-    int64_t num_bookmarks{};     ///< Number of bookmarks.
-    int64_t num_libraries{};     ///< Number of libraries.
-    int64_t total_duration_ms{}; ///< Sum of track durations in milliseconds.
+struct EngineState {
+    int shuffle_enabled{};
+    caudio::types::RepeatMode repeat_mode{caudio::types::RepeatMode::Off};
+    int64_t cursor_pos{};
+    int64_t current_track_id{};
+    float volume{1.0f};
+    int64_t active_queue_id{1};
+    float pre_mute_volume{0.5f};
+    int64_t position_ms{};
+    std::vector<int64_t> shuffle_perm;
 };
 
-} // namespace caudio::engine
+} // namespace caudio::types

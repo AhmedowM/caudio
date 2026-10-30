@@ -1,14 +1,13 @@
 #pragma once
 
 /**
- * @file types.hpp
- * @brief Core value types for the caudio database layer.
- * @ingroup caudio_db
- * @details Defines the db-local plain-data structs (Queue, Library, DbStats,
- * TrackQuery, HistoryQuery). The shared records (Track, Playlist, QueueItem,
- * HistoryEntry, Bookmark, LibraryStats) live in `caudio::types`.
- * All are trivially copyable aggregates with default-initialised members; no
- * invariants beyond those documented per-field.
+ * @file db.hpp
+ * @brief Database value types shared across caudio components.
+ * @ingroup caudio_types
+ * @details Defines database rows, filters and aggregate statistics without
+ * coupling consumers to the SQLite database implementation.
+ * All are default-initialised aggregates; no invariants beyond those
+ * documented per-field.
  */
 
 #include <caudio/types/record.hpp>
@@ -16,11 +15,11 @@
 #include <optional>
 #include <string>
 
-namespace caudio::db {
+namespace caudio::types {
 
 /**
  * @brief Queue container row.
- * @ingroup caudio_db
+ * @ingroup caudio_types
  * @details Maps to `queues`. Separate from `queue` (items) table.
  */
 struct Queue {
@@ -33,7 +32,7 @@ struct Queue {
 
 /**
  * @brief Library (scan root) row.
- * @ingroup caudio_db
+ * @ingroup caudio_types
  * @details Maps to `libraries`. Id 1 is the default library with empty path.
  */
 struct Library {
@@ -49,10 +48,10 @@ struct Library {
 
 /**
  * @brief Aggregate database statistics.
- * @ingroup caudio_db
+ * @ingroup caudio_types
  * @details Returned by `Database::getStats()`. Counts exclude soft-deleted tracks.
  */
-struct DbStats {
+struct PlaybackStats {
     int64_t num_tracks{};        ///< Number of live tracks.
     int64_t num_playlists{};     ///< Number of playlists.
     int64_t num_queue_items{};   ///< Number of queue items.
@@ -64,7 +63,7 @@ struct DbStats {
 
 /**
  * @brief Filter for listing tracks.
- * @ingroup caudio_db
+ * @ingroup caudio_types
  * @details All fields are optional filters combined with AND. `search`
  * maps to a LIKE on title/artist/album/genre. `limit == 0` means no limit;
  * `offset` requires `LIMIT -1` when no limit is set.
@@ -83,7 +82,7 @@ struct TrackQuery {
 
 /**
  * @brief Filter for listing history entries.
- * @ingroup caudio_db
+ * @ingroup caudio_types
  */
 struct HistoryQuery {
     std::optional<int64_t> track_id{}; ///< Filter by track.
@@ -92,4 +91,4 @@ struct HistoryQuery {
     int offset{};                      ///< Row offset.
 };
 
-} // namespace caudio::db
+} // namespace caudio::types
