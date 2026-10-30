@@ -19,14 +19,14 @@ uint64_t wallMs() noexcept {
     return (uint64_t)duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
-bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept {
+bool shouldMarkPlayed(double duration, double played, bool marked, int pctThr, int secsThr) noexcept {
     if (marked)
         return false;
     double pct = pctThr > 0 ? (double)pctThr / 100.0 : 0.6;
     double secs = secsThr > 0 ? (double)secsThr : 90.0;
-    if (duration > 0.0 && pos / duration >= pct)
+    if (duration > 0.0 && played / duration >= pct)
         return true;
-    if (pos >= secs)
+    if (played >= secs)
         return true;
     return false;
 }

@@ -165,6 +165,8 @@ struct Engine::Impl {
 
     // monitor / decode
     void engineTick();
+    void resetPlaybackAccounting() noexcept;
+    void accountPlaybackTime() noexcept;
     void monitorLoop(std::stop_token st);
     void decodeLoop(std::stop_token st);
     void doHistoryMark();
@@ -182,6 +184,8 @@ struct Engine::Impl {
     std::atomic<caudio::types::PlaybackState> playbackState_{caudio::types::PlaybackState::Stopped};
     std::chrono::steady_clock::time_point playStart_{};
     double pausePos_{0};
+    std::atomic<uint64_t> accumulatedPlaybackMs_{0};
+    std::atomic<uint64_t> lastPlaybackSampleMs_{0};
     std::atomic<bool> markedPlayed_{false};
     int64_t startedMs_{0};
     std::string lastErr_{};
@@ -437,6 +441,7 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
     if (s == caudio::types::PlaybackState::Paused) {
         // resume, don't dequeue
         playStart_ = std::chrono::steady_clock::now();
+        lastPlaybackSampleMs_.store(detail::nowMs(), std::memory_order_release);
         playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
         if (output_)
             output_->start();
@@ -457,6 +462,7 @@ Engine::ExpectedVoid Engine::Impl::play(int64_t queueId) {
             ring_->reset();
         pausePos_ = 0;
         playStart_ = std::chrono::steady_clock::now();
+        resetPlaybackAccounting();
         if (output_)
             output_->start();
         lk.unlock();
@@ -561,6 +567,8 @@ Engine::ExpectedVoid Engine::Impl::pause() {
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not playing"));
     // record pause position
     pausePos_ = currentPositionLocked();
+    accountPlaybackTime();
+    lastPlaybackSampleMs_.store(0, std::memory_order_release);
     playbackState_.store(caudio::types::PlaybackState::Paused, std::memory_order_release);
     if (output_)
         output_->stop();
@@ -575,6 +583,7 @@ Engine::ExpectedVoid Engine::Impl::resume() {
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::State, "not paused"));
     playStart_ = std::chrono::steady_clock::now();
+    lastPlaybackSampleMs_.store(detail::nowMs(), std::memory_order_release);
     playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
     if (output_)
         output_->start();
@@ -587,6 +596,9 @@ Engine::ExpectedVoid Engine::Impl::stop() {
     auto s = playbackState_.load(std::memory_order_acquire);
     if (s == caudio::types::PlaybackState::Stopped)
         return {};
+    if (s == caudio::types::PlaybackState::Playing)
+        accountPlaybackTime();
+    lastPlaybackSampleMs_.store(0, std::memory_order_release);
     playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
     // Release playback resources (decoder/output/ring hold tens of MB for
     // large files; measured +47 MB private retained after stop). Replay
@@ -603,6 +615,7 @@ Engine::ExpectedVoid Engine::Impl::stop() {
         ring_.reset();
     }
     pausePos_ = 0;
+    resetPlaybackAccounting();
     hasCurrent_.store(false, std::memory_order_release);
     // Rewind the cursor to the stopped track: cursor addresses the NEXT track,
     // so a later play would otherwise skip the stopped one. Already-stopped
@@ -653,6 +666,7 @@ Engine::ExpectedVoid Engine::Impl::seek(double seconds) {
         seconds = dur;
     pausePos_ = seconds;
     playStart_ = std::chrono::steady_clock::now();
+    lastPlaybackSampleMs_.store(detail::nowMs(), std::memory_order_release);
     if (ring_)
         ring_->reset();
 
@@ -704,9 +718,12 @@ Engine::ExpectedVoid Engine::Impl::resumeAfterTagWrite(const caudio::types::Trac
         return {};
     }
     bool marked = markedPlayed_.load(std::memory_order_acquire);
+    uint64_t accumulated = accumulatedPlaybackMs_.load(std::memory_order_acquire);
     caudio::types::Track reopen = t;
     auto r = doPlayTrack(reopen, pos);
     markedPlayed_.store(marked, std::memory_order_release);
+    accumulatedPlaybackMs_.store(accumulated, std::memory_order_release);
+    lastPlaybackSampleMs_.store(detail::nowMs(), std::memory_order_release);
     if (!r) {
         unlockQueue();
         return std::unexpected(r.error());
@@ -956,6 +973,7 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         pausePos_ = 0;
         playStart_ = std::chrono::steady_clock::now();
         playbackState_.store(caudio::types::PlaybackState::Playing, std::memory_order_release);
+        resetPlaybackAccounting();
         markedPlayed_.store(false, std::memory_order_release);
         gaplessArmed_.store(false, std::memory_order_release);
         startedMs_ = (int64_t)detail::wallMs();
@@ -1096,6 +1114,7 @@ Engine::Impl::Impl(const caudio::types::EngineConfig& cfg) : cfg_(cfg), state_{}
     playbackState_.store(caudio::types::PlaybackState::Stopped, std::memory_order_release);
     hasCurrent_.store(false, std::memory_order_release);
     markedPlayed_.store(false, std::memory_order_release);
+    resetPlaybackAccounting();
     gaplessArmed_.store(false, std::memory_order_release);
     lastProgressMs_.store(0, std::memory_order_release);
     // callbacks from config
@@ -1625,6 +1644,19 @@ void Engine::Impl::pushEvent(const caudio::types::EngineEvent& ev) {
     }
 }
 
+void Engine::Impl::resetPlaybackAccounting() noexcept {
+    accumulatedPlaybackMs_.store(0, std::memory_order_release);
+    lastPlaybackSampleMs_.store(detail::nowMs(), std::memory_order_release);
+}
+
+void Engine::Impl::accountPlaybackTime() noexcept {
+    const uint64_t now = detail::nowMs();
+    const uint64_t last = lastPlaybackSampleMs_.exchange(now, std::memory_order_acq_rel);
+    if (last == 0 || now < last)
+        return;
+    accumulatedPlaybackMs_.fetch_add(now - last, std::memory_order_acq_rel);
+}
+
 void Engine::Impl::doHistoryMark() {
     if (!hasDb())
         return;
@@ -1633,10 +1665,11 @@ void Engine::Impl::doHistoryMark() {
     if (markedPlayed_.load(std::memory_order_acquire))
         return;
     double dur = duration_;
-    double pos = currentPositionLocked();
+    const double played =
+        static_cast<double>(accumulatedPlaybackMs_.load(std::memory_order_acquire)) / 1000.0;
     int pct = cfg_.historyThresholdPct ? cfg_.historyThresholdPct : 60;
     int secs = cfg_.historyThresholdSecs ? cfg_.historyThresholdSecs : 90;
-    if (!detail::shouldMarkPlayed(dur, pos, false, pct, secs))
+    if (!detail::shouldMarkPlayed(dur, played, false, pct, secs))
         return;
     bool expected = false;
     bool desired = true;
@@ -1647,6 +1680,7 @@ void Engine::Impl::doHistoryMark() {
         return;
     int64_t completion = static_cast<int64_t>(detail::wallMs());
     double completionPct = 0.0;
+    const double pos = currentPositionLocked();
     if (dur > 0.0) {
         completionPct = (pos / dur) * 100.0;
         if (completionPct > 100.0)
@@ -1660,6 +1694,9 @@ void Engine::Impl::doHistoryMark() {
 }
 
 void Engine::Impl::engineTick() {
+    if (playbackState_.load(std::memory_order_acquire) ==
+        caudio::types::PlaybackState::Playing)
+        accountPlaybackTime();
     doHistoryMark();
     auto st = playbackState_.load(std::memory_order_acquire);
     if (st == caudio::types::PlaybackState::Playing) {

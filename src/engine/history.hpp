@@ -36,13 +36,13 @@ uint64_t wallMs() noexcept;
 /**
  * @brief Tests whether playback should count as "played" for history.
  * @param duration Track duration in seconds (0 if unknown).
- * @param pos Current position in seconds.
+ * @param played Current accumulated playback time in seconds.
  * @param marked Whether already marked (true => always false).
  * @param pctThr Percentage threshold 0..100 (60 => 0.6); 0 defaults to 60.
  * @param secsThr Absolute seconds threshold; 0 defaults to 90 s.
- * @return true if `pos/duration >= pct` or `pos >= secs` and not already marked.
+ * @return true if `played/duration >= pct` or `played >= secs` and not already marked.
  */
-bool shouldMarkPlayed(double duration, double pos, bool marked, int pctThr, int secsThr) noexcept;
+bool shouldMarkPlayed(double duration, double played, bool marked, int pctThr, int secsThr) noexcept;
 
 } // namespace caudio::engine::detail
 

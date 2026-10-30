@@ -341,10 +341,12 @@ jobs:
           # ctest hermetic: immune to older same-named MinGW runtimes
           # elsewhere on the image (0xc0000139). Runs pre-build because
           # discovery executes test binaries during the build itself.
-          # NOTE: the runtime dir is derived from the msys2 location, never
-          # `command -v g++`: in Git-Bash steps that resolves to the
-          # runner's C:\mingw64 gcc 15.2. No zlib1: objdump shows the
-          # trimmed avcodec imports only UCRT/system + sibling DLLs.
+          # NOTE: derive the runtime dir from the compiler selected by the
+          # toolchain. The build uses the runner's C:\mingw64 g++, so staging
+          # MSYS2 UCRT64 runtimes here would produce an incompatible DLL pair
+          # and 0xc0000139 when Catch2 discovery launches a test executable.
+          # No zlib1: objdump shows the trimmed avcodec imports only
+          # UCRT/system + sibling DLLs.
           dest="${{ steps.pick.outputs.build_dir }}"
           troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
           if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then
@@ -356,8 +358,8 @@ jobs:
             test -f "$d" || (echo "missing $d" && exit 1)
             cp "$d" "$dest/"
           done
-          uroot="$(cygpath "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin")"
-          for d in "$uroot"/libstdc++-*.dll "$uroot"/libgcc_s_*-1.dll "$uroot"/libwinpthread-*.dll; do
+          compiler_bin="$(dirname "$(cygpath "$(command -v g++)")")"
+          for d in "$compiler_bin"/libstdc++-*.dll "$compiler_bin"/libgcc_s_*-1.dll "$compiler_bin"/libwinpthread-*.dll; do
             test -f "$d" || (echo "missing $d" && exit 1)
             cp "$d" "$dest/"
           done

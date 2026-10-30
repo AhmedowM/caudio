@@ -25,19 +25,19 @@ using namespace caudio::test_helpers;
 TEST_CASE("shouldMarkPlayed 60pct 90s thresholds", "[engine_history]") {
     // detail::shouldMarkPlayed is in engine namespace detail
     using caudio::engine::detail::shouldMarkPlayed;
-    // duration 100s, pos 59 -> not marked (59%)
+    // duration 100s, accumulated playback 59s -> not marked (59%)
     REQUIRE(shouldMarkPlayed(100.0, 59.0, false, 60, 90) == false);
-    // 61% true
+    // 61% accumulated playback is true
     REQUIRE(shouldMarkPlayed(100.0, 61.0, false, 60, 90) == true);
     // already marked -> false even if threshold met
     REQUIRE(shouldMarkPlayed(100.0, 80.0, true, 60, 90) == false);
-    // secs threshold: pos 91 with duration long and pct not met but secs met
+    // 91s accumulated playback with duration long and pct not met
     REQUIRE(shouldMarkPlayed(1000.0, 91.0, false, 60, 90) == true);
-    // pct 60 with duration 0 -> only secs matters; pos 90 true via secs
+    // pct 60 with duration 0 -> only secs matters; 90s is true
     REQUIRE(shouldMarkPlayed(0.0, 90.0, false, 60, 90) == true);
-    // short duration 10s, pos 9 secs not but pct 90% requires 6s -> true via pct
+    // short duration 10s, 6.5s accumulated playback -> true via pct
     REQUIRE(shouldMarkPlayed(10.0, 6.5, false, 60, 90) == true);
-    // pos less than both thresholds -> false
+    // accumulated playback less than both thresholds -> false
     REQUIRE(shouldMarkPlayed(200.0, 10.0, false, 60, 90) == false);
 }
 
@@ -121,6 +121,10 @@ TEST_CASE("history insert increments play_count and last_played", "[engine_histo
         sqlite3_close(h);
         return ok;
     };
+    // Seeking beyond the threshold must not count as listened playback.
+    REQUIRE(eng->seek(5.0).has_value());
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    REQUIRE_FALSE(checkMarked());
     busyWaitUntil(checkMarked, std::chrono::milliseconds(2000), std::chrono::milliseconds(50));
     REQUIRE(checkMarked());
     // Stored timestamps must be wall-clock (regression: the monotonic clock
