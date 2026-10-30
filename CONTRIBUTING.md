@@ -6,8 +6,8 @@
 
 | Tool | Minimum Version | Notes |
 |---|---|---|
-| **Compiler** | GCC 14+ / Clang 17+ / AppleClang 17+ | C++23 required (`std::expected`, `std::print`, modules). Scan/generator + move-only callbacks are polyfilled in-tree (libc++ lacks both). MinGW GCC 14+ on Windows. |
-| **CMake** | 3.28+ | Required for `FILE_SET CXX_MODULES` and BMI handling |
+| **Compiler** | GCC 13+ / LLVM Clang 19+ / AppleClang from Xcode 26 | GCC 13 supports the headers build; GCC 14+ is required for modules. C++23 is required. |
+| **CMake** | 3.31+ | Required for module dependency scanning and `FILE_SET CXX_MODULES` |
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | recent (tools + dev packages) | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. CI uses Ubuntu system FFmpeg; auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
 | **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
@@ -22,18 +22,62 @@
 
 ### Clone and Configure
 
+The preferred workflow is the intent-driven configure script. It keeps local
+builds aligned with CI and can configure, build, test, package, and select a
+toolchain in one command.
+
 ```sh
 git clone https://github.com/AhmedowM/caudio.git
 cd caudio
 
-#Recommended : Ninja + tests enabled
-cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+# Recommended: development build with examples, tests, and four jobs
+python scripts/configure.py dev --toolchain clang --jobs 4 --build --test
 
-#With docs
-cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_BUILD_DOCS=ON
+# Optional modules build (GCC 14+, LLVM Clang 19+, or MSVC 2022)
+python scripts/configure.py modules --toolchain clang --build
+```
 
-#Sanitizers(Linux only, ignored on Windows / MinGW)
-cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON -DCAUDIO_ENABLE_SANITIZERS=ON
+Inspect all wrapper options with:
+
+```sh
+python scripts/configure.py --help
+python scripts/configure.py dev --help
+```
+
+Use CMake presets when the compiler is already configured in the environment:
+
+```sh
+cmake --list-presets
+cmake --preset dev
+cmake --build --preset dev --parallel 4
+ctest --test-dir build/dev --output-on-failure --parallel 4
+```
+
+Bare CMake remains supported for packaging and custom integrations:
+
+```sh
+cmake -S . -B build/custom -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCAUDIO_ENABLE_TESTS=ON
+cmake --build build/custom --parallel 4
+ctest --test-dir build/custom --output-on-failure --parallel 4
+```
+
+For a complete option list, see the configuration reference in
+[`README.md`](README.md). Do not add a new module-only API: public headers
+remain canonical and module partitions mirror them.
+
+### Optional configure features
+
+```sh
+# Build documentation
+python scripts/configure.py dev --toolchain clang --docs --build
+
+# Enable sanitizers on supported Unix toolchains
+python scripts/configure.py dev --toolchain clang --sanitizers --build --test
+
+# CI-style, headless tests
+python scripts/configure.py ci --toolchain clang --jobs 4 --build --test
 ```
 
 ### Build and Test
@@ -43,7 +87,7 @@ cmake --build build -j4
 ctest --test-dir build -j4 --output-on-failure
 
 #Run a single test binary
-./build/test_engine_queue --success
+./build/dev-clang-ninja-x64/test_engine_queue --success
 
 #Manual CLI smoke test
 ./build/caudio --version
@@ -53,7 +97,7 @@ ctest --test-dir build -j4 --output-on-failure
 ```
 
 > **Audio tests beep:** `AudioOutput::create` (`ma_device_start`) beeps on desktop.
-> For silent/headless runs: `CAUDIO_TEST_NOAUDIO=1 ctest -j4` -- tests that would beep
+> For silent/headless runs: `CAUDIO_TEST_NOAUDIO=1 ctest --test-dir build --output-on-failure -j4` -- tests that would beep
 > check `caudio::test::noAudio()` / `CAUDIO_SKIP_IF_NOAUDIO()` in `tests/common.hpp`
 > and `SKIP` when set. CI sets `CAUDIO_TEST_NOAUDIO=1` automatically. For silent
 > ring exercises without a device use `caudio::test::makeDummyRing()` (no `ma_device_init`).
@@ -77,10 +121,11 @@ Man page is at `docs/man/caudio.1` -- preview with `man ./docs/man/caudio.1` or 
   ```
 - **Linter:** `clang-tidy` using `.clang-tidy` (optional, not enforced in CI yet).
 - **Naming:** `PascalCase` for types, `camelCase` for functions/variables, `snake_case` for files and locals. Match surrounding code; do not add `k`-prefix constants.
-- **Headers/modules:** public API lives in `include/caudio/` (`*.hpp`), sources in `src/` (`*.cpp`). C++23 modules (`*.cppm`, opt-in via `CAUDIO_ENABLE_MODULES=ON`) mirror the headers; do not add new module-only APIs.
-- **Errors
-    : **Return `std::expected<T, utils::Error>`;
-do not throw across module boundaries. Use `StatusCode` enum.
+- **Headers/modules:** public API lives in `include/caudio/` (`*.hpp`), and
+  sources in `src/` (`*.cpp`). C++23 modules (`*.cppm`) mirror the headers;
+  do not add new module-only APIs.
+- **Errors:** return `std::expected<T, utils::Error>` and use the existing
+  `StatusCode` values. Do not throw across module boundaries.
 
 ## Commit Style
 
@@ -146,7 +191,7 @@ caudio/
     service/dispatch_*.cpp  # Service::handle() per command group
     service/service_paths.* service/service_status.* service/service_audio.*
                          # (*.cppm mirrors sit beside sources; CAUDIO_ENABLE_MODULES=ON)
-  cli/src/shell/         # Executable only: main, Shell dispatch, parse helpers
+  cli/src/shell/        # Executable only: main, Shell dispatch, parse helpers
   cmake/components/      # Per-component build files (utils/player/db/engine/cli/combined)
   tests/                 # Catch2 tests (tests/common.hpp helpers)
   examples/              # mini_cpp, player_db_demo, engine_demo

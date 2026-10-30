@@ -8,6 +8,7 @@ set(CAUDIO_DB_MODULE_SOURCES
   modules/caudio/db.cppm
   modules/caudio/db/core.cppm
   modules/caudio/db/scan.cppm
+  modules/caudio/db/maintenance.cppm
   modules/caudio/db/search.cppm
   modules/caudio/db/json.cppm
 )
@@ -19,6 +20,7 @@ set(CAUDIO_DB_SOURCES
   src/db/scan.cpp
   src/db/search.cpp
   src/db/json.cpp
+  src/db/maintenance.cpp
   src/db/write_thread.cpp
   src/db/statement.cpp
   src/db/transaction.cpp

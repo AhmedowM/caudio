@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/contracts/database.hpp>
 #include <caudio/db/database.hpp>
+#include <caudio/db/maintenance.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/media/scan.hpp>
 #include <caudio/utils/error.hpp>
@@ -158,6 +159,61 @@ TEST_CASE("scan non-existent dir returns empty", "[db_scan]") {
                                                     caudio::media::ScanMode::Sampled);
     REQUIRE(tracks.has_value());
     REQUIRE(tracks->empty());
+}
+
+TEST_CASE("library maintenance reports missing and duplicate rows", "[db_scan]") {
+    auto root = tempDirPath("maintenance");
+    std::filesystem::create_directories(root);
+    auto present = root / "present.mp3";
+    std::ofstream(present, std::ios::binary) << "present";
+
+    auto dbRes = Database::open(":memory:");
+    REQUIRE(dbRes.has_value());
+    auto db = std::move(dbRes.value());
+    auto library = db->libraryAdd(root.string(), "maintenance");
+    REQUIRE(library.has_value());
+
+    caudio::types::Track first;
+    first.path = present.string();
+    first.library_id = *library;
+    first.fingerprint.fill(0x11);
+    auto firstId = db->insertTrack(first);
+    REQUIRE(firstId.has_value());
+
+    caudio::types::Track duplicate = first;
+    duplicate.path = present.string();
+    duplicate.fingerprint.fill(0x33);
+    auto duplicateId = db->insertTrack(duplicate);
+    REQUIRE(duplicateId.has_value());
+
+    caudio::types::Track missing = first;
+    missing.path = (root / "missing.mp3").string();
+    missing.fingerprint.fill(0x22);
+    auto missingId = db->insertTrack(missing);
+    REQUIRE(missingId.has_value());
+
+    auto dryRun = libraryReport(*db, *library);
+    REQUIRE(dryRun.has_value());
+    REQUIRE(dryRun->tracks_checked == 3);
+    REQUIRE(dryRun->missingFiles() == 1);
+    REQUIRE(dryRun->duplicateTracks() == 1);
+
+    auto preview = libraryApplyMaintenance(
+        *db, *library, LibraryMaintenanceOptions{.dry_run = true, .prune_missing = true});
+    REQUIRE(preview.has_value());
+    REQUIRE(preview->missingFiles() == 1);
+    REQUIRE(db->getTrack(*missingId).has_value());
+
+    auto prune = libraryApplyMaintenance(
+        *db, *library, LibraryMaintenanceOptions{.dry_run = false, .prune_missing = true});
+    REQUIRE(prune.has_value());
+    REQUIRE(prune->missingFiles() == 1);
+    REQUIRE(!db->getTrack(*missingId).has_value());
+    REQUIRE(db->getTrack(*firstId).has_value());
+    REQUIRE(db->getTrack(*duplicateId).has_value());
+
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
 }
 
 TEST_CASE("scan empty dir returns empty", "[db_scan]") {
