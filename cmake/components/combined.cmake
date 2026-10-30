@@ -16,7 +16,6 @@ if(CAUDIO_BUILD_SHARED)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_compile_features(combined PUBLIC cxx_std_23)
-  target_sources(combined PRIVATE src/_stub/shared_stub.cpp)
   # Object libraries are compiled once with PIC; linking them directly pulls
   # each object file exactly once. Vendor static libs (sqlite3, blake3) are
   # linked normally -- the linker pulls only needed objects.

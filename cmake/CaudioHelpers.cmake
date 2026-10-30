@@ -108,7 +108,7 @@ function(caudio_add_component NAME)
     add_library(${NAME} STATIC ${ARG_SOURCES})
     set_target_properties(${NAME} PROPERTIES OUTPUT_NAME ${NAME}_static)
   else()
-    add_library(${NAME} SHARED src/_stub/shared_stub.cpp)
+    add_library(${NAME} SHARED)
     set_target_properties(${NAME} PROPERTIES
       OUTPUT_NAME ${NAME}
       ARCHIVE_OUTPUT_NAME ${NAME})
@@ -229,7 +229,6 @@ function(caudio_add_shared_variant NAME)
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_compile_features(${NAME}_shared PUBLIC cxx_std_23)
-  target_sources(${NAME}_shared PRIVATE src/_stub/shared_stub.cpp)
   # Define CAUDIO_BUILDING_DLL so CAUDIO_API expands to dllexport on Windows.
   target_compile_definitions(${NAME}_shared PRIVATE CAUDIO_BUILDING_DLL)
   # MSVC C4251/C4275: STL types in dllexport classes. Suppress for shared builds;
