@@ -22,7 +22,19 @@ endfunction()
 
 function(ca_set_module_warnings tgt)
   if(CAUDIO_ENABLE_MODULES)
-    target_compile_options(${tgt} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-template-names-tu-local -Wno-expose-global-module-tu-local -Wno-global-module>)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
+        # GCC 14 re-applies visibility attributes while composing imported
+        # module partitions and reports them after the definition. The
+        # attributes are intentional on the canonical headers.
+        target_compile_options(${tgt} PRIVATE -Wno-attributes)
+      else()
+        target_compile_options(${tgt} PRIVATE
+          -Wno-template-names-tu-local
+          -Wno-expose-global-module-tu-local
+          -Wno-global-module)
+      endif()
+    endif()
   endif()
 endfunction()
 

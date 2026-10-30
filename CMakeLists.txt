@@ -16,6 +16,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CAUDIO_ENABLE_MODULES "build/install C++23 modules (optional, headers are canonical)" OFF)
 if(CAUDIO_ENABLE_MODULES)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+    message(FATAL_ERROR
+      "CAUDIO_ENABLE_MODULES requires GCC 14 or newer; GCC ${CMAKE_CXX_COMPILER_VERSION} "
+      "does not provide the C++ module import-graph scanner required by CMake.")
+  endif()
   set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 else()
   set(CMAKE_CXX_SCAN_FOR_MODULES OFF)

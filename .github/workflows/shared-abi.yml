@@ -23,26 +23,26 @@
 # halves are covered: clang-21 + gcc-16 on Linux, AppleClang + brew LLVM on
 # macOS. Tests force CAUDIO_BUILD_STATIC=ON, so one build covers both flavours.
 
-name: Shared ABI
+name: Shared ABI (manual)
 
 "on":
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - "CMakeLists.txt"
-      - "cmake/**"
-      - "scripts/configure.py"
-      - "include/caudio/**"
-      - ".github/workflows/shared-abi.yml"
-  pull_request:
-    branches: [master]
-    paths:
-      - "CMakeLists.txt"
-      - "cmake/**"
-      - "scripts/configure.py"
-      - "include/caudio/**"
-      - ".github/workflows/shared-abi.yml"
+  # push:
+  #   branches: [master]
+  #   paths:
+  #     - "CMakeLists.txt"
+  #     - "cmake/**"
+  #     - "scripts/configure.py"
+  #     - "include/caudio/**"
+  #     - ".github/workflows/shared-abi.yml"
+  # pull_request:
+  #   branches: [master]
+  #   paths:
+  #     - "CMakeLists.txt"
+  #     - "cmake/**"
+  #     - "scripts/configure.py"
+  #     - "include/caudio/**"
+  #     - ".github/workflows/shared-abi.yml"
 
 permissions:
   contents: read
