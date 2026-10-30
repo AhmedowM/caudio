@@ -127,17 +127,17 @@ struct DatabaseAccess {
      * @param db Database instance.
      * @return Vector of libraries or Error.
      */
-    static std::expected<std::vector<Library>, caudio::utils::Error>
+    static std::expected<std::vector<caudio::types::Library>, caudio::utils::Error>
     libraryListLocked(Database& db);
     /**
      * @brief Forwards to Database::libraryUpdateLocked().
      * @ingroup caudio_db
      * @param db Database instance.
-     * @param l Library with updated fields.
+     * @param l caudio::types::Library with updated fields.
      * @return Success or Error InvalidArg/NotFound/Internal.
      */
     static std::expected<void, caudio::utils::Error> libraryUpdateLocked(Database& db,
-                                                                         const Library& l);
+                                                                         const caudio::types::Library& l);
 
     // --- Playlist / queue locked helpers ---
     /**
@@ -167,7 +167,7 @@ struct DatabaseAccess {
      * @brief Forwards to Database::queueEnqueueLocked().
      * @ingroup caudio_db
      * @param db Database instance.
-     * @param qid Queue id (0 -> 1).
+     * @param qid caudio::types::Queue id (0 -> 1).
      * @param tid Track id.
      * @param pos Position (-1 = append).
      * @return Success or Error.
@@ -178,7 +178,7 @@ struct DatabaseAccess {
      * @brief Forwards to Database::queueDequeueLocked().
      * @ingroup caudio_db
      * @param db Database instance.
-     * @param qid Queue id.
+     * @param qid caudio::types::Queue id.
      * @return QueueItem or Error NotFound.
      */
     static std::expected<caudio::types::QueueItem, caudio::utils::Error>

@@ -2,7 +2,6 @@
 # NOTE: history/shuffle live in src/engine/ (NOT installed), no partitions.
 set(CAUDIO_ENGINE_MODULE_SOURCES
   modules/caudio/engine.cppm
-  modules/caudio/engine/types.cppm
   modules/caudio/engine/core.cppm
 )
 set(CAUDIO_ENGINE_SOURCES

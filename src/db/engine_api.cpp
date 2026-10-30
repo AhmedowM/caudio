@@ -26,11 +26,11 @@ std::expected<bool, caudio::utils::Error> Database::queueExists(int64_t qid) {
     return true;
 }
 
-std::expected<caudio::contracts::PlaybackStats, caudio::utils::Error> Database::playbackStats() {
+std::expected<caudio::types::PlaybackStats, caudio::utils::Error> Database::playbackStats() {
     auto stats = getStats();
     if (!stats)
         return std::unexpected(stats.error());
-    return caudio::contracts::PlaybackStats{
+    return caudio::types::PlaybackStats{
         stats->num_tracks,    stats->num_playlists, stats->num_queue_items,  stats->num_history,
         stats->num_bookmarks, stats->num_libraries, stats->total_duration_ms};
 }
@@ -67,7 +67,7 @@ std::expected<caudio::types::Track, caudio::utils::Error> Database::queueTrackAt
     return getTrack(trackId);
 }
 
-std::expected<caudio::contracts::PlaybackState, caudio::utils::Error> Database::loadEngineState() {
+std::expected<caudio::types::EngineState, caudio::utils::Error> Database::loadEngineState() {
     sqlite3* handle = DatabaseAccess::handle(*this);
     if (!handle)
         return std::unexpected(
@@ -88,7 +88,7 @@ std::expected<caudio::contracts::PlaybackState, caudio::utils::Error> Database::
                 caudio::utils::makeError(caudio::utils::StatusCode::Internal, "prepare failed"));
     }
     internal::StmtGuard statement(raw);
-    caudio::contracts::PlaybackState state;
+    caudio::types::EngineState state;
     int rc = sqlite3_step(raw);
     if (rc == SQLITE_DONE)
         return state;
@@ -149,7 +149,7 @@ std::expected<caudio::contracts::PlaybackState, caudio::utils::Error> Database::
 }
 
 std::expected<void, caudio::utils::Error>
-Database::saveEngineState(const caudio::contracts::PlaybackState& state) {
+Database::saveEngineState(const caudio::types::EngineState& state) {
     sqlite3* handle = DatabaseAccess::handle(*this);
     if (!handle)
         return std::unexpected(

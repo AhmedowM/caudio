@@ -1,8 +1,8 @@
 ﻿#include <atomic>
 #include <caudio/contracts/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/reader.hpp>
 #include <caudio/player/output.hpp>
@@ -84,7 +84,7 @@ struct EngineState {
 };
 
 struct Engine::Impl {
-    explicit Impl(const EngineConfig& cfg);
+    explicit Impl(const caudio::types::EngineConfig& cfg);
 
     // lifecycle
     std::optional<caudio::utils::Error> init();
@@ -144,7 +144,7 @@ struct Engine::Impl {
     ExpectedVoid setRepeat(caudio::types::RepeatMode m);
 
     // library / history
-    std::expected<caudio::engine::EngineStats, caudio::utils::Error> stats();
+    std::expected<caudio::types::PlaybackStats, caudio::utils::Error> stats();
     std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     listHistory(int limit);
     std::expected<void, caudio::utils::Error> clearHistory();
@@ -158,20 +158,20 @@ struct Engine::Impl {
     void preroll();
 
     // callbacks / events
-    ExpectedVoid setCallbacks(const EngineCallbacks& cbs);
-    std::expected<EngineEvent, caudio::utils::Error> pollEvent();
-    ExpectedVoid drainEvents(EngineEvent* buf, size_t cap, size_t* n);
-    std::vector<EngineEvent> drainAll();
+    ExpectedVoid setCallbacks(const caudio::types::EngineCallbacks& cbs);
+    std::expected<caudio::types::EngineEvent, caudio::utils::Error> pollEvent();
+    ExpectedVoid drainEvents(caudio::types::EngineEvent* buf, size_t cap, size_t* n);
+    std::vector<caudio::types::EngineEvent> drainAll();
 
     // monitor / decode
     void engineTick();
     void monitorLoop(std::stop_token st);
     void decodeLoop(std::stop_token st);
     void doHistoryMark();
-    void pushEvent(const EngineEvent& ev);
+    void pushEvent(const caudio::types::EngineEvent& ev);
 
     // members (moved verbatim from Engine)
-    EngineConfig cfg_{};
+    caudio::types::EngineConfig cfg_{};
     EngineState state_{};
     QueueState queue_{};
     caudio::types::Track currentTrack_{};
@@ -206,9 +206,9 @@ struct Engine::Impl {
     std::condition_variable_any monCv_{};
 
     // events
-    caudio::utils::MpscQueue<EngineEvent> eventQueue_{64};
+    caudio::utils::MpscQueue<caudio::types::EngineEvent> eventQueue_{64};
     std::mutex cbMutex_{};
-    EngineCallbacks callbacks_{};
+    caudio::types::EngineCallbacks callbacks_{};
 
     // atomics spec required
     std::atomic<uint64_t> lastProgressMs_{0};
@@ -224,7 +224,7 @@ struct Engine::Impl {
     mutable std::timed_mutex queueMutex_;
 };
 
-Engine::Engine(const EngineConfig& cfg) : impl_(std::make_unique<Impl>(cfg)) {}
+Engine::Engine(const caudio::types::EngineConfig& cfg) : impl_(std::make_unique<Impl>(cfg)) {}
 
 Engine::ExpectedVoid Engine::attachDatabase(std::shared_ptr<caudio::contracts::IDatabase> db) {
     return impl_->attachDatabase(std::move(db));
@@ -315,7 +315,7 @@ caudio::types::RepeatMode Engine::repeat() const noexcept {
     return impl_->repeat();
 }
 
-std::expected<caudio::engine::EngineStats, caudio::utils::Error> Engine::stats() {
+std::expected<caudio::types::PlaybackStats, caudio::utils::Error> Engine::stats() {
     return impl_->stats();
 }
 
@@ -356,23 +356,23 @@ Engine::ExpectedVoid Engine::prev() {
     return impl_->prev();
 }
 
-Engine::ExpectedVoid Engine::setCallbacks(const EngineCallbacks& cbs) {
+Engine::ExpectedVoid Engine::setCallbacks(const caudio::types::EngineCallbacks& cbs) {
     return impl_->setCallbacks(cbs);
 }
 
-std::expected<EngineEvent, caudio::utils::Error> Engine::pollEvent() {
+std::expected<caudio::types::EngineEvent, caudio::utils::Error> Engine::pollEvent() {
     return impl_->pollEvent();
 }
 
-Engine::ExpectedVoid Engine::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
+Engine::ExpectedVoid Engine::drainEvents(caudio::types::EngineEvent* buf, size_t cap, size_t* n) {
     return impl_->drainEvents(buf, cap, n);
 }
 
-std::vector<EngineEvent> Engine::drainAll() {
+std::vector<caudio::types::EngineEvent> Engine::drainAll() {
     return impl_->drainAll();
 }
 
-Engine::ExpectedEngine Engine::create(const EngineConfig& cfg) {
+Engine::ExpectedEngine Engine::create(const caudio::types::EngineConfig& cfg) {
     auto e = std::unique_ptr<Engine>(new Engine(cfg));
     auto err = e->impl_->init();
     if (err)
@@ -812,13 +812,13 @@ void Engine::Impl::noteEnqueued(int64_t qid, std::size_t count) noexcept {
     unlockQueue();
 }
 
-std::expected<caudio::engine::EngineStats, caudio::utils::Error> Engine::Impl::stats() {
+std::expected<caudio::types::PlaybackStats, caudio::utils::Error> Engine::Impl::stats() {
     if (!hasDb())
         return std::unexpected(caudio::utils::makeError(caudio::utils::StatusCode::State, "no db"));
     auto ds = db_->playbackStats();
     if (!ds)
         return std::unexpected(ds.error());
-    return EngineStats{
+    return caudio::types::PlaybackStats{
         ds->num_tracks,    ds->num_playlists, ds->num_queue_items,   ds->num_history,
         ds->num_bookmarks, ds->num_libraries, ds->total_duration_ms,
     };
@@ -855,8 +855,8 @@ Engine::ExpectedVoid Engine::Impl::setShuffle(bool on) {
     if (!r)
         return std::unexpected(r.error());
     // push queue changed event
-    EngineEvent ev;
-    ev.type = EngineEventType::QueueChanged;
+    caudio::types::EngineEvent ev;
+    ev.type = caudio::types::EngineEventType::QueueChanged;
     ev.queue_id = queue_.queue_id;
     pushEvent(ev);
     return {};
@@ -921,8 +921,8 @@ Engine::ExpectedVoid Engine::Impl::switchQueue(int64_t qid) {
     unlockQueue();
     if (err)
         return std::unexpected(*err);
-    EngineEvent ev;
-    ev.type = EngineEventType::QueueChanged;
+    caudio::types::EngineEvent ev;
+    ev.type = caudio::types::EngineEventType::QueueChanged;
     ev.queue_id = qid;
     pushEvent(ev);
     return {};
@@ -959,8 +959,8 @@ Engine::ExpectedVoid Engine::Impl::advanceLocked(bool stopAtEnd, int lockWaitMs)
         markedPlayed_.store(false, std::memory_order_release);
         gaplessArmed_.store(false, std::memory_order_release);
         startedMs_ = (int64_t)detail::wallMs();
-        EngineEvent ev;
-        ev.type = EngineEventType::TrackStarted;
+        caudio::types::EngineEvent ev;
+        ev.type = caudio::types::EngineEventType::TrackStarted;
         ev.track_id = currentTrack_.id;
         ev.queue_id = queue_.queue_id;
         ev.duration = duration_;
@@ -1038,14 +1038,14 @@ Engine::ExpectedVoid Engine::Impl::prev() {
     return {};
 }
 
-Engine::ExpectedVoid Engine::Impl::setCallbacks(const EngineCallbacks& cbs) {
+Engine::ExpectedVoid Engine::Impl::setCallbacks(const caudio::types::EngineCallbacks& cbs) {
     std::lock_guard<std::mutex> lk(cbMutex_);
     callbacks_ = cbs;
     cfg_.callbacks = cbs;
     return {};
 }
 
-std::expected<EngineEvent, caudio::utils::Error> Engine::Impl::pollEvent() {
+std::expected<caudio::types::EngineEvent, caudio::utils::Error> Engine::Impl::pollEvent() {
     auto r = eventQueue_.pop();
     if (!r)
         return std::unexpected(
@@ -1053,7 +1053,7 @@ std::expected<EngineEvent, caudio::utils::Error> Engine::Impl::pollEvent() {
     return r.value();
 }
 
-Engine::ExpectedVoid Engine::Impl::drainEvents(EngineEvent* buf, size_t cap, size_t* n) {
+Engine::ExpectedVoid Engine::Impl::drainEvents(caudio::types::EngineEvent* buf, size_t cap, size_t* n) {
     if (!n)
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "null n"));
@@ -1072,8 +1072,8 @@ Engine::ExpectedVoid Engine::Impl::drainEvents(EngineEvent* buf, size_t cap, siz
     return {};
 }
 
-std::vector<EngineEvent> Engine::Impl::drainAll() {
-    std::vector<EngineEvent> out;
+std::vector<caudio::types::EngineEvent> Engine::Impl::drainAll() {
+    std::vector<caudio::types::EngineEvent> out;
     while (true) {
         auto r = eventQueue_.pop();
         if (!r)
@@ -1083,7 +1083,7 @@ std::vector<EngineEvent> Engine::Impl::drainAll() {
     return out;
 }
 
-Engine::Impl::Impl(const EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
+Engine::Impl::Impl(const caudio::types::EngineConfig& cfg) : cfg_(cfg), state_{}, queue_{} {
     cfg_.pollMs = cfg.pollMs ? cfg.pollMs : 10;
     cfg_.gaplessMs = cfg.gaplessMs ? cfg.gaplessMs : 300;
     cfg_.historyThresholdPct = cfg.historyThresholdPct ? cfg.historyThresholdPct : 60;
@@ -1191,7 +1191,7 @@ std::expected<void, caudio::utils::Error> Engine::Impl::saveState() {
     if (!hasDb())
         return std::unexpected(
             caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "no db"));
-    caudio::contracts::PlaybackState persisted;
+    caudio::types::EngineState persisted;
     persisted.shuffle_enabled = state_.shuffleEnabled;
     persisted.repeat_mode = state_.repeatMode;
     persisted.cursor_pos = state_.cursorPos;
@@ -1551,8 +1551,8 @@ std::expected<void, caudio::utils::Error> Engine::Impl::doPlayTrack(caudio::type
     playStart_ = std::chrono::steady_clock::now();
     if (hasDb())
         (void)saveState();
-    EngineEvent ev;
-    ev.type = EngineEventType::TrackStarted;
+    caudio::types::EngineEvent ev;
+    ev.type = caudio::types::EngineEventType::TrackStarted;
     ev.track_id = t.id;
     ev.queue_id = queue_.queue_id;
     ev.duration = duration_;
@@ -1595,20 +1595,20 @@ void Engine::Impl::preroll() {
     }
 }
 
-void Engine::Impl::pushEvent(const EngineEvent& ev) {
+void Engine::Impl::pushEvent(const caudio::types::EngineEvent& ev) {
     // MpscQueue cap 64 drop policy
     auto r = eventQueue_.push(ev);
     if (!r)
         return; // drop if full
     // dispatch callbacks outside queue lock
-    EngineCallbacks cbsCopy;
+    caudio::types::EngineCallbacks cbsCopy;
     {
         std::lock_guard<std::mutex> lk(cbMutex_);
         cbsCopy = callbacks_;
     }
-    if (ev.type == EngineEventType::TrackStarted && cbsCopy.on_track_started) {
+    if (ev.type == caudio::types::EngineEventType::TrackStarted && cbsCopy.on_track_started) {
         cbsCopy.on_track_started(ev.track_id);
-    } else if (ev.type == EngineEventType::TrackEnded && cbsCopy.on_track_ended) {
+    } else if (ev.type == caudio::types::EngineEventType::TrackEnded && cbsCopy.on_track_ended) {
         double pct = 0;
         if (ev.duration > 0) {
             pct = (ev.position / ev.duration) * 100;
@@ -1618,9 +1618,9 @@ void Engine::Impl::pushEvent(const EngineEvent& ev) {
                 pct = 100;
         }
         cbsCopy.on_track_ended(ev.track_id, pct);
-    } else if (ev.type == EngineEventType::QueueChanged && cbsCopy.on_queue_changed) {
+    } else if (ev.type == caudio::types::EngineEventType::QueueChanged && cbsCopy.on_queue_changed) {
         cbsCopy.on_queue_changed(ev.queue_id);
-    } else if (ev.type == EngineEventType::Error && cbsCopy.on_error) {
+    } else if (ev.type == caudio::types::EngineEventType::Error && cbsCopy.on_error) {
         cbsCopy.on_error(caudio::utils::StatusCode::Internal, ev.msg);
     }
 }
@@ -1667,8 +1667,8 @@ void Engine::Impl::engineTick() {
         uint64_t last = lastProgressMs_.load(std::memory_order_acquire);
         if (now - last >= 500) {
             lastProgressMs_.store(now, std::memory_order_release);
-            EngineEvent ev;
-            ev.type = EngineEventType::Progress;
+            caudio::types::EngineEvent ev;
+            ev.type = caudio::types::EngineEventType::Progress;
             ev.track_id = hasCurrent_.load(std::memory_order_acquire) ? currentTrack_.id
                                                                       : state_.currentTrackId;
             ev.queue_id = queue_.queue_id ? queue_.queue_id : 1;
@@ -1708,7 +1708,7 @@ void Engine::Impl::engineTick() {
 void Engine::Impl::monitorLoop(std::stop_token st) {
     // Two-tier waits (C-1): the 10 ms cadence is only needed while playing
     // (300 ms gapless pre-roll window still gets ~12 looks at 25 ms).
-    // Idle backs off to 100 ms. An explicit EngineConfig::pollMs override is
+    // Idle backs off to 100 ms. An explicit caudio::types::EngineConfig::pollMs override is
     // honored for the playing interval; idle is always >= 100 ms.
     int cfgPoll = cfg_.pollMs ? cfg_.pollMs : 10;
     if (cfgPoll <= 0)

@@ -6,7 +6,6 @@
 # links blake3.
 set(CAUDIO_DB_MODULE_SOURCES
   modules/caudio/db.cppm
-  modules/caudio/db/types.cppm
   modules/caudio/db/core.cppm
   modules/caudio/db/scan.cppm
   modules/caudio/db/search.cppm

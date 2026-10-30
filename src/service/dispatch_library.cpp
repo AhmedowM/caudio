@@ -3,7 +3,7 @@
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/media/audio_ext.hpp>
@@ -148,7 +148,7 @@ Service::Impl::handle(const caudio::ipc::LibraryStats& cmd) {
 
 std::expected<caudio::ipc::Result, caudio::utils::Error>
 Service::Impl::handle(const caudio::ipc::LibraryList& cmd) {
-    caudio::db::TrackQuery q{};
+    caudio::types::TrackQuery q{};
     q.limit = cmd.limit;
     q.offset = cmd.offset;
     if (cmd.query.has_value())

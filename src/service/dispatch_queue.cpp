@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <caudio/db/database.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/media/audio_ext.hpp>

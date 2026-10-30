@@ -14,7 +14,7 @@
  * encoding (the wire text lives in `types/format.hpp`, its inverse in
  * `types/parse.hpp`).
  *
- * `caudio::engine` re-exports these as aliases (see `engine/types.hpp`). This
+ * these are owned directly by `caudio::types`. This
  * layer is deliberately dependency-free (no `fwd.hpp`, no std headers) so it
  * can sit at the bottom of the component graph. Later U-3 work moves the
  * plain-data structs (`Track`, `Playlist`, ...) here as well.

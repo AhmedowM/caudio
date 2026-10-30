@@ -1,6 +1,6 @@
 #include <sqlite3.h>
 
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
 #include <cstddef>
@@ -229,7 +229,7 @@ std::optional<size_t> queueIndexOfLocked(sqlite3* db, int64_t qid, int64_t track
     }
 }
 
-std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid) {
+std::expected<caudio::types::Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid) {
     if (qid == 0)
         qid = 1;
     if (!db)
@@ -244,7 +244,7 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
     if (!st.step()) {
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
     }
-    Queue q;
+    caudio::types::Queue q;
     q.id = st.columnInt(0);
     q.name = st.columnText(1);
     q.repeat_mode = static_cast<int32_t>(st.columnInt(2));
@@ -253,7 +253,7 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
     return q;
 }
 
-std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3* db) {
+std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> listQueuesLocked(sqlite3* db) {
     if (!db)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -262,9 +262,9 @@ std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3
         st.prepare(db, "SELECT id, name, repeat_mode, temp, library_id FROM queues ORDER BY id");
     if (!e)
         return std::unexpected{e.error()};
-    std::vector<Queue> out;
+    std::vector<caudio::types::Queue> out;
     while (st.step()) {
-        Queue q;
+        caudio::types::Queue q;
         q.id = st.columnInt(0);
         q.name = st.columnText(1);
         q.repeat_mode = static_cast<int32_t>(st.columnInt(2));

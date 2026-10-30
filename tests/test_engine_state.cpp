@@ -2,9 +2,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <caudio/db/database.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/engine/engine.hpp>
-#include <caudio/engine/types.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <common.hpp>
@@ -39,7 +39,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
             REQUIRE(r.has_value());
             REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
         }
-        EngineConfig cfg;
+        caudio::types::EngineConfig cfg;
         cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
@@ -75,7 +75,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
     sqlite3_finalize(st);
     sqlite3_close(h);
     // reopen via Engine::open and verify loaded
-    auto e2Res = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto e2Res = openEngineWithDatabase(dbPath, caudio::types::EngineConfig{.enableMonitorThread = false});
     REQUIRE(e2Res.has_value());
     auto eng2 = std::move(e2Res.value());
     REQUIRE(eng2->volume() > 0.41f);
@@ -106,7 +106,7 @@ TEST_CASE("engine state save and load roundtrip", "[engine_state]") {
 
 TEST_CASE("engine state open without file creates default", "[engine_state]") {
     std::string dbPath = tempDbPath("eng_state_default").string();
-    auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
+    auto eRes = openEngineWithDatabase(dbPath, caudio::types::EngineConfig{.enableMonitorThread = false});
     REQUIRE(eRes.has_value());
     auto eng = std::move(eRes.value());
     REQUIRE(eng->volume() == 1.0f);
@@ -122,7 +122,7 @@ TEST_CASE("engine state open without file creates default", "[engine_state]") {
 }
 
 TEST_CASE("engine state volume clamped 0-1", "[engine_state]") {
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
@@ -139,7 +139,7 @@ TEST_CASE("engine create emits lifecycle log", "[engine_state]") {
     Logger logger(
         [&](LogLevel lvl, std::string_view msg) { out.emplace_back(lvl, std::string(msg)); },
         LogLevel::Trace);
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     cfg.logger = &logger;
@@ -165,7 +165,7 @@ TEST_CASE("engine state shuffle toggle clears perm", "[engine_state]") {
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
     }
-    EngineConfig cfg;
+    caudio::types::EngineConfig cfg;
     cfg.allowSimulatedPlayback = true;
     cfg.enableMonitorThread = false;
     auto eRes = Engine::create(cfg);
@@ -221,7 +221,7 @@ TEST_CASE("engine persists resume position across restart", "[engine_state]") {
         trackId = *r;
         REQUIRE(db->queueEnqueue(1, trackId, -1).has_value());
 
-        EngineConfig cfg;
+        caudio::types::EngineConfig cfg;
         cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
@@ -249,7 +249,7 @@ TEST_CASE("engine persists resume position across restart", "[engine_state]") {
         sqlite3_close(h);
     }
     {
-        auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
+        auto eRes = openEngineWithDatabase(dbPath, caudio::types::EngineConfig{.enableMonitorThread = false});
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
         REQUIRE(eng->state() == caudio::types::PlaybackState::Stopped);
@@ -281,7 +281,7 @@ TEST_CASE("explicit stop clears the resume position", "[engine_state]") {
         REQUIRE(r.has_value());
         REQUIRE(db->queueEnqueue(1, *r, -1).has_value());
 
-        EngineConfig cfg;
+        caudio::types::EngineConfig cfg;
         cfg.allowSimulatedPlayback = true;
         cfg.enableMonitorThread = false;
         auto eRes = Engine::create(cfg);
@@ -296,7 +296,7 @@ TEST_CASE("explicit stop clears the resume position", "[engine_state]") {
         eng->shutdown();
     }
     {
-        auto eRes = openEngineWithDatabase(dbPath, EngineConfig{.enableMonitorThread = false});
+        auto eRes = openEngineWithDatabase(dbPath, caudio::types::EngineConfig{.enableMonitorThread = false});
         REQUIRE(eRes.has_value());
         auto eng = std::move(eRes.value());
         REQUIRE(eng->position() == 0.0);

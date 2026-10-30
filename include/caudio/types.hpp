@@ -15,4 +15,6 @@
 #include <caudio/types/format.hpp>
 #include <caudio/types/parse.hpp>
 #include <caudio/types/record.hpp>
+#include <caudio/types/db.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/types/wire.hpp>

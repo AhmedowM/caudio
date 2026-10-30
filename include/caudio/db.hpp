@@ -14,4 +14,4 @@
 #include <caudio/db/json.hpp>
 #include <caudio/db/scan.hpp>
 #include <caudio/db/search.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>

@@ -7,6 +7,8 @@
  */
 
 #include <caudio/fwd.hpp>
+#include <caudio/types/db.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
@@ -19,28 +21,6 @@
 
 namespace caudio::contracts {
 
-struct PlaybackState {
-    int shuffle_enabled{};
-    caudio::types::RepeatMode repeat_mode{caudio::types::RepeatMode::Off};
-    int64_t cursor_pos{};
-    int64_t current_track_id{};
-    float volume{1.0f};
-    int64_t active_queue_id{1};
-    float pre_mute_volume{0.5f};
-    int64_t position_ms{};
-    std::vector<int64_t> shuffle_perm;
-};
-
-struct PlaybackStats {
-    int64_t num_tracks{};
-    int64_t num_playlists{};
-    int64_t num_queue_items{};
-    int64_t num_history{};
-    int64_t num_bookmarks{};
-    int64_t num_libraries{};
-    int64_t total_duration_ms{};
-};
-
 class IDatabase {
   public:
     virtual ~IDatabase() = default;
@@ -48,15 +28,15 @@ class IDatabase {
     virtual bool isOpen() const noexcept = 0;
     virtual std::optional<std::size_t> queueIndexOf(int64_t qid, int64_t trackId) = 0;
     virtual std::size_t queueCount(int64_t qid) = 0;
-    virtual std::expected<PlaybackStats, caudio::utils::Error> playbackStats() = 0;
+    virtual std::expected<caudio::types::PlaybackStats, caudio::utils::Error> playbackStats() = 0;
     virtual std::expected<bool, caudio::utils::Error> queueExists(int64_t qid) = 0;
     virtual std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id) = 0;
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     queueTrackAt(int64_t qid, int64_t position) = 0;
 
-    virtual std::expected<PlaybackState, caudio::utils::Error> loadEngineState() = 0;
+    virtual std::expected<caudio::types::EngineState, caudio::utils::Error> loadEngineState() = 0;
     virtual std::expected<void, caudio::utils::Error>
-    saveEngineState(const PlaybackState& state) = 0;
+    saveEngineState(const caudio::types::EngineState& state) = 0;
     virtual std::expected<void, caudio::utils::Error>
     saveEngineShuffle(bool enabled, std::span<const int64_t> permutation,
                       int64_t cursor_position) = 0;
@@ -73,10 +53,10 @@ class IDatabase {
     findByFingerprint(const std::array<uint8_t, 32>& fp) = 0;
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     findByPath(std::string_view path) = 0;
-    virtual std::expected<caudio::db::Queue, caudio::utils::Error> getQueue(int64_t qid) = 0;
+    virtual std::expected<caudio::types::Queue, caudio::utils::Error> getQueue(int64_t qid) = 0;
     virtual std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     listQueueItems(int64_t qid) = 0;
-    virtual std::expected<std::vector<caudio::db::Queue>, caudio::utils::Error> listQueues() = 0;
+    virtual std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> listQueues() = 0;
     virtual std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
                                                                      int64_t library_id = 1) = 0;
     virtual std::expected<void, caudio::utils::Error> deleteQueue(int64_t qid) = 0;
@@ -95,12 +75,12 @@ class IDatabase {
     virtual std::expected<void, caudio::utils::Error> queueClear(int64_t qid) = 0;
     virtual std::expected<void, caudio::utils::Error>
     updateTrack(const caudio::types::Track& t) = 0;
-    virtual std::expected<std::vector<db::Library>, caudio::utils::Error> listLibraries() = 0;
-    virtual std::expected<db::DbStats, caudio::utils::Error> getStats() = 0;
+    virtual std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> listLibraries() = 0;
+    virtual std::expected<caudio::types::PlaybackStats, caudio::utils::Error> getStats() = 0;
     virtual std::expected<caudio::types::LibraryStats, caudio::utils::Error>
     libraryStats(std::optional<int> mostPlayed = std::nullopt) = 0;
     virtual std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
-    listTracks(const db::TrackQuery* q = nullptr) = 0;
+    listTracks(const caudio::types::TrackQuery* q = nullptr) = 0;
     virtual std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
     listBookmarks(int64_t tid) = 0;
     virtual std::expected<void, caudio::utils::Error> bookmarkAdd(int64_t tid, int64_t pos,
@@ -129,7 +109,7 @@ class IDatabase {
     createPlaylistFromTracks(std::string_view name, std::span<const int64_t> trackIds) = 0;
     virtual std::expected<void, caudio::utils::Error> deletePlaylist(int64_t id) = 0;
     virtual caudio::utils::Logger* logger() const noexcept = 0;
-    virtual std::expected<void, caudio::utils::Error> libraryUpdate(const db::Library& l) = 0;
+    virtual std::expected<void, caudio::utils::Error> libraryUpdate(const caudio::types::Library& l) = 0;
     virtual std::expected<void, caudio::utils::Error> libraryDelete(int64_t id) = 0;
 };
 

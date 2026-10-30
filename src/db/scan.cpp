@@ -2,7 +2,7 @@
 
 #include <caudio/db/database.hpp>
 #include <caudio/db/scan.hpp>
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/media/decoder.hpp>
 #include <caudio/media/scan.hpp>
 #include <caudio/utils/error.hpp>

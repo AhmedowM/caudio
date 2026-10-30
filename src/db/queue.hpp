@@ -1,6 +1,6 @@
 #pragma once
 
-#include <caudio/db/types.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils.hpp>
 #include <cstdint>
 #include <db/detail.hpp>
@@ -14,7 +14,7 @@
 
 /**
  * @file queue.hpp
- * @brief Queue table helpers (single-writer invariant).
+ * @brief caudio::types::Queue table helpers (single-writer invariant).
  * @ingroup caudio_db
  * @details All helpers are `*Locked` -- the caller must hold the
  * Database mutex (dbMutex_) exclusively for mutating ops and at least
@@ -35,7 +35,7 @@ namespace caudio::db {
  * @brief Enqueues a track (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @param tid Track id (must be non-zero).
  * @param pos Position (-1 = append at MAX+1, else shift + insert).
  * @return Success or Error with StatusCode::InvalidArg if tid==0,
@@ -53,7 +53,7 @@ std::expected<void, caudio::utils::Error> queueEnqueueLocked(sqlite3* db, int64_
  * @brief Dequeues the head item (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @return QueueItem or Error NotFound/Internal.
  * @details Selects ORDER BY position LIMIT 1, deletes it, then shifts
  * remaining positions down by 1 (position-1 where position > removed).
@@ -67,7 +67,7 @@ std::expected<caudio::types::QueueItem, caudio::utils::Error> queueDequeueLocked
  * @brief Removes item at position (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @param pos Position to remove.
  * @return Success or Error NotFound/Internal.
  * @details Deletes WHERE queue_id=? AND position=?, then shifts down
@@ -81,7 +81,7 @@ std::expected<void, caudio::utils::Error> queueRemoveLocked(sqlite3* db, int64_t
  * @brief Clears all items in a queue (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @return Success or Error Internal.
  * @par Thread safety
  * Caller must hold Database::mutex() exclusively.
@@ -92,7 +92,7 @@ std::expected<void, caudio::utils::Error> queueClearLocked(sqlite3* db, int64_t 
  * @brief Lists all items in a queue ordered by position (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @return Vector of QueueItems or Error Internal.
  * @par Thread safety
  * Caller must hold Database::mutex() (shared or exclusive).
@@ -104,7 +104,7 @@ queueListLocked(sqlite3* db, int64_t qid);
  * @brief Counts items in a queue (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @return Count (0 if no db or on prepare failure).
  * @par Thread safety
  * Caller must hold Database::mutex() (shared or exclusive).
@@ -115,7 +115,7 @@ size_t queueCountLocked(sqlite3* db, int64_t qid);
  * @brief Finds the 0-based index of a track in a queue (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @param trackId Track id to locate (first occurrence by position).
  * @return 0-based index into the ORDER BY position listing, or std::nullopt
  * if the track is not in the queue (or on prepare failure / null handle).
@@ -131,12 +131,12 @@ std::optional<size_t> queueIndexOfLocked(sqlite3* db, int64_t qid, int64_t track
  * @brief Gets a queue container row (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
- * @return Queue or Error NotFound/Internal.
+ * @param qid caudio::types::Queue id (0 -> 1).
+ * @return caudio::types::Queue or Error NotFound/Internal.
  * @par Thread safety
  * Caller must hold Database::mutex().
  */
-std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid);
+std::expected<caudio::types::Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t qid);
 
 /**
  * @brief Lists all queue containers (caller holds DB mutex).
@@ -146,13 +146,13 @@ std::expected<Queue, caudio::utils::Error> getQueueLocked(sqlite3* db, int64_t q
  * @par Thread safety
  * Caller must hold Database::mutex().
  */
-std::expected<std::vector<Queue>, caudio::utils::Error> listQueuesLocked(sqlite3* db);
+std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> listQueuesLocked(sqlite3* db);
 
 /**
  * @brief Creates a queue container (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param name Queue name (must be non-empty).
+ * @param name caudio::types::Queue name (must be non-empty).
  * @param library_id Owning library.
  * @return New row id or Error InvalidArg/Internal.
  * @par Thread safety
@@ -165,7 +165,7 @@ std::expected<int64_t, caudio::utils::Error> createQueueLocked(sqlite3* db, std:
  * @brief Deletes a queue container and its items (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @return Success or Error NotFound/Internal.
  * @details First deletes from queue (items), then from queues (container).
  * @par Thread safety
@@ -177,7 +177,7 @@ std::expected<void, caudio::utils::Error> deleteQueueLocked(sqlite3* db, int64_t
  * @brief Sets the repeat mode for a queue (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @param repeat_mode New mode.
  * @return Success or Error NotFound/Internal.
  * @par Thread safety
@@ -190,7 +190,7 @@ std::expected<void, caudio::utils::Error> setQueueRepeatLocked(sqlite3* db, int6
  * @brief Sets the temporary flag for a queue (caller holds DB mutex).
  * @ingroup caudio_db
  * @param db SQLite handle.
- * @param qid Queue id (0 -> 1).
+ * @param qid caudio::types::Queue id (0 -> 1).
  * @param temp New flag (temporary queues are purged on daemon shutdown).
  * @return Success or Error NotFound/Internal.
  * @par Thread safety

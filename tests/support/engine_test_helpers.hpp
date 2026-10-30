@@ -13,7 +13,7 @@
 namespace caudio::test_helpers {
 
 inline std::expected<std::unique_ptr<caudio::engine::Engine>, caudio::utils::Error>
-openEngineWithDatabase(std::string_view path, const caudio::engine::EngineConfig& config) {
+openEngineWithDatabase(std::string_view path, const caudio::types::EngineConfig& config) {
     auto database = caudio::db::Database::open(path);
     if (!database)
         return std::unexpected(database.error());

@@ -38,11 +38,7 @@ struct Config;
 
 namespace caudio::db {
 class Database;
-struct DbStats;
 class SqliteStatement;
-struct Queue;
-struct Library;
-struct TrackQuery;
 } // namespace caudio::db
 
 namespace caudio::contracts {
@@ -51,13 +47,6 @@ class IDatabase;
 
 namespace caudio::engine {
 class Engine;
-struct EngineConfig;
-struct EngineCallbacks;
-struct EngineEvent;
-enum class EngineEventType : std::uint8_t;
-// PlaybackState / RepeatMode are wire enums owned by `caudio::types` (see
-// types/wire.hpp); engine/types.hpp uses caudio::types::PlaybackState /
-// caudio::types::RepeatMode directly.
 } // namespace caudio::engine
 
 namespace caudio::media {
@@ -91,6 +80,16 @@ struct Playlist;
 struct QueueItem;
 struct HistoryEntry;
 struct Bookmark;
+struct Queue;
+struct Library;
+struct TrackQuery;
+struct HistoryQuery;
+struct PlaybackStats;
+struct EngineState;
+enum class EngineEventType : std::uint8_t;
+struct EngineEvent;
+struct EngineCallbacks;
+struct EngineConfig;
 } // namespace caudio::types
 
 namespace caudio::utils {
