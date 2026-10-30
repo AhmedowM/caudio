@@ -11,6 +11,11 @@ if(CAUDIO_BUILD_SHARED)
   add_library(combined SHARED)
   add_library(caudio::combined ALIAS combined)
   set_target_properties(combined PROPERTIES OUTPUT_NAME caudio VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR} PDB_NAME caudio_)
+  if(MSVC)
+    # The CLI executable is also named caudio and uses the default caudio.ilk.
+    # Avoid an incremental-link state collision when Ninja links both targets.
+    target_link_options(combined PRIVATE /INCREMENTAL:NO)
+  endif()
   target_include_directories(combined PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>

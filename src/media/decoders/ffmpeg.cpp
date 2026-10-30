@@ -16,7 +16,7 @@
 #include <string>
 #include <string_view>
 
-#if defined(__GNUC__) && !defined(__clang__)
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 14
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wglobal-module"
 #endif
@@ -29,7 +29,7 @@ extern "C" {
 #include <libavutil/samplefmt.h>
 #include <libswresample/swresample.h>
 }
-#if defined(__GNUC__) && !defined(__clang__)
+#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 14
 #pragma GCC diagnostic pop
 #endif
 
