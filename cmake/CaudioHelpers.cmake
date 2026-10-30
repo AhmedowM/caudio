@@ -18,6 +18,9 @@ set(CAUDIO_WARNING_FLAGS
 
 function(ca_set_warnings tgt)
   target_compile_options(${tgt} PRIVATE ${CAUDIO_WARNING_FLAGS})
+  if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${tgt} PRIVATE -Wa,--mbig-obj)
+  endif()
 endfunction()
 
 function(ca_set_module_warnings tgt)

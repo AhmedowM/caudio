@@ -34,14 +34,15 @@ caudio_apply_extra_flags(caudio_cli)
 # Scoped to Windows-GNU only: the Linux-GNU links (release intents across
 # the bake-off matrix) succeed without it.
 target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>:-Wl,--allow-multiple-definition>)
-# Static GNU runtime for the shipped executable: kills GLIBCXX-version failures
-# and missing libstdc++/libgcc DLLs on bare machines (all platforms, validated
-# by CI incl. macOS/GCC). libwinpthread stays shared -- a single instance
+# Static GNU runtime for the shipped Windows executable: avoid missing
+# libstdc++/libgcc DLLs on bare machines. FreeBSD keeps the shared runtime
+# because its packaged GCC runtime has unresolved quad-precision symbols when
+# statically linked on ARM64. libwinpthread stays shared -- a single instance
 # shared with FFmpeg's own DLLs; swresample/av* stay DLL (no static FFmpeg
 # build here). Skipped under sanitizers (ASan runtime interplays badly with
 # static libstdc++). Replaces the old libstdc++exp workaround: no TU uses
 # std::print directly anymore (see utils/print.hpp).
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CAUDIO_ENABLE_SANITIZERS)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32 AND NOT CAUDIO_ENABLE_SANITIZERS)
   target_link_options(caudio_cli PRIVATE -static-libgcc -static-libstdc++)
 endif()
 if(CAUDIO_ENABLE_SANITIZERS)
