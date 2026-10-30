@@ -6,257 +6,337 @@
 [![C++](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
 [![CMake](https://img.shields.io/badge/CMake-%3E%3D3.28-red)](CMakeLists.txt)
 
-## Overview
+`caudio` is a headless, local music player and a reusable C++23 library. It
+decodes audio with FFmpeg, stores the library and playback state in SQLite,
+and exposes a command-line client backed by a daemon. There is no GUI and no
+cloud service.
 
-`caudio` is a headless music player: seven C++23 libraries (utils, player, db, engine, ipc, client, service) plus a `caudio` CLI that drives a background daemon over IPC (JSON with 4-byte big-endian framing). It plays local files with FFmpeg decoding, SQLite-backed library management, and gapless miniaudio output — no GUI needed.
+## Contents
 
-## Features
+- [Highlights](#highlights)
+- [Support status](#support-status)
+- [Dependencies](#dependencies)
+- [Build from source](#build-from-source)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Use as a library](#use-as-a-library)
+- [C++23 modules](#c23-modules)
+- [Documentation and packaging](#documentation-and-packaging)
+- [Contributing](#contributing)
+- [License](#license)
 
-- **FFmpeg decode** -- primary decoder (libavformat/avcodec/avutil/swresample), streaming demux, sample-accurate seek, metadata extraction
-- **Gapless playback** -- pre-roll double-buffer in `Engine::decodeLoop`, frame-accurate `AudioOutput` callback
-- **Shuffle / Repeat** -- Fisher-Yates shuffle with stable permutation, `RepeatMode::Off|One|All` (`src/engine/shuffle.cpp`)
-- **Queue & Playlist** -- SQLite-backed queues, atomic `clear+re-enqueue` for move, M3U/PLS/JSON import/export
-- **FTS5 search** -- `SQLite FTS5` virtual table with `sanitizeFtsTerm` fallback to `LIKE` (`src/db/search.cpp`)
-- **Fingerprint dedup** -- BLAKE3 64 KiB head+tail fingerprint (`src/media/fingerprint.cpp`), sampled/full scan modes
-- **SHM status at 10 Hz** -- lock-free `AtomicShmStatus` shared-memory block polled by TUIs (`src/ipc/shm_status.cpp`)
-- **Daemon lifecycle** -- single-instance `flock` (POSIX) / socket-bind (Windows), `caudio start [--foreground]` / `shutdown`, live `STATUS` via `--watch`
+## Highlights
 
-## Quickstart
+- Gapless playback with sample-accurate seeking.
+- FFmpeg-backed decoding and metadata extraction.
+- SQLite library management with FTS5 search.
+- Queues, playlists, shuffle, repeat, history, bookmarks, and statistics.
+- JSON IPC with 4-byte big-endian framing.
+- Lock-free shared-memory status updates at 10 Hz for lightweight clients.
+- Nine installable libraries, an optional CLI, and opt-in C++23 modules.
 
-Presets describe the build intent; the host default toolchain is selected for
-you. `cmake --list-presets` shows all of them:
+## Support status
+
+The versions below are the versions currently tested by the project. Newer
+versions may work, but are not part of this compatibility statement.
+
+| Platform | Tested toolchain | Status |
+| --- | --- | --- |
+| Linux | GCC 13 | Supported for the traditional headers build |
+| Linux | LLVM Clang 19 | Supported for the traditional headers and modules builds |
+| Linux | GCC 14+ | Supported; GCC 14 is the minimum for the modules build |
+| Windows 2022 runner | MSVC 19.44 (Visual Studio 2022 toolset) | Supported |
+| macOS 15+ | Xcode 26 / AppleClang | Supported |
+| FreeBSD 15.1 | GCC 14 | Supported and tested |
+| FreeBSD 15.1 | System Clang | Not fully supported: the system headers lack required C++23 library features |
+| FreeBSD 15.1 | LLVM 21 packages | Not fully tested: the installed compiler still resolves against the system C++ headers |
+
+The C++23 modules build requires a compiler and generator with import-graph
+scanning. In practice, use GCC 14+, LLVM Clang 19+, or MSVC 2022. GCC 13 is
+supported for the canonical headers build, but not for modules.
+
+## Dependencies
+
+### Required build tools
+
+- **CMake 3.28 or newer**. CMake's `FILE_SET CXX_MODULES` support is required.
+- **Ninja 1.11 or newer**. Ninja is required for the modules build and is the
+  recommended generator for every platform.
+- **Python 3.9 or newer** for `scripts/configure.py`.
+- **Git 2.30 or newer** when configuring from a repository checkout.
+
+### Compiler and runtime dependencies
+
+- **FFmpeg** with `libavformat`, `libavcodec`, `libavutil`, and
+  `libswresample`. A compatible system installation is preferred.
+- **TagLib 2.3.2** is fetched during configuration for file-tag writing.
+- A C++23 standard library providing `std::expected` and `std::print`.
+  The project supplies small compatibility shims where libc++ does not yet
+  provide the required C++23 facilities.
+
+FFmpeg can be supplied by the system, by a package manager, or by the
+project's fetch logic. Release and CI builds may use the project's trimmed
+FFmpeg 8.1.2 packages. To use a known installation, set `FFmpeg_ROOT` or
+pass `--ffmpeg-root` to the configure script.
+
+### Fetched and vendored dependencies
+
+The following dependencies are fetched only when their feature is enabled:
+
+| Dependency | Version | Used for |
+| --- | --- | --- |
+| Catch2 | 3.16.0 | Tests |
+| CLI11 | 2.7.2 | CLI |
+| TagLib | 2.3.2 | File-tag writing |
+
+The following sources are vendored in [`vendor/`](vendor/):
+
+| Dependency | Version | License |
+| --- | --- | --- |
+| SQLite amalgamation | 3.53.4 | Public Domain |
+| nlohmann/json | 3.12.0 | MIT |
+| miniaudio | 0.11.25 | MIT |
+| BLAKE3 | 1.8.7 | Apache-2.0 OR CC0-1.0 |
+
+See [`vendor/README.md`](vendor/README.md) for upstream links and provenance.
+
+## Build from source
+
+### 1. Clone
 
 ```sh
 git clone https://github.com/AhmedowM/caudio.git
 cd caudio
-
-# Linux (GCC is the default) / macOS (brew LLVM Clang) / Windows (see below)
-cmake --preset dev        # Debug, tests + examples
-cmake --build build/dev
-ctest --test-dir build/dev --output-on-failure
-./build/dev/caudio --version
-./build/dev/caudio start
-./build/dev/caudio status
 ```
 
-| Preset | Intent |
-|---|---|
-| `dev` | Debug, tests + examples |
-| `ci` | Debug, tests, no audio device |
-| `release` | Release (git tag required) |
-| `release-lto` | Release + LTO (git tag required) |
-| `minsize` | MinSizeRel |
-| `minsize-lto` | MinSizeRel + LTO + section GC |
-| `modules` | C++23 modules on, no CLI/tests/examples |
+### 2. Choose a configure method
 
-For a specific compiler, arch, or build directory, use the resolver (it also
-drives CI, so local and CI commands cannot drift):
+The preferred method is the project wrapper. It selects the repository's
+toolchain policy, supports cross-platform compiler selection, and keeps local
+commands aligned with CI.
 
 ```sh
-python scripts/configure.py dev --toolchain gcc --build-dir build/dev-gcc
-python scripts/configure.py dev --toolchain gcc --build-dir build/dev-gcc --build --test
-python scripts/configure.py ci --toolchain clang --build-dir build/ci-clang
-python scripts/configure.py modules --toolchain msvc --build-dir build/modules-msvc
+# Preferred: configure, build, and test a Debug development tree.
+python scripts/configure.py dev --toolchain clang --jobs 4 --build --test
 ```
 
-| Host | Toolchain |
-|---|---|
-| Linux | GCC 14+ by default; `--toolchain clang` for LLVM Clang |
-| macOS | brew LLVM Clang by default; `--toolchain apple` for Xcode AppleClang (release builds) |
-| Windows | LLVM Clang from `PATH` when installed (MSVC ABI target); otherwise MSVC or MinGW GCC |
-| Windows | `--toolchain msvc` runs Ninja + `vcvars` (auto-discovered; pass `--vcvars PATH` if needed) |
-| Windows | `--toolchain gcc` for MinGW GCC 14+ (ships larger binaries) |
+Useful wrapper options:
 
-Typical first session:
+```sh
+# List the wrapper's available options and intents.
+python scripts/configure.py --help
+python scripts/configure.py dev --help
+
+# Configure a headless CI-style tree.
+python scripts/configure.py ci --toolchain gcc --build-dir build/ci-gcc
+
+# Configure and build the optional C++23 modules.
+python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang --build
+
+# Configure a release-oriented tree with a specific FFmpeg installation.
+python scripts/configure.py release --toolchain clang \
+  --ffmpeg-root /opt/ffmpeg --build-dir build/release-clang
+```
+
+The wrapper accepts intents including `dev`, `ci`, `release`, `release-lto`,
+`minsize`, `minsize-lto`, and `modules`. Use `--build` to invoke the build and
+`--test` to run CTest after configuration.
+
+#### CMake presets
+
+Presets are convenient when the host compiler is already on `PATH`:
+
+```sh
+cmake --list-presets
+cmake --preset dev
+cmake --build --preset dev --parallel 4
+ctest --test-dir build/dev --output-on-failure --parallel 4
+```
+
+Available presets are `dev`, `ci`, `release`, `release-lto`, `minsize`,
+`minsize-lto`, and `modules`. Presets use Ninja and the project toolchain
+dispatcher; use the wrapper when you need an explicit compiler, architecture,
+FFmpeg root, or CI-equivalent invocation.
+
+#### Bare CMake
+
+Bare CMake is useful for packaging, unusual generators, or integrating caudio
+into an existing build:
+
+```sh
+cmake -S . -B build/custom -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_STANDARD=23 \
+  -DCAUDIO_ENABLE_TESTS=ON \
+  -DCAUDIO_BUILD_SHARED=ON
+cmake --build build/custom --parallel 4
+ctest --test-dir build/custom --output-on-failure --parallel 4
+```
+
+For modules, add `-DCAUDIO_ENABLE_MODULES=ON` and use Ninja. For a complete
+list of project options, inspect the [configuration reference](#configuration).
+
+### Platform notes
+
+- **Linux:** install FFmpeg development packages from your distribution.
+- **macOS:** install Ninja and FFmpeg with Homebrew, then use
+  `--toolchain apple` for Xcode AppleClang or `--toolchain clang` for Homebrew
+  LLVM.
+- **Windows:** use a Ninja shell with Visual Studio environment variables for
+  MSVC, or use LLVM Clang targeting the MSVC ABI. MinGW GCC is also supported.
+- **FreeBSD:** the tested path is FreeBSD 15.1 with GCC 14 and system FFmpeg.
+
+Headless test runs can avoid opening an audio device:
+
+```sh
+python scripts/configure.py ci --toolchain clang --build-dir build/ci \
+  --build --test
+# The ci intent enables CAUDIO_TEST_NOAUDIO.
+```
+
+## Quick start
+
+After building with the `dev` intent:
 
 ```sh
 ./build/dev/caudio library scan --path ~/Music
-./build/dev/caudio library search "beatles" --limit 10
-./build/dev/caudio queue add ~/Music/album/track.flac
+./build/dev/caudio library search "miles davis" --limit 10
+./build/dev/caudio queue add ~/Music/Kind\ of\ Blue/*.flac
 ./build/dev/caudio play
 ./build/dev/caudio status --watch --interval 1000
-# ...or skip the queue entirely:
-./build/dev/caudio ~/Music/album/track.flac
 ```
+
+The daemon can also be managed explicitly:
+
+```sh
+./build/dev/caudio start
+./build/dev/caudio status --json
+./build/dev/caudio pause
+./build/dev/caudio shutdown
+```
+
+Or play a path directly without creating a permanent library queue:
+
+```sh
+./build/dev/caudio ~/Music/album/track.flac
+./build/dev/caudio ~/Music/album --recursive --save
+```
+
+Run `caudio --help` or `caudio <command> --help` for the complete CLI
+reference. Most commands communicate with the daemon; configuration commands
+work without one, and playback commands can start it automatically.
 
 ## Configuration
 
-Presets capture the common intents; individual cache options remain for scripting and CI:
+Important cache options:
 
-| Option | Default | Effect |
-|---|---|---|
-| `CAUDIO_WITH_FETCH_FFMPEG` | `ON` | Auto-fetch FFmpeg when missing (system → vcpkg/Conan → prebuilt → source) |
-| `CAUDIO_USE_TRIMMED_FFMPEG` | `OFF` | Trimmed decode-only FFmpeg build (`cmake/FFmpegTrimmed.cmake` whitelist; needs `FFmpeg_ROOT` prebuilt or builds `ffmpeg_trimmed`) |
-| `CAUDIO_TRIMMED_ROOT` | -- | Prebuilt trimmed FFmpeg prefix (cache `-D` or env): auto-selects the trimmed provider, no other flags needed |
-| `CAUDIO_BUILD_CLI` | `ON` | Build the `caudio` executable (`OFF` skips the CLI11 fetch entirely) |
-| `CAUDIO_BUILD_SHARED` | `OFF` | Shared `*_shared` variants + combined `libcaudio` |
-| `CAUDIO_ENABLE_TESTS` | `OFF` | Catch2 tests (`ctest --test-dir build/dev`) |
-| `CAUDIO_ENABLE_EXAMPLES` | `OFF` | `examples/` (`caudio_mini`, `player_db_demo`, `engine_demo`) |
-| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | ASan+UBSan on Linux/GCC+Clang; MinGW is a configure error, MSVC supports ASan only |
-| `CAUDIO_ENABLE_MODULES` | `OFF` | C++23 module interfaces (`import caudio.*`); headers always build |
-| `CAUDIO_BUILD_DOCS` | `OFF` | Doxygen docs (needs `doxygen`; optional `dot`) |
-| `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip audio-device tests (no beep) for headless CI |
-| `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | clang-tidy during build |
-| `CAUDIO_REQUIRE_GIT_VERSION` | `OFF` | Fail configure without a git tag (release intents enable it) |
-| `CMAKE_BUILD_TYPE` | -- | `Debug` / `Release` / `RelWithDebInfo` (single-config generators) |
-| `FFmpeg_ROOT` | -- | Override FFmpeg location |
+| Option | Default | Description |
+| --- | --- | --- |
+| `CAUDIO_BUILD_SHARED` | `ON` | Build per-component shared libraries |
+| `CAUDIO_BUILD_STATIC` | Depends on shared mode | Build static component libraries |
+| `CAUDIO_BUILD_CLI` | `ON` | Build the `caudio` executable |
+| `CAUDIO_ENABLE_TESTS` | `OFF` | Build Catch2 tests |
+| `CAUDIO_ENABLE_EXAMPLES` | `OFF` | Build the examples |
+| `CAUDIO_ENABLE_MODULES` | `OFF` | Build/install C++23 module interfaces |
+| `CAUDIO_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer where supported |
+| `CAUDIO_BUILD_DOCS` | `OFF` | Build Doxygen documentation |
+| `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip tests that require an audio device |
+| `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | Run clang-tidy during the build |
+| `CAUDIO_USE_TRIMMED_FFMPEG` | `OFF` | Use a decode-only trimmed FFmpeg build |
+| `FFmpeg_ROOT` | unset | Override the FFmpeg installation |
 
-Requirements:
+## Use as a library
 
-- **Compilers** -- Linux: GCC 14+ (default) or Clang 17+; macOS: brew LLVM Clang (`brew install llvm`) or Xcode AppleClang (release);
-Windows: LLVM Clang preferred (MSVC ABI target, also what releases build with), MSVC 2022+ via `--toolchain msvc` (CI), or MinGW GCC 14+
-- **CMake ≥ 3.28**, **Ninja** (required for C++23 modules, recommended everywhere)
-- **FFmpeg** -- system install preferred (Ubuntu: `libavcodec-dev libavformat-dev libavutil-dev libswresample-dev`; macOS: `brew install ffmpeg`; Windows: `choco install ffmpeg`), else auto-fetched
-- **Auto-fetched, no action needed** -- Catch2 3.16.0 (tests only), CLI11 2.7.2 (CLI only)
-- **Vendored in `vendor/`** -- nlohmann/json 3.12.0, SQLite 3.53.4, miniaudio 0.11.25, BLAKE3 1.8.7 (see `vendor/README.md` for provenance)
-- **Optional** -- Doxygen (+ Graphviz `dot`) for docs; `ccache` via `-DCMAKE_CXX_COMPILER_LAUNCHER=ccache`
+The public headers under [`include/caudio/`](include/caudio/) are canonical.
+Install exports provide these targets:
 
-## Usage
-
-Run `caudio --help` or `caudio <subcommand> --help`. Most commands talk to the daemon over IPC; `config get`, client-side validation, and PATH expansion work without one, and `play` (plus direct play below) autostarts a missing daemon.
-
-| Command | Effect |
-|---|---|
-| `caudio [PATH]... [--save]` | Play files right away in a new queue (temporary, purged on shutdown; `--save` keeps it). PATH is a file, folder, or glob |
-| `caudio start [--foreground]` | Start daemon (background by default; `--foreground` for systemd/debug) |
-| `caudio shutdown` | Stop daemon (sends `Shutdown`, polls pid+socket) |
-| `caudio play` | Start/resume playback (replays stopped track; autostarts daemon) |
-| `caudio pause` | Pause playback (warns when idle) |
-| `caudio resume` | Resume from pause (plays from cursor when stopped) |
-| `caudio restart` | Seek to 0 and play |
-| `caudio stop` | Stop playback |
-| `caudio next` / `prev` | Next / previous track (shuffle-aware, repeat-aware; `next` wraps, `prev` warns at start) |
-| `caudio seek <time>` | Seek -- `mm:ss`/`hh:mm:ss` (`ss` < 60), seconds, or relative `+N`/`-N` (silent on success) |
-| `caudio status [--json] [--watch] [--interval <ms>]` | Show status; `--watch`/`--follow` polls every `--interval` ms (default 1000), JSON streams one object per line |
-| `caudio volume [0-100\|+N\|-N\|mute\|unmute]` | Get or set volume (`mute`/`0` remembers level, `unmute` restores) |
-| `caudio queue tracks [--order added\|playback] [--json]` | Tracks in active queue (playback order, current marked `>`) |
-| `caudio queue list [--json]` | List all queues (id, name, track count, active, temp) |
-| `caudio queue switch <qid>` | Switch active queue (cursor resets) |
-| `caudio queue create <name>` / `queue delete <qid>` | Create queue / delete queue (never the active one) |
-| `caudio queue add [PATH]... [--id <id>] [--playlist <pid> [--replace]] [--search] [--recursive] [--json]` | Add files (auto-library), ids, search hits, or playlist tracks; re-adds warn |
-| `caudio queue remove [PATH]... [--id <id>] [--pos <n>] [--json]` | Remove by path, library id, or queue position (exclusive) |
-| `caudio queue move <from> <to>` | Reorder queue |
-| `caudio queue clear` | Clear queue (playback of current track continues) |
-| `caudio queue shuffle [on\|off]` | Toggle or set shuffle (reports state) |
-| `caudio queue repeat [off\|one\|all]` | Set repeat mode (bare cycles and reports) |
-| `caudio playlist list [--json]` | List playlists |
-| `caudio playlist tracks <pid> [--json]` | Tracks in playlist |
-| `caudio playlist create <name>` | Create empty playlist |
-| `caudio playlist add <pid> [--id <id>...] [PATH]...` | Append tracks (re-adds warn) |
-| `caudio playlist load <pid> [--play] [--replace]` | Load into a new queue (`--replace`: overwrite active; `--play`: switch and play) |
-| `caudio playlist save <name> [--queue <qid>]` | Save queue as playlist |
-| `caudio playlist delete <pid>` | Delete playlist |
-| `caudio playlist rename <pid> <name>` | Rename playlist |
-| `caudio playlist export <pid> <path> [--format m3u\|pls\|json]` | Export to file |
-| `caudio playlist import <path> [--name <n>]` | Import from file (reports matched/skipped/duplicates) |
-| `caudio library scan [--path <p>] [--full-hash]` | Scan directory (reports added tracks) |
-| `caudio library search <query> [--limit N] [--json]` | FTS5 + filename search with match highlighting |
-| `caudio library stats [--most-played N] [--queue all\|<qid>] [--playlist <pid>] [--json]` | Counts, top-N, queue/playlist overviews |
-| `caudio library list [--query <q>] [--artist <a>] [--album <a>] [--genre <g>] [--limit N] [--offset N] [--json]` | Filtered listing |
-| `caudio library add <path> [--recursive]` | Add file/dir to library |
-| `caudio library remove <id-or-path>` | Remove track from library (files untouched) |
-| `caudio tag edit <id> <field> <value>` | Retag file in place, then re-register its database row (`title`,`artist`,`album`,`album_artist`,`genre`,`year`,`track_number`,`disc_number`; loaded track is suspended and resumed) |
-| `caudio tag get <id> [field] [--json]` | Get track tags (or one field) |
-| `caudio info [--json]` | Current track info (metadata + play count) |
-| `caudio history list [--limit N] [--json]` | Playback history |
-| `caudio history clear` | Clear history |
-| `caudio bookmark add [time] [--note <text>] [--track <id>] [--json]` | Bookmark a position (default: current position and track) |
-| `caudio bookmark list [--track <id>] [--json]` | List bookmarks (default: current track) |
-| `caudio bookmark remove <id> [--json]` | Remove a bookmark |
-| `caudio bookmark goto <id> [--json]` | Play the bookmarked track at its position |
-| `caudio device list [--json]` | List audio output devices |
-| `caudio device set <id>` | Set default device |
-| `caudio device test [--id <id>]` | Check device is available (enumeration only, no sound) |
-| `caudio config get <key> [--json]` | Get config value (no daemon needed) |
-| `caudio config set <key> <value>` | Set config value (silent) |
-| `caudio config list [--json]` | List config |
-| `caudio config export <path>` | Export config file |
-| `caudio config import <path>` | Validate and import config file |
-| `caudio config reset [key]` | Reset key or all to defaults |
-| `caudio version [--json]` | Version plus build details (compiler, C++ std, runtime, build, os, arch) |
-
-Global options: `--config <FILE>` (default XDG / `%LOCALAPPDATA%`), `--log-level trace|debug|info|warn|error`, `--device <DEVICE>`, `--version` (prints `caudio::version::version()`), `--help` / `-h`. Exit codes: `0` success, `1` any error (see `EXIT STATUS` in `docs/man/caudio.1`).
-
-### As a library
-
-Eight components, link only what you use:
-
-| Target | Covers |
-|---|---|
-| `caudio::utils` | Errors, logging, JSON facade, threads, queues/rings, printing, versioning |
-| `caudio::contracts` | Backend-neutral interfaces shared between components |
-| `caudio::media` | File reading, FFmpeg decoding, metadata/tags, library scan discovery |
-| `caudio::player` | Audio output, gapless playback (reader/decoder re-exported from `caudio::media`) |
-| `caudio::db` | SQLite storage: tracks, library scan persistence, FTS5 search, batched writes |
-| `caudio::engine` | Playback state machine: queue, shuffle, history, gapless, events |
-| `caudio::ipc` | Daemon wire protocol: commands, results, framing, config |
-| `caudio::client` | Daemon client + output formatting |
-| `caudio::service` | The daemon: IPC server, dispatch, shared-memory status |
-
-Headers under `include/caudio/` are canonical and always build:
+| Target | Responsibility |
+| --- | --- |
+| `caudio::utils` | Errors, logging, JSON, queues, threads, and versioning |
+| `caudio::types` | Shared value types |
+| `caudio::contracts` | Backend-neutral interfaces |
+| `caudio::media` | Reading, decoding, metadata, and library discovery |
+| `caudio::player` | Audio output and playback primitives |
+| `caudio::db` | SQLite storage and FTS5 search |
+| `caudio::engine` | Queue, shuffle, repeat, history, and playback state |
+| `caudio::ipc` | Daemon protocol, framing, and configuration |
+| `caudio::client` | Daemon client and output formatting |
+| `caudio::service` | Daemon service and shared-memory status |
 
 ```cmake
 find_package(caudio CONFIG REQUIRED)
 
-add_executable(myapp main.cpp)
-target_link_libraries(myapp PRIVATE caudio::engine caudio::db)
+add_executable(my_player main.cpp)
+target_link_libraries(my_player PRIVATE caudio::engine caudio::db)
 ```
 
 ```cpp
-#include <caudio.hpp> // umbrella: utils, player, db, engine, ipc, client, service
+#include <caudio.hpp>
 #include <memory>
 #include <print>
-#include <utility>
 
 int main() {
-    auto dbRes = caudio::db::Database::open(":memory:");
-    if (!dbRes) {
-        std::println(stderr, "database open: {}", dbRes.error().message);
+    auto database = caudio::db::Database::open(":memory:");
+    if (!database) {
+        std::println(stderr, "database open failed: {}", database.error().message);
         return 1;
     }
-    auto database = std::shared_ptr<caudio::db::Database>(std::move(dbRes.value()));
 
-    auto engRes = caudio::engine::Engine::create();
-    if (!engRes) {
-        std::println(stderr, "engine create: {}", engRes.error().message);
+    auto engine = caudio::engine::Engine::create();
+    if (!engine) {
+        std::println(stderr, "engine create failed: {}", engine.error().message);
         return 1;
     }
-    auto eng = std::move(engRes.value());
-    if (auto r = eng->attachDatabase(database); !r) {
-        std::println(stderr, "database attach: {}", r.error().message);
+
+    if (auto result = engine.value()->attachDatabase(
+            std::shared_ptr<caudio::db::Database>(std::move(database.value())));
+        !result) {
+        std::println(stderr, "database attach failed: {}", result.error().message);
         return 1;
     }
-    if (auto r = eng->play(); !r) {
-        std::println(stderr, "play: {}", r.error().message);
-        return 1;
-    }
-    std::println("state={}", (int)eng->state());
+
+    return engine.value()->play() ? 0 : 1;
 }
 ```
 
-`examples/` holds runnable versions (built by the `dev` preset): `mini_cpp.cpp` (minimal `caudio::player`), `player_db_demo.cpp` (player + db scan/search), `engine_demo.cpp` (queue/history/events).
-
-### As C++23 modules (opt-in)
-
-Configure with the `modules` intent (`CAUDIO_ENABLE_MODULES=ON`, no CLI), then import instead of including:
+Runnable examples are in [`examples/`](examples/): the original minimal
+player, player/database demo, and engine queue/history demo. The
+[`examples/downstream/`](examples/downstream/) project is intentionally
+separate from the repository build: it uses `find_package(caudio CONFIG
+REQUIRED)` and demonstrates one small consumer per public component, followed
+by database/engine composition, media discovery, configuration backup, and
+the minimal player. Build it against an installed caudio tree with:
 
 ```sh
-cmake --preset modules
-cmake --build build/modules
-# or pick a toolchain explicitly:
-python scripts/configure.py modules --toolchain clang --build-dir build/modules-clang
+cmake -S examples/downstream -B build/examples-downstream \
+  -DCMAKE_PREFIX_PATH=/path/to/caudio/prefix
+cmake --build build/examples-downstream --parallel 4
 ```
 
-```cmake
-cmake_minimum_required(VERSION 3.28)
-project(mod_consumer CXX)
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_SCAN_FOR_MODULES ON)
-find_package(caudio CONFIG REQUIRED)
+The standalone examples are grouped as follows:
 
-add_executable(consumer main.cpp)
-target_link_libraries(consumer PRIVATE caudio::media)
+- `types.cpp`, `contracts.cpp`, `utils.cpp`, `config.cpp`, `media.cpp`,
+  `player.cpp`, `database.cpp`, `engine.cpp`, `ipc.cpp`, `client.cpp`,
+  `service.cpp`, and `app.cpp` show the smallest useful include and API for
+  each public component.
+- `library.cpp` combines database and engine-facing types without requiring
+  the daemon.
+- `fingerprint.cpp` demonstrates batch media discovery, while
+  `config_backup.cpp` demonstrates a small configuration automation utility.
+- `mini_player.cpp` is the complete one-file playback example.
+
+Module-only consumers are in [`examples/modules/`](examples/modules/). They
+use `import caudio.*` rather than public headers and require a module-enabled
+installation plus a compiler that supports C++23 import-graph scanning.
+
+## C++23 modules
+
+Modules are opt-in and mirror the public library targets. Configure them with
+the `modules` intent:
+
+```sh
+python scripts/configure.py modules --toolchain clang \
+  --build-dir build/modules-clang --build
 ```
 
 ```cpp
@@ -264,37 +344,38 @@ import caudio.media;
 
 int main() {
     auto tracks = caudio::media::scanTracksToVector(".");
-
-    return tracks.has_value() ? 0 : 1;
+    return tracks ? 0 : 1;
 }
 ```
 
-Available modules mirror the libraries: `caudio`, `caudio.utils`, `caudio.media`, `caudio.player`, `caudio.db`, `caudio.engine`, `caudio.ipc`, `caudio.service`, `caudio.client` (plus `:partitions` such as `caudio.db:scan`). An install ships the `*.cppm` sources under `<prefix>/modules/`; your toolchain rebuilds BMIs at consumer-configure time — BMI CRC covers defines/flags, so prebuilt BMIs never travel across compilers. Requires CMake ≥ 3.28 and a compiler with C++23 module support (GCC 14+, Clang 17+, MSVC 2022+).
+Available named modules include `caudio`, `caudio.utils`, `caudio.media`,
+`caudio.player`, `caudio.db`, `caudio.engine`, `caudio.ipc`,
+`caudio.service`, and `caudio.client`, with partitions such as
+`caudio.db:scan`. Consumers rebuild BMIs with their own compiler; prebuilt
+BMIs are not portable across compilers or incompatible flags.
 
-API docs:
+## Documentation and packaging
 
-```sh
-python scripts/configure.py dev --docs --build-dir build/docs
-cmake --build build/docs --target doc
-# output: build/docs/docs/html (docs/Doxyfile.in)
-```
-
-The man page is at `docs/man/caudio.1`, installed to `${CMAKE_INSTALL_MANDIR}/man1`.
-
-Packaging (releases ship the `minsize` intent):
+Build API documentation and install the project:
 
 ```sh
-python scripts/configure.py minsize --toolchain clang --build-dir build/minsize-clang
-python scripts/configure.py minsize --toolchain clang --build-dir build/minsize-clang --build
-cmake --install build/minsize-clang --prefix /usr/local
-# macOS: --toolchain apple
-# man page: /usr/local/share/man/man1/caudio.1
-# modules (CAUDIO_ENABLE_MODULES=ON only): /usr/local/modules/*.cppm (same level as include/)
-# config:   /usr/local/lib/cmake/caudio/caudioConfig.cmake
+python scripts/configure.py dev --toolchain clang --docs \
+  --build-dir build/docs
+cmake --build build/docs --target doc --parallel 4
+
+cmake --install build/dev --prefix "$PWD/stage"
+cmake --build build/dev --target package
 ```
 
-`cmake --build build/<dir> --target package` produces `caudio-<ver>-<os>-<arch>[-dev].tar.gz` / `.zip` (one format per OS: ZIP on Windows, TGZ elsewhere).
+The generated API documentation is under the build documentation directory.
+The CLI man page is [`docs/man/caudio.1`](docs/man/caudio.1). Packages use ZIP
+on Windows and TGZ elsewhere.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding conventions, test
+requirements, documentation, and pull-request guidance.
 
 ## License
 
-MIT -- see [LICENSE](LICENSE). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+caudio is released under the [MIT License](LICENSE).
