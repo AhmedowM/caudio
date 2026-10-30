@@ -522,9 +522,10 @@ TEST_CASE("cli daemon lifecycle", "[cli]") {
     auto load = run({"playlist", "load", "1"});
     REQUIRE(load.exitCode == 0);
     REQUIRE(contains(load.out, "Loaded playlist 1 into queue"));
+    long long loadedPlaylistId = 0;
     long long loadedQid = 0;
-    REQUIRE(std::sscanf(load.out.c_str(), "Loaded playlist %*lld into queue %lld", &loadedQid) ==
-            1);
+    REQUIRE(std::sscanf(load.out.c_str(), "Loaded playlist %lld into queue %lld",
+                        &loadedPlaylistId, &loadedQid) == 2);
     REQUIRE(run({"queue", "switch", std::to_string(loadedQid)}).exitCode == 0);
     auto trkN = run({"queue", "tracks"});
     REQUIRE(contains(trkN.out, "Queue (1 tracks):"));

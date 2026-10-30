@@ -81,7 +81,7 @@ struct ServiceAccess;
  * under the documented locks; `queueMutex_` is try_lock on fast paths and
  * bounded-wait on transport commands, so callers must still handle Busy
  * (budget exceeded).
- * @see PlaybackState
+ * @see caudio::types::PlaybackState
  * @see caudio::types::EngineConfig
  */
 class CAUDIO_API Engine final {

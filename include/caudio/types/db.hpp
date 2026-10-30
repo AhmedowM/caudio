@@ -6,8 +6,8 @@
  * @ingroup caudio_types
  * @details Defines database rows, filters and aggregate statistics without
  * coupling consumers to the SQLite database implementation.
- * All are trivially copyable aggregates with default-initialised members; no
- * invariants beyond those documented per-field.
+ * All are default-initialised aggregates; no invariants beyond those
+ * documented per-field.
  */
 
 #include <caudio/types/record.hpp>

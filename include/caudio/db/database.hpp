@@ -32,7 +32,7 @@ namespace caudio::db {
  */
 struct DatabaseOptions {
     std::size_t writeBatchSize =
-        256; ///< caudio::types::Queue capacity / batch size for the background writer (default 256).
+        256; ///< Queue capacity / batch size for the background writer (default 256).
     /// Non-owning logger (may be null = silent). Must outlive the Database;
     /// never emitted from destructors. Set from opts at open().
     caudio::utils::Logger* logger{nullptr};
@@ -117,7 +117,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Enqueues multiple tracks atomically (single transaction).
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 defaults to 1).
+     * @param qid Queue id (0 defaults to 1).
      * @param tids Track ids to enqueue.
      * @return Success or Error (Internal/Busy/NotFound).
      * @details Holds dbMutex_ exclusively and uses BEGIN IMMEDIATE / COMMIT
@@ -134,7 +134,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Replaces an entire queue atomically.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 defaults to 1).
+     * @param qid Queue id (0 defaults to 1).
      * @param ids Track ids to set (clears then enqueues).
      * @return Success or Error.
      * @details Single transaction: queueClearLocked + queueEnqueueLocked per id.
@@ -302,10 +302,13 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      */
     std::expected<std::vector<caudio::types::Playlist>, caudio::utils::Error>
     listPlaylists() override;
+    /** @brief Adds a track to a playlist. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
                                                                int64_t pos = -1) override;
+    /** @brief Removes a track from a playlist. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> playlistRemoveTrack(int64_t pid,
                                                                   int64_t tid) override;
+    /** @brief Reorders a playlist item. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> playlistReorder(int64_t pid, int64_t from,
                                                               int64_t to) override;
     /**
@@ -320,7 +323,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     playlistGetTracks(int64_t pid) override;
 
     /**
-     * @brief caudio::types::Queue operations -- forwarded to queue partition (see queue.cppm).
+     * @brief Queue operations -- forwarded to queue partition (see queue.cppm).
      * @ingroup caudio_db
      * @details All queue methods normalize qid == 0 to 1 and enforce the
      * UNIQUE(queue_id, position) invariant via dbMutex_ serialization.
@@ -328,7 +331,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Enqueues a track.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @param tid Track id.
      * @param pos Position (-1 = append).
      * @return Success or Error.
@@ -341,7 +344,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Dequeues the head item.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id.
+     * @param qid Queue id.
      * @return QueueItem or Error NotFound.
      * @par Thread safety
      * Thread-safe: unique_lock.
@@ -351,7 +354,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Removes item at position.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @param pos Position to remove.
      * @return Success or Error NotFound.
      * @par Thread safety
@@ -362,7 +365,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Clears a queue.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @return Success or Error.
      * @par Thread safety
      * Thread-safe: unique_lock.
@@ -372,7 +375,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Lists all items in a queue ordered by position.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @return Vector of items or Error.
      * @par Thread safety
      * Thread-safe: shared_lock.
@@ -380,25 +383,32 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     listQueueItems(int64_t qid) override;
 
+    /** @brief Loads the track at a queue position. @ingroup caudio_db */
     std::expected<caudio::types::Track, caudio::utils::Error>
     queueTrackAt(int64_t qid, int64_t position) override;
 
+    /** @brief Loads a queue container by id. @ingroup caudio_db */
     std::expected<caudio::types::Queue, caudio::utils::Error> getQueue(int64_t qid) override;
+    /** @brief Reports whether a queue exists. @ingroup caudio_db */
     std::expected<bool, caudio::utils::Error> queueExists(int64_t qid) override;
 
+    /** @brief Lists queue containers. @ingroup caudio_db */
     std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> listQueues() override;
 
+    /** @brief Creates a queue container. @ingroup caudio_db */
     std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
                                                              int64_t library_id = 1) override;
 
+    /** @brief Deletes a queue container. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> deleteQueue(int64_t qid) override;
 
+    /** @brief Sets the repeat mode stored for a queue. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> setQueueRepeat(int64_t qid, int repeat_mode);
 
     /**
      * @brief Sets the temporary flag for a queue.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id.
+     * @param qid Queue id.
      * @param temp New flag.
      * @return Success or Error.
      * @par Thread safety
@@ -409,7 +419,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Returns the number of items in a queue.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @return Item count.
      * @par Thread safety
      * Thread-safe: shared_lock on dbMutex_; delegates to queueCountLocked().
@@ -419,7 +429,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     /**
      * @brief Finds the 0-based index of a track in a queue.
      * @ingroup caudio_db
-     * @param qid caudio::types::Queue id (0 -> 1).
+     * @param qid Queue id (0 -> 1).
      * @param trackId Track id to locate (first occurrence by position).
      * @return Index into the ORDER BY position listing, or std::nullopt if
      * the track is not in the queue.
@@ -522,7 +532,9 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      * Thread-safe: shared_lock (delegates to libraryListLocked).
      */
     std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> listLibraries() override;
+    /** @brief Updates a library definition. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> libraryUpdate(const caudio::types::Library& l) override;
+    /** @brief Deletes a library definition. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> libraryDelete(int64_t id) override;
 
     /**
@@ -533,6 +545,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      * Thread-safe: shared_lock + cacheMutex_ for cached statements.
      */
     std::expected<caudio::types::PlaybackStats, caudio::utils::Error> getStats() override;
+    /** @brief Returns engine-oriented playback statistics. @ingroup caudio_db */
     std::expected<caudio::types::PlaybackStats, caudio::utils::Error> playbackStats() override;
 
     /**
@@ -548,8 +561,10 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
     libraryStats(std::optional<int> mostPlayed = std::nullopt) override;
 
     // Persisted engine state and playback history
+    /** @brief Loads persisted engine state. @ingroup caudio_db */
     std::expected<caudio::types::EngineState, caudio::utils::Error>
     loadEngineState() override;
+    /** @brief Persists engine state. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error>
     saveEngineState(const caudio::types::EngineState& state) override;
     std::expected<void, caudio::utils::Error>

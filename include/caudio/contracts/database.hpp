@@ -12,104 +12,187 @@
 #include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <optional>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace caudio::contracts {
 
+/**
+ * @brief Backend-neutral persistence interface used by engine and service.
+ * @ingroup caudio_contracts
+ * @details Implementations provide the queue, track, playlist, bookmark,
+ * library and playback-state operations required by higher-level components.
+ * Methods return `std::expected` when an operation can fail; implementations
+ * own synchronization and must keep returned references and pointers valid
+ * only for the duration documented by the concrete backend.
+ */
 class IDatabase {
   public:
+    /**
+     * @brief Destroys the database contract.
+     * @ingroup caudio_contracts
+     */
     virtual ~IDatabase() = default;
 
+    // Connection and queue inspection
+    /** @brief Returns whether the backing database is open. */
     virtual bool isOpen() const noexcept = 0;
+    /** @brief Finds a track's zero-based position in a queue. */
     virtual std::optional<std::size_t> queueIndexOf(int64_t qid, int64_t trackId) = 0;
+    /** @brief Returns the number of items in a queue. */
     virtual std::size_t queueCount(int64_t qid) = 0;
+    /** @brief Returns aggregate playback statistics. */
     virtual std::expected<caudio::types::PlaybackStats, caudio::utils::Error> playbackStats() = 0;
+    /** @brief Reports whether a queue exists. */
     virtual std::expected<bool, caudio::utils::Error> queueExists(int64_t qid) = 0;
+    /** @brief Loads a track by id. */
     virtual std::expected<caudio::types::Track, caudio::utils::Error> getTrack(int64_t id) = 0;
+    /** @brief Loads the track at a queue position. */
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     queueTrackAt(int64_t qid, int64_t position) = 0;
 
+    // Engine persistence and history
+    /** @brief Loads the persisted playback-engine state. */
     virtual std::expected<caudio::types::EngineState, caudio::utils::Error> loadEngineState() = 0;
+    /** @brief Persists the complete playback-engine state. */
     virtual std::expected<void, caudio::utils::Error>
     saveEngineState(const caudio::types::EngineState& state) = 0;
+    /** @brief Persists shuffle enablement, permutation and cursor position. */
     virtual std::expected<void, caudio::utils::Error>
     saveEngineShuffle(bool enabled, std::span<const int64_t> permutation,
                       int64_t cursor_position) = 0;
+    /** @brief Persists the current queue cursor position. */
     virtual std::expected<void, caudio::utils::Error> saveEngineCursor(int64_t cursor_position) = 0;
+    /** @brief Records a completed or partially completed track play. */
     virtual std::expected<void, caudio::utils::Error>
     markPlayed(int64_t track_id, int64_t started_at, int64_t completed_at, int64_t position_ms,
                double completion_pct, int64_t queue_id) = 0;
+    /** @brief Lists playback history entries, limited by the caller. */
     virtual std::expected<std::vector<caudio::types::HistoryEntry>, caudio::utils::Error>
     engineHistoryList(int limit) = 0;
+    /** @brief Clears playback history. */
     virtual std::expected<void, caudio::utils::Error> engineHistoryClear() = 0;
+
+    // Tracks
+    /** @brief Inserts a track and returns its new row id. */
     virtual std::expected<int64_t, caudio::utils::Error>
     insertTrack(const caudio::types::Track& t) = 0;
+    /** @brief Finds a track by its content fingerprint. */
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     findByFingerprint(const std::array<uint8_t, 32>& fp) = 0;
+    /** @brief Finds a track by filesystem path. */
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     findByPath(std::string_view path) = 0;
+    // Queues
+    /** @brief Loads a queue container by id. */
     virtual std::expected<caudio::types::Queue, caudio::utils::Error> getQueue(int64_t qid) = 0;
+    /** @brief Lists items in a queue ordered by position. */
     virtual std::expected<std::vector<caudio::types::QueueItem>, caudio::utils::Error>
     listQueueItems(int64_t qid) = 0;
+    /** @brief Lists queue containers. */
     virtual std::expected<std::vector<caudio::types::Queue>, caudio::utils::Error> listQueues() = 0;
+    /** @brief Creates a queue container and returns its id. */
     virtual std::expected<int64_t, caudio::utils::Error> createQueue(std::string_view name,
                                                                      int64_t library_id = 1) = 0;
+    /** @brief Deletes a queue container. */
     virtual std::expected<void, caudio::utils::Error> deleteQueue(int64_t qid) = 0;
+    /** @brief Sets whether a queue is temporary. */
     virtual std::expected<void, caudio::utils::Error> setQueueTemp(int64_t qid, bool temp) = 0;
+    /** @brief Enqueues a span of track ids atomically. */
     virtual std::expected<void, caudio::utils::Error>
     queueEnqueueBatch(int64_t qid, std::span<const int64_t> tids) = 0;
+    /** @brief Enqueues a vector of track ids atomically. */
     virtual std::expected<void, caudio::utils::Error>
     queueEnqueueBatch(int64_t qid, const std::vector<int64_t>& tids) = 0;
+    /** @brief Enqueues one track at a position, or appends when position is -1. */
     virtual std::expected<void, caudio::utils::Error> queueEnqueue(int64_t qid, int64_t tid,
                                                                    int64_t pos = -1) = 0;
+    /** @brief Removes the item at a queue position. */
     virtual std::expected<void, caudio::utils::Error> queueRemove(int64_t qid, int64_t pos) = 0;
+    /** @brief Replaces a queue from a span of track ids. */
     virtual std::expected<void, caudio::utils::Error>
     queueReplaceAll(int64_t qid, std::span<const int64_t> ids) = 0;
+    /** @brief Replaces a queue from a vector of track ids. */
     virtual std::expected<void, caudio::utils::Error>
     queueReplaceAll(int64_t qid, const std::vector<int64_t>& ids) = 0;
+    /** @brief Removes all items from a queue. */
     virtual std::expected<void, caudio::utils::Error> queueClear(int64_t qid) = 0;
+    /** @brief Updates an existing track row. */
     virtual std::expected<void, caudio::utils::Error>
     updateTrack(const caudio::types::Track& t) = 0;
+
+    // Libraries and statistics
+    /** @brief Lists configured library roots. */
     virtual std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> listLibraries() = 0;
+    /** @brief Returns aggregate database statistics. */
     virtual std::expected<caudio::types::PlaybackStats, caudio::utils::Error> getStats() = 0;
+    /** @brief Returns library totals and optionally most-played tracks. */
     virtual std::expected<caudio::types::LibraryStats, caudio::utils::Error>
     libraryStats(std::optional<int> mostPlayed = std::nullopt) = 0;
+    /** @brief Lists tracks matching an optional filter. */
     virtual std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
     listTracks(const caudio::types::TrackQuery* q = nullptr) = 0;
+
+    // Bookmarks
+    /** @brief Lists bookmarks for a track. */
     virtual std::expected<std::vector<caudio::types::Bookmark>, caudio::utils::Error>
     listBookmarks(int64_t tid) = 0;
+    /** @brief Adds a bookmark at a position in milliseconds. */
     virtual std::expected<void, caudio::utils::Error> bookmarkAdd(int64_t tid, int64_t pos,
                                                                   std::string_view note = {}) = 0;
+    /** @brief Removes a bookmark by id. */
     virtual std::expected<void, caudio::utils::Error> bookmarkRemove(int64_t id) = 0;
+    /** @brief Loads a bookmark by id. */
     virtual std::expected<caudio::types::Bookmark, caudio::utils::Error>
     bookmarkGet(int64_t id) = 0;
+    // Track deletion
+    /** @brief Deletes a track by id. */
     virtual std::expected<void, caudio::utils::Error> deleteTrack(int64_t id) = 0;
+
+    // Playlists
+    /** @brief Lists playlists. */
     virtual std::expected<std::vector<caudio::types::Playlist>, caudio::utils::Error>
     listPlaylists() = 0;
+    /** @brief Lists tracks in a playlist ordered by position. */
     virtual std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
     playlistGetTracks(int64_t pid) = 0;
+    /** @brief Loads a playlist by id. */
     virtual std::expected<caudio::types::Playlist, caudio::utils::Error>
     getPlaylist(int64_t id) = 0;
+    /** @brief Creates a playlist and returns its id. */
     virtual std::expected<int64_t, caudio::utils::Error>
     createPlaylist(std::string_view name, int type = 0, std::string_view smart_query = {}) = 0;
+    /** @brief Adds a track to a playlist. */
     virtual std::expected<void, caudio::utils::Error> playlistAddTrack(int64_t pid, int64_t tid,
                                                                        int64_t pos = -1) = 0;
+    /** @brief Removes a track from a playlist. */
     virtual std::expected<void, caudio::utils::Error> playlistRemoveTrack(int64_t pid,
                                                                           int64_t tid) = 0;
+    /** @brief Moves a playlist item between positions. */
     virtual std::expected<void, caudio::utils::Error> playlistReorder(int64_t pid, int64_t from,
                                                                       int64_t to) = 0;
+    /** @brief Changes a playlist name. */
     virtual std::expected<void, caudio::utils::Error> renamePlaylist(int64_t id,
                                                                      std::string_view newName) = 0;
+    /** @brief Creates a playlist from an ordered list of track ids. */
     virtual std::expected<int64_t, caudio::utils::Error>
     createPlaylistFromTracks(std::string_view name, std::span<const int64_t> trackIds) = 0;
+    /** @brief Deletes a playlist by id. */
     virtual std::expected<void, caudio::utils::Error> deletePlaylist(int64_t id) = 0;
+
+    // Diagnostics
+    /** @brief Returns the non-owning logger used by the implementation. */
     virtual caudio::utils::Logger* logger() const noexcept = 0;
-    virtual std::expected<void, caudio::utils::Error> libraryUpdate(const caudio::types::Library& l) = 0;
+    /** @brief Updates a library root. */
+    virtual std::expected<void, caudio::utils::Error>
+    libraryUpdate(const caudio::types::Library& l) = 0;
+    /** @brief Deletes a library root by id. */
     virtual std::expected<void, caudio::utils::Error> libraryDelete(int64_t id) = 0;
 };
 
