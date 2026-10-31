@@ -338,9 +338,105 @@ jobs:
             test-winclang-modules.log
           if-no-files-found: warn
 
+  mingw:
+    name: modules mingw (windows-latest / MinGW UCRT64)
+    runs-on: windows-latest
+    continue-on-error: ${{ inputs.strict == false }}
+    env:
+      CAUDIO_TEST_NOAUDIO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup GCC (Windows MinGW UCRT64)
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
+
+      - name: Add MinGW to PATH (Windows)
+        run: |
+          echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Verify GCC (Windows MinGW)
+        run: |
+          command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
+          command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
+          gcc --version || exit 1
+          g++ --version || exit 1
+        shell: bash
+
+      - name: Install dependencies (Windows)
+        run: |
+          choco install ninja -y --no-progress || echo "ninja choco install failed"
+          choco install ffmpeg -y --no-progress || echo "ffmpeg choco install failed, will download prebuilt"
+          cmake --version
+          ninja --version
+          ffmpeg -version || echo "ffmpeg not on PATH, will download prebuilt"
+        shell: bash
+
+      - name: Download FFmpeg (Windows MinGW fallback)
+        shell: pwsh
+        run: |
+          python scripts/download-ffmpeg.py
+          $root = python scripts/download-ffmpeg.py --print-root
+          echo "FFmpeg_ROOT=$root" >> $env:GITHUB_ENV
+          echo "$root/bin" >> $env:GITHUB_PATH
+
+      - name: Configure (modules, MinGW)
+        run: |
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-mingw $TESTS
+        shell: bash
+
+      - name: Expose DLLs (Windows MinGW)
+        run: |
+          dll=$(find build/modules-mingw/_deps -name 'avcodec-*.dll' | head -n 1)
+          if [ -z "$dll" ]; then
+            fdir="$(dirname "$(command -v ffmpeg)")"
+            dll=$(find "$fdir" -maxdepth 1 -name 'avcodec-*.dll' | head -n 1)
+          fi
+          test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
+          cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
+          cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
+        shell: bash
+
+      - name: Build
+        run: |
+          TESTS=""
+          if [ "${{ inputs.run_tests }}" = "true" ]; then TESTS="--define CAUDIO_ENABLE_TESTS=ON"; fi
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-mingw $TESTS --build 2>&1 | tee build-mingw.log
+        shell: bash
+
+      - name: Test
+        if: inputs.run_tests
+        env:
+          CAUDIO_TEST_NOAUDIO: 1
+        run: |
+          python scripts/configure.py modules --toolchain gcc --build-dir build/modules-mingw --define CAUDIO_ENABLE_TESTS=ON --test 2>&1 | tee test-mingw.log
+        shell: bash
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modules-mingw-logs
+          path: |
+            build-mingw.log
+            test-mingw.log
+          if-no-files-found: warn
+
   report:
     name: modules support report
-    needs: [gcc, clang, msvc, winclang]
+    needs: [gcc, clang, msvc, winclang, mingw]
     if: always()
     runs-on: ubuntu-latest
     steps:

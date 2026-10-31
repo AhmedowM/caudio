@@ -42,6 +42,9 @@ target_link_options(caudio_cli PRIVATE $<$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM
 # build here). Skipped under sanitizers (ASan runtime interplays badly with
 # static libstdc++). Replaces the old libstdc++exp workaround: no TU uses
 # std::print directly anymore (see utils/print.hpp).
+if(MSVC)
+  target_link_options(caudio_cli PRIVATE /INCREMENTAL:NO)
+endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND WIN32 AND NOT CAUDIO_ENABLE_SANITIZERS)
   target_link_options(caudio_cli PRIVATE -static-libgcc -static-libstdc++)
 endif()

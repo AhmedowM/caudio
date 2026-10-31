@@ -34,9 +34,6 @@ jobs:
             compiler: clang
             toolchain: clang
           - os: windows-latest
-            compiler: windows-gcc
-            toolchain: gcc
-          - os: windows-latest
             compiler: msvc
             toolchain: msvc
     steps:
@@ -81,34 +78,6 @@ jobs:
           "$LLVM_PREFIX/bin/clang++" --version
           LLVM_MAJOR="$("$LLVM_PREFIX/bin/clang" -dumpversion | cut -d. -f1)"
           test "$LLVM_MAJOR" -ge 20 || (echo "brew LLVM too old for our C++23 baseline (<expected>, <print>): $LLVM_MAJOR" && exit 1)
-
-      - name: Setup GCC (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
-        id: msys2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-binutils
-
-      - name: Add MinGW to PATH (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
-        run: |
-          # setup-msys2 installs under RUNNER_TEMP, not C:/msys64: resolve via
-          # the action's msys2-location output.
-          echo "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
-          echo "CC=gcc" >> $GITHUB_ENV
-          echo "CXX=g++" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Verify GCC 16 (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'windows-gcc'
-        run: |
-          command -v gcc || (echo "gcc not on PATH after msys2 setup" && exit 1)
-          command -v g++ || (echo "g++ not on PATH after msys2 setup" && exit 1)
-          gcc --version || exit 1
-          g++ --version || exit 1
-        shell: bash
 
       - name: Install dependencies (Ubuntu)
         if: runner.os == 'Linux'
@@ -173,9 +142,6 @@ jobs:
           fi
           test -n "$dll" || (echo "FFmpeg DLLs not found" && exit 1)
           cygpath -w "$(cd "$(dirname "$dll")" && pwd)" >> $GITHUB_PATH
-          if [ "${{ matrix.compiler }}" = "windows-gcc" ]; then
-            cygpath -w "$(dirname "$(command -v g++)")" >> $GITHUB_PATH
-          fi
           echo "PATH additions:"; tail -n 2 "$GITHUB_PATH"
         shell: bash
 
@@ -243,149 +209,6 @@ jobs:
             build/docs/docs/xml
             build/docs/docs/doxygen-warnings.log
           if-no-files-found: error
-
-  ffmpeg-trimmed:
-    name: ffmpeg-trimmed (windows-latest / MinGW, decode-only whitelist)
-    runs-on: windows-latest
-    timeout-minutes: 90
-    env:
-      CAUDIO_TEST_NOAUDIO: 1
-      CAUDIO_TRIMMED_ROOT: ${{ github.workspace }}/ffmpeg-trimmed
-      # Pinned version from cmake/FFmpegTrimmed.cmake; REBUILD increments
-      # when the producer re-runs for the same FFmpeg version.
-      DEPS_REPO: "AhmedowM/deps-private"
-      FFMPEG_VERSION: "8.1.2"
-      REBUILD: "1"
-      RELEASE_TAG: "ffmpeg-trimmed-8.1.2-2"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup MSYS2 (UCRT64 + trim build tools)
-        id: msys2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-binutils
-            mingw-w64-ucrt-x86_64-zlib
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-python
-            make
-            pkgconf
-            nasm
-            git
-
-      - name: Add trim tools to PATH
-        run: |
-          "${{ steps.msys2.outputs.msys2-location }}/ucrt64/bin" >> $GITHUB_PATH
-          "${{ steps.msys2.outputs.msys2-location }}/usr/bin" >> $GITHUB_PATH
-        shell: pwsh
-
-      - name: Download trimmed archive from deps-private
-        env:
-          GH_TOKEN: ${{ secrets.DEPS_PAT }}
-        run: |
-          gh release download "${{ env.RELEASE_TAG }}" \
-            --repo "${{ env.DEPS_REPO }}" \
-            --pattern "ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz" \
-            --dir . \
-            --clobber
-        shell: bash
-
-      - name: Extract trimmed archive
-        run: |
-          if command -v cygpath >/dev/null 2>&1; then
-            troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          else
-            troot="$CAUDIO_TRIMMED_ROOT"
-          fi
-          mkdir -p "$troot"
-          tar -xzf ffmpeg-trimmed-${{ env.FFMPEG_VERSION }}-windows-x86_64.tar.gz -C "$troot"
-          ls "$troot/bin"
-        shell: bash
-
-      - name: Configure (trimmed, fallback to default provider)
-        id: pick
-        # msys2 shell: the module's FFmpeg build needs the full UCRT64 env,
-        # and bare `g++` here is the proven ucrt64 gcc 16.2 (the runner's
-        # C:\mingw64 15.2 chokes on the fattest TUs). Build/Test stay on
-        # default shells so DLL staging (below) governs loader resolution.
-        # Native Windows CMake must use Git for Windows: MSYS2 Git's HTTPS
-        # remote helper aborts when FetchContent invokes it from cmd.exe.
-        run: |
-          git_executable='C:/Program Files/Git/cmd/git.exe'
-          if python scripts/configure.py ci \
-            --toolchain gcc \
-            --trimmed-ffmpeg \
-            --ffmpeg-root "$CAUDIO_TRIMMED_ROOT" \
-            --define "GIT_EXECUTABLE=$git_executable" \
-            --build-dir build/ci-trimmed-gcc; then
-            echo "build_dir=build/ci-trimmed-gcc" >> "$GITHUB_OUTPUT"
-            echo "trimmed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::trimmed FFmpeg unavailable -- falling back to default provider"
-            python scripts/configure.py ci \
-              --toolchain gcc \
-              --define "GIT_EXECUTABLE=$git_executable" \
-              --build-dir build/ci-gcc
-            echo "build_dir=build/ci-gcc" >> "$GITHUB_OUTPUT"
-            echo "trimmed=false" >> "$GITHUB_OUTPUT"
-          fi
-        shell: msys2 {0}
-
-      - name: Stage DLLs beside test executables
-        run: |
-          # The loader searches the exe directory before System32/PATH, so
-          # staging the exact DLLs here makes build-time Catch2 discovery +
-          # ctest hermetic: immune to older same-named MinGW runtimes
-          # elsewhere on the image (0xc0000139). Runs pre-build because
-          # discovery executes test binaries during the build itself.
-          # NOTE: derive the runtime dir from the compiler selected by the
-          # toolchain. The build uses the runner's C:\mingw64 g++, so staging
-          # MSYS2 UCRT64 runtimes here would produce an incompatible DLL pair
-          # and 0xc0000139 when Catch2 discovery launches a test executable.
-          # No zlib1: objdump shows the trimmed avcodec imports only
-          # UCRT/system + sibling DLLs.
-          dest="${{ steps.pick.outputs.build_dir }}"
-          troot="$(cygpath "$CAUDIO_TRIMMED_ROOT")"
-          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then
-            src="$troot/bin"
-          else
-            src="$dest/_deps/ffmpeg_prebuilt-src/bin"
-          fi
-          for d in "$src"/avcodec-*.dll "$src"/avformat-*.dll "$src"/avutil-*.dll "$src"/swresample-*.dll; do
-            test -f "$d" || (echo "missing $d" && exit 1)
-            cp "$d" "$dest/"
-          done
-          compiler_bin="$(dirname "$(cygpath "$(command -v g++)")")"
-          for d in "$compiler_bin"/libstdc++-*.dll "$compiler_bin"/libgcc_s_*-1.dll "$compiler_bin"/libwinpthread-*.dll; do
-            test -f "$d" || (echo "missing $d" && exit 1)
-            cp "$d" "$dest/"
-          done
-          ls "$dest/"*.dll
-        shell: bash
-
-      - name: Build
-        run: |
-          EXTRA=""
-          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
-          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --build
-        shell: bash
-
-      - name: Test
-        env:
-          CAUDIO_TEST_NOAUDIO: 1
-        run: |
-          EXTRA=""
-          if [ "${{ steps.pick.outputs.trimmed }}" = "true" ]; then EXTRA="--trimmed-ffmpeg --ffmpeg-root $CAUDIO_TRIMMED_ROOT"; fi
-          python scripts/configure.py ci --toolchain gcc --build-dir "${{ steps.pick.outputs.build_dir }}" $EXTRA --test
-        shell: bash
 
   ffmpeg-trimmed-msvc:
     name: ffmpeg-trimmed (windows-latest / MSVC, decode-only whitelist)

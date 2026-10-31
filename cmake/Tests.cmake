@@ -47,6 +47,15 @@ if(CAUDIO_ENABLE_TESTS)
       caudio_apply_sanitizers(${name})
     endif()
     catch_discover_tests(${name} PROPERTIES SKIP_RETURN_CODE 4)
+    # Pin test discovery to the shared libraries it links so Ninja cannot
+    # run catch_discover_tests (which executes the binary) while the DLLs
+    # it depends on are still being linked in parallel. On Windows a
+    # partially-linked DLL produces STATUS_ENTRYPOINT_NOT_FOUND (0xc0000139).
+    foreach(lib ${ARG_LIBS})
+      if(TARGET ${lib})
+        add_dependencies(${name} ${lib})
+      endif()
+    endforeach()
   endfunction()
 
   caudio_add_catch_test(test_utils_result tests/test_utils_result.cpp LIBS caudio::utils)
