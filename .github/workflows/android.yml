@@ -62,7 +62,6 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: ${{ matrix.ndk }}
-          local-cache: true
 
       - name: Install build tools
         run: |
