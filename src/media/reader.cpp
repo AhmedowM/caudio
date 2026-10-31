@@ -1,14 +1,17 @@
 #include <stdio.h>
 
+#include <algorithm>
 #include <caudio/media/reader.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/result.hpp>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <expected>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <span>
@@ -16,6 +19,14 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#include <io.h>
+#include <sys/stat.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace caudio::media {
 
@@ -52,6 +63,61 @@ int64_t fileSizeInner(FILE* f) noexcept {
     if (fseek64(f, cur, SEEK_SET) != 0)
         return -1;
     return sz;
+}
+
+// Descriptor helpers (TU-local; POSIX/Windows CRT only, no Android headers).
+int64_t fdTell64(int fd) noexcept {
+#if defined(_WIN32)
+    return _lseeki64(fd, 0, SEEK_CUR);
+#else
+    off_t o = lseek(fd, 0, SEEK_CUR);
+    if (o == (off_t)-1)
+        return -1;
+    return static_cast<int64_t>(o);
+#endif
+}
+
+int64_t fdSeek64(int fd, int64_t off, int whence) noexcept {
+#if defined(_WIN32)
+    return _lseeki64(fd, off, whence);
+#else
+    off_t o = lseek(fd, static_cast<off_t>(off), whence);
+    if (o == (off_t)-1)
+        return -1;
+    return static_cast<int64_t>(o);
+#endif
+}
+
+int64_t fdSize(int fd) noexcept {
+#if defined(_WIN32)
+    struct _stat64 st{};
+    if (_fstat64(fd, &st) != 0)
+        return -1;
+    return static_cast<int64_t>(st.st_size);
+#else
+    struct stat st{};
+    if (fstat(fd, &st) != 0)
+        return -1;
+    return static_cast<int64_t>(st.st_size);
+#endif
+}
+
+int64_t fdRead(int fd, std::byte* dst, std::size_t len) noexcept {
+#if defined(_WIN32)
+    const unsigned int chunk =
+        static_cast<unsigned int>(std::min<std::size_t>(len, std::numeric_limits<int>::max()));
+    return static_cast<int64_t>(_read(fd, dst, chunk));
+#else
+    return static_cast<int64_t>(::read(fd, dst, len));
+#endif
+}
+
+void fdClose(int fd) noexcept {
+#if defined(_WIN32)
+    (void)_close(fd);
+#else
+    (void)::close(fd);
+#endif
 }
 } // namespace detail
 
@@ -174,7 +240,145 @@ int64_t FileReader::size() noexcept {
     return impl_->fileSize;
 }
 
+bool FileReader::seekable() const noexcept {
+    return true;
+}
+
 FileReader::FileReader(FileToken) : impl_(std::make_unique<Impl>()) {}
+
+/// Owned/borrowed descriptor, tracked position, cached size and seek lock.
+struct DescriptorReader::Impl {
+    int fd{-1};
+    bool seekable{false};
+    bool owned{false};
+    int64_t size{-1};
+    int64_t pos{0};
+    mutable std::mutex mutex;
+};
+
+caudio::utils::Expected<std::unique_ptr<Reader>> DescriptorReader::open(FileDescriptor descriptor) {
+    if (descriptor.value < 0) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("invalid descriptor")});
+    }
+    if (!descriptor.readable) {
+        return std::unexpected(caudio::utils::Error{
+            caudio::utils::StatusCode::InvalidArg, std::string_view("descriptor is not readable")});
+    }
+
+    int64_t size = -1;
+    int64_t pos = 0;
+    if (descriptor.seekable) {
+        pos = detail::fdTell64(descriptor.value);
+        if (pos < 0) {
+            // The caller asserted seekability; fail without taking ownership.
+            return std::unexpected(
+                caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                     std::string_view("descriptor position unavailable")});
+        }
+        size = detail::fdSize(descriptor.value);
+    }
+
+    auto holder =
+        std::unique_ptr<DescriptorReader>(new DescriptorReader(DescriptorToken{}, descriptor));
+    holder->impl_->pos = pos;
+    holder->impl_->size = size;
+    std::unique_ptr<Reader> base = std::move(holder);
+    return caudio::utils::Expected<std::unique_ptr<Reader>>{std::move(base)};
+}
+
+DescriptorReader::DescriptorReader(DescriptorToken, FileDescriptor descriptor)
+    : impl_(std::make_unique<Impl>()) {
+    impl_->fd = descriptor.value;
+    impl_->seekable = descriptor.seekable;
+    impl_->owned = descriptor.closeOnDestroy;
+}
+
+DescriptorReader::~DescriptorReader() {
+    if (impl_ && impl_->owned && impl_->fd >= 0)
+        detail::fdClose(impl_->fd);
+    if (impl_)
+        impl_->fd = -1;
+}
+
+std::size_t DescriptorReader::read(std::span<std::byte> dst) {
+    if (!impl_ || impl_->fd < 0 || dst.empty())
+        return 0;
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    for (;;) {
+        int64_t n = detail::fdRead(impl_->fd, dst.data(), dst.size());
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            return 0;
+        }
+        impl_->pos += n;
+        return static_cast<std::size_t>(n);
+    }
+}
+
+caudio::utils::Expected<void> DescriptorReader::seek(int64_t offset, int whence) {
+    if (!impl_ || impl_->fd < 0) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("invalid descriptor")});
+    }
+    if (!impl_->seekable) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                                    std::string_view("source is not seekable")});
+    }
+    if (whence != SEEK_SET && whence != SEEK_CUR && whence != SEEK_END) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("bad whence")});
+    }
+
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    int64_t base = 0;
+    switch (whence) {
+    case SEEK_SET:
+        base = 0;
+        break;
+    case SEEK_CUR:
+        base = impl_->pos;
+        break;
+    case SEEK_END:
+        if (impl_->size < 0) {
+            return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                                        std::string_view("size is unknown")});
+        }
+        base = impl_->size;
+        break;
+    default:
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("bad whence")});
+    }
+    int64_t newPos = base + offset;
+    if (newPos < 0 || (impl_->size >= 0 && newPos > impl_->size)) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
+                                                    std::string_view("seek out of range")});
+    }
+    int64_t landed = detail::fdSeek64(impl_->fd, newPos, SEEK_SET);
+    if (landed < 0) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Io,
+                                                    std::string_view("descriptor seek failed")});
+    }
+    impl_->pos = landed;
+    return {};
+}
+
+int64_t DescriptorReader::tell() noexcept {
+    if (!impl_ || impl_->fd < 0)
+        return -1;
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    return impl_->pos;
+}
+
+int64_t DescriptorReader::size() noexcept {
+    return impl_ ? impl_->size : -1;
+}
+
+bool DescriptorReader::seekable() const noexcept {
+    return impl_ && impl_->seekable;
+}
 
 caudio::utils::Expected<std::unique_ptr<Reader>>
 MemoryReader::open(std::span<const std::byte> data) {
@@ -245,6 +449,10 @@ int64_t MemoryReader::tell() noexcept {
 
 int64_t MemoryReader::size() noexcept {
     return static_cast<int64_t>(buf_.size());
+}
+
+bool MemoryReader::seekable() const noexcept {
+    return true;
 }
 
 MemoryReader::MemoryReader(std::span<const std::byte> src)

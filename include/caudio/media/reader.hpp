@@ -11,16 +11,19 @@
  * - Reader: Abstract base class for all input sources
  * - FileReader: File-based reading with 64-bit seek support
  * - MemoryReader: In-memory buffer reading
+ * - DescriptorReader: Native file-descriptor reading with explicit ownership
  *
  * Thread Safety:
  * - Reader interface: Thread-compatible (single-threaded use expected)
  * - FileReader: Thread-safe for concurrent read/seek/tell (internal mutex)
  * - MemoryReader: Not thread-safe (no internal synchronization)
+ * - DescriptorReader: Thread-safe for concurrent read/seek/tell (internal mutex)
  *
  * Error Codes (via Expected<void>):
- * - InvalidArg: Null file, bad whence, seek out of range, empty path
+ * - InvalidArg: Null file, bad whence, seek out of range, empty path, bad descriptor
  * - NotFound: File not found or cannot be opened
- * - Internal: fseek/ftell failure, size not cached
+ * - Unsupported: Seek requested on a non-seekable descriptor
+ * - Internal: fseek/ftell/read failure, size not cached
  * - NoMem: Allocation failure
  */
 
@@ -33,6 +36,36 @@
 #include <vector>
 
 namespace caudio::media {
+
+/**
+ * @struct FileDescriptor
+ * @brief Native descriptor plus explicit ownership and seekability metadata
+ * @ingroup caudio_media
+ *
+ * This is a plain integer descriptor (POSIX `int` or Windows CRT `int`), not
+ * an Android `ParcelFileDescriptor` or any other platform object. It exists so
+ * hosts can hand an already-open file to the media layer without inventing a
+ * filesystem path for content URIs.
+ *
+ * Ownership:
+ * - When `closeOnDestroy` is true, the reader created from this descriptor
+ *   closes it exactly once.
+ * - When false, the caller retains ownership and must keep the descriptor open
+ *   for the reader's lifetime; the media layer never closes a borrowed
+ *   descriptor.
+ *
+ * Seekability is explicit. Set `seekable` only when the host knows the
+ * descriptor supports `lseek`/`_lseeki64`; callers must not infer it from the
+ * descriptor number or the containing object.
+ *
+ * On Windows, the descriptor must be opened in binary mode by the caller.
+ */
+struct FileDescriptor {
+    int value{-1};              ///< Native descriptor/handle; negative = invalid.
+    bool readable{true};        ///< Caller asserts the descriptor is readable.
+    bool seekable{false};       ///< Caller asserts seek() is supported.
+    bool closeOnDestroy{false}; ///< Transfer ownership to the created reader.
+};
 
 /**
  * @class Reader
@@ -91,6 +124,20 @@ class CAUDIO_API Reader {
      * @return Total size in bytes, or -1 if unknown
      */
     [[nodiscard]] virtual int64_t size() noexcept = 0;
+
+    /**
+     * @brief Report whether seek() is supported by this source
+     * @return true when seek() may succeed; false for streaming sources
+     *
+     * The default is true for the existing file and memory readers. A
+     * descriptor reader reports the caller-supplied `FileDescriptor::seekable`
+     * flag so FFmpeg and other consumers can avoid seek-dependent operations
+     * on streams. `seek()` on a non-seekable reader returns
+     * `StatusCode::Unsupported` instead of silently changing position.
+     */
+    [[nodiscard]] virtual bool seekable() const noexcept {
+        return true;
+    }
 };
 
 /**
@@ -147,9 +194,80 @@ class CAUDIO_API FileReader final : public Reader {
     /** @brief Returns the cached file size, or -1 if unavailable. */
     [[nodiscard]] int64_t size() noexcept override;
 
+    /** @brief Files are always seekable. */
+    [[nodiscard]] bool seekable() const noexcept override;
+
   private:
     struct FileToken {};
     explicit FileReader(FileToken token);
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+
+/**
+ * @class DescriptorReader
+ * @brief Reader backed by a native file descriptor with explicit ownership
+ * @ingroup caudio_media
+ *
+ * DescriptorReader adapts an already-open descriptor to the Reader interface
+ * using 64-bit seek operations (`_lseeki64` on Windows, `lseek` on POSIX) and
+ * the platform read primitive (`_read`/`read`). It is the media-layer bridge
+ * for Android Storage Access Framework descriptors and any other host that can
+ * open a file but cannot expose a stable filesystem path.
+ *
+ * Ownership follows FileDescriptor::closeOnDestroy: the reader closes an owned
+ * descriptor in its destructor and never closes a borrowed one.
+ *
+ * Thread Safety: Thread-safe for concurrent read/seek/tell via an internal
+ * mutex. The descriptor's position is serialized by the reader.
+ *
+ * Error Handling:
+ * - open(): InvalidArg for a negative or unreadable descriptor; Unsupported
+ *   when the descriptor claims seekability but the platform seek probe fails.
+ * - read(): Returns 0 at EOF or on read error; interrupted reads are retried.
+ * - seek(): Unsupported for a non-seekable descriptor; InvalidArg for a bad
+ *   whence or out-of-range target; Io for a failed platform seek.
+ * - tell(): Returns the tracked position, or -1 after a failed seek.
+ * - size(): Returns the cached size for seekable descriptors, or -1.
+ */
+class CAUDIO_API DescriptorReader final : public Reader {
+  public:
+    DescriptorReader() = delete;
+
+    /**
+     * @brief Create a reader from a native descriptor
+     * @param descriptor Descriptor and ownership/seekability metadata
+     * @return Expected containing unique_ptr<Reader> on success, Error on failure
+     *
+     * On success, ownership of an owned descriptor has transferred to the
+     * returned reader. On failure the descriptor remains owned by the caller.
+     *
+     * @retval StatusCode::InvalidArg Descriptor is negative or not readable
+     * @retval StatusCode::Unsupported The descriptor is marked seekable but
+     *         the platform cannot determine its position
+     */
+    static caudio::utils::Expected<std::unique_ptr<Reader>> open(FileDescriptor descriptor);
+
+    ~DescriptorReader() override;
+
+    /** @brief Reads bytes and advances the tracked position; 0 at EOF/error. */
+    std::size_t read(std::span<std::byte> dst) override;
+
+    /** @brief Moves the descriptor position when the source is seekable. */
+    [[nodiscard]] caudio::utils::Expected<void> seek(int64_t offset, int whence) override;
+
+    /** @brief Returns the tracked descriptor position, or -1 on error. */
+    [[nodiscard]] int64_t tell() noexcept override;
+
+    /** @brief Returns the cached descriptor size, or -1 when unknown. */
+    [[nodiscard]] int64_t size() noexcept override;
+
+    /** @brief Returns the caller-supplied seekability flag. */
+    [[nodiscard]] bool seekable() const noexcept override;
+
+  private:
+    struct DescriptorToken {};
+    explicit DescriptorReader(DescriptorToken token, FileDescriptor descriptor);
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
@@ -212,6 +330,8 @@ class CAUDIO_API MemoryReader final : public Reader {
     [[nodiscard]] int64_t tell() noexcept override;
     /** @brief Returns the size of the owned buffer. */
     [[nodiscard]] int64_t size() noexcept override;
+    /** @brief Memory buffers are always seekable. */
+    [[nodiscard]] bool seekable() const noexcept override;
 
   private:
     explicit MemoryReader(std::span<const std::byte> src);

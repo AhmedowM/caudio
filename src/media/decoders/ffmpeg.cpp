@@ -81,7 +81,8 @@ struct Decoder::Impl {
 
     static int readCallback(void* opaque, uint8_t* buf, int bufSize);
 
-    // AVIO seek: AVSEEK_SIZE queries size, AVSEEK_FORCE stripped, seekable=1
+    // AVIO seek: AVSEEK_SIZE queries size, AVSEEK_FORCE stripped. The callback
+    // is only installed when the reader reports seekability.
     static int64_t seekCallback(void* opaque, int64_t offset, int whence);
 
     Reader* reader_{nullptr};
@@ -294,6 +295,10 @@ caudio::utils::Expected<void> Decoder::Impl::seek(double seconds) {
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::InvalidArg,
                                                     std::string_view("bad seconds")});
     }
+    if (reader_ && !reader_->seekable()) {
+        return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Unsupported,
+                                                    std::string_view("source is not seekable")});
+    }
     AVStream* stream = fmt_->streams[audioStreamIdx_];
     if (!stream)
         return std::unexpected(caudio::utils::Error{caudio::utils::StatusCode::Internal,
@@ -454,6 +459,7 @@ bool Decoder::Impl::init() {
     // Allocate AVIOContext with our callbacks -- use larger buffer for high-rate FLAC/WAV
     // probing
     constexpr size_t bufferSize = 8192;
+    const bool canSeek = reader_ && reader_->seekable();
     uint8_t* avioBuffer = static_cast<uint8_t*>(av_malloc(bufferSize));
     if (!avioBuffer) {
         avformat_free_context(fmt_);
@@ -462,15 +468,17 @@ bool Decoder::Impl::init() {
     }
 
     avio_ = avio_alloc_context(avioBuffer, static_cast<int>(bufferSize), 0, this, &readCallback,
-                               nullptr, &seekCallback);
+                               nullptr, canSeek ? &seekCallback : nullptr);
     if (!avio_) {
         av_free(avioBuffer);
         avformat_free_context(fmt_);
         fmt_ = nullptr;
         return false;
     }
-    // Ensure we own buffer lifetime via AVIOContext (avio_context_free will free it)
-    avio_->seekable = 1;
+    // Non-seekable sources (pipes, one-shot host descriptors) must not
+    // advertise seeking: FFmpeg otherwise probes/rewinds and reports a
+    // confusing I/O failure instead of decoding forward.
+    avio_->seekable = canSeek ? 1 : 0;
 
     fmt_->pb = avio_;
     fmt_->flags |= AVFMT_FLAG_CUSTOM_IO;
