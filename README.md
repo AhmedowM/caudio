@@ -261,13 +261,14 @@ Install exports provide these targets:
 | `caudio::utils` | Errors, logging, JSON, queues, threads, and versioning |
 | `caudio::types` | Shared value types |
 | `caudio::contracts` | Backend-neutral interfaces |
-| `caudio::media` | Reading, decoding, metadata, and library discovery |
+| `caudio::media` | Reading, decoding, metadata, and library discovery (`Source`, `PathSource`, `DescriptorSource`, `Reader`) |
 | `caudio::player` | Audio output and playback primitives |
 | `caudio::db` | SQLite storage and FTS5 search |
 | `caudio::engine` | Queue, shuffle, repeat, history, and playback state |
 | `caudio::ipc` | Daemon protocol, framing, and configuration |
 | `caudio::client` | Daemon client and output formatting |
-| `caudio::service` | Daemon service and shared-memory status |
+| `caudio::service` | Daemon service (`Service`) and in-process service host (`Host`) |
+| `caudio::config` | Configuration management (`Config`, `RuntimePaths`, canonical path helpers) |
 
 ```cmake
 find_package(caudio CONFIG REQUIRED)
@@ -303,6 +304,46 @@ int main() {
 
     return engine.value()->play() ? 0 : 1;
 }
+```
+
+### Media sources
+
+`caudio::media::Source` is an abstract factory for readers over a media source.
+Two implementations ship with the library:
+
+- `caudio::media::PathSource` — backed by an ordinary filesystem path; seekable
+  and re-openable. Preserves existing desktop behavior.
+- `caudio::media::DescriptorSource` — backed by a caller-supplied native file
+  descriptor (`FileDescriptor`). Single-use: ownership transfers to the reader
+  on the first successful `open()`. Descriptors are never persisted; a host
+  reopens the source per operation using a stable source identity.
+
+```cpp
+#include <caudio/media/reader.hpp>
+#include <caudio/media/source.hpp>
+
+caudio::media::PathSource source{"/Music/track.flac"};
+auto reader = source.open(); // FileReader
+```
+
+### Service host (in-process)
+
+`caudio::service::Host` runs a `caudio::service::Service` in-process without
+desktop daemon scaffolding (no lock file, PID file, socket, IPC server, or
+shared memory). It owns the worker thread and exposes `requestStop()`,
+`wait()`, `stop()`, `running()`, `ready()`, `error()`, and `service()`. Use
+`ServiceConfig::inProcess` with explicit `caudio::config::RuntimePaths` for
+host-private directories such as Android app-private storage.
+
+```cpp
+#include <caudio/service/host.hpp>
+
+caudio::service::ServiceConfig cfg;
+cfg.runtime.database = "/data/app/caudio/caudio.db";
+cfg.runtime.logs = "/data/app/caudio/logs";
+auto host = caudio::service::Host::create(cfg);
+// ... use host->service() ...
+host->stop();
 ```
 
 Runnable examples are in [`examples/`](examples/): the original minimal
