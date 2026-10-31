@@ -194,11 +194,11 @@ std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
                 upd.bindInt(21, t.last_scanned);
                 upd.bindInt(22, t.dirty ? 1 : 0);
                 upd.bindInt(23, t.library_id ? t.library_id : 1);
-                const auto source = caudio::types::normalizedSource(t);
-                upd.bindInt(24, static_cast<int>(source.kind));
-                upd.bindText(25, source.key);
-                upd.bindInt(26, source.available ? 1 : 0);
-                upd.bindText(27, source.display_name);
+                const auto updatedSource = caudio::types::normalizedSource(t);
+                upd.bindInt(24, static_cast<int>(updatedSource.kind));
+                upd.bindText(25, updatedSource.key);
+                upd.bindInt(26, updatedSource.available ? 1 : 0);
+                upd.bindText(27, updatedSource.display_name);
                 if (t.deleted_at)
                     upd.bindInt(28, t.deleted_at);
                 else
