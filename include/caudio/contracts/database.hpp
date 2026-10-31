@@ -3,7 +3,7 @@
 /**
  * @file database.hpp
  * @brief Neutral persistence contract used by the playback engine.
- * @ingroup caudio_contracts
+ * @defgroup caudio_contracts caudio persistence contracts
  */
 
 #include <caudio/fwd.hpp>
@@ -28,9 +28,22 @@ namespace caudio::contracts {
  * @ingroup caudio_contracts
  * @details Implementations provide the queue, track, playlist, bookmark,
  * library and playback-state operations required by higher-level components.
- * Methods return `std::expected` when an operation can fail; implementations
- * own synchronization and must keep returned references and pointers valid
- * only for the duration documented by the concrete backend.
+ * Methods return `std::expected` when an operation can fail. The interface
+ * does not own the concrete backend, and callers must keep the implementation
+ * alive for the duration of every call and any operation that depends on it.
+ * Implementations own synchronization; value results are copies and do not
+ * expose backend-owned storage.
+ *
+ * @par Thread safety
+ * Concrete implementations must document their concurrency guarantees.
+ * The engine may call this interface from its monitor/decode and service
+ * paths, so implementations used with `Engine` must serialize their own
+ * database access.
+ *
+ * @par Error behavior
+ * Implementations should use `StatusCode::NotFound` for absent entities,
+ * `InvalidArg` for invalid caller input, `State` for an invalid lifecycle
+ * state, and `Io`, `Corrupt`, or `Internal` for backend failures.
  */
 class IDatabase {
   public:

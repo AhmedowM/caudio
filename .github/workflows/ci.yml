@@ -229,14 +229,19 @@ jobs:
 
       - name: Configure + build docs
         run: |
+          command -v doxygen
+          doxygen --version
           python scripts/configure.py ci --toolchain gcc --docs --no-tests --build-dir build/docs
-          cmake --build build/docs --target doc
+          cmake --build build/docs --target doc-check
 
       - name: Upload artifact - docs
         uses: actions/upload-artifact@v4
         with:
           name: caudio-docs
-          path: build/docs/docs/html
+          path: |
+            build/docs/docs/html
+            build/docs/docs/xml
+            build/docs/docs/doxygen-warnings.log
           if-no-files-found: error
 
   ffmpeg-trimmed:

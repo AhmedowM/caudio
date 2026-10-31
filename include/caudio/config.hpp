@@ -16,8 +16,8 @@ namespace caudio::config {
 /**
  * @brief Canonical path helpers: single source for socket/pid/lock derived from dbPath.
  * All three use hash of dbPath.generic_string() + XDG/LOCALAPPDATA base dir.
- * - Windows socket is Named Pipe \\.\pipe\caudio-<hex>, pid/lock are files under
- * %LOCALAPPDATA%\caudio
+ * - Windows uses a named pipe derived from the database path; pid/lock are files under
+ * `%LOCALAPPDATA%/caudio`
  * - POSIX socket/pid/lock are under $XDG_RUNTIME_DIR/caudio or $XDG_DATA_HOME/caudio or
  * ~/.local/share/caudio
  */

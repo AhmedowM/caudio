@@ -10,7 +10,7 @@
  * single canonical `caudio::utils::Expected<T>` alias so public headers can name
  * fallible return types without pulling the heavier `utils/error.hpp` (which
  * drags `<format>`, `<string>` and the `Error` formatter).
- * @include-only This header is fully inline; no .cpp is required.
+ * @note This header is fully inline; no .cpp is required.
  */
 
 #include <cstdint>

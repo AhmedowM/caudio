@@ -4,7 +4,7 @@
  * @file ring.hpp
  * @brief SPSC ring buffer with cache-line isolation and SPSC invariants.
  * @ingroup caudio_utils
- * @include-only This header is fully inline/template; no .cpp is required.
+ * @note This header is fully inline/template; no .cpp is required.
  */
 
 #include <atomic>

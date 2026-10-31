@@ -4,7 +4,7 @@
  * @file variant.hpp
  * @brief Command variant and alternative concepts for the caudio IPC protocol.
  * @ingroup caudio_ipc
- * @include-only This header is fully inline/template; no .cpp is required.
+ * @note This header is fully inline/template; no .cpp is required.
  */
 
 #include <caudio/ipc/command/bookmark.hpp>

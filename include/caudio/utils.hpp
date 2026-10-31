@@ -4,7 +4,6 @@
  * @file utils.hpp
  * @brief Main header for caudio.utils -- includes all utility partitions.
  * @defgroup caudio_utils caudio utilities
- * @ingroup caudio_utils
  * @details This header includes all public partitions of caudio.utils:
  * - result: StatusCode, toString, formatter
  * - error: Error, Expected, makeError

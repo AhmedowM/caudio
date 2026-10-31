@@ -4,7 +4,6 @@
  * @file caudio.hpp
  * @brief Umbrella header for caudio -- modern C++23 music player library.
  * @defgroup caudio caudio
- * @ingroup caudio
  *
  * @details caudio is a cross-platform, offline-first music player library
  * written in modern C++23. It provides layered libraries (this header

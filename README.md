@@ -245,7 +245,7 @@ Important cache options:
 | `CAUDIO_ENABLE_EXAMPLES` | `OFF` | Build the examples |
 | `CAUDIO_ENABLE_MODULES` | `OFF` | Build/install C++23 module interfaces |
 | `CAUDIO_ENABLE_SANITIZERS` | `OFF` | Enable AddressSanitizer and UndefinedBehaviorSanitizer where supported |
-| `CAUDIO_BUILD_DOCS` | `OFF` | Build Doxygen documentation |
+| `CAUDIO_BUILD_DOCS` | `OFF` | Build public API documentation (HTML and XML) with Doxygen |
 | `CAUDIO_TEST_NOAUDIO` | `OFF` | Skip tests that require an audio device |
 | `CAUDIO_ENABLE_CLANG_TIDY` | `OFF` | Run clang-tidy during the build |
 | `CAUDIO_USE_TRIMMED_FFMPEG` | `OFF` | Use a decode-only trimmed FFmpeg build |
@@ -367,7 +367,7 @@ Build API documentation and install the project:
 ```sh
 python scripts/configure.py dev --toolchain clang --docs \
   --build-dir build/docs
-cmake --build build/docs --target doc --parallel 4
+cmake --build build/docs --target doc-check --parallel 4
 
 cmake --install build/dev --prefix "$PWD/stage"
 cmake --build build/dev --target package

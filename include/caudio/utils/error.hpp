@@ -48,7 +48,7 @@ struct CAUDIO_API Error {
      * @param other Error to compare.
      * @return true if code and message are equal.
      */
-    bool operator==(const Error&) const = default;
+    bool operator==(const Error& other) const = default;
 };
 
 /**

@@ -10,7 +10,7 @@
 | **CMake** | 3.31+ | Required for module dependency scanning and `FILE_SET CXX_MODULES` |
 | **Ninja** | 1.11+ | **Required** -- C++23 modules only work reliably with Ninja generator |
 | **FFmpeg** | recent (tools + dev packages) | `libavformat`, `libavcodec`, `libavutil`, `libswresample`. CI uses Ubuntu system FFmpeg; auto-fetched if not found when `CAUDIO_WITH_FETCH_FFMPEG=ON` |
-| **Doxygen** | 1.9+ | Optional, only for `CAUDIO_BUILD_DOCS=ON`. `dot` (Graphviz) optional for graphs |
+| **Doxygen** | 1.9+ | Required for `CAUDIO_BUILD_DOCS=ON`; `dot` (Graphviz) is optional for graphs |
 | **Catch2** | 3.16.0 | System package preferred, else shallow-fetched via `FetchContent` when `CAUDIO_ENABLE_TESTS=ON` |
 | **Git** | 2.30+ | For `git describe --tags` version stamping |
 
@@ -118,9 +118,10 @@ ctest --test-dir build -j4 --output-on-failure
 
 ```sh
 cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON
-cmake --build build --target doc
-#HTML output : docs / html / and build / docs / html /
-#Open : docs / html / index.html
+cmake --build build --target doc-check
+# HTML: build/docs/html/index.html
+# XML:  build/docs/xml/index.xml
+# Open: build/docs/html/index.html
 ```
 
 Man page is at `docs/man/caudio.1` -- preview with `man ./docs/man/caudio.1` or `groff -man -Tascii docs/man/caudio.1 | less`.
@@ -179,7 +180,7 @@ refactor(cmake): SANITIZERS target-scoped, sqlite dedup
    cmake -B build -G Ninja -DCAUDIO_ENABLE_TESTS=ON
    cmake --build build -j4
    ctest --test-dir build -j4
-   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc
+   cmake -B build -G Ninja -DCAUDIO_BUILD_DOCS=ON && cmake --build build --target doc-check
    ```
 4. **Format** changed files with `clang-format`.
 5. **Push** and open a PR against `main`. Include:

@@ -4,7 +4,7 @@
  * @file math.hpp
  * @brief Miscellaneous math utilities.
  * @ingroup caudio_utils
- * @include-only This header is fully inline; no .cpp is required.
+ * @note This header is fully inline; no .cpp is required.
  */
 
 #include <algorithm>

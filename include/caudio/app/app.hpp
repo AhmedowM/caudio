@@ -47,15 +47,17 @@ namespace caudio::app {
  * neither is silent success.
  */
 struct CAUDIO_API Outcome {
-    std::optional<caudio::ipc::Result> result;
-    std::optional<std::string> line;
-    bool toStderr = false;
-    bool failed = false;
-    bool quiet = false;
+    std::optional<caudio::ipc::Result> result; ///< Structured result for frontend rendering.
+    std::optional<std::string> line;           ///< Human-readable line, when applicable.
+    bool toStderr = false;                     ///< Render `line` on stderr instead of stdout.
+    bool failed = false;                       ///< Indicates a runtime failure (exit code 1).
+    bool quiet = false;                        ///< Suppresses human rendering of `result`.
+    /** @brief Creates a successful warning outcome written to stderr. */
     static std::expected<Outcome, caudio::utils::Error> warn(std::string message);
+    /** @brief Creates a failed outcome written to stderr. */
     static std::expected<Outcome, caudio::utils::Error> fail(std::string message);
 };
-/** @brief Handler return: outcome data, or the error to render. */
+/** @brief Handler return: outcome data, or the error to render. @ingroup caudio_app */
 using AppResult = std::expected<Outcome, caudio::utils::Error>;
 
 /**
@@ -67,13 +69,14 @@ using AppResult = std::expected<Outcome, caudio::utils::Error>;
  * mode, exitCode is the process exit code.
  */
 struct CAUDIO_API BatchReport {
-    std::optional<ipc::Result> json;
-    std::string out;
-    std::string err;
-    int exitCode = 0;
+    std::optional<ipc::Result> json; ///< Structured result for JSON mode.
+    std::string out;                  ///< Human-readable stdout content.
+    std::string err;                  ///< Human-readable stderr content.
+    int exitCode = 0;                 ///< Process-compatible exit code.
+    /** @brief Creates a failed batch report with stderr content. */
     static std::expected<BatchReport, caudio::utils::Error> fail(std::string message);
 };
-/** @brief Batch handler return. */
+/** @brief Batch handler return. @ingroup caudio_app */
 using BatchResult = std::expected<BatchReport, caudio::utils::Error>;
 
 /** @brief Known tag fields accepted by tagValue. @ingroup caudio_app */
@@ -340,6 +343,7 @@ class CAUDIO_API App {
     /**
      * @brief Saves a queue as a playlist.
      * @ingroup caudio_app
+     * @param name Playlist name.
      * @param qid Source queue id, or nullopt for the active queue.
      */
     AppResult playlistSave(const std::string& name, std::optional<std::int64_t> qid);
@@ -359,6 +363,7 @@ class CAUDIO_API App {
     /**
      * @brief Imports a playlist file.
      * @ingroup caudio_app
+     * @param path Playlist file path.
      * @param name Playlist name, or nullopt to derive from the file.
      */
     AppResult playlistImport(const std::string& path, std::optional<std::string> name);
@@ -382,6 +387,7 @@ class CAUDIO_API App {
      * @ingroup caudio_app
      * @param mostPlayed Top-N threshold (>= 0 enables detailed mode).
      * @param queues Queue selectors ("all" or numeric ids).
+     * @param playlists Playlist ids to include in the breakdown.
      */
     BatchResult libraryStats(int mostPlayed, const std::vector<std::string>& queues,
                              const std::vector<std::int64_t>& playlists);
@@ -421,6 +427,7 @@ class CAUDIO_API App {
     /**
      * @brief Reads one tag field as human text plus single-key JSON.
      * @ingroup caudio_app
+     * @param id Track id.
      * @param field Must name a known field (see isTagField); frontends
      * validate before calling, unknown names fail as InvalidArg.
      */

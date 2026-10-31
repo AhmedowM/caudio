@@ -82,6 +82,7 @@ constexpr std::string_view toString(StatusCode r) noexcept {
 
 /**
  * @brief std::formatter specialization for StatusCode.
+ * @ingroup caudio_utils
  * @details Enables `std::format("{}", StatusCode::Busy)` via toString().
  */
 template <>

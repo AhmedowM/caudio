@@ -11,7 +11,7 @@
  * It uses only `<coroutine>` (available everywhere) and matches the
  * `std::generator` iteration subset used here. Always use this type
  * instead of `std::generator` directly.
- * @include-only This header is fully inline/template; no .cpp is required.
+ * @note This header is fully inline/template; no .cpp is required.
  */
 
 #include <coroutine>

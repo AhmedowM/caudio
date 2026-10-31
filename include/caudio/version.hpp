@@ -5,7 +5,6 @@
  * @brief Version helpers in caudio::version -- wraps the CMake-generated
  * version_config.hpp constants.
  * @defgroup caudio_version caudio version
- * @ingroup caudio_version
  * @details Thin header that exposes version constants plus helpers
  * `version()` / `versionString()`. Includes the CMake-generated
  * version_config.hpp for version constants.

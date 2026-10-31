@@ -28,6 +28,7 @@ namespace caudio::db {
  * @param db Database to update.
  * @param libraryId Library id whose `path` is the scan root.
  * @param progress Optional callback `progress(scanned, total, path)` invoked per file.
+ * @param mode Discovery mode passed to `caudio::media::scanTracks`.
  * @return Success or `Error` with `StatusCode::InvalidArg` if libraryId==0,
  * `StatusCode::NotFound` if library or path not found, `StatusCode::Busy` if
  * `BEGIN IMMEDIATE` fails, or `StatusCode::Internal` on commit failure.

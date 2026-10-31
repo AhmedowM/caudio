@@ -44,11 +44,21 @@ struct ServiceConfig : public caudio::config::Config {
  */
 class CAUDIO_API Service final {
   public:
+    /**
+     * @brief Result type returned by Service creation.
+     * @ingroup caudio_service
+     * @details Contains an owning service instance on success. On failure,
+     * the error identifies configuration, single-instance, database, IPC,
+     * or shared-memory initialization failure.
+     */
     using ExpectedService = std::expected<std::unique_ptr<Service>, caudio::utils::Error>;
 
     /**
      * @brief Factory method to create and initialize a Service instance.
+     * @ingroup caudio_service
      * @param cfg Service configuration (dbPath, optional socketPath, configPath, logLevel).
+     * @param db Optional already-open database contract; when omitted, Service
+     * opens its configured database.
      * @return Expected unique_ptr to Service, or Error if initialization fails.
      *
      * Performs single-instance enforcement via flock lock file and PID file checks.
@@ -60,6 +70,7 @@ class CAUDIO_API Service final {
 
     /**
      * @brief Destructor: ensures cleanup via shutdown().
+     * @ingroup caudio_service
      */
     ~Service();
 
@@ -70,17 +81,21 @@ class CAUDIO_API Service final {
 
     /**
      * @brief Run the service event loop until stop_token is triggered.
+     * @ingroup caudio_service
      * @param st Stop token to request graceful shutdown.
      * @return void on success, Error if already running.
      *
      * Starts the IPC server with an internal dispatcher for incoming commands.
      * Blocks until stop_token signals or shutdown() is called.
      * Thread safety: Must not be called concurrently with another run().
+     * The token is observed between dispatch iterations; call `shutdown()` to
+     * request immediate teardown from another thread.
      */
     caudio::utils::Expected<void> run(std::stop_token st);
 
     /**
      * @brief Replaces the attached database and reloads engine state from it.
+     * @ingroup caudio_service
      * @param db Shared database contract (must be non-null and open).
      * @return Success or Error InvalidArg if db is null or not open.
      */
@@ -88,6 +103,7 @@ class CAUDIO_API Service final {
 
     /**
      * @brief Gracefully shut down the service.
+     * @ingroup caudio_service
      *
      * Signals shutdown to IPC server and Engine, removes PID file, socket file (Unix),
      * and releases the flock lock file. Shared memory handle is cleaned up via RAII.

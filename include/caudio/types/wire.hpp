@@ -10,14 +10,13 @@
  * that both `caudio::engine` and `caudio::ipc` depend on, so neither component
  * has to include the other. `RepeatMode` and `PlaybackState` cross the
  * daemon/client boundary (fields of `caudio::ipc::Status` and of several
- * commands) and have a fixed `int` underlying type matching the JSON wire
- * encoding (the wire text lives in `types/format.hpp`, its inverse in
+ * commands) and have a fixed `std::uint8_t` underlying type. Their JSON wire
+ * text lives in `types/format.hpp`, and its inverse in
  * `types/parse.hpp`).
  *
- * these are owned directly by `caudio::types`. This
+ * These values are owned directly by `caudio::types`. This
  * layer is deliberately dependency-free (no `fwd.hpp`, no std headers) so it
- * can sit at the bottom of the component graph. Later U-3 work moves the
- * plain-data structs (`Track`, `Playlist`, ...) here as well.
+ * can sit at the bottom of the component graph.
  */
 
 namespace caudio::types {
@@ -32,7 +31,11 @@ namespace caudio::types {
  * - `One`: repeats the current track without advancing the cursor.
  * @see caudio::ipc::Status
  */
-enum class RepeatMode : std::uint8_t { Off = 0, All = 1, One = 2 };
+enum class RepeatMode : std::uint8_t {
+    Off = 0, ///< Advance normally and wrap according to the active queue mode.
+    All = 1, ///< Repeat the queue after its last item.
+    One = 2  ///< Repeat the current track without advancing.
+};
 
 /**
  * @brief Playback state machine (wire value).
@@ -45,6 +48,11 @@ enum class RepeatMode : std::uint8_t { Off = 0, All = 1, One = 2 };
  * - Any -> `Stopped` via Engine::stop().
  * @see caudio::ipc::Status
  */
-enum class PlaybackState : std::uint8_t { Stopped = 0, Ready = 1, Playing = 2, Paused = 3 };
+enum class PlaybackState : std::uint8_t {
+    Stopped = 0, ///< No track is currently playing.
+    Ready = 1,   ///< The engine is initialized and ready to play.
+    Playing = 2, ///< Audio playback is active.
+    Paused = 3   ///< Playback is paused with the current position retained.
+};
 
 } // namespace caudio::types

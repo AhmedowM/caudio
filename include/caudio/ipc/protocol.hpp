@@ -92,8 +92,8 @@ using Json = caudio::utils::Json;
  * @param cmd Command to execute.
  */
 struct IpcRequest final {
-    uint32_t id{0};
-    Command cmd{};
+    uint32_t id{0}; ///< Request identifier echoed by the daemon in its reply.
+    Command cmd{};  ///< Command variant to dispatch.
 };
 
 /**
@@ -105,8 +105,9 @@ struct IpcRequest final {
  * @param result Result value on success, or error on failure.
  */
 struct IpcReply final {
-    uint32_t id{0};
-    std::expected<Result, caudio::utils::Error> result{};
+    uint32_t id{0}; ///< Request identifier copied from the originating request.
+    std::expected<Result, caudio::utils::Error>
+        result{}; ///< Result on success or transport/dispatch error.
 };
 // ---------------------------------------------------------------------------
 // Command JSON
