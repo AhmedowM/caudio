@@ -8,13 +8,13 @@
 #include <atomic>
 #include <caudio/config.hpp>
 #include <caudio/contracts/database.hpp>
-#include <caudio/types/db.hpp>
-#include <caudio/types/engine.hpp>
 #include <caudio/ipc/command.hpp>
 #include <caudio/ipc/protocol.hpp>
 #include <caudio/ipc/result.hpp>
 #include <caudio/ipc/shm_status.hpp>
 #include <caudio/service/service.hpp>
+#include <caudio/types/db.hpp>
+#include <caudio/types/engine.hpp>
 #include <caudio/utils/error.hpp>
 #include <caudio/utils/log.hpp>
 #include <caudio/utils/result.hpp>
@@ -51,79 +51,111 @@ Service::~Service() {
 
 Service::ExpectedService Service::create(const ServiceConfig& cfg,
                                          std::shared_ptr<caudio::contracts::IDatabase> db) {
-    // Determine socket path
+    // Host-supplied runtime paths are authoritative over the inherited fields.
+    // Desktop callers leave RuntimePaths empty and keep the existing behavior.
+    ServiceConfig resolved = cfg;
+    if (!cfg.runtime.database.empty())
+        resolved.dbPath = cfg.runtime.database;
+    if (!cfg.runtime.configuration.empty())
+        resolved.configPath = cfg.runtime.configuration;
+    if (!cfg.runtime.socket.empty())
+        resolved.socketPath = cfg.runtime.socket;
+
+    if (auto dirs = cfg.runtime.ensureDirectories(); !dirs)
+        return std::unexpected{dirs.error()};
+
+    const bool inProcess = cfg.inProcess;
+    const std::filesystem::path& dbPath = resolved.dbPath;
+
     std::string spStr;
-    if (!cfg.socketPath.empty()) {
-        spStr = cfg.socketPath;
-    } else {
-        spStr = detail::socketPathForDb(cfg.dbPath);
-    }
-
-    // Single-instance enforcement via flock lock file
-    std::filesystem::path lockPath =
-        detail::lockPathForSocket(cfg.dbPath, cfg.socketPath.empty() ? spStr : cfg.socketPath);
+    std::filesystem::path lockPath;
+    std::filesystem::path pidPath;
     std::intptr_t lockFd = -1;
-    if (!detail::tryAcquireLock(lockPath, lockFd)) {
-        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists,
-                                                        "service already running (lock held)")};
-    }
-
-    // Check for stale PID file
-    std::filesystem::path pidPath =
-        detail::pidPathForSocket(cfg.dbPath, cfg.socketPath.empty() ? spStr : cfg.socketPath);
     std::error_code ec;
-    if (std::filesystem::exists(pidPath, ec)) {
-        auto existingPid = detail::readPidFile(pidPath);
-        if (existingPid && detail::checkPidAlive(*existingPid)) {
-            // Process is alive, daemon already running
-            detail::releaseLock(lockFd);
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::AlreadyExists, "service already running (pid alive)")};
-        }
-        // Stale PID - remove it
-        std::filesystem::remove(pidPath, ec);
-    }
 
-    // Check for stale socket
-#ifdef _WIN32
-    if (!spStr.empty() && spStr.starts_with("\\\\")) {
-        if (detail::probeSocketAlive(spStr)) {
-            detail::releaseLock(lockFd);
-            return std::unexpected{caudio::utils::makeError(
-                caudio::utils::StatusCode::AlreadyExists, "service already running (pipe alive)")};
+    if (!inProcess) {
+        // Determine socket path: explicit override, else derived from the database.
+        if (!resolved.socketPath.empty()) {
+            spStr = resolved.socketPath;
+        } else {
+            spStr = detail::socketPathForDb(dbPath);
         }
-    } else
-#endif
-        if (!spStr.empty() && !spStr.starts_with("\\\\")) {
-        std::filesystem::path sockP(spStr);
-        if (std::filesystem::exists(sockP, ec)) {
+        resolved.socketPath = spStr;
+
+        // Single-instance enforcement via flock lock file
+        lockPath = detail::lockPathForSocket(dbPath, spStr);
+        if (!detail::tryAcquireLock(lockPath, lockFd)) {
+            return std::unexpected{caudio::utils::makeError(
+                caudio::utils::StatusCode::AlreadyExists, "service already running (lock held)")};
+        }
+
+        // Check for stale PID file
+        pidPath = detail::pidPathForSocket(dbPath, spStr);
+        if (std::filesystem::exists(pidPath, ec)) {
+            auto existingPid = detail::readPidFile(pidPath);
+            if (existingPid && detail::checkPidAlive(*existingPid)) {
+                // Process is alive, daemon already running
+                detail::releaseLock(lockFd);
+                return std::unexpected{
+                    caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists,
+                                             "service already running (pid alive)")};
+            }
+            // Stale PID - remove it
+            std::filesystem::remove(pidPath, ec);
+        }
+
+        // Check for stale socket
+#ifdef _WIN32
+        if (!spStr.empty() && spStr.starts_with("\\\\")) {
             if (detail::probeSocketAlive(spStr)) {
                 detail::releaseLock(lockFd);
                 return std::unexpected{
                     caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists,
-                                             "service already running (socket alive)")};
-            } else {
-                // Stale socket - remove
-                std::filesystem::remove(sockP, ec);
+                                             "service already running (pipe alive)")};
+            }
+        } else
+#endif
+            if (!spStr.empty() && !spStr.starts_with("\\\\")) {
+            std::filesystem::path sockP(spStr);
+            if (std::filesystem::exists(sockP, ec)) {
+                if (detail::probeSocketAlive(spStr)) {
+                    detail::releaseLock(lockFd);
+                    return std::unexpected{
+                        caudio::utils::makeError(caudio::utils::StatusCode::AlreadyExists,
+                                                 "service already running (socket alive)")};
+                } else {
+                    // Stale socket - remove
+                    std::filesystem::remove(sockP, ec);
+                }
             }
         }
     }
 
     // ensure db parent dirs exist before open (fixes "unable to open database file")
-    {
+    if (!dbPath.empty()) {
         std::error_code ec2;
-        auto parent = cfg.dbPath.parent_path();
+        auto parent = dbPath.parent_path();
         if (!parent.empty())
             std::filesystem::create_directories(parent, ec2);
     }
-    // Daemon log first: rotating file next to the db (see logPathFor), so
-    // db/engine creation below already emit. A log that cannot be opened
-    // degrades to silence — logging must never block startup.
+
+    // Log first: rotating file next to the db (see logPathFor), so db/engine
+    // creation below already emit. A host-supplied log directory wins. An
+    // in-process host without a log directory stays silent instead of
+    // inferring a desktop location. A log that cannot be opened degrades to
+    // silence — logging must never block startup.
     caudio::utils::Logger::Callback logCb = [](caudio::utils::LogLevel, std::string_view) {};
-    if (auto lp = caudio::config::logPathFor(cfg.dbPath)) {
+    std::filesystem::path logFile;
+    if (!cfg.runtime.logs.empty()) {
+        logFile = cfg.runtime.logs / "caudio.log";
+    } else if (!inProcess) {
+        if (auto lp = caudio::config::logPathFor(dbPath))
+            logFile = *lp;
+    }
+    if (!logFile.empty()) {
         caudio::utils::FileSinkOptions sinkOpts;
         sinkOpts.teeStderr = cfg.logToStderr;
-        if (auto sink = caudio::utils::FileLogSink::open(*lp, sinkOpts))
+        if (auto sink = caudio::utils::FileLogSink::open(logFile, sinkOpts))
             logCb = sink->callback();
     }
     auto loggerPtr = std::make_unique<caudio::utils::Logger>(
@@ -131,18 +163,6 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg,
                               cfg.logLevel, std::to_underlying(caudio::utils::LogLevel::Trace),
                               std::to_underlying(caudio::utils::LogLevel::Error))));
     caudio::utils::Logger* logger = loggerPtr.get();
-
-    // open DB
-    // caudio::db::DatabaseOptions dbOpts;
-    // dbOpts.logger = logger;
-    // auto dbRes = caudio::db::Database::open(cfg.dbPath.generic_string(), dbOpts);
-    // if (!dbRes) {
-    //     auto err = dbRes.error();
-    //     std::string msg = err.message + " (" + cfg.dbPath.generic_string() + ")";
-    //     detail::releaseLock(lockFd);
-    //     return std::unexpected{caudio::utils::makeError(err.code, msg)};
-    // }
-    // std::shared_ptr<caudio::db::Database> dbShared(std::move(dbRes.value()));
 
     // create Engine
     caudio::types::EngineConfig ecfg{};
@@ -154,58 +174,68 @@ Service::ExpectedService Service::create(const ServiceConfig& cfg,
         return std::unexpected{engRes.error()};
     }
     std::unique_ptr<caudio::engine::Engine> eng = std::move(engRes.value());
-    if (auto e = eng->attachDatabase(db); !e) {
-        detail::releaseLock(lockFd);
-        return std::unexpected{e.error()};
-    }
-
-    // ipc server listen -- honor Config::socketPath if set (canonical override), else derive
-    // from dbPath
-    auto srvPtr = std::make_unique<IpcServer>();
-    auto listenRes = srvPtr->listen(cfg.dbPath, cfg.socketPath);
-    if (!listenRes) {
-        detail::releaseLock(lockFd);
-        return std::unexpected{listenRes.error()};
-    }
-
-    // Create PID file with current PID
-    std::string pidStr;
-    try {
-        auto parent = pidPath.parent_path();
-        if (!parent.empty()) {
-            std::filesystem::create_directories(parent, ec);
+    if (db) {
+        if (auto e = eng->attachDatabase(db); !e) {
+            detail::releaseLock(lockFd);
+            return std::unexpected{e.error()};
         }
-        std::ofstream pf(pidPath);
-        if (pf) {
-#ifdef _WIN32
-            pidStr = std::to_string(::_getpid());
-#else
-            pidStr = std::to_string(::getpid());
-#endif
-            pf << pidStr << "\n";
-        }
-    } catch (...) {
     }
 
-    // Create shared memory status block for event-driven status snapshots
-    // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
-    std::string shmName = caudio::config::detail_paths::hex8ForDb(cfg.dbPath);
-    auto shmRes = caudio::ipc::ShmStatusWriter::create(shmName);
-    if (!shmRes) {
-        // Non-fatal: continue without shm (clients fall back to IPC status).
-        loggerPtr->warn("shm status unavailable: {} (falling back to IPC status)",
-                        shmRes.error().message);
-    }
+    // IPC server / PID / shared status exist only for the desktop daemon.
+    std::unique_ptr<IpcServer> srvPtr;
+    std::string shmName;
     std::unique_ptr<caudio::ipc::ShmStatusWriter> shmWriter;
-    if (shmRes)
-        shmWriter = std::make_unique<caudio::ipc::ShmStatusWriter>(std::move(*shmRes));
+    std::string pidStr;
+    if (!inProcess) {
+        srvPtr = std::make_unique<IpcServer>();
+        auto listenRes = srvPtr->listen(dbPath, spStr);
+        if (!listenRes) {
+            detail::releaseLock(lockFd);
+            return std::unexpected{listenRes.error()};
+        }
+
+        // Create PID file with current PID
+        try {
+            auto parent = pidPath.parent_path();
+            if (!parent.empty()) {
+                std::filesystem::create_directories(parent, ec);
+            }
+            std::ofstream pf(pidPath);
+            if (pf) {
+#ifdef _WIN32
+                pidStr = std::to_string(::_getpid());
+#else
+                pidStr = std::to_string(::getpid());
+#endif
+                pf << pidStr << "\n";
+            }
+        } catch (...) {
+        }
+
+        // Create shared memory status block for event-driven status snapshots
+        // Derive shm name via canonical hex8 (consistent with socket/pid/lock)
+        shmName = caudio::config::detail_paths::hex8ForDb(dbPath);
+        auto shmRes = caudio::ipc::ShmStatusWriter::create(shmName);
+        if (!shmRes) {
+            // Non-fatal: continue without shm (clients fall back to IPC status).
+            loggerPtr->warn("shm status unavailable: {} (falling back to IPC status)",
+                            shmRes.error().message);
+        }
+        if (shmRes)
+            shmWriter = std::make_unique<caudio::ipc::ShmStatusWriter>(std::move(*shmRes));
+    }
 
     auto svc = std::unique_ptr<Service>(
-        new Service(cfg, std::move(db), std::move(eng), std::move(srvPtr), std::move(loggerPtr),
-                    pidPath, spStr, lockFd, std::move(shmWriter), shmName));
-    svc->impl_->logger_->info("daemon started version={} pid={} db={} socket={}",
-                              caudio::version::version(), pidStr, cfg.dbPath.generic_string(),
-                              spStr);
+        new Service(resolved, std::move(db), std::move(eng), std::move(srvPtr),
+                    std::move(loggerPtr), pidPath, spStr, lockFd, std::move(shmWriter), shmName));
+    if (inProcess) {
+        svc->impl_->logger_->info("service started in-process version={} db={}",
+                                  caudio::version::version(), dbPath.generic_string());
+    } else {
+        svc->impl_->logger_->info("daemon started version={} pid={} db={} socket={}",
+                                  caudio::version::version(), pidStr, dbPath.generic_string(),
+                                  spStr);
+    }
     return svc;
 }
 
@@ -229,6 +259,10 @@ Service::Impl::Impl(const ServiceConfig& cfg, std::shared_ptr<caudio::contracts:
 
 caudio::utils::Expected<void> Service::run(std::stop_token st) {
     return impl_->run(st);
+}
+
+bool Service::running() const noexcept {
+    return impl_->running_.load(std::memory_order_acquire);
 }
 
 caudio::utils::Expected<void> Service::Impl::run(std::stop_token st) {

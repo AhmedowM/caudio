@@ -28,6 +28,27 @@ namespace caudio::service {
 struct ServiceConfig : public caudio::config::Config {
     /** @brief Echo log lines to stderr (foreground mode). Default: false. */
     bool logToStderr{false};
+
+    /**
+     * @brief Run without desktop daemon scaffolding. Default: false.
+     *
+     * When true, Service::create does not acquire a lock file, write a PID
+     * file, create a socket/named pipe, listen for IPC, or allocate shared
+     * status memory. Commands are dispatched directly through Service::run's
+     * in-process loop and Host. This is the mode an Android foreground service
+     * uses; desktop CLI and daemon behavior is unchanged when false.
+     */
+    bool inProcess{false};
+
+    /**
+     * @brief Explicit host-supplied directories and transport path.
+     *
+     * Empty fields retain existing desktop behavior. When `database` is set it
+     * takes precedence over the inherited `dbPath`; `socket` takes precedence
+     * over the inherited `socketPath`. In-process hosts should set at least
+     * `database` so no desktop path discovery is required.
+     */
+    caudio::config::RuntimePaths runtime{};
 };
 
 /**
@@ -58,12 +79,24 @@ class CAUDIO_API Service final {
      * @ingroup caudio_service
      * @param cfg Service configuration (dbPath, optional socketPath, configPath, logLevel).
      * @param db Optional already-open database contract; when omitted, Service
-     * opens its configured database.
+     * works without one (Engine attaches whatever is supplied).
      * @return Expected unique_ptr to Service, or Error if initialization fails.
      *
-     * Performs single-instance enforcement via flock lock file and PID file checks.
-     * Creates PID file, initializes shared memory status block for event-driven status snapshots,
-     * and starts IPC server listening on derived or explicit socket path.
+     * Resolves host-supplied runtime paths first (`runtime.database`,
+     * `runtime.configuration`, `runtime.socket` take precedence over the
+     * inherited fields) and creates any supplied directories.
+     *
+     * When `cfg.inProcess` is false, performs single-instance enforcement via
+     * flock lock file and PID file checks, creates a PID file, initializes the
+     * shared memory status block, and starts the IPC server listening on the
+     * derived or explicit socket path.
+     *
+     * When `cfg.inProcess` is true, none of the desktop scaffolding is
+     * created: no lock, PID, socket, IPC server, or shared memory. Only the
+     * database, engine, and optional log file are initialized; callers drive
+     * the loop through `run()` and the `Host` wrapper.
+     *
+     * @see Host
      */
     static ExpectedService create(const ServiceConfig& cfg,
                                   std::shared_ptr<caudio::contracts::IDatabase> db = nullptr);
@@ -92,6 +125,16 @@ class CAUDIO_API Service final {
      * request immediate teardown from another thread.
      */
     caudio::utils::Expected<void> run(std::stop_token st);
+
+    /**
+     * @brief Reports whether the service loop is active.
+     * @ingroup caudio_service
+     * @return True from the moment `run()` starts until `shutdown()` begins.
+     *
+     * Host implementations use this to wait for readiness after starting
+     * `run()` on a worker thread.
+     */
+    [[nodiscard]] bool running() const noexcept;
 
     /**
      * @brief Replaces the attached database and reloads engine state from it.

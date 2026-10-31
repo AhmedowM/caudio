@@ -7,6 +7,7 @@
  * @defgroup caudio_config caudio configuration
  */
 
+#include <caudio/config/runtime.hpp>
 #include <caudio/fwd.hpp>
 #include <filesystem>
 #include <string>
@@ -22,13 +23,16 @@ namespace caudio::config {
  * ~/.local/share/caudio
  */
 CAUDIO_API caudio::utils::Expected<std::string> socketPathFor(const std::filesystem::path& dbPath);
-CAUDIO_API caudio::utils::Expected<std::filesystem::path> pidPathFor(const std::filesystem::path& dbPath);
-CAUDIO_API caudio::utils::Expected<std::filesystem::path> lockPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path>
+pidPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path>
+lockPathFor(const std::filesystem::path& dbPath);
 /**
  * @brief Daemon log file path for a database: `<db-dir>/caudio.log`.
  * Falls back to the temp dir when the db path has no parent.
  */
-CAUDIO_API caudio::utils::Expected<std::filesystem::path> logPathFor(const std::filesystem::path& dbPath);
+CAUDIO_API caudio::utils::Expected<std::filesystem::path>
+logPathFor(const std::filesystem::path& dbPath);
 
 /**
  * @brief User-facing configuration loaded from config.json.

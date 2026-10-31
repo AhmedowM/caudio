@@ -18,15 +18,15 @@
 #include <type_traits>
 
 #if defined(_WIN32)
-  #if defined(CAUDIO_BUILDING_DLL)
-    #define CAUDIO_API __declspec(dllexport)
-  #else
-    #define CAUDIO_API
-  #endif
-#elif defined(__GNUC__) || defined(__clang__)
-  #define CAUDIO_API __attribute__((visibility("default")))
+#if defined(CAUDIO_BUILDING_DLL)
+#define CAUDIO_API __declspec(dllexport)
 #else
-  #define CAUDIO_API
+#define CAUDIO_API
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define CAUDIO_API __attribute__((visibility("default")))
+#else
+#define CAUDIO_API
 #endif
 
 struct sqlite3;
@@ -62,6 +62,7 @@ namespace caudio::service {
 // IpcServer is internal (src/service/ipc_server.hpp); the public
 // `caudio/service/service.hpp` only names it in Service's private members,
 // so the forward declaration stays here.
+class Host;
 class IpcServer;
 class Service;
 } // namespace caudio::service
