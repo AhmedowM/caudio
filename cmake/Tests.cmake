@@ -79,6 +79,10 @@ if(CAUDIO_ENABLE_TESTS)
   caudio_add_catch_test(test_ipc tests/test_ipc.cpp LIBS caudio::service caudio::client caudio::ipc caudio::engine caudio::db caudio::player caudio::utils caudio::sqlite3 WITH_ALLOW_MULTIPLE_DEFINITION)
   caudio_add_catch_test(test_config tests/test_config.cpp LIBS caudio::config caudio::utils)
 
+  caudio_add_catch_test(test_media_source tests/test_media_source.cpp LIBS caudio::media caudio::player caudio::utils)
+  caudio_add_catch_test(test_db_source tests/test_db_source.cpp LIBS caudio::db caudio::utils caudio::sqlite3)
+  caudio_add_catch_test(test_service_host tests/test_service_host.cpp LIBS caudio::service caudio::config caudio::db caudio::utils caudio::sqlite3)
+
   # CLI golden tests: spawn the real executable with hermetic temp configs
   # and assert on stdout/stderr/exit codes (help texts, parse errors,
   # no-daemon errors, full daemon lifecycle). Needs the CLI binary, so it

@@ -6,6 +6,7 @@ set(CAUDIO_CONFIG_MODULE_SOURCES
 )
 set(CAUDIO_CONFIG_SOURCES
   src/config.cpp
+  src/config/runtime.cpp
   src/config/raw.cpp
 )
 caudio_add_component(config SOURCES ${CAUDIO_CONFIG_SOURCES} MODULE_SOURCES ${CAUDIO_CONFIG_MODULE_SOURCES} DEPS caudio::utils Threads::Threads)

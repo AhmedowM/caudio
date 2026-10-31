@@ -3,12 +3,14 @@
 set(CAUDIO_SERVICE_MODULE_SOURCES
   modules/caudio/service.cppm
   modules/caudio/service/core.cppm
+  modules/caudio/service/host.cppm
 )
 set(CAUDIO_SERVICE_SOURCES
   src/service/ipc_server.cpp
   src/service/service_paths.cpp
   src/service/service_status.cpp
   src/service/service_impl.cpp
+  src/service/host.cpp
   src/service/dispatch_playback.cpp
   src/service/dispatch_queue.cpp
   src/service/dispatch_library.cpp

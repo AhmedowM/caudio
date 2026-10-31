@@ -9,6 +9,7 @@ using ::caudio::config::loadConfig;
 using ::caudio::config::lockPathFor;
 using ::caudio::config::logPathFor;
 using ::caudio::config::pidPathFor;
+using ::caudio::config::RuntimePaths;
 using ::caudio::config::saveConfig;
 using ::caudio::config::socketPathFor;
 } // namespace caudio::config

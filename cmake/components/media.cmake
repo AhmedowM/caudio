@@ -2,12 +2,14 @@
 set(CAUDIO_MEDIA_MODULE_SOURCES
   modules/caudio/media.cppm
   modules/caudio/media/reader.cppm
+  modules/caudio/media/source.cppm
   modules/caudio/media/decoder.cppm
   modules/caudio/media/audio_ext.cppm
   modules/caudio/media/scan.cppm
 )
 set(CAUDIO_MEDIA_SOURCES
   src/media/reader.cpp
+  src/media/source.cpp
   src/media/decoder.cpp
   src/media/decoders/ffmpeg.cpp
   src/media/scan.cpp
