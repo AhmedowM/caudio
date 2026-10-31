@@ -9,6 +9,7 @@
 #include <expected>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace caudio::utils {
 
@@ -52,6 +53,15 @@ Json trackToJson(const caudio::types::Track& t) {
     j["deleted_at"] = t.deleted_at;
     j["fingerprint"] = toHex(t.fingerprint);
     j["path"] = t.path;
+    {
+        const auto source = caudio::types::normalizedSource(t);
+        Json s;
+        s["kind"] = std::string(caudio::types::sourceKindName(source.kind));
+        s["key"] = source.key;
+        s["display_name"] = source.display_name;
+        s["available"] = source.available;
+        j["source"] = std::move(s);
+    }
     j["title"] = t.title;
     j["artist"] = t.artist;
     j["album"] = t.album;
@@ -127,6 +137,36 @@ std::expected<caudio::types::Track, Error> trackFromJson(const Json& j) {
             t.library_id = 1;
         getI64("deleted_at", t.deleted_at, 0);
         getStr("path", t.path);
+        t.source.kind = caudio::types::SourceKind::path;
+        t.source.key = t.path;
+        t.source.display_name = t.path;
+        t.source.available = true;
+        if (j.contains("source") && j["source"].isObject()) {
+            const Json s = j["source"];
+            std::string kindName = "path";
+            if (s.contains("kind") && s["kind"].isString())
+                kindName = s["kind"].get<std::string>();
+            auto parsedKind = caudio::types::sourceKindFromName(kindName);
+            if (!parsedKind) {
+                return std::unexpected{
+                    makeError(StatusCode::Corrupt, "invalid source kind: " + kindName)};
+            }
+            t.source.kind = *parsedKind;
+            if (s.contains("key") && s["key"].isString())
+                t.source.key = s["key"].get<std::string>();
+            else
+                t.source.key.clear();
+            if (s.contains("display_name") && s["display_name"].isString())
+                t.source.display_name = s["display_name"].get<std::string>();
+            else
+                t.source.display_name.clear();
+            if (s.contains("available") && s["available"].isBoolean())
+                t.source.available = s["available"].get<bool>();
+            else
+                t.source.available = true;
+            if (t.source.kind == caudio::types::SourceKind::path && t.source.key.empty())
+                t.source.key = t.path;
+        }
         getStr("title", t.title);
         getStr("artist", t.artist);
         getStr("album", t.album);

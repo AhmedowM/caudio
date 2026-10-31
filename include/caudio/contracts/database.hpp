@@ -6,13 +6,13 @@
  * @defgroup caudio_contracts caudio persistence contracts
  */
 
+#include <array>
 #include <caudio/fwd.hpp>
 #include <caudio/types/db.hpp>
 #include <caudio/types/engine.hpp>
 #include <caudio/types/record.hpp>
 #include <caudio/types/wire.hpp>
 #include <caudio/utils/error.hpp>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
@@ -74,6 +74,14 @@ class IDatabase {
     /** @brief Finds a track by filesystem path. */
     virtual std::expected<caudio::types::Track, caudio::utils::Error>
     findByPath(std::string_view path) = 0;
+    /**
+     * @brief Finds a track by durable source identity.
+     * @param source Source kind and stable key; path rows use the filesystem
+     * path as the key after normalization.
+     * @return Track on success, or NotFound.
+     */
+    virtual std::expected<caudio::types::Track, caudio::utils::Error>
+    findBySource(const caudio::types::SourceRef& source) = 0;
     /** @brief Updates an existing track row. */
     virtual std::expected<void, caudio::utils::Error>
     updateTrack(const caudio::types::Track& t) = 0;
@@ -160,7 +168,8 @@ class IDatabase {
 
     // Libraries and statistics
     /** @brief Lists configured library roots. */
-    virtual std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> listLibraries() = 0;
+    virtual std::expected<std::vector<caudio::types::Library>, caudio::utils::Error>
+    listLibraries() = 0;
     /** @brief Updates an existing library definition; unknown ids are rejected. */
     virtual std::expected<void, caudio::utils::Error>
     libraryUpdate(const caudio::types::Library& l) = 0;

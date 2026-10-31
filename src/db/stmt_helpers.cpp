@@ -44,6 +44,10 @@ void fillTrackFromStmt(sqlite3_stmt* stmt, caudio::types::Track& t) {
     t.last_scanned = sqlite3_column_int64(stmt, 23);
     t.dirty = sqlite3_column_int(stmt, 24) != 0;
     t.library_id = static_cast<int>(sqlite3_column_int(stmt, 25));
+    t.source.kind = static_cast<caudio::types::SourceKind>(sqlite3_column_int(stmt, 26));
+    t.source.key = columnText(stmt, 27);
+    t.source.available = sqlite3_column_int(stmt, 28) != 0;
+    t.source.display_name = columnText(stmt, 29);
 }
 
 SqliteErrGuard::~SqliteErrGuard() {

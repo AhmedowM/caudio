@@ -12,8 +12,8 @@
 
 #include <array>
 #include <caudio/contracts/database.hpp>
-#include <caudio/types/db.hpp>
 #include <caudio/fwd.hpp>
+#include <caudio/types/db.hpp>
 #include <caudio/utils/error.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -216,6 +216,21 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      */
     std::expected<caudio::types::Track, caudio::utils::Error>
     findByPath(std::string_view path) override;
+    /**
+     * @brief Finds a track by durable source identity.
+     * @ingroup caudio_db
+     * @param source Source kind and stable key. Path rows normally use the
+     * filesystem path as the key after `normalizedSource()`.
+     * @return Track or Error InvalidArg (empty key)/NotFound/Internal.
+     * @details Implements deterministic source deduplication: callers compare
+     * `(source.kind, source.key)` instead of guessing a filesystem path for a
+     * content URI. A transient descriptor number is never part of this key.
+     * @par Thread safety
+     * Thread-safe: shared_lock on dbMutex_.
+     * @see caudio::types::normalizedSource
+     */
+    std::expected<caudio::types::Track, caudio::utils::Error>
+    findBySource(const caudio::types::SourceRef& source) override;
     /**
      * @brief Lists tracks with optional filters.
      * @ingroup caudio_db
@@ -531,9 +546,11 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
      * @par Thread safety
      * Thread-safe: shared_lock (delegates to libraryListLocked).
      */
-    std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> listLibraries() override;
+    std::expected<std::vector<caudio::types::Library>, caudio::utils::Error>
+    listLibraries() override;
     /** @brief Updates a library definition. @ingroup caudio_db */
-    std::expected<void, caudio::utils::Error> libraryUpdate(const caudio::types::Library& l) override;
+    std::expected<void, caudio::utils::Error>
+    libraryUpdate(const caudio::types::Library& l) override;
     /** @brief Deletes a library definition. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error> libraryDelete(int64_t id) override;
 
@@ -562,8 +579,7 @@ class CAUDIO_API Database final : public caudio::contracts::IDatabase {
 
     // Persisted engine state and playback history
     /** @brief Loads persisted engine state. @ingroup caudio_db */
-    std::expected<caudio::types::EngineState, caudio::utils::Error>
-    loadEngineState() override;
+    std::expected<caudio::types::EngineState, caudio::utils::Error> loadEngineState() override;
     /** @brief Persists engine state. @ingroup caudio_db */
     std::expected<void, caudio::utils::Error>
     saveEngineState(const caudio::types::EngineState& state) override;

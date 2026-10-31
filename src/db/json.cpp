@@ -102,8 +102,9 @@ std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
                                 "sample_rate, channels, bitrate, title, artist, album, "
                                 "album_artist, genre, year, track_num, disc_num, "
                                 "cover_art_path, rating, play_count, last_played, date_added, "
-                                "last_scanned, dirty, library_id, deleted_at) VALUES "
-                                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                                "last_scanned, dirty, library_id, source_kind, source_key, "
+                                "source_available, source_display_name, deleted_at) VALUES "
+                                "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
             !e) {
             corrupt = true;
             break;
@@ -137,10 +138,15 @@ std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
         stmt.bindInt(22, t.last_scanned);
         stmt.bindInt(23, t.dirty ? 1 : 0);
         stmt.bindInt(24, t.library_id ? t.library_id : 1);
+        const auto source = caudio::types::normalizedSource(t);
+        stmt.bindInt(25, static_cast<int>(source.kind));
+        stmt.bindText(26, source.key);
+        stmt.bindInt(27, source.available ? 1 : 0);
+        stmt.bindText(28, source.display_name);
         if (t.deleted_at)
-            stmt.bindInt(25, t.deleted_at);
+            stmt.bindInt(29, t.deleted_at);
         else
-            stmt.bindNull(25);
+            stmt.bindNull(29);
         int rc = stmt.stepDone();
         if (rc == SQLITE_CONSTRAINT) {
             SqliteStatement sel;
@@ -158,7 +164,9 @@ std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
                                        "album=?, album_artist=?, genre=?, year=?, track_num=?, "
                                        "disc_num=?, cover_art_path=?, rating=?, play_count=?, "
                                        "last_played=?, date_added=?, last_scanned=?, dirty=?, "
-                                       "library_id=?, deleted_at=? WHERE id=?");
+                                       "library_id=?, source_kind=?, source_key=?, "
+                                       "source_available=?, source_display_name=?, deleted_at=? "
+                                       "WHERE id=?");
                     !e) {
                     corrupt = true;
                     break;
@@ -186,11 +194,16 @@ std::expected<void, caudio::utils::Error> importJson(contracts::IDatabase& db_,
                 upd.bindInt(21, t.last_scanned);
                 upd.bindInt(22, t.dirty ? 1 : 0);
                 upd.bindInt(23, t.library_id ? t.library_id : 1);
+                const auto source = caudio::types::normalizedSource(t);
+                upd.bindInt(24, static_cast<int>(source.kind));
+                upd.bindText(25, source.key);
+                upd.bindInt(26, source.available ? 1 : 0);
+                upd.bindText(27, source.display_name);
                 if (t.deleted_at)
-                    upd.bindInt(24, t.deleted_at);
+                    upd.bindInt(28, t.deleted_at);
                 else
-                    upd.bindNull(24);
-                upd.bindInt(25, existing);
+                    upd.bindNull(28);
+                upd.bindInt(29, existing);
                 (void)upd.stepDone();
             } else {
                 SqliteStatement sel2;

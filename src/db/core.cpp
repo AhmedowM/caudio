@@ -80,7 +80,11 @@ inline constexpr std::string_view schema =
     "date_added DATETIME DEFAULT CURRENT_TIMESTAMP,"
     "last_scanned DATETIME,"
     "dirty BOOLEAN DEFAULT 0,"
-    "library_id INTEGER DEFAULT 1 REFERENCES libraries(id)"
+    "library_id INTEGER DEFAULT 1 REFERENCES libraries(id),"
+    "source_kind INTEGER NOT NULL DEFAULT 0,"
+    "source_key TEXT NOT NULL DEFAULT '',"
+    "source_available BOOLEAN NOT NULL DEFAULT 1,"
+    "source_display_name TEXT"
     ");"
     "CREATE INDEX IF NOT EXISTS idx_tracks_fingerprint ON tracks(fingerprint);"
     "CREATE INDEX IF NOT EXISTS idx_tracks_path ON tracks(path);"
@@ -184,12 +188,14 @@ inline constexpr std::string_view insertTrackSql =
     "INSERT INTO tracks (fingerprint, path, size, mtime, duration, sample_rate, channels, "
     "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
     "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
-    "library_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+    "library_id, source_kind, source_key, source_available, source_display_name) VALUES "
+    "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
 inline constexpr std::string_view updateTrackSql =
     "UPDATE tracks SET fingerprint=?, path=?, size=?, mtime=?, duration=?, sample_rate=?, "
     "channels=?, bitrate=?, title=?, artist=?, album=?, album_artist=?, genre=?, year=?, "
     "track_num=?, disc_num=?, cover_art_path=?, rating=?, play_count=?, last_played=?, "
-    "date_added=?, last_scanned=?, dirty=?, library_id=?, deleted_at=? WHERE id=?";
+    "date_added=?, last_scanned=?, dirty=?, library_id=?, source_kind=?, source_key=?, "
+    "source_available=?, source_display_name=?, deleted_at=? WHERE id=?";
 
 // Private implementation: the SQLite handle, statement cache, locks and the
 // background writer live here so the public header stays include-light.
@@ -217,6 +223,8 @@ struct Database::Impl {
     // Track / library locked helpers
     std::expected<caudio::types::Track, caudio::utils::Error>
     findByPathLocked(std::string_view path);
+    std::expected<caudio::types::Track, caudio::utils::Error>
+    findBySourceLocked(const caudio::types::SourceRef& source);
     std::expected<caudio::types::Track, caudio::utils::Error>
     findByFingerprintLocked(const std::array<uint8_t, 32>& fp);
     std::expected<int64_t, caudio::utils::Error> insertTrackLocked(const caudio::types::Track& t);
@@ -335,12 +343,46 @@ Database::open(std::string_view path, const DatabaseOptions& opts) {
     // Migration: add pre_mute_volume column if missing (for existing DBs)
     // Migration: add position_ms column if missing (for existing DBs)
     // Migration: add queues.temp column if missing (for existing DBs)
-    for (const char* mig : {"ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
-                            "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5",
-                            "ALTER TABLE engine_state ADD COLUMN position_ms INTEGER DEFAULT 0",
-                            "ALTER TABLE queues ADD COLUMN temp INTEGER DEFAULT 0"}) {
+    for (const char* mig :
+         {"ALTER TABLE engine_state ADD COLUMN active_queue_id INTEGER DEFAULT 1",
+          "ALTER TABLE engine_state ADD COLUMN pre_mute_volume REAL DEFAULT 0.5",
+          "ALTER TABLE engine_state ADD COLUMN position_ms INTEGER DEFAULT 0",
+          "ALTER TABLE queues ADD COLUMN temp INTEGER DEFAULT 0",
+          "ALTER TABLE tracks ADD COLUMN source_kind INTEGER NOT NULL DEFAULT 0",
+          "ALTER TABLE tracks ADD COLUMN source_key TEXT NOT NULL DEFAULT ''",
+          "ALTER TABLE tracks ADD COLUMN source_available BOOLEAN NOT NULL DEFAULT 1",
+          "ALTER TABLE tracks ADD COLUMN source_display_name TEXT"}) {
         char* migErr = nullptr;
         int migRc = sqlite3_exec(raw, mig, nullptr, nullptr, &migErr);
+        if (migErr) {
+            sqlite3_free(migErr);
+            migErr = nullptr;
+        }
+        (void)migRc;
+    }
+    // Existing rows were path-only. Give them an explicit source identity so
+    // (source_kind, source_key) deduplication works without rewriting paths.
+    // Non-fatal when the columns already hold normalized values.
+    {
+        char* migErr = nullptr;
+        int migRc = sqlite3_exec(raw,
+                                 "UPDATE tracks SET source_key=path, source_display_name=path "
+                                 "WHERE source_kind=0 AND source_key=''",
+                                 nullptr, nullptr, &migErr);
+        if (migErr) {
+            sqlite3_free(migErr);
+            migErr = nullptr;
+        }
+        (void)migRc;
+    }
+    // The source index is created only after the migration columns exist on
+    // legacy databases; CREATE TABLE above covers fresh databases.
+    {
+        char* migErr = nullptr;
+        int migRc = sqlite3_exec(raw,
+                                 "CREATE INDEX IF NOT EXISTS idx_tracks_source ON "
+                                 "tracks(source_kind, source_key)",
+                                 nullptr, nullptr, &migErr);
         if (migErr) {
             sqlite3_free(migErr);
             migErr = nullptr;
@@ -473,6 +515,34 @@ Database::Impl::findByPathLocked(std::string_view path) {
 }
 
 std::expected<caudio::types::Track, caudio::utils::Error>
+Database::Impl::findBySourceLocked(const caudio::types::SourceRef& source) {
+    if (!db_)
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
+    if (source.key.empty()) {
+        return std::unexpected{
+            caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg, "empty source key")};
+    }
+    std::string sql =
+        std::string(internal::selectTracksCols) + " WHERE source_kind=? AND source_key=?";
+    std::unique_lock cacheLk{cacheMutex_};
+    auto sRes = getCachedForUse(sql);
+    if (!sRes)
+        return std::unexpected{sRes.error()};
+    SqliteStatement& st = *(*sRes);
+    st.bindInt(1, static_cast<int>(source.kind));
+    st.bindText(2, source.key);
+    bool hasRow = st.step();
+    caudio::types::Track t;
+    if (hasRow)
+        internal::fillTrackFromStmt(st.get(), t);
+    st.reset();
+    if (!hasRow)
+        return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
+    return t;
+}
+
+std::expected<caudio::types::Track, caudio::utils::Error>
 Database::Impl::findByFingerprintLocked(const std::array<uint8_t, 32>& fp) {
     if (!db_)
         return std::unexpected{
@@ -566,7 +636,8 @@ std::expected<void, caudio::utils::Error> Database::Impl::deleteTrackLocked(int6
     return {};
 }
 
-std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> Database::Impl::libraryListLocked() {
+std::expected<std::vector<caudio::types::Library>, caudio::utils::Error>
+Database::Impl::libraryListLocked() {
     if (!db_)
         return std::unexpected{
             caudio::utils::makeError(caudio::utils::StatusCode::Internal, "no db")};
@@ -592,7 +663,8 @@ std::expected<std::vector<caudio::types::Library>, caudio::utils::Error> Databas
     return out;
 }
 
-std::expected<void, caudio::utils::Error> Database::Impl::libraryUpdateLocked(const caudio::types::Library& l) {
+std::expected<void, caudio::utils::Error>
+Database::Impl::libraryUpdateLocked(const caudio::types::Library& l) {
     if (l.id == 0)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::InvalidArg)};
     if (!db_)
@@ -652,6 +724,11 @@ void bindTrackForInsert(SqliteStatement& st, const caudio::types::Track& t) {
     st.bindInt(22, t.last_scanned);
     st.bindInt(23, t.dirty ? 1 : 0);
     st.bindInt(24, t.library_id ? t.library_id : 1);
+    const auto source = caudio::types::normalizedSource(t);
+    st.bindInt(25, static_cast<int>(source.kind));
+    st.bindText(26, source.key);
+    st.bindInt(27, source.available ? 1 : 0);
+    st.bindText(28, source.display_name);
 }
 
 void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t) {
@@ -681,11 +758,16 @@ void bindTrackForUpdate(SqliteStatement& st, const caudio::types::Track& t) {
     st.bindInt(22, t.last_scanned);
     st.bindInt(23, t.dirty ? 1 : 0);
     st.bindInt(24, t.library_id ? t.library_id : 1);
+    const auto source = caudio::types::normalizedSource(t);
+    st.bindInt(25, static_cast<int>(source.kind));
+    st.bindText(26, source.key);
+    st.bindInt(27, source.available ? 1 : 0);
+    st.bindText(28, source.display_name);
     if (t.deleted_at)
-        st.bindInt(25, t.deleted_at);
+        st.bindInt(29, t.deleted_at);
     else
-        st.bindNull(25);
-    st.bindInt(26, t.id);
+        st.bindNull(29);
+    st.bindInt(30, t.id);
 }
 
 std::expected<int64_t, caudio::utils::Error> Database::insertTrack(const caudio::types::Track& t) {
@@ -777,6 +859,12 @@ Database::findByPath(std::string_view path) {
     if (!hasRow)
         return std::unexpected{caudio::utils::makeError(caudio::utils::StatusCode::NotFound)};
     return t;
+}
+
+std::expected<caudio::types::Track, caudio::utils::Error>
+Database::findBySource(const caudio::types::SourceRef& source) {
+    std::shared_lock lk{impl_->dbMutex_};
+    return impl_->findBySourceLocked(source);
 }
 
 std::expected<std::vector<caudio::types::Track>, caudio::utils::Error>
@@ -1806,8 +1894,8 @@ DatabaseAccess::libraryListLocked(Database& db) {
     return db.impl_->libraryListLocked();
 }
 
-std::expected<void, caudio::utils::Error> DatabaseAccess::libraryUpdateLocked(Database& db,
-                                                                              const caudio::types::Library& l) {
+std::expected<void, caudio::utils::Error>
+DatabaseAccess::libraryUpdateLocked(Database& db, const caudio::types::Library& l) {
     return db.impl_->libraryUpdateLocked(l);
 }
 

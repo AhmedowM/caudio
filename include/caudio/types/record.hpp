@@ -15,9 +15,91 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace caudio::types {
+
+/**
+ * @enum SourceKind
+ * @brief Durable identity category for a track's bytes.
+ * @ingroup caudio_types
+ *
+ * This is deliberately separate from `caudio::media::SourceKind`, which
+ * describes a read transport (path or descriptor). A persisted source may be
+ * an ordinary path, a host-issued stable identifier (for example an Android
+ * document URI or MediaStore id), an app-private imported copy, or a source
+ * whose permission was revoked. A host reopens external identities and hands
+ * the media layer a descriptor; descriptors themselves are never persisted.
+ */
+enum class SourceKind : std::uint8_t {
+    path = 0,       ///< Ordinary filesystem path (legacy default).
+    external = 1,   ///< Stable host-issued identifier, not a filesystem path.
+    imported = 2,   ///< App-private copy created by the host.
+    unavailable = 3 ///< Source is known but cannot currently be reopened.
+};
+
+/**
+ * @struct SourceRef
+ * @brief Persisted source identity and availability for a track.
+ * @ingroup caudio_types
+ *
+ * `key` is the stable identity used for deduplication:
+ * - `path`: the filesystem path (normalized from Track::path when empty).
+ * - `external`: the host-issued document/media identifier.
+ * - `imported`: the app-private path or host key for the imported copy.
+ * - `unavailable`: the last known key, retained so the host can retry.
+ *
+ * Deduplication rule: `(kind, key)` identifies a source. `Track::path` remains
+ * the display/legacy path and must not be used to fake a content URI. Hosts
+ * should call `normalizedSource()` before persistence or lookup so path rows
+ * always carry an explicit key.
+ */
+struct SourceRef {
+    SourceKind kind{SourceKind::path}; ///< Durable identity category.
+    std::string key;                   ///< Stable identity; empty only before normalization.
+    std::string display_name;          ///< Optional user-facing name.
+    bool available{true};              ///< False when the host cannot reopen the source.
+};
+
+/**
+ * @brief Returns the stable serialized name of a source kind.
+ * @ingroup caudio_types
+ * @param kind Source kind.
+ * @return `"path"`, `"external"`, `"imported"`, or `"unavailable"`.
+ */
+[[nodiscard]] inline constexpr std::string_view sourceKindName(SourceKind kind) noexcept {
+    switch (kind) {
+    case SourceKind::path:
+        return "path";
+    case SourceKind::external:
+        return "external";
+    case SourceKind::imported:
+        return "imported";
+    case SourceKind::unavailable:
+        return "unavailable";
+    }
+    return "path";
+}
+
+/**
+ * @brief Parses a source kind from its serialized name.
+ * @ingroup caudio_types
+ * @param name Case-sensitive name produced by sourceKindName().
+ * @return Parsed kind, or nullopt for an unknown name.
+ */
+[[nodiscard]] inline constexpr std::optional<SourceKind>
+sourceKindFromName(std::string_view name) noexcept {
+    if (name == "path")
+        return SourceKind::path;
+    if (name == "external")
+        return SourceKind::external;
+    if (name == "imported")
+        return SourceKind::imported;
+    if (name == "unavailable")
+        return SourceKind::unavailable;
+    return std::nullopt;
+}
 
 /**
  * @brief Represents a single audio track row.
@@ -53,7 +135,25 @@ struct Track {
     int32_t rating{};                      ///< User rating (0..5).
     std::array<uint8_t, 32> fingerprint{}; ///< BLAKE3-256 content fingerprint (UNIQUE).
     bool dirty{false};                     ///< True if metadata needs re-scan.
+    SourceRef source{};                    ///< Durable source identity (path by default).
 };
+
+/**
+ * @brief Returns a persistence-ready source reference for a track.
+ * @ingroup caudio_types
+ * @param t Track whose `source` may leave the key empty.
+ * @return Copy of `t.source`; for `SourceKind::path` an empty key is filled
+ *         from `t.path`. Other kinds are returned unchanged so callers can
+ *         detect a missing host identifier.
+ */
+[[nodiscard]] inline SourceRef normalizedSource(const Track& t) {
+    SourceRef source = t.source;
+    if (source.kind == SourceKind::path && source.key.empty())
+        source.key = t.path;
+    if (source.display_name.empty() && source.kind == SourceKind::path)
+        source.display_name = t.path;
+    return source;
+}
 
 /**
  * @brief Playlist row.

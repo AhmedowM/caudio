@@ -30,7 +30,8 @@ tryFtsQuery(sqlite3* h, std::string_view query, int limit) {
         "SELECT t.id, t.fingerprint, t.path, t.deleted_at, t.size, t.mtime, t.duration, "
         "t.sample_rate, t.channels, t.bitrate, t.title, t.artist, t.album, t.album_artist, "
         "t.genre, t.year, t.track_num, t.disc_num, t.cover_art_path, t.rating, t.play_count, "
-        "t.last_played, t.date_added, t.last_scanned, t.dirty, t.library_id "
+        "t.last_played, t.date_added, t.last_scanned, t.dirty, t.library_id, t.source_kind, "
+        "t.source_key, t.source_available, t.source_display_name "
         "FROM tracks t JOIN tracks_fts f ON t.id = f.rowid WHERE tracks_fts MATCH ? ORDER BY rank "
         "LIMIT ?";
     SqliteStatement st;
@@ -75,7 +76,7 @@ searchFts(contracts::IDatabase& db_, std::string_view query, int limit) {
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
         "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
-        "library_id "
+        "library_id, source_kind, source_key, source_available, source_display_name "
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
         "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE OR path LIKE ? ESCAPE '\\' "
@@ -115,7 +116,7 @@ searchLike(contracts::IDatabase& db_, std::string_view query, int limit) {
         "SELECT id, fingerprint, path, deleted_at, size, mtime, duration, sample_rate, channels, "
         "bitrate, title, artist, album, album_artist, genre, year, track_num, disc_num, "
         "cover_art_path, rating, play_count, last_played, date_added, last_scanned, dirty, "
-        "library_id "
+        "library_id, source_kind, source_key, source_available, source_display_name "
         "FROM tracks WHERE title LIKE ? ESCAPE '\\' COLLATE NOCASE OR artist LIKE ? ESCAPE '\\' "
         "COLLATE NOCASE OR album LIKE ? ESCAPE '\\' COLLATE NOCASE OR album_artist LIKE ? ESCAPE "
         "'\\' COLLATE NOCASE OR genre LIKE ? ESCAPE '\\' COLLATE NOCASE OR path LIKE ? ESCAPE '\\' "
