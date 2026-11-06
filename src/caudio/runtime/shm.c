@@ -36,8 +36,16 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
         return CA_SHM_INVALID;
     }
 
+#if defined(__ANDROID__)
+    if (err) {
+        ca_error_set(err, CA_NOT_SUPPORTED,
+                     "shared memory unsupported on Android");
+    }
+    (void)name;
+    (void)size;
     (void)create;
-
+    return CA_SHM_INVALID;
+#elif defined(_WIN32) || defined(__CYGWIN__)
     ca_shm_t shm = (ca_shm_t)calloc(1, sizeof(struct ca_shm));
     if (shm == nullptr) {
         if (err) {
@@ -46,7 +54,6 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
         return CA_SHM_INVALID;
     }
 
-#if defined(_WIN32) || defined(__CYGWIN__)
     DWORD flProtect = PAGE_READWRITE;
 
     shm->handle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr,
@@ -62,7 +69,17 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     DWORD last = GetLastError();
     shm->created = (last != ERROR_ALREADY_EXISTS);
     shm->size = size;
+
+    return shm;
 #else
+    ca_shm_t shm = (ca_shm_t)calloc(1, sizeof(struct ca_shm));
+    if (shm == nullptr) {
+        if (err) {
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate shm");
+        }
+        return CA_SHM_INVALID;
+    }
+
     int flags = O_RDWR;
     mode_t mode = 0600;
 
@@ -120,9 +137,9 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     } else {
         shm->size = size;
     }
-#endif
 
     return shm;
+#endif
 }
 
 ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
@@ -138,7 +155,17 @@ ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
         return CA_INVALID_ARGUMENT;
     }
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(__ANDROID__)
+    if (err) {
+        ca_error_set(err, CA_NOT_SUPPORTED,
+                     "shared memory unsupported on Android");
+    }
+    (void)shm;
+    (void)offset;
+    (void)length;
+    (void)out;
+    return CA_NOT_SUPPORTED;
+#elif defined(_WIN32) || defined(__CYGWIN__)
     DWORD dwDesired = FILE_MAP_READ | FILE_MAP_WRITE;
     void *addr = MapViewOfFile(shm->handle, dwDesired, 0,
                                (DWORD)offset, length);
@@ -185,7 +212,15 @@ ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
 
     (void)length;
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(__ANDROID__)
+    if (err) {
+        ca_error_set(err, CA_NOT_SUPPORTED,
+                     "shared memory unsupported on Android");
+    }
+    (void)addr;
+    (void)length;
+    return CA_NOT_SUPPORTED;
+#elif defined(_WIN32) || defined(__CYGWIN__)
     if (!UnmapViewOfFile(addr)) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "UnmapViewOfFile failed");
@@ -220,7 +255,9 @@ ca_status ca_shm_close(ca_shm_t shm, ca_error *err) {
         return CA_OK;
     }
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(__ANDROID__)
+    free(shm);
+#elif defined(_WIN32) || defined(__CYGWIN__)
     CloseHandle(shm->handle);
 #else
     close(shm->fd);
@@ -242,7 +279,14 @@ ca_status ca_shm_unlink(const char *name, ca_error *err) {
         return CA_INVALID_ARGUMENT;
     }
 
-#if defined(_WIN32) || defined(__CYGWIN__)
+#if defined(__ANDROID__)
+    if (err) {
+        ca_error_set(err, CA_NOT_SUPPORTED,
+                     "shared memory unsupported on Android");
+    }
+    (void)name;
+    return CA_NOT_SUPPORTED;
+#elif defined(_WIN32) || defined(__CYGWIN__)
     /* Win32 named file mappings are unlinked when the last handle closes;
        there is no separate unlink. */
     (void)name;

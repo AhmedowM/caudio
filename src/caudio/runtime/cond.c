@@ -149,7 +149,8 @@ ca_status ca_cond_wait(ca_cond_t cond, ca_mutex_t mutex, ca_error *err) {
         return CA_IO_ERROR;
     }
 #else
-    int rc = pthread_cond_wait(&cond->cond, &mutex->lock);
+    int rc = pthread_cond_wait(&cond->cond,
+                               (pthread_mutex_t *)ca_mutex_native_handle(mutex));
     if (rc != 0) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_cond_wait failed: %d",
@@ -209,7 +210,9 @@ ca_status ca_cond_timedwait(ca_cond_t cond, ca_mutex_t mutex,
     ts.tv_sec  = (time_t)(abstime_us / 1000000ULL);
     ts.tv_nsec = (long)((abstime_us % 1000000ULL) * 1000ULL);
 
-    int rc = pthread_cond_timedwait(&cond->cond, &mutex->lock, &ts);
+    int rc = pthread_cond_timedwait(&cond->cond,
+                                (pthread_mutex_t *)ca_mutex_native_handle(mutex),
+                                &ts);
     if (rc == ETIMEDOUT) {
         if (err) {
             ca_error_set(err, CA_TIMED_OUT, "condition variable timed out");

@@ -36,9 +36,6 @@ ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
         return CA_INVALID_ARGUMENT;
     }
 
-#if !defined(_WIN32) && !defined(__CYGWIN__)
-#endif
-
     ca_process_t p = (ca_process_t)calloc(1, sizeof(struct ca_process));
     if (p == nullptr) {
         if (err) {
