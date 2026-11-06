@@ -4,11 +4,17 @@
 set(CA_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/status.c
     ${CMAKE_CURRENT_SOURCE_DIR}/error.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/fs.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/path.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/time.c
 )
 
 set(CA_RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/status.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/error.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/fs.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/path.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/time.h
 )
 
 if(CA_RUNTIME_BUILD_SHARED)
