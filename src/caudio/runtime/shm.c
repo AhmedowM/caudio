@@ -55,6 +55,7 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     }
 
     DWORD flProtect = PAGE_READWRITE;
+    (void)create;
 
     shm->handle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr,
                                      flProtect, 0, (DWORD)size, nullptr);

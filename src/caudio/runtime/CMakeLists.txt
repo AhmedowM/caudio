@@ -1,5 +1,6 @@
 # ca_runtime component — part of caudio's own tree (not a standalone project).
-# Self-contained: no dependency on cstdx. Compiles to its own shared library.
+# Depends on cstdx for the cx_allocator contract. Compiles to its own shared
+# library.
 
 set(CA_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/status.c
@@ -16,6 +17,7 @@ set(CA_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/socket.c
     ${CMAKE_CURRENT_SOURCE_DIR}/shm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/file_lock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/json.c
 )
 
 set(CA_RUNTIME_PUBLIC_HEADERS
@@ -33,6 +35,7 @@ set(CA_RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/socket.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/shm.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/file_lock.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/json.h
 )
 
 if(CA_RUNTIME_BUILD_SHARED)
@@ -51,6 +54,7 @@ add_library(ca_runtime::ca_runtime ALIAS ca_runtime)
 target_include_directories(ca_runtime
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/libs/cstdx/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
@@ -70,5 +74,7 @@ else()
 endif()
 
 if(WIN32)
-  target_link_libraries(ca_runtime PRIVATE ws2_32)
+  target_link_libraries(ca_runtime PRIVATE ws2_32 yyjson cstdx::cstdx)
+else()
+  target_link_libraries(ca_runtime PRIVATE yyjson cstdx::cstdx)
 endif()

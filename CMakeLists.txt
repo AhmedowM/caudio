@@ -37,6 +37,7 @@ endif()
 
 # ca_runtime lives inside caudio's own tree (include/caudio/runtime, src/caudio/runtime).
 # It is self-contained: no dependency on cstdx.
+add_subdirectory(libs/third_party/yyjson)
 add_subdirectory(src/caudio/runtime)
 
 if(CAUDIO_BUILD_TESTS)
@@ -78,6 +79,7 @@ target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
 target_include_directories(caudio
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/libs/cstdx/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

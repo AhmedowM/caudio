@@ -1,0 +1,255 @@
+name: caudio
+
+# Continuous integration for the caudio domain library. caudio builds on top
+# of cstdx (in-tree) and ca_runtime (in-tree). caudio itself does not depend
+# on caudio headers from cstdx.
+
+on:
+  push:
+    paths:
+      - 'libs/cstdx/**'
+      - 'include/caudio/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/caudio.yml'
+      - '.github/workflows/cstdx.yml'
+  pull_request:
+    paths:
+      - 'libs/cstdx/**'
+      - 'include/caudio/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/caudio.yml'
+      - '.github/workflows/cstdx.yml'
+
+concurrency:
+  group: caudio-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_VERSION: 3.28.3
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Linux, GCC 14+. Debug and Release. One debug slice flips char signedness.
+  # -------------------------------------------------------------------------
+  linux-gcc:
+    name: Linux GCC ${{ matrix.build_type }}${{ matrix.char_signedness }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_type: Debug
+            char_signedness: signed
+            c_flags: ''
+          - build_type: Debug
+            char_signedness: unsigned
+            c_flags: '-funsigned-char'
+          - build_type: Release
+            char_signedness: signed
+            c_flags: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 ninja-build cmake libasan8 libubsan1
+
+      - name: Configure
+        env:
+          CFLAGS: ${{ matrix.c_flags }}
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_C_FLAGS="$CFLAGS -Werror"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Clang 18+ with ASan + UBSan.
+  # -------------------------------------------------------------------------
+  linux-clang-sanitizers:
+    name: Linux Clang ASan+UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-18 lld-18 ninja-build cmake libclang-rt-18-dev
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # macOS, AppleClang 16+ (Xcode 16 on macos-15). Debug and Release.
+  # -------------------------------------------------------------------------
+  macos:
+    name: macOS ${{ matrix.build_type }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain version
+        run: |
+          cmake --version
+          clang --version
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_C_FLAGS="-Werror"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Windows via MSYS2. Both MinGW-w64 GCC and the Clang/LLVM toolchain.
+  # Debug and Release per toolchain.
+  # -------------------------------------------------------------------------
+  windows-msys2:
+    name: Windows ${{ matrix.msystem }} ${{ matrix.build_type }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: MINGW64
+            package_prefix: mingw-w64-x86_64
+            cc: gcc
+            cxx: g++
+            build_type: Debug
+          - msystem: MINGW64
+            package_prefix: mingw-w64-x86_64
+            cc: gcc
+            cxx: g++
+            build_type: Release
+          - msystem: CLANG64
+            package_prefix: mingw-w64-clang-x86_64
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+          - msystem: CLANG64
+            package_prefix: mingw-w64-clang-x86_64
+            cc: clang
+            cxx: clang++
+            build_type: Release
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            base-devel
+            ${{ matrix.package_prefix }}-cmake
+            ${{ matrix.package_prefix }}-ninja
+            ${{ matrix.package_prefix }}-${{ matrix.cc }}
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Android NDK r30, arm64-v8a, API 28. Build-only validation (no device to
+  # run tests on).
+  # -------------------------------------------------------------------------
+  android-ndk:
+    name: Android NDK r30 arm64-v8a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build cmake unzip wget
+
+      - name: Download Android NDK r30
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r30-linux.zip
+          unzip -q android-ndk-r30-linux.zip
+          echo "NDK_ROOT=$PWD/android-ndk-r30" >> $GITHUB_ENV
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_SYSTEM_NAME=Android \
+            -DCMAKE_SYSTEM_VERSION=28 \
+            -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+            -DCMAKE_ANDROID_NDK=$NDK_ROOT \
+            -DCMAKE_C_COMPILER=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/clang \
+            -DCMAKE_C_FLAGS="-Werror" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSROOT=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot \
+            -DCAUDIO_BUILD_TESTS=OFF \
+            -DCAUDIO_BUILD_SHARED=ON \
+            -DCA_RUNTIME_BUILD_SHARED=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Verify shared libraries
+        run: |
+          ls -la build/bin/libcstdx.so build/bin/libca_runtime.so build/bin/libcaudio.so
+          file build/bin/libcstdx.so build/bin/libca_runtime.so build/bin/libcaudio.so
