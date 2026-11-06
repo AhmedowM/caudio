@@ -13,6 +13,10 @@ set(CAUDIO_UNIT_TESTS
     rwlock
     tls
     thread
+    process
+    socket
+    shm
+    file_lock
 )
 
 foreach(_test IN LISTS CAUDIO_UNIT_TESTS)
@@ -21,6 +25,10 @@ foreach(_test IN LISTS CAUDIO_UNIT_TESTS)
     target_include_directories(caudio_test_${_test}
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
     )
+
+    if(WIN32 AND _test STREQUAL "socket")
+        target_link_libraries(caudio_test_${_test} PRIVATE ws2_32)
+    endif()
 
     add_test(NAME caudio.${_test} COMMAND caudio_test_${_test})
     set_tests_properties(caudio.${_test} PROPERTIES LABELS unit)

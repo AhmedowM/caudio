@@ -12,6 +12,10 @@ set(CA_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cond.c
     ${CMAKE_CURRENT_SOURCE_DIR}/rwlock.c
     ${CMAKE_CURRENT_SOURCE_DIR}/tls.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/process.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/socket.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/shm.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/file_lock.c
 )
 
 set(CA_RUNTIME_PUBLIC_HEADERS
@@ -25,6 +29,10 @@ set(CA_RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/cond.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/rwlock.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/tls.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/process.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/socket.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/shm.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/file_lock.h
 )
 
 if(CA_RUNTIME_BUILD_SHARED)
@@ -59,4 +67,8 @@ if(MSVC)
   target_compile_options(ca_runtime PRIVATE /W4)
 else()
   target_compile_options(ca_runtime PRIVATE -Wall -Wextra -Werror)
+endif()
+
+if(WIN32)
+  target_link_libraries(ca_runtime PRIVATE ws2_32)
 endif()
