@@ -12,7 +12,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(CSTDX_BUILD_TESTS "Build cstdx tests" ${PROJECT_IS_TOP_LEVEL})
 option(CSTDX_BUILD_CPP_TESTS "Build C++ differential/property tests" OFF)
 option(CSTDX_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
-option(CSTDX_BUILD_SHARED "Build cstdx as a shared library" OFF)
+option(CSTDX_BUILD_SHARED "Build cstdx as a shared library" ON)
 option(CSTDX_BUILD_BENCHMARKS "Build cstdx benchmarks" OFF)
 
 # ---------------------------------------------------------------------------

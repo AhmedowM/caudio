@@ -1,0 +1,46 @@
+# ca_runtime component — part of caudio's own tree (not a standalone project).
+# Self-contained: no dependency on cstdx. Compiles to its own shared library.
+
+set(CA_RUNTIME_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/status.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/error.c
+)
+
+set(CA_RUNTIME_PUBLIC_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/status.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/error.h
+)
+
+if(CA_RUNTIME_BUILD_SHARED)
+  add_library(ca_runtime SHARED ${CA_RUNTIME_SOURCES} ${CA_RUNTIME_PUBLIC_HEADERS})
+  target_compile_definitions(ca_runtime
+      PUBLIC  CAUDIO_SHARED
+      PRIVATE CAUDIO_EXPORTS
+  )
+else()
+  add_library(ca_runtime STATIC ${CA_RUNTIME_SOURCES} ${CA_RUNTIME_PUBLIC_HEADERS})
+  target_compile_definitions(ca_runtime PRIVATE CAUDIO_EXPORTS)
+endif()
+
+add_library(ca_runtime::ca_runtime ALIAS ca_runtime)
+
+target_include_directories(ca_runtime
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+target_compile_features(ca_runtime PUBLIC c_std_23)
+
+set_target_properties(ca_runtime PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    VERSION ${PROJECT_VERSION}
+)
+
+if(MSVC)
+  target_compile_options(ca_runtime PRIVATE /W4)
+else()
+  target_compile_options(ca_runtime PRIVATE -Wall -Wextra -Werror)
+endif()
