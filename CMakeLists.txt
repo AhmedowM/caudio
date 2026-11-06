@@ -39,6 +39,10 @@ endif()
 # It is self-contained: no dependency on cstdx.
 add_subdirectory(src/caudio/runtime)
 
+if(CAUDIO_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()
+
 option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" ON)
 
 if(CAUDIO_ENABLE_CCACHE)

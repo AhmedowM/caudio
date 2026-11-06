@@ -78,33 +78,27 @@ const char *ca_path_basename(const char *path) {
         return nullptr;
     }
 
-    const char *last = find_last_separator(path);
-    if (last == nullptr) {
+    /* Find the end of the string, skipping trailing separators. */
+    const char *end = path;
+    while (*end != '\0') {
+        ++end;
+    }
+    while (end > path && (end[-1] == '/' || end[-1] == '\\')) {
+        --end;
+    }
+
+    if (end == path) {
+        /* All separators or empty: return "/"-like result. */
         return path;
     }
 
-    /* Skip trailing separators. */
-    const char *p = last + 1;
-    while (*p == '/' || *p == '\\') {
-        ++p;
+    /* Walk back from end to find the last separator. */
+    const char *start = end;
+    while (start > path && (start[-1] != '/' && start[-1] != '\\')) {
+        --start;
     }
 
-    if (*p == '\0') {
-        /* Path ended with separator(s); walk back to find the real basename. */
-        const char *end = last;
-        while (end > path && (end[-1] == '/' || end[-1] == '\\')) {
-            --end;
-        }
-
-        const char *prev = find_last_separator(path);
-        if (prev == nullptr || prev >= end) {
-            return path;
-        }
-
-        return prev + 1;
-    }
-
-    return p;
+    return start;
 }
 
 const char *ca_path_dirname(const char *path) {
