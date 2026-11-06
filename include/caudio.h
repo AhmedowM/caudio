@@ -15,10 +15,15 @@
  */
 
 #include <caudio/api.h>
+#include <caudio/runtime/cond.h>
 #include <caudio/runtime/error.h>
 #include <caudio/runtime/fs.h>
+#include <caudio/runtime/mutex.h>
 #include <caudio/runtime/path.h>
+#include <caudio/runtime/rwlock.h>
 #include <caudio/runtime/status.h>
+#include <caudio/runtime/thread.h>
+#include <caudio/runtime/tls.h>
 #include <caudio/runtime/time.h>
 
 #endif /* CAUDIO_H */

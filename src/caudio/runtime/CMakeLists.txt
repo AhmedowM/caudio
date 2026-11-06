@@ -7,6 +7,11 @@ set(CA_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/fs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/path.c
     ${CMAKE_CURRENT_SOURCE_DIR}/time.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/thread.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/mutex.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/cond.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/rwlock.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/tls.c
 )
 
 set(CA_RUNTIME_PUBLIC_HEADERS
@@ -15,6 +20,11 @@ set(CA_RUNTIME_PUBLIC_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/fs.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/path.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/time.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/thread.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/mutex.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/cond.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/rwlock.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/caudio/runtime/tls.h
 )
 
 if(CA_RUNTIME_BUILD_SHARED)
