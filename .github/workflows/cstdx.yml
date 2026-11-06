@@ -1,0 +1,399 @@
+name: cstdx
+
+# Continuous integration for the standalone cstdx library. caudio itself has
+# its own workflow; this one only runs when cstdx (or the root wiring) changes.
+
+on:
+  push:
+    paths:
+      - 'libs/cstdx/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cstdx.yml'
+  pull_request:
+    paths:
+      - 'libs/cstdx/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cstdx.yml'
+
+concurrency:
+  group: cstdx-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CTEST_OUTPUT_ON_FAILURE: 1
+  CMAKE_VERSION: 3.28.3
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Linux, GCC 14+. Debug and Release. One debug slice flips char signedness,
+  # which catches the base64 class of bug.
+  # -------------------------------------------------------------------------
+  linux-gcc:
+    name: Linux GCC ${{ matrix.build_type }}${{ matrix.char_signedness }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build_type: Debug
+            char_signedness: signed
+            c_flags: ''
+          - build_type: Debug
+            char_signedness: unsigned
+            c_flags: '-funsigned-char'
+          - build_type: Release
+            char_signedness: signed
+            c_flags: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 ninja-build cmake libasan8 libubsan1
+
+      - name: Configure
+        env:
+          CFLAGS: ${{ matrix.c_flags }}
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_C_FLAGS="$CFLAGS -Werror"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Clang 18+ with ASan + UBSan. The whole test suite runs under sanitizers.
+  # -------------------------------------------------------------------------
+  linux-clang-sanitizers:
+    name: Linux Clang ASan+UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-18 lld-18 ninja-build cmake libclang-rt-18-dev
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # C++23 differential/property tests against the STL. GoogleTest and
+  # RapidCheck are fetched by the test CMakeLists.
+  # -------------------------------------------------------------------------
+  cpp-differential:
+    name: C++23 differential (GCC)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 ninja-build cmake
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCSTDX_BUILD_CPP_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # libFuzzer smoke run. Long runs are nightly; CI does a short bounded run
+  # so a regression is caught without blocking PRs for minutes.
+  # -------------------------------------------------------------------------
+  fuzz-smoke:
+    name: libFuzzer smoke (Clang)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-18 ninja-build cmake libclang-rt-18-dev
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCSTDX_BUILD_FUZZ=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Fuzz smoke
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build -L fuzz --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # macOS, AppleClang 16+ (Xcode 16 on macos-15). Debug and Release.
+  # -------------------------------------------------------------------------
+  macos:
+    name: macOS ${{ matrix.build_type }}
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain version
+        run: |
+          cmake --version
+          clang --version
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Windows via MSYS2. Both MinGW-w64 GCC and the Clang/LLVM toolchain.
+  # Debug and Release per toolchain.
+  # -------------------------------------------------------------------------
+  windows-msys2:
+    name: Windows ${{ matrix.msystem }} ${{ matrix.build_type }}
+    runs-on: windows-2022
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: MINGW64
+            package_prefix: mingw-w64-x86_64
+            cc: gcc
+            cxx: g++
+            build_type: Debug
+          - msystem: MINGW64
+            package_prefix: mingw-w64-x86_64
+            cc: gcc
+            cxx: g++
+            build_type: Release
+          - msystem: CLANG64
+            package_prefix: mingw-w64-clang-x86_64
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+          - msystem: CLANG64
+            package_prefix: mingw-w64-clang-x86_64
+            cc: clang
+            cxx: clang++
+            build_type: Release
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            base-devel
+            ${{ matrix.package_prefix }}-cmake
+            ${{ matrix.package_prefix }}-ninja
+            ${{ matrix.package_prefix }}-${{ matrix.cc }}
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Public headers must be self-contained as both C23 and C++23.
+  # -------------------------------------------------------------------------
+  headers:
+    name: Headers ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc-14
+            cxx: g++-14
+          - compiler: clang-18
+            cxx: clang++-18
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 clang-18 ninja-build cmake
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build header smoke targets
+        run: cmake --build build --parallel --target cstdx_headers_c cstdx_headers_cpp
+
+      - name: Run header smoke targets
+        run: |
+          ./build/tests/headers/cstdx_headers_c
+          ./build/tests/headers/cstdx_headers_cpp
+
+  # -------------------------------------------------------------------------
+  # Standalone install + export. A separate consumer project must find the
+  # installed package as cstdx::cstdx and link it.
+  # -------------------------------------------------------------------------
+  install-export:
+    name: Install and export
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 ninja-build cmake
+
+      - name: Build and install cstdx
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$PWD/prefix"
+          cmake --build build --parallel
+          cmake --install build
+
+      - name: Build a consumer with find_package
+        run: |
+          mkdir -p consumer
+          cat > consumer/CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(cstdx_consumer LANGUAGES C)
+          set(CMAKE_C_STANDARD 23)
+          set(CMAKE_C_STANDARD_REQUIRED ON)
+          find_package(cstdx CONFIG REQUIRED)
+          add_executable(consumer main.c)
+          target_link_libraries(consumer PRIVATE cstdx::cstdx)
+          EOF
+          cat > consumer/main.c <<'EOF'
+          #include <cstdx/string.h>
+
+          #include <string.h>
+
+          int main(void) {
+              cx_string *text = nullptr;
+
+              if (cx_string_from(&text, "installed", nullptr) != CX_OK) {
+                  return 1;
+              }
+
+              int failed = strcmp(cx_string_cstr(text), "installed") != 0;
+
+              cx_string_destroy(&text);
+              return failed;
+          }
+          EOF
+
+          cmake -S consumer -B consumer/build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_PREFIX_PATH="$PWD/prefix"
+          cmake --build consumer/build --parallel
+          ./consumer/build/consumer
+
+  # -------------------------------------------------------------------------
+  # The caudio root build adds cstdx with add_subdirectory. This proves the
+  # in-tree wiring still configures, builds, and runs the cstdx tests.
+  # -------------------------------------------------------------------------
+  monorepo-layout:
+    name: caudio root layout
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 ninja-build cmake
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER=gcc-14 \
+            -DCMAKE_CXX_COMPILER=g++-14 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCAUDIO_ENABLE_CCACHE=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

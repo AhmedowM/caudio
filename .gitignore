@@ -1,0 +1,11 @@
+build/*
+.dev/*
+*.exe
+*.dll
+*.pdb
+*.so
+*.dylib
+*.obj
+*.o
+*.a
+*.lib
