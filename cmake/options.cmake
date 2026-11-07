@@ -1,6 +1,7 @@
 # caudio project options and test registration.
 
 option(CAUDIO_BUILD_TESTS "Build unit tests" ON)
+option(CAUDIO_BUILD_CPP_TESTS "Build C++ differential tests" OFF)
 option(CAUDIO_BUILD_SHARED "Build caudio as a shared library" ON)
 option(CA_RUNTIME_BUILD_SHARED "Build ca_runtime as a shared library" ${CAUDIO_BUILD_SHARED})
 option(CAUDIO_USE_SYSTEM_CSTDX "Use an installed cstdx instead of the in-tree copy" OFF)

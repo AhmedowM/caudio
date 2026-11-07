@@ -33,6 +33,10 @@ foreach(_source IN LISTS _caudio_test_sources)
     set_tests_properties(caudio.${_test} PROPERTIES LABELS unit)
 endforeach()
 
+if(CAUDIO_BUILD_CPP_TESTS)
+  include(${CMAKE_CURRENT_LIST_DIR}/tests-cpp.cmake)
+endif()
+
 unset(_caudio_tests_dir)
 unset(_caudio_test_sources)
 unset(_source)
