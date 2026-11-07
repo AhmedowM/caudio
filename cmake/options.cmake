@@ -18,9 +18,15 @@ option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-
 # impose feature-test macros on consumer code. A shared INTERFACE target cannot
 # be used here because a static ca_runtime would export it as a link dependency
 # that is not part of caudioTargets.
+#
+# On Darwin, strict _POSIX_C_SOURCE hides BSD extensions that caudio's POSIX
+# layer still relies on, notably INADDR_LOOPBACK in <netinet/in.h>. Requesting
+# _DARWIN_C_SOURCE restores the Darwin C library's full namespace without
+# dropping the POSIX.1-2008 level.
 set(CAUDIO_POSIX_DEFINITIONS
     _POSIX_C_SOURCE=200809L
     $<$<BOOL:${MINGW}>:_DEFAULT_SOURCE>
+    $<$<BOOL:${APPLE}>:_DARWIN_C_SOURCE>
 )
 
 if(CAUDIO_BUILD_TESTS)

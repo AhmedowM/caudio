@@ -34,11 +34,13 @@ static int test_write_read(void) {
     CA_CHECK_EQ(CA_OK, err.code);
     CA_CHECK_EQ(strlen(msg), read);
     CA_CHECK_EQ(0, strcmp(buf, msg));
-    ca_fs_close(f);
 
-    /* size */
+    /* size must be queried while the handle is still open */
     uint64_t sz = ca_fs_size(f, &err);
-    /* f is closed; size after close is undefined, skip */
+    CA_CHECK_EQ(CA_OK, err.code);
+    CA_CHECK_EQ(strlen(msg), sz);
+
+    ca_fs_close(f);
 
     return ca_test_finish("fs.write_read");
 }
