@@ -16,10 +16,13 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/cond.h>
+#include <caudio/runtime/endpoint.h>
+#include <caudio/runtime/env.h>
 #include <caudio/runtime/error.h>
 #include <caudio/runtime/file_lock.h>
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/json.h>
+#include <caudio/runtime/log.h>
 #include <caudio/runtime/mutex.h>
 #include <caudio/runtime/path.h>
 #include <caudio/runtime/process.h>
