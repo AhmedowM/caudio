@@ -35,4 +35,19 @@
 #endif
 /* clang-format on */
 
+/**
+ * @brief Annotate a printf-style variadic function.
+ *
+ * @param format_index One-based index of the format parameter.
+ * @param first_argument One-based index of the first variadic argument.
+ *
+ * Expands to nothing on compilers without `__attribute__((format))`.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+    #define CA_PRINTF(format_index, first_argument) \
+        __attribute__((format(printf, format_index, first_argument)))
+#else
+    #define CA_PRINTF(format_index, first_argument)
+#endif
+
 #endif /* CAUDIO_API_H */
