@@ -25,7 +25,7 @@ foreach(_source IN LISTS _caudio_test_sources)
         PRIVATE ${_caudio_tests_dir}
     )
 
-    if(WIN32 AND _test STREQUAL "socket")
+    if(WIN32 AND (_test STREQUAL "socket" OR _test STREQUAL "endpoint"))
         target_link_libraries(caudio_test_${_test} PRIVATE ws2_32)
     endif()
 

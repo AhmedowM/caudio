@@ -108,6 +108,30 @@ static int test_connect_send_recv(void) {
     return ca_test_finish("socket.connect_send_recv");
 }
 
+static int test_addr_un(void) {
+    ca_error err;
+    ca_error_init(&err);
+
+    ca_socket_addr_t sa;
+    memset(&sa, 0, sizeof(sa));
+    CA_CHECK_EQ(CA_OK, ca_socket_addr_un(&sa, "caudio_test.sock", &err));
+    CA_CHECK_EQ(CA_OK, err.code);
+    CA_CHECK_EQ(CA_SOCKET_DOMAIN_UNIX, sa.domain);
+    CA_CHECK(sa.len > 0);
+
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_socket_addr_un(nullptr, "caudio_test.sock", &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_addr_un(&sa, nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_addr_un(&sa, "", &err));
+
+    char long_path[200];
+    memset(long_path, 'a', sizeof(long_path) - 1);
+    long_path[sizeof(long_path) - 1] = '\0';
+    CA_CHECK_EQ(CA_OVERFLOW, ca_socket_addr_un(&sa, long_path, &err));
+
+    return ca_test_finish("socket.addr_un");
+}
+
 static int test_null_args(void) {
     ca_error err;
     ca_error_init(&err);
@@ -124,6 +148,8 @@ static int test_null_args(void) {
                 ca_socket_send(CA_SOCKET_INVALID, "x", 1, 0, &err));
     CA_CHECK_EQ((size_t)-1,
                 ca_socket_recv(CA_SOCKET_INVALID, "x", 1, 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_socket_wait_readable(CA_SOCKET_INVALID, 0, &err));
 
     return ca_test_finish("socket.null_args");
 }
@@ -132,6 +158,7 @@ int main(void) {
     int failures = 0;
     failures += test_create_bind_listen();
     failures += test_connect_send_recv();
+    failures += test_addr_un();
     failures += test_null_args();
     return failures;
 }

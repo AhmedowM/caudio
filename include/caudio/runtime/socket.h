@@ -18,8 +18,12 @@
 #if defined(_WIN32) || defined(__CYGWIN__)
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #if !defined(__CYGWIN__)
+        #include <afunix.h>
+    #endif
 #else
     #include <sys/socket.h>
+    #include <sys/un.h>
     #include <netinet/in.h>
     #include <arpa/inet.h>
 #endif
@@ -78,9 +82,23 @@ CAUDIO_API ca_socket_t ca_socket_create(ca_socket_domain domain,
 #define CA_SOCKET_INVALID ((ca_socket_t)nullptr)
 
 /**
+ * @brief Fill @p out with the address of a UNIX-domain socket at @p path.
+ *
+ * @p path is UTF-8 on every platform. The length limit is the platform's
+ * `sun_path` capacity (108 bytes on Linux and Windows, 104 on macOS), including
+ * the terminating NUL.
+ *
+ * @return CA_OK on success, CA_INVALID_ARGUMENT for a NULL or empty path, or
+ *         CA_OVERFLOW if the path does not fit in `sun_path`.
+ */
+CAUDIO_API ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
+                                       ca_error *err);
+
+/**
  * @brief Bind @p sock to @p addr.
  *
- * @return CA_OK on success.
+ * @return CA_OK on success, CA_ALREADY_EXISTS if the address is in use, or
+ *         another ca_status.
  */
 CAUDIO_API ca_status ca_socket_bind(ca_socket_t sock,
                                     const ca_socket_addr_t *addr,
@@ -97,7 +115,12 @@ CAUDIO_API ca_status ca_socket_listen(ca_socket_t sock, int backlog,
 /**
  * @brief Connect @p sock to @p addr.
  *
- * @return CA_OK on success.
+ * A blocking socket is connected before returning. Transient failures that a
+ * caller may retry (no listener yet, would block, already in progress) are
+ * reported as CA_BUSY.
+ *
+ * @return CA_OK on success, CA_BUSY if the connection is not ready yet, or
+ *         another ca_status.
  */
 CAUDIO_API ca_status ca_socket_connect(ca_socket_t sock,
                                        const ca_socket_addr_t *addr,
@@ -142,6 +165,16 @@ CAUDIO_API void ca_socket_close(ca_socket_t sock);
  */
 CAUDIO_API ca_status ca_socket_setblocking(ca_socket_t sock, int blocking,
                                            ca_error *err);
+
+/**
+ * @brief Wait until @p sock is readable or @p timeout_ms elapses.
+ *
+ * @param timeout_ms Negative to wait indefinitely, 0 to poll, positive for a
+ *                   bounded wait in milliseconds.
+ * @return CA_OK if readable, CA_TIMED_OUT on timeout, or another ca_status.
+ */
+CAUDIO_API ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms,
+                                             ca_error *err);
 
 #ifdef __cplusplus
 }
