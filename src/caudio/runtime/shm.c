@@ -1,6 +1,3 @@
-/* POSIX.1-2008 for shm_open, ftruncate, mmap with -std=c2x on Linux/GCC */
-#define _POSIX_C_SOURCE 200809L
-
 #include <caudio/runtime/shm.h>
 
 #include <stdlib.h>

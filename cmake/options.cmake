@@ -6,6 +6,23 @@ option(CA_RUNTIME_BUILD_SHARED "Build ca_runtime as a shared library" ${CAUDIO_B
 option(CAUDIO_USE_SYSTEM_CSTDX "Use an installed cstdx instead of the in-tree copy" OFF)
 option(CAUDIO_ENABLE_CCACHE "use ccache/sccache compiler launcher if found (opt-in)" ON)
 
+# POSIX feature-test macros for caudio's own targets.
+#
+# libc consumes these macros while parsing the first system header, so they
+# must be defined before any include in every translation unit. Keeping the
+# values here and applying them as target_compile_definitions() is the
+# single-place equivalent of repeating `#define _POSIX_C_SOURCE 200809L` at the
+# top of each source file.
+#
+# They are applied PRIVATE (not INTERFACE): caudio's installed package must not
+# impose feature-test macros on consumer code. A shared INTERFACE target cannot
+# be used here because a static ca_runtime would export it as a link dependency
+# that is not part of caudioTargets.
+set(CAUDIO_POSIX_DEFINITIONS
+    _POSIX_C_SOURCE=200809L
+    $<$<BOOL:${MINGW}>:_DEFAULT_SOURCE>
+)
+
 if(CAUDIO_BUILD_TESTS)
   enable_testing()
 endif()

@@ -51,6 +51,10 @@ endif()
 # so it must be PUBLIC.
 target_link_libraries(ca_runtime PUBLIC cstdx::cstdx)
 
+# Feature-test macros must reach every caudio TU before its first system
+# header; they stay PRIVATE so the installed package does not export them.
+target_compile_definitions(ca_runtime PRIVATE ${CAUDIO_POSIX_DEFINITIONS})
+
 # yyjson is an implementation detail. Fold its OBJECT library into ca_runtime
 # directly instead of linking it: a static archive would otherwise record
 # yyjson in its exported link interface, and an OBJECT target cannot be

@@ -17,7 +17,10 @@ foreach(_source IN LISTS _caudio_test_sources)
     string(REGEX REPLACE "^test_" "" _test "${_test}")
 
     add_executable(caudio_test_${_test} "${_source}")
-    target_link_libraries(caudio_test_${_test} PRIVATE ca_runtime::ca_runtime)
+    target_link_libraries(caudio_test_${_test}
+        PRIVATE ca_runtime::ca_runtime)
+    target_compile_definitions(caudio_test_${_test}
+        PRIVATE ${CAUDIO_POSIX_DEFINITIONS})
     target_include_directories(caudio_test_${_test}
         PRIVATE ${_caudio_tests_dir}
     )

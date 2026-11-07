@@ -1,10 +1,3 @@
-/* POSIX.1-2008 for fileno, stat, etc. with -std=c2x */
-#define _POSIX_C_SOURCE 200809L
-
-#if defined(__MINGW32__) || defined(__MINGW64__)
-#  define _DEFAULT_SOURCE
-#endif
-
 #include <caudio/runtime/fs.h>
 
 #include <stdio.h>

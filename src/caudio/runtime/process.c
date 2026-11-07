@@ -1,6 +1,3 @@
-/* POSIX.1-2008 for kill, sigaction, posix_spawn with -std=c2x on Linux/GCC */
-#define _POSIX_C_SOURCE 200809L
-
 #include <caudio/runtime/process.h>
 
 #include <stdlib.h>
