@@ -16,6 +16,16 @@ target_include_directories(yyjson PUBLIC ${_yyjson_dir}/src)
 
 target_compile_features(yyjson PRIVATE c_std_23)
 
+# ca_json enforces CA_JSON_MAX_DEPTH (include/caudio/runtime/json.h) after
+# parsing. yyjson treats its limit as exclusive (depth >= limit fails), so
+# allow one extra level here; json.c asserts that the two stay in sync.
+set(CAUDIO_YYJSON_DEPTH_LIMIT 129)
+
+target_compile_definitions(yyjson PRIVATE
+    YYJSON_READER_DEPTH_LIMIT=${CAUDIO_YYJSON_DEPTH_LIMIT}
+    YYJSON_WRITER_DEPTH_LIMIT=${CAUDIO_YYJSON_DEPTH_LIMIT}
+)
+
 # Third-party code: keep warnings on, but do not make its warnings fatal.
 if(MSVC)
   target_compile_options(yyjson PRIVATE /W3)

@@ -55,6 +55,13 @@ target_link_libraries(ca_runtime PUBLIC cstdx::cstdx)
 # header; they stay PRIVATE so the installed package does not export them.
 target_compile_definitions(ca_runtime PRIVATE ${CAUDIO_POSIX_DEFINITIONS})
 
+# json.c includes yyjson.h and asserts that the vendored build's depth limit
+# matches CA_JSON_MAX_DEPTH; keep its view identical to the yyjson target.
+target_compile_definitions(ca_runtime PRIVATE
+    YYJSON_READER_DEPTH_LIMIT=${CAUDIO_YYJSON_DEPTH_LIMIT}
+    YYJSON_WRITER_DEPTH_LIMIT=${CAUDIO_YYJSON_DEPTH_LIMIT}
+)
+
 # yyjson is an implementation detail. Fold its OBJECT library into ca_runtime
 # directly instead of linking it: a static archive would otherwise record
 # yyjson in its exported link interface, and an OBJECT target cannot be

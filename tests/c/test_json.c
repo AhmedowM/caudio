@@ -1,3 +1,4 @@
+#include <caudio/runtime/fs.h>
 #include <caudio/runtime/json.h>
 
 #include <cstdx/allocator.h>
@@ -5,11 +6,60 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ca_test.h"
 
 static const char *JSON_FILE = "caudio_test_json_file.json";
+
+/* Build "[0,0,...,0]" with the requested element count. */
+static char *make_array_text(size_t count, size_t *out_len) {
+    size_t len = count == 0 ? 2 : 1 + count + (count - 1) + 1;
+    char *text = (char *)malloc(len + 1);
+    if (!text) {
+        return NULL;
+    }
+
+    size_t pos = 0;
+    text[pos++] = '[';
+    for (size_t i = 0; i < count; ++i) {
+        text[pos++] = '0';
+        if (i + 1 < count) {
+            text[pos++] = ',';
+        }
+    }
+    text[pos++] = ']';
+    text[pos] = '\0';
+
+    if (out_len) {
+        *out_len = pos;
+    }
+    return text;
+}
+
+/* Build "[[...[0]...]]" with the requested container depth. */
+static char *make_nested_text(size_t depth, size_t *out_len) {
+    char *text = (char *)malloc(2 * depth + 2);
+    if (!text) {
+        return NULL;
+    }
+
+    size_t pos = 0;
+    for (size_t i = 0; i < depth; ++i) {
+        text[pos++] = '[';
+    }
+    text[pos++] = '0';
+    for (size_t i = 0; i < depth; ++i) {
+        text[pos++] = ']';
+    }
+    text[pos] = '\0';
+
+    if (out_len) {
+        *out_len = pos;
+    }
+    return text;
+}
 
 static ca_json *must_parse(const char *text, size_t len,
                            const cx_allocator *alloc) {
@@ -308,7 +358,8 @@ static int test_allocator(void) {
     ca_error err;
     ca_error_init(&err);
     json = NULL;
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_json_parse(&json, "{", 0, &alloc, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_parse(&json, "{", 0, &alloc, &err));
     CA_CHECK_EQ(0, counted.live_blocks);
 
     json = must_parse("{\"a\":1}", 0, &alloc);
@@ -345,11 +396,36 @@ static int test_parse_file(void) {
                     ca_json_object_get(ca_json_root(json), "file")));
     ca_json_destroy(&json);
 
+    /* The transient file-read buffer must also come from, and return to, the
+     * supplied allocator. */
+    cx_allocator_counted counted;
+    CA_CHECK_EQ(CX_OK, cx_allocator_counted_init(&counted, NULL));
+    cx_allocator alloc = cx_allocator_counted_as_allocator(&counted);
+    CA_CHECK_EQ(CA_OK, ca_json_parse_file(&json, JSON_FILE, &alloc, &err));
+    CA_CHECK(json != NULL);
+    ca_json_destroy(&json);
+    CA_CHECK_EQ(0, counted.live_blocks);
+    CA_CHECK(!cx_allocator_counted_has_leaks(&counted));
+    cx_allocator_counted_destroy(&counted);
+
     json = (ca_json *)(uintptr_t)1;
     CA_CHECK_EQ(CA_IO_ERROR,
                 ca_json_parse_file(&json, "caudio_test_json_missing.json", NULL,
                                    &err));
     CA_CHECK(json == NULL);
+
+    json = (ca_json *)(uintptr_t)1;
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_parse_file(&json, NULL, NULL, &err));
+    CA_CHECK(json == NULL);
+
+    json = (ca_json *)(uintptr_t)1;
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_parse_file(&json, "", NULL, &err));
+    CA_CHECK(json == NULL);
+
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_parse_file(NULL, JSON_FILE, NULL, &err));
 
     file = fopen(JSON_FILE, "wb");
     CA_CHECK(file != NULL);
@@ -368,6 +444,113 @@ static int test_parse_file(void) {
     return ca_test_finish("json.parse_file");
 }
 
+static int test_input_limit(void) {
+    ca_error err;
+    ca_error_init(&err);
+
+    /* The cap is checked before the input is inspected, so it is safe to pair
+     * a tiny string with an oversized length. */
+    ca_json *json = (ca_json *)(uintptr_t)1;
+    CA_CHECK_EQ(CA_OVERFLOW,
+                ca_json_parse(&json, "{}", CA_JSON_MAX_BYTES + 1, NULL, &err));
+    CA_CHECK(json == NULL);
+    CA_CHECK_EQ(CA_OVERFLOW, err.code);
+    CA_CHECK(err.message[0] != '\0');
+
+    return ca_test_finish("json.input_limit");
+}
+
+static int test_depth_limit(void) {
+    ca_error err;
+    ca_error_init(&err);
+
+    /* Exactly at the cap is accepted. */
+    size_t len = 0;
+    char *text = make_nested_text(CA_JSON_MAX_DEPTH, &len);
+    CA_CHECK(text != NULL);
+    ca_json *json = NULL;
+    CA_CHECK_EQ(CA_OK, ca_json_parse(&json, text, len, NULL, &err));
+    CA_CHECK(json != NULL);
+    ca_json_destroy(&json);
+    free(text);
+
+    /* One level deeper is rejected. */
+    ca_error_init(&err);
+    text = make_nested_text(CA_JSON_MAX_DEPTH + 1, &len);
+    CA_CHECK(text != NULL);
+    json = (ca_json *)(uintptr_t)1;
+    CA_CHECK_EQ(CA_OVERFLOW, ca_json_parse(&json, text, len, NULL, &err));
+    CA_CHECK(json == NULL);
+    CA_CHECK_EQ(CA_OVERFLOW, err.code);
+    free(text);
+
+    return ca_test_finish("json.depth_limit");
+}
+
+static int test_container_limit(void) {
+    ca_error err;
+    ca_error_init(&err);
+
+    /* Exactly at the cap is accepted. */
+    size_t len = 0;
+    char *text = make_array_text(CA_JSON_MAX_CONTAINER, &len);
+    CA_CHECK(text != NULL);
+    ca_json *json = NULL;
+    CA_CHECK_EQ(CA_OK, ca_json_parse(&json, text, len, NULL, &err));
+    CA_CHECK(json != NULL);
+    if (json) {
+        CA_CHECK_EQ(CA_JSON_MAX_CONTAINER,
+                    ca_json_array_size(ca_json_root(json)));
+    }
+    ca_json_destroy(&json);
+    free(text);
+
+    /* One entry over the cap is rejected after parsing. */
+    ca_error_init(&err);
+    text = make_array_text((size_t)CA_JSON_MAX_CONTAINER + 1, &len);
+    CA_CHECK(text != NULL);
+    json = (ca_json *)(uintptr_t)1;
+    CA_CHECK_EQ(CA_OVERFLOW, ca_json_parse(&json, text, len, NULL, &err));
+    CA_CHECK(json == NULL);
+    CA_CHECK_EQ(CA_OVERFLOW, err.code);
+    CA_CHECK(err.message[0] != '\0');
+    free(text);
+
+    return ca_test_finish("json.container_limit");
+}
+
+static int test_parse_file_unicode(void) {
+    /* "caudio_test_json_café.json" in UTF-8. */
+    const char *path = "caudio_test_json_caf\xc3\xa9.json";
+
+    ca_error err;
+    ca_error_init(&err);
+    (void)ca_fs_remove(path, NULL);
+
+    ca_file_t file =
+        ca_fs_open(path, CA_FS_WRITE | CA_FS_CREATE | CA_FS_TRUNCATE, &err);
+    CA_CHECK(file != CA_FS_INVALID);
+    if (file != CA_FS_INVALID) {
+        const char *text = "{\"unicode\":true}";
+        CA_CHECK_EQ((long long)strlen(text),
+                    (long long)ca_fs_write(file, text, strlen(text), &err));
+        ca_fs_close(file);
+    }
+
+    ca_json *json = NULL;
+    CA_CHECK_EQ(CA_OK, ca_json_parse_file(&json, path, NULL, &err));
+    CA_CHECK(json != NULL);
+    if (json) {
+        const ca_json_val *root = ca_json_root(json);
+        CA_CHECK_EQ(CA_JSON_TRUE,
+                    ca_json_type_of(ca_json_object_get(root, "unicode")));
+        ca_json_destroy(&json);
+    }
+
+    CA_CHECK_EQ(CA_OK, ca_fs_remove(path, &err));
+    return ca_test_finish("json.parse_file_unicode");
+}
+
 int main(void) {
     int failures = 0;
 
@@ -382,6 +565,10 @@ int main(void) {
     failures += test_serialize();
     failures += test_allocator();
     failures += test_parse_file();
+    failures += test_input_limit();
+    failures += test_depth_limit();
+    failures += test_container_limit();
+    failures += test_parse_file_unicode();
 
     return failures;
 }

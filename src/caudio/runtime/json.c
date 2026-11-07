@@ -1,11 +1,20 @@
 #include <caudio/runtime/json.h>
 
+#include <caudio/runtime/fs.h>
+
 #include <cstdx/allocator.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
 #include <yyjson.h>
+
+/* yyjson fails when the container depth reaches the configured limit, so the
+ * public cap permits one fewer level. Keep the two in sync: this fails the
+ * build rather than silently accepting deeper input. */
+#if YYJSON_READER_DEPTH_LIMIT != (CA_JSON_MAX_DEPTH + 1)
+    #error "YYJSON_READER_DEPTH_LIMIT must equal CA_JSON_MAX_DEPTH + 1"
+#endif
 
 /**
  * @file caudio/runtime/json.c
@@ -127,6 +136,68 @@ static yyjson_alc ca_json_make_alc(ca_json_alloc_ctx *ctx) {
     };
 }
 
+/**
+ * @brief Walk a parsed document and enforce the public depth/container caps.
+ *
+ * yyjson is built with a parse-time depth limit, so this traversal is bounded.
+ * It still runs unconditionally: the public limits are part of the ca_json
+ * contract and must not depend on a particular yyjson build configuration.
+ */
+static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
+                                      ca_error *err) {
+    if (!val) {
+        return CA_OK;
+    }
+
+    yyjson_type type = yyjson_get_type(val);
+    if (type != YYJSON_TYPE_ARR && type != YYJSON_TYPE_OBJ) {
+        return CA_OK;
+    }
+
+    size_t next_depth = depth + 1;
+    if (next_depth > (size_t)CA_JSON_MAX_DEPTH) {
+        if (err) {
+            ca_error_set(err, CA_OVERFLOW,
+                         "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
+        }
+        return CA_OVERFLOW;
+    }
+
+    size_t count = type == YYJSON_TYPE_ARR ? yyjson_arr_size(val)
+                                           : yyjson_obj_size(val);
+    if (count > (size_t)CA_JSON_MAX_CONTAINER) {
+        if (err) {
+            ca_error_set(err, CA_OVERFLOW,
+                         "JSON container has %zu entries; limit is %d", count,
+                         CA_JSON_MAX_CONTAINER);
+        }
+        return CA_OVERFLOW;
+    }
+
+    if (type == YYJSON_TYPE_ARR) {
+        yyjson_arr_iter iter = yyjson_arr_iter_with(val);
+        const yyjson_val *child = NULL;
+        while ((child = yyjson_arr_iter_next(&iter)) != NULL) {
+            ca_status status = json_validate_limits(child, next_depth, err);
+            if (status != CA_OK) {
+                return status;
+            }
+        }
+    } else {
+        yyjson_obj_iter iter = yyjson_obj_iter_with(val);
+        yyjson_val *key = NULL;
+        while ((key = yyjson_obj_iter_next(&iter)) != NULL) {
+            const yyjson_val *child = yyjson_obj_iter_get_val(key);
+            ca_status status = json_validate_limits(child, next_depth, err);
+            if (status != CA_OK) {
+                return status;
+            }
+        }
+    }
+
+    return CA_OK;
+}
+
 ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
                         const cx_allocator *alloc, ca_error *err) {
     if (err) {
@@ -153,13 +224,23 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
         len = strlen(text);
     }
 
+    if (len > CA_JSON_MAX_BYTES) {
+        if (err) {
+            ca_error_set(err, CA_OVERFLOW,
+                         "JSON input is %zu bytes; limit is %zu", len,
+                         CA_JSON_MAX_BYTES);
+        }
+        return CA_OVERFLOW;
+    }
+
     const cx_allocator *a = alloc ? alloc : cx_allocator_default();
 
     ca_json *json = (ca_json *)cx_allocator_alloc(a, sizeof(ca_json),
                                                   alignof(ca_json));
     if (!json) {
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON handle");
+            ca_error_set(err, CA_OUT_OF_MEMORY,
+                         "failed to allocate JSON handle");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -173,21 +254,144 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
     yyjson_doc *doc = yyjson_read_opts((char *)text, len, 0, &alc, &rerr);
 
     if (!doc) {
-        ca_status status = rerr.code == YYJSON_READ_ERROR_MEMORY_ALLOCATION
-                               ? CA_OUT_OF_MEMORY
-                               : CA_INVALID_ARGUMENT;
+        ca_status status = CA_INVALID_ARGUMENT;
+
+        if (rerr.code == YYJSON_READ_ERROR_MEMORY_ALLOCATION) {
+            status = CA_OUT_OF_MEMORY;
+        } else if (rerr.code == YYJSON_READ_ERROR_DEPTH) {
+            status = CA_OVERFLOW;
+        }
+
         if (err) {
-            ca_error_set(err, status, "JSON parse error: %s at byte %lu",
-                         rerr.msg ? rerr.msg : "unknown",
-                         (unsigned long)rerr.pos);
+            if (status == CA_OVERFLOW) {
+                ca_error_set(err, status, "JSON nesting exceeds %d levels",
+                             CA_JSON_MAX_DEPTH);
+            } else {
+                ca_error_set(err, status, "JSON parse error: %s at byte %lu",
+                             rerr.msg ? rerr.msg : "unknown",
+                             (unsigned long)rerr.pos);
+            }
         }
         cx_allocator_free(&json->alloc, json, sizeof(ca_json),
                           alignof(ca_json));
         return status;
     }
 
+    ca_status limit_status =
+        json_validate_limits(yyjson_doc_get_root(doc), 0, err);
+    if (limit_status != CA_OK) {
+        yyjson_doc_free(doc);
+        cx_allocator_free(&json->alloc, json, sizeof(ca_json),
+                          alignof(ca_json));
+        return limit_status;
+    }
+
     json->doc = doc;
     *out = json;
+    return CA_OK;
+}
+
+/**
+ * @brief Read a whole file into a buffer, enforcing CA_JSON_MAX_BYTES.
+ *
+ * The returned buffer is allocated with @p alloc, is NUL-terminated, and must
+ * be released with cx_allocator_free(alloc, buffer, *out_capacity, 0).
+ *
+ * @return CA_OK, CA_IO_ERROR, CA_OUT_OF_MEMORY, or CA_OVERFLOW.
+ */
+static ca_status json_read_all(const char *path, const cx_allocator *alloc,
+                               char **out_text, size_t *out_len,
+                               size_t *out_capacity, ca_error *err) {
+    *out_text = NULL;
+    *out_len = 0;
+    *out_capacity = 0;
+
+    ca_file_t file = ca_fs_open(path, CA_FS_READ, err);
+    if (file == CA_FS_INVALID) {
+        if (err && err->code != CA_OK) {
+            return err->code;
+        }
+        return CA_IO_ERROR;
+    }
+
+    /* Read in chunks up to one byte past the cap: that extra byte is enough to
+     * distinguish "exactly at the limit" from "over the limit". */
+    const size_t max_capacity = CA_JSON_MAX_BYTES + 1;
+    size_t capacity = 64 * 1024;
+    if (capacity > max_capacity) {
+        capacity = max_capacity;
+    }
+
+    char *buffer = (char *)cx_allocator_alloc(alloc, capacity, 0);
+    if (!buffer) {
+        ca_fs_close(file);
+        if (err) {
+            ca_error_set(err, CA_OUT_OF_MEMORY,
+                         "failed to allocate JSON read buffer");
+        }
+        return CA_OUT_OF_MEMORY;
+    }
+
+    size_t total = 0;
+    ca_status status = CA_OK;
+
+    for (;;) {
+        if (total == capacity) {
+            size_t new_capacity = capacity * 2;
+            if (new_capacity < capacity || new_capacity > max_capacity) {
+                new_capacity = max_capacity;
+            }
+
+            char *grown = (char *)cx_allocator_realloc(
+                alloc, buffer, capacity, new_capacity, 0);
+            if (!grown) {
+                status = CA_OUT_OF_MEMORY;
+                if (err) {
+                    ca_error_set(err, CA_OUT_OF_MEMORY,
+                                 "failed to grow JSON read buffer");
+                }
+                break;
+            }
+
+            buffer = grown;
+            capacity = new_capacity;
+        }
+
+        size_t got = ca_fs_read(file, buffer + total, capacity - total, err);
+        if (got == (size_t)-1) {
+            status = (err && err->code != CA_OK) ? err->code : CA_IO_ERROR;
+            break;
+        }
+
+        if (got == 0) {
+            break;
+        }
+
+        total += got;
+        if (total > CA_JSON_MAX_BYTES) {
+            status = CA_OVERFLOW;
+            if (err) {
+                ca_error_set(err, CA_OVERFLOW,
+                             "JSON file exceeds %zu bytes",
+                             CA_JSON_MAX_BYTES);
+            }
+            break;
+        }
+    }
+
+    ca_fs_close(file);
+
+    if (status != CA_OK) {
+        cx_allocator_free(alloc, buffer, capacity, 0);
+        return status;
+    }
+
+    /* capacity > total is guaranteed: growth stops at CA_JSON_MAX_BYTES + 1
+     * and any read that pushes total over the cap is rejected above. */
+    buffer[total] = '\0';
+    *out_text = buffer;
+    *out_len = total;
+    *out_capacity = capacity;
     return CA_OK;
 }
 
@@ -206,56 +410,26 @@ ca_status ca_json_parse_file(ca_json **out, const char *path,
 
     *out = NULL;
 
-    if (!path) {
+    if (!path || path[0] == '\0') {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL or empty");
         }
         return CA_INVALID_ARGUMENT;
     }
 
     const cx_allocator *a = alloc ? alloc : cx_allocator_default();
 
-    ca_json *json = (ca_json *)cx_allocator_alloc(a, sizeof(ca_json),
-                                                  alignof(ca_json));
-    if (!json) {
-        if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON handle");
-        }
-        return CA_OUT_OF_MEMORY;
-    }
-
-    json->doc = NULL;
-    json->alloc = *a;
-    json->alc_ctx.alloc = &json->alloc;
-
-    yyjson_alc alc = ca_json_make_alc(&json->alc_ctx);
-    yyjson_read_err rerr = {0};
-    yyjson_doc *doc = yyjson_read_file(path, 0, &alc, &rerr);
-
-    if (!doc) {
-        /* yyjson exposes error codes as const objects rather than enum
-         * constants, so they cannot be used as switch labels. */
-        ca_status status = CA_INVALID_ARGUMENT;
-
-        if (rerr.code == YYJSON_READ_ERROR_MEMORY_ALLOCATION) {
-            status = CA_OUT_OF_MEMORY;
-        } else if (rerr.code == YYJSON_READ_ERROR_FILE_OPEN ||
-                   rerr.code == YYJSON_READ_ERROR_FILE_READ) {
-            status = CA_IO_ERROR;
-        }
-
-        if (err) {
-            ca_error_set(err, status, "JSON file error: %s",
-                         rerr.msg ? rerr.msg : "unknown");
-        }
-        cx_allocator_free(&json->alloc, json, sizeof(ca_json),
-                          alignof(ca_json));
+    char *text = NULL;
+    size_t len = 0;
+    size_t capacity = 0;
+    ca_status status = json_read_all(path, a, &text, &len, &capacity, err);
+    if (status != CA_OK) {
         return status;
     }
 
-    json->doc = doc;
-    *out = json;
-    return CA_OK;
+    status = ca_json_parse(out, text, len, alloc, err);
+    cx_allocator_free(a, text, capacity, 0);
+    return status;
 }
 
 void ca_json_destroy(ca_json **out) {

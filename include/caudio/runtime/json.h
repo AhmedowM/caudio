@@ -19,6 +19,37 @@
  * in this header, so the full definition is not needed here. */
 typedef struct cx_allocator cx_allocator;
 
+/**
+ * @defgroup ca_json_limits JSON parsing limits
+ * @{
+ */
+
+/**
+ * @brief Maximum accepted JSON input size in bytes (16 MiB).
+ *
+ * Applies to both ca_json_parse() and ca_json_parse_file(). Larger inputs are
+ * rejected with CA_OVERFLOW before any parsing work is done.
+ */
+#define CA_JSON_MAX_BYTES ((size_t)16 * 1024 * 1024)
+
+/**
+ * @brief Maximum nesting depth of arrays and objects.
+ *
+ * A document with more than this many nested arrays/objects is rejected with
+ * CA_OVERFLOW. The depth of a scalar document is 0.
+ */
+#define CA_JSON_MAX_DEPTH 128
+
+/**
+ * @brief Maximum number of elements in a single array or key/value pairs in a
+ *        single object.
+ *
+ * Containers with more entries are rejected with CA_OVERFLOW.
+ */
+#define CA_JSON_MAX_CONTAINER 1000000
+
+/** @} */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -63,9 +94,10 @@ typedef enum ca_json_type {
  * @param len   Length of text in bytes, or 0 to use strlen(text).
  * @param alloc Allocator for internal memory; NULL means default allocator.
  * @param err   Optional error record.
- * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input,
- *         CA_INVALID_ARGUMENT on malformed JSON, CA_OUT_OF_MEMORY on
- *         allocation failure.
+ * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input or malformed
+ *         JSON, CA_OVERFLOW if the input exceeds CA_JSON_MAX_BYTES or the
+ *         document exceeds CA_JSON_MAX_DEPTH or CA_JSON_MAX_CONTAINER,
+ *         CA_OUT_OF_MEMORY on allocation failure.
  */
 CAUDIO_API ca_status ca_json_parse(ca_json **out, const char *text,
                                    size_t len, const cx_allocator *alloc,
@@ -74,12 +106,17 @@ CAUDIO_API ca_status ca_json_parse(ca_json **out, const char *text,
 /**
  * @brief Parse JSON from a file path.
  *
- * @param path  UTF-8 file path (system-native encoding on Windows).
+ * The file is read through ca_fs, so @p path is UTF-8 on every platform,
+ * including Windows.
+ *
+ * @param path  UTF-8 file path.
  * @param alloc Allocator for internal memory; NULL means default allocator.
  * @param err   Optional error record.
- * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input,
- *         CA_IO_ERROR if the file cannot be opened or read,
- *         CA_OUT_OF_MEMORY on allocation failure.
+ * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input or malformed
+ *         JSON, CA_IO_ERROR if the file cannot be opened or read, CA_OVERFLOW
+ *         if the file exceeds CA_JSON_MAX_BYTES or the document exceeds
+ *         CA_JSON_MAX_DEPTH or CA_JSON_MAX_CONTAINER, CA_OUT_OF_MEMORY on
+ *         allocation failure.
  */
 CAUDIO_API ca_status ca_json_parse_file(ca_json **out, const char *path,
                                         const cx_allocator *alloc,
