@@ -56,6 +56,11 @@ foreach(_test IN LISTS CSTDX_DIFFERENTIAL_TESTS)
       PRIVATE cstdx::cstdx GTest::gtest_main rapidcheck_gtest)
   target_compile_features(cstdx_diff_${_test} PRIVATE cxx_std_23)
 
+  if(CSTDX_ENABLE_SANITIZERS)
+    target_compile_options(cstdx_diff_${_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+    target_link_options(cstdx_diff_${_test} PRIVATE -fsanitize=address,undefined)
+  endif()
+
   add_test(NAME cstdx.diff.${_test} COMMAND cstdx_diff_${_test})
   set_tests_properties(cstdx.diff.${_test} PROPERTIES LABELS differential)
 endforeach()

@@ -6,6 +6,11 @@
 add_executable(cstdx_headers_c headers.c)
 target_link_libraries(cstdx_headers_c PRIVATE cstdx::cstdx)
 
+if(CSTDX_ENABLE_SANITIZERS)
+  target_compile_options(cstdx_headers_c PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+  target_link_options(cstdx_headers_c PRIVATE -fsanitize=address,undefined)
+endif()
+
 add_test(NAME cstdx.headers.c COMMAND cstdx_headers_c)
 set_tests_properties(cstdx.headers.c PROPERTIES LABELS headers)
 
@@ -22,6 +27,11 @@ if(CMAKE_CXX_COMPILER)
       CXX_STANDARD_REQUIRED ON
       CXX_EXTENSIONS OFF
   )
+
+  if(CSTDX_ENABLE_SANITIZERS)
+    target_compile_options(cstdx_headers_cpp PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+    target_link_options(cstdx_headers_cpp PRIVATE -fsanitize=address,undefined)
+  endif()
 
   add_test(NAME cstdx.headers.cpp COMMAND cstdx_headers_cpp)
   set_tests_properties(cstdx.headers.cpp PROPERTIES LABELS headers)

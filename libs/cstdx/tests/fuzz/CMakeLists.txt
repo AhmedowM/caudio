@@ -38,6 +38,9 @@ target_compile_options(cstdx_fuzz_support PRIVATE
     -fno-omit-frame-pointer
     -g
 )
+target_link_options(cstdx_fuzz_support PRIVATE
+    -fsanitize=fuzzer-no-link,address,undefined
+)
 
 set(CSTDX_FUZZ_TARGETS
     base64

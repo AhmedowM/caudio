@@ -25,6 +25,7 @@ on:
       - 'cmake/**'
       - '.github/workflows/caudio.yml'
       - '.github/workflows/cstdx.yml'
+  workflow_dispatch:
 
 concurrency:
   group: caudio-${{ github.workflow }}-${{ github.ref }}
@@ -42,7 +43,7 @@ jobs:
   # Linux, GCC 14+. Debug and Release. One debug slice flips char signedness.
   # -------------------------------------------------------------------------
   linux-gcc:
-    name: Linux GCC ${{ matrix.build_type }}${{ matrix.char_signedness }}
+    name: Linux GCC ${{ matrix.build_type }} ${{ matrix.char_signedness }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
@@ -84,7 +85,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   # -------------------------------------------------------------------------
-  # Clang 18+ with ASan + UBSan.
+  # Clang 19+ with ASan + UBSan.
   # -------------------------------------------------------------------------
   linux-clang-sanitizers:
     name: Linux Clang ASan+UBSan
@@ -97,15 +98,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang-18 lld-18 ninja-build cmake libclang-rt-18-dev
+            clang-19 lld-19 ninja-build cmake libclang-rt-19-dev clang-tools-19 libasan8 libubsan1
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_C_COMPILER=clang-19 \
+            -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror"
+            -DCSTDX_ENABLE_SANITIZERS=ON
 
       - name: Build
         run: cmake --build build --parallel
@@ -161,23 +162,31 @@ jobs:
         include:
           - msystem: MINGW64
             package_prefix: mingw-w64-x86_64
-            cc: gcc
-            cxx: g++
+            cc_package: gcc
+            cxx_package: gcc
+            cc_binary: gcc
+            cxx_binary: gcc
             build_type: Debug
           - msystem: MINGW64
             package_prefix: mingw-w64-x86_64
-            cc: gcc
-            cxx: g++
+            cc_package: gcc
+            cxx_package: gcc
+            cc_binary: gcc
+            cxx_binary: gcc
             build_type: Release
           - msystem: CLANG64
             package_prefix: mingw-w64-clang-x86_64
-            cc: clang
-            cxx: clang++
+            cc_package: clang
+            cxx_package: clang
+            cc_binary: clang
+            cxx_binary: clang++
             build_type: Debug
           - msystem: CLANG64
             package_prefix: mingw-w64-clang-x86_64
-            cc: clang
-            cxx: clang++
+            cc_package: clang
+            cxx_package: clang
+            cc_binary: clang
+            cxx_binary: clang++
             build_type: Release
     defaults:
       run:
@@ -193,20 +202,23 @@ jobs:
             base-devel
             ${{ matrix.package_prefix }}-cmake
             ${{ matrix.package_prefix }}-ninja
-            ${{ matrix.package_prefix }}-${{ matrix.cc }}
+            ${{ matrix.package_prefix }}-${{ matrix.cc_package }}
+            ${{ matrix.package_prefix }}-${{ matrix.cxx_package }}
 
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_C_COMPILER=${{ matrix.cc_binary }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_binary }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
 
       - name: Build
         run: cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          export PATH="$PWD/build/bin:$PATH"
+          ctest --test-dir build --output-on-failure
 
   # -------------------------------------------------------------------------
   # Android NDK r30, arm64-v8a, API 28. Build-only validation (no device to

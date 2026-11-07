@@ -1,3 +1,10 @@
+/* POSIX.1-2008 for fileno, stat, etc. with -std=c2x */
+#define _POSIX_C_SOURCE 200809L
+
+#if defined(__MINGW32__) || defined(__MINGW64__)
+#  define _DEFAULT_SOURCE
+#endif
+
 #include <caudio/runtime/fs.h>
 
 #include <stdio.h>
@@ -10,7 +17,9 @@
     #include <windows.h>
     #include <io.h>
     #include <sys/stat.h>
+    #include <dirent.h>
 #else
+    #include <dirent.h>
     #include <unistd.h>
     #include <sys/stat.h>
     #include <sys/types.h>
@@ -179,11 +188,10 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
         return CA_FS_INVALID;
     }
 
-    file->fd = fileno(fp);
-    /* We keep the FILE* indirectly via fd; ownership of the FILE* is not
-       tracked here. Use POSIX fd ops directly. */
+    file->fd = dup(fileno(fp));
+    fclose(fp);
+    /* We keep the fd directly; use POSIX fd ops for I/O. */
     file->writable = (flags & (CA_FS_WRITE | CA_FS_APPEND | CA_FS_CREATE)) != 0;
-    (void)fp;
 
     return file;
 #endif
@@ -465,6 +473,76 @@ ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
     return status;
 }
 
+#if !defined(_WIN32) && !defined(__CYGWIN__)
+/* Remove all entries inside a directory (not the directory itself).
+ * Used as a fallback when rmdir fails with ENOTEMPTY. */
+static ca_status remove_dir_contents(const char *path, ca_error *err) {
+    DIR *dir = opendir(path);
+    if (!dir) {
+        if (err) {
+            ca_error_set(err, CA_IO_ERROR, "opendir failed for %s: %s",
+                         path, strerror(errno));
+        }
+        return CA_IO_ERROR;
+    }
+
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (strcmp(entry->d_name, ".") == 0 ||
+            strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        size_t child_len = strlen(path) + 1 + strlen(entry->d_name) + 1;
+        char *child = (char *)malloc(child_len);
+        if (!child) {
+            closedir(dir);
+            if (err) {
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
+            }
+            return CA_OUT_OF_MEMORY;
+        }
+
+        snprintf(child, child_len, "%s/%s", path, entry->d_name);
+
+        struct stat st;
+        if (stat(child, &st) != 0) {
+            free(child);
+            continue;
+        }
+
+        ca_status status = CA_OK;
+        if (S_ISDIR(st.st_mode)) {
+            status = remove_dir_contents(child, err);
+            if (status == CA_OK && rmdir(child) != 0) {
+                status = CA_IO_ERROR;
+                if (err) {
+                    ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s",
+                                 child, strerror(errno));
+                }
+            }
+        } else {
+            if (unlink(child) != 0) {
+                status = CA_IO_ERROR;
+                if (err) {
+                    ca_error_set(err, CA_IO_ERROR, "unlink failed for %s: %s",
+                                 child, strerror(errno));
+                }
+            }
+        }
+
+        free(child);
+        if (status != CA_OK) {
+            closedir(dir);
+            return status;
+        }
+    }
+
+    closedir(dir);
+    return CA_OK;
+}
+#endif
+
 ca_status ca_fs_remove(const char *path, ca_error *err) {
     if (err) {
         ca_error_init(err);
@@ -510,23 +588,31 @@ ca_status ca_fs_remove(const char *path, ca_error *err) {
         return CA_IO_ERROR;
     }
 #else
-    if (unlink(path) != 0) {
-        if (errno == EISDIR) {
-            if (rmdir(path) != 0) {
-                if (err) {
-                    ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s",
-                                 path, strerror(errno));
-                }
-                return CA_IO_ERROR;
-            }
-        } else {
-            if (err) {
-                ca_error_set(err, CA_IO_ERROR, "unlink failed for %s: %s",
-                             path, strerror(errno));
-            }
-            return CA_IO_ERROR;
-        }
+    /* Try unlink first (works for files; fails with EISDIR for dirs). */
+    if (unlink(path) == 0) {
+        return CA_OK;
     }
+
+    /* Try rmdir (works for empty directories). */
+    if (rmdir(path) == 0) {
+        return CA_OK;
+    }
+
+    /* Directory may not be empty; remove contents and retry. */
+    ca_status st = remove_dir_contents(path, err);
+    if (st != CA_OK) {
+        return st;
+    }
+
+    if (rmdir(path) != 0) {
+        if (err) {
+            ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s",
+                         path, strerror(errno));
+        }
+        return CA_IO_ERROR;
+    }
+
+    return CA_OK;
 #endif
 
     return CA_OK;

@@ -10,7 +10,7 @@ does not link C++.
 ## Requirements
 
 - **Language:** C23 (`-std=c23`, no GNU extensions required).
-- **Compilers:** GCC 14+, Clang 18+, AppleClang 16+, Android NDK r27+.
+- **Compilers:** GCC 14+, Clang 19+, AppleClang 16+, Android NDK r27+.
 - **Windows:** MinGW-w64 GCC or Clang using the UCRT. MSVC `cl.exe` is not
   supported.
 - **CMake:** 3.28+.

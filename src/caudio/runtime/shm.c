@@ -1,3 +1,6 @@
+/* POSIX.1-2008 for shm_open, ftruncate, mmap with -std=c2x on Linux/GCC */
+#define _POSIX_C_SOURCE 200809L
+
 #include <caudio/runtime/shm.h>
 
 #include <stdlib.h>
@@ -229,6 +232,10 @@ ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
         return CA_IO_ERROR;
     }
 #else
+    /* length of 0 is a no-op; munmap(addr, 0) fails with EINVAL on macOS. */
+    if (length == 0) {
+        return CA_OK;
+    }
     if (munmap(addr, length) != 0) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "munmap failed: %d", errno);

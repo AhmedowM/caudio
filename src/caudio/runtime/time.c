@@ -1,3 +1,6 @@
+/* POSIX.1-2008 for clock_gettime, nanosleep with -std=c23 */
+#define _POSIX_C_SOURCE 200809L
+
 #include <caudio/runtime/time.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)

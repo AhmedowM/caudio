@@ -26,6 +26,11 @@ foreach(_test IN LISTS CAUDIO_UNIT_TESTS)
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
+    if(CSTDX_ENABLE_SANITIZERS)
+        target_compile_options(caudio_test_${_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+        target_link_options(caudio_test_${_test} PRIVATE -fsanitize=address,undefined)
+    endif()
+
     if(WIN32 AND _test STREQUAL "socket")
         target_link_libraries(caudio_test_${_test} PRIVATE ws2_32)
     endif()

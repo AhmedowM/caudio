@@ -13,6 +13,7 @@ option(CSTDX_BUILD_TESTS "Build cstdx tests" ${PROJECT_IS_TOP_LEVEL})
 option(CSTDX_BUILD_CPP_TESTS "Build C++ differential/property tests" OFF)
 option(CSTDX_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
 option(CSTDX_BUILD_SHARED "Build cstdx as a shared library" ON)
+option(CSTDX_ENABLE_SANITIZERS "Enable AddressSanitizer + UBSan" OFF)
 option(CSTDX_BUILD_BENCHMARKS "Build cstdx benchmarks" OFF)
 
 # ---------------------------------------------------------------------------
@@ -79,6 +80,14 @@ set(CSTDX_PUBLIC_HEADERS
     include/cstdx/base64.h
 )
 
+# Co-locate DLLs and executables in the build tree on Windows so tests can find
+# shared libraries at runtime without manipulating PATH. Must be set before
+# add_library() takes effect.
+if(WIN32 AND CSTDX_BUILD_SHARED)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+endif()
+
 if(CSTDX_BUILD_SHARED)
   add_library(cstdx SHARED ${CSTDX_SOURCES} ${CSTDX_PUBLIC_HEADERS})
   target_compile_definitions(cstdx
@@ -91,6 +100,11 @@ else()
 endif()
 
 add_library(cstdx::cstdx ALIAS cstdx)
+
+if(CSTDX_ENABLE_SANITIZERS)
+  target_compile_options(cstdx PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+  target_link_options(cstdx PRIVATE -fsanitize=address,undefined)
+endif()
 
 target_include_directories(cstdx
     PUBLIC

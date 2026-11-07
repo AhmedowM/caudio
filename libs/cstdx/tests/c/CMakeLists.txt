@@ -30,6 +30,11 @@ foreach(_test IN LISTS CSTDX_UNIT_TESTS)
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
+    if(CSTDX_ENABLE_SANITIZERS)
+        target_compile_options(cstdx_test_${_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
+        target_link_options(cstdx_test_${_test} PRIVATE -fsanitize=address,undefined)
+    endif()
+
     add_test(NAME cstdx.${_test} COMMAND cstdx_test_${_test})
     set_tests_properties(cstdx.${_test} PROPERTIES LABELS unit)
 endforeach()

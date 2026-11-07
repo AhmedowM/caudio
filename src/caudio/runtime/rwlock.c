@@ -1,3 +1,6 @@
+/* POSIX.1-2008 for pthread_rwlock_* with -std=c2x on Linux/GCC */
+#define _POSIX_C_SOURCE 200809L
+
 #include <caudio/runtime/rwlock.h>
 
 #include <stdlib.h>

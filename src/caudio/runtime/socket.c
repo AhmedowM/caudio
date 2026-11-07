@@ -1,3 +1,6 @@
+/* POSIX.1-2008 for socket, getaddrinfo, inet_pton with -std=c2x on Linux/GCC */
+#define _POSIX_C_SOURCE 200809L
+
 #include <caudio/runtime/socket.h>
 
 #include <stdlib.h>

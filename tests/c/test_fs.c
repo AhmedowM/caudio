@@ -92,6 +92,11 @@ static int test_mkdirs_nested(void) {
 
 int main(void) {
     int failures = 0;
+    ca_error err;
+    ca_error_init(&err);
+    /* Clean up any leftover state from previous runs. */
+    ca_fs_remove("caudio_test_fs_dir", &err);
+
     failures += test_write_read();
     failures += test_exists();
     failures += test_remove();
