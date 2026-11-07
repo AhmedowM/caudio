@@ -4,32 +4,23 @@
 # against ca_runtime::ca_runtime and are registered with CTest under the
 # "unit" label.
 
-set(CAUDIO_UNIT_TESTS
-    fs
-    path
-    time
-    mutex
-    cond
-    rwlock
-    tls
-    thread
-    process
-    socket
-    shm
-    file_lock
+set(_caudio_tests_dir ${PROJECT_SOURCE_DIR}/tests/c)
+
+# test_<name>.c -> caudio_test_<name> / caudio.<name>. CONFIGURE_DEPENDS makes
+# new test files register automatically.
+file(GLOB _caudio_test_sources CONFIGURE_DEPENDS
+    "${_caudio_tests_dir}/test_*.c"
 )
 
-foreach(_test IN LISTS CAUDIO_UNIT_TESTS)
-    add_executable(caudio_test_${_test} test_${_test}.c)
+foreach(_source IN LISTS _caudio_test_sources)
+    get_filename_component(_test "${_source}" NAME_WE)
+    string(REGEX REPLACE "^test_" "" _test "${_test}")
+
+    add_executable(caudio_test_${_test} "${_source}")
     target_link_libraries(caudio_test_${_test} PRIVATE ca_runtime::ca_runtime)
     target_include_directories(caudio_test_${_test}
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+        PRIVATE ${_caudio_tests_dir}
     )
-
-    if(CSTDX_ENABLE_SANITIZERS)
-        target_compile_options(caudio_test_${_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
-        target_link_options(caudio_test_${_test} PRIVATE -fsanitize=address,undefined)
-    endif()
 
     if(WIN32 AND _test STREQUAL "socket")
         target_link_libraries(caudio_test_${_test} PRIVATE ws2_32)
@@ -39,4 +30,7 @@ foreach(_test IN LISTS CAUDIO_UNIT_TESTS)
     set_tests_properties(caudio.${_test} PROPERTIES LABELS unit)
 endforeach()
 
-unset(CAUDIO_UNIT_TESTS)
+unset(_caudio_tests_dir)
+unset(_caudio_test_sources)
+unset(_source)
+unset(_test)

@@ -29,7 +29,7 @@ if(DEFINED CAUDIO_PROJECT_VERSION AND NOT CAUDIO_PROJECT_VERSION STREQUAL "")
     message(FATAL_ERROR "PROJECT_VERSION='${CAUDIO_PROJECT_VERSION}' is not X.Y.Z[-suffix] (optional leading v)")
   endif()
   set(GIT_TAG "v${PROJECT_VERSION}${CAUDIO_VERSION_SUFFIX}")
-  message(STATUS "Using explicit version override: ${PROJECT_VERSION}${CAUDIO_VERSION_SUFFIX} (-DC AUDIO_PROJECT_VERSION)")
+  message(STATUS "Using explicit version override: ${PROJECT_VERSION}${CAUDIO_VERSION_SUFFIX} (-DCAUDIO_PROJECT_VERSION)")
 else() # No explicit override, try to get version from git tag or VERSION file
   execute_process(
     COMMAND git describe --tags --abbrev=0 --dirty

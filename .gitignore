@@ -1,4 +1,5 @@
 build/*
+libs/cstdx/build/*
 .dev/*
 *.exe
 *.dll

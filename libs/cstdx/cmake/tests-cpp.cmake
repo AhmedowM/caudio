@@ -7,10 +7,6 @@
 #
 # Enable with -DCSTDX_BUILD_CPP_TESTS=ON (for example in CI).
 
-if(NOT CSTDX_BUILD_CPP_TESTS)
-  return()
-endif()
-
 enable_language(CXX)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -43,6 +39,8 @@ if(NOT rapidcheck_FOUND)
   FetchContent_MakeAvailable(rapidcheck)
 endif()
 
+set(_cstdx_cpp_tests_dir ${PROJECT_SOURCE_DIR}/tests/cpp)
+
 set(CSTDX_DIFFERENTIAL_TESTS
     string
     bytes
@@ -51,18 +49,18 @@ set(CSTDX_DIFFERENTIAL_TESTS
 )
 
 foreach(_test IN LISTS CSTDX_DIFFERENTIAL_TESTS)
-  add_executable(cstdx_diff_${_test} diff_${_test}.cpp diff_common.h)
+  add_executable(cstdx_diff_${_test}
+      ${_cstdx_cpp_tests_dir}/diff_${_test}.cpp
+      ${_cstdx_cpp_tests_dir}/diff_common.h
+  )
   target_link_libraries(cstdx_diff_${_test}
       PRIVATE cstdx::cstdx GTest::gtest_main rapidcheck_gtest)
   target_compile_features(cstdx_diff_${_test} PRIVATE cxx_std_23)
-
-  if(CSTDX_ENABLE_SANITIZERS)
-    target_compile_options(cstdx_diff_${_test} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
-    target_link_options(cstdx_diff_${_test} PRIVATE -fsanitize=address,undefined)
-  endif()
 
   add_test(NAME cstdx.diff.${_test} COMMAND cstdx_diff_${_test})
   set_tests_properties(cstdx.diff.${_test} PROPERTIES LABELS differential)
 endforeach()
 
+unset(_cstdx_cpp_tests_dir)
 unset(CSTDX_DIFFERENTIAL_TESTS)
+unset(_test)

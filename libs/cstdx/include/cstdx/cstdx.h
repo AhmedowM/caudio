@@ -10,6 +10,7 @@
  */
 
 #include <cstdx/api.h>
+#include <cstdx/version.h>
 
 #include <cstdx/status.h>
 #include <cstdx/checked.h>

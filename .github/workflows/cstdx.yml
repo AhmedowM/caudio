@@ -98,7 +98,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang-19 \
             -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCSTDX_ENABLE_SANITIZERS=ON
+            -DCSTDX_SANITIZERS=address,undefined
 
       - name: Build
         run: cmake --build build --parallel
@@ -163,8 +163,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang-19 \
             -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCSTDX_BUILD_FUZZ=ON \
-            -DCSTDX_ENABLE_SANITIZERS=ON
+            -DCSTDX_BUILD_FUZZ=ON
 
       - name: Build
         run: cmake --build build --parallel

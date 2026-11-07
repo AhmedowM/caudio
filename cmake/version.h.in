@@ -5,13 +5,14 @@
 #ifndef CAUDIO_VERSION_H
 #define CAUDIO_VERSION_H
 
-#include <stdint.h>
+/** Full version string, including any pre-release suffix. */
+#define CAUDIO_VERSION "@CAUDIO_VERSION_FULL@"
 
-const char* const CAUDIO_VERSION = "@CAUDIO_VERSION_FULL@";
-const char* const CAUDIO_GIT_HASH = "@CAUDIO_GIT_HASH@";
+/** Short git hash of the source tree, or "unknown". */
+#define CAUDIO_GIT_HASH "@CAUDIO_GIT_HASH@"
 
-const uint32_t CAUDIO_VERSION_MAJOR = @PROJECT_VERSION_MAJOR@;
-const uint32_t CAUDIO_VERSION_MINOR = @PROJECT_VERSION_MINOR@;
-const uint32_t CAUDIO_VERSION_PATCH = @PROJECT_VERSION_PATCH@;
+#define CAUDIO_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
+#define CAUDIO_VERSION_MINOR @PROJECT_VERSION_MINOR@
+#define CAUDIO_VERSION_PATCH @PROJECT_VERSION_PATCH@
 
-#endif // CAUDIO_VERSION_H
+#endif /* CAUDIO_VERSION_H */

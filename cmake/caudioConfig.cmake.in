@@ -1,5 +1,11 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+
+# caudio's public headers expose cstdx types, and ca_runtime is exported with
+# cstdx::cstdx in its link interface.
+find_dependency(cstdx CONFIG)
+
 include("${CMAKE_CURRENT_LIST_DIR}/caudioTargets.cmake")
 
 check_required_components(caudio)

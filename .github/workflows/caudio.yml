@@ -12,6 +12,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'CMakeLists.txt'
+      - 'CMakePresets.json'
       - 'cmake/**'
       - '.github/workflows/caudio.yml'
       - '.github/workflows/cstdx.yml'
@@ -22,6 +23,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'CMakeLists.txt'
+      - 'CMakePresets.json'
       - 'cmake/**'
       - '.github/workflows/caudio.yml'
       - '.github/workflows/cstdx.yml'
@@ -106,7 +108,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang-19 \
             -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCSTDX_ENABLE_SANITIZERS=ON
+            -DCAUDIO_SANITIZERS=address,undefined
 
       - name: Build
         run: cmake --build build --parallel

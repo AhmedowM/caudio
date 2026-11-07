@@ -1,0 +1,249 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CAUDIO_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Developer build (Debug)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "release-dbg-info",
+      "displayName": "Release build with debug info",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "minsize",
+      "displayName": "Minimum-size release build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "MinSizeRel"
+      }
+    },
+    {
+      "name": "release-lto",
+      "displayName": "Release build with link-time optimisation",
+      "inherits": "release",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
+      }
+    },
+    {
+      "name": "minsize-lto",
+      "displayName": "Minimum-size release build with link-time optimisation",
+      "inherits": "minsize",
+      "cacheVariables": {
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Debug with AddressSanitizer",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CAUDIO_SANITIZERS": "address"
+      }
+    },
+    {
+      "name": "ubsan",
+      "displayName": "Debug with UndefinedBehaviorSanitizer",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CAUDIO_SANITIZERS": "undefined"
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "displayName": "Debug with AddressSanitizer + UndefinedBehaviorSanitizer",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CAUDIO_SANITIZERS": "address,undefined"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Debug with ThreadSanitizer",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CAUDIO_SANITIZERS": "thread"
+      }
+    },
+    {
+      "name": "msan",
+      "displayName": "Debug with MemorySanitizer (Clang only)",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CAUDIO_SANITIZERS": "memory"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "release-dbg-info",
+      "configurePreset": "release-dbg-info"
+    },
+    {
+      "name": "minsize",
+      "configurePreset": "minsize"
+    },
+    {
+      "name": "release-lto",
+      "configurePreset": "release-lto"
+    },
+    {
+      "name": "minsize-lto",
+      "configurePreset": "minsize-lto"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "ubsan",
+      "configurePreset": "ubsan"
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "msan",
+      "configurePreset": "msan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release-dbg-info",
+      "configurePreset": "release-dbg-info",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "minsize",
+      "configurePreset": "minsize",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release-lto",
+      "configurePreset": "release-lto",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "minsize-lto",
+      "configurePreset": "minsize-lto",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "ubsan",
+      "configurePreset": "ubsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "asan-ubsan",
+      "configurePreset": "asan-ubsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1:strict_string_checks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=1"
+      }
+    },
+    {
+      "name": "msan",
+      "configurePreset": "msan",
+      "output": {
+        "outputOnFailure": true
+      },
+      "environment": {
+        "MSAN_OPTIONS": "halt_on_error=1"
+      }
+    }
+  ]
+}

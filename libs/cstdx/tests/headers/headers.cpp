@@ -26,6 +26,7 @@
 #include <cstdx/string_builder.h>
 #include <cstdx/string_view.h>
 #include <cstdx/vector.h>
+#include <cstdx/version.h>
 
 int main() {
     return 0;

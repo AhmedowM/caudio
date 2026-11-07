@@ -5,13 +5,13 @@
 #   -DCSTDX_BUILD_CPP_TESTS=ON
 #   -DCSTDX_BUILD_FUZZ=ON  (Clang, -fsanitize=fuzzer)
 
-add_subdirectory(c)
-add_subdirectory(headers)
+include(${CMAKE_CURRENT_LIST_DIR}/tests-c.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/tests-headers.cmake)
 
 if(CSTDX_BUILD_CPP_TESTS)
-  add_subdirectory(cpp)
+  include(${CMAKE_CURRENT_LIST_DIR}/tests-cpp.cmake)
 endif()
 
 if(CSTDX_BUILD_FUZZ)
-  add_subdirectory(fuzz)
+  include(${CMAKE_CURRENT_LIST_DIR}/tests-fuzz.cmake)
 endif()

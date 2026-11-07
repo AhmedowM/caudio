@@ -21,11 +21,27 @@ C23 features are used directly: `nullptr`, `constexpr`, `auto`,
 
 ## Build, test, install
 
+The repository ships CMake presets for the common configurations:
+
 ```sh
-cmake -S libs/cstdx -B build/cstdx -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/cstdx
-ctest --test-dir build/cstdx --output-on-failure
-cmake --install build/cstdx --prefix /some/prefix
+cmake --preset dev
+cmake --build --preset dev
+ctest --preset dev
+cmake --install build/dev --prefix /some/prefix
+```
+
+Available presets: `dev`, `release`, `release-dbg-info`, `minsize`,
+`release-lto`, `minsize-lto`, plus the sanitizer presets `asan`, `ubsan`,
+`asan-ubsan`, `tsan`, and `msan`. Each preset has matching build and test
+presets.
+
+Without presets:
+
+```sh
+cmake -S . -B build/dev -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/dev
+ctest --test-dir build/dev --output-on-failure
+cmake --install build/dev --prefix /some/prefix
 ```
 
 Consume the installed package with:
@@ -45,8 +61,30 @@ Inside the caudio monorepo, `add_subdirectory(libs/cstdx)` is the default;
 | `CSTDX_BUILD_TESTS` | on when top-level | Build the C unit tests |
 | `CSTDX_BUILD_CPP_TESTS` | off | Build GoogleTest + RapidCheck differential tests (fetches dependencies) |
 | `CSTDX_BUILD_FUZZ` | off | Build libFuzzer targets (Clang only) |
-| `CSTDX_BUILD_SHARED` | off | Build a shared library instead of a static one |
-| `CSTDX_BUILD_BENCHMARKS` | off | Build benchmarks |
+| `CSTDX_BUILD_SHARED` | on | Build a shared library instead of a static one |
+| `CSTDX_BUILD_BENCHMARKS` | off | Build benchmarks (not implemented yet) |
+| `CSTDX_SANITIZERS` | empty | Comma-separated sanitizers: `address`, `undefined`, `thread`, `memory`, `leak` (`asan`/`ubsan`/`tsan`/`msan` aliases accepted) |
+| `CSTDX_PROJECT_VERSION` | empty | Explicit version override (`X.Y.Z[-suffix]`) |
+| `CSTDX_REQUIRE_GIT_VERSION` | off | Fail configure when no `vX.Y.Z` git tag is available |
+
+`CSTDX_ENABLE_SANITIZERS=ON` is a deprecated alias for
+`CSTDX_SANITIZERS=address,undefined`. When cstdx is built as part of the caudio
+monorepo, use `-DCAUDIO_SANITIZERS=...` instead so caudio and cstdx are
+instrumented consistently.
+
+### Versioning
+
+The version is resolved, in order, from `-DCSTDX_PROJECT_VERSION=X.Y.Z[-suffix]`,
+the nearest `vX.Y.Z` git tag, `libs/cstdx/VERSION`, then a `0.1.0` fallback.
+The generated `<cstdx/version.h>` is installed with the library and exposes:
+
+```c
+CSTDX_VERSION        /* "0.1.0", including any pre-release suffix */
+CSTDX_VERSION_MAJOR
+CSTDX_VERSION_MINOR
+CSTDX_VERSION_PATCH
+CSTDX_GIT_HASH       /* short hash, or "unknown" */
+```
 
 ## API at a glance
 
@@ -66,6 +104,7 @@ Inside the caudio monorepo, `add_subdirectory(libs/cstdx)` is the default;
 | `cstdx/hash.h` | FNV-1a 32/64 and incremental `cx_hasher` |
 | `cstdx/sort.h` | Stable bottom-up merge sort over `void * + element_size` |
 | `cstdx/base64.h` | Strict RFC 4648 encode/decode |
+| `cstdx/version.h` | Version string, numeric components, and git hash |
 
 ### Opaque owned types
 

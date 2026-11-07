@@ -3,13 +3,10 @@
 # `headers.c` is always built. `headers.cpp` is built when a C++ compiler is
 # available, because the C++ differential harness includes the same headers.
 
-add_executable(cstdx_headers_c headers.c)
-target_link_libraries(cstdx_headers_c PRIVATE cstdx::cstdx)
+set(_cstdx_headers_dir ${PROJECT_SOURCE_DIR}/tests/headers)
 
-if(CSTDX_ENABLE_SANITIZERS)
-  target_compile_options(cstdx_headers_c PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
-  target_link_options(cstdx_headers_c PRIVATE -fsanitize=address,undefined)
-endif()
+add_executable(cstdx_headers_c ${_cstdx_headers_dir}/headers.c)
+target_link_libraries(cstdx_headers_c PRIVATE cstdx::cstdx)
 
 add_test(NAME cstdx.headers.c COMMAND cstdx_headers_c)
 set_tests_properties(cstdx.headers.c PROPERTIES LABELS headers)
@@ -19,7 +16,7 @@ check_language(CXX)
 if(CMAKE_CXX_COMPILER)
   enable_language(CXX)
 
-  add_executable(cstdx_headers_cpp headers.cpp)
+  add_executable(cstdx_headers_cpp ${_cstdx_headers_dir}/headers.cpp)
   target_link_libraries(cstdx_headers_cpp PRIVATE cstdx::cstdx)
   target_compile_features(cstdx_headers_cpp PRIVATE cxx_std_23)
   set_target_properties(cstdx_headers_cpp PROPERTIES
@@ -28,11 +25,8 @@ if(CMAKE_CXX_COMPILER)
       CXX_EXTENSIONS OFF
   )
 
-  if(CSTDX_ENABLE_SANITIZERS)
-    target_compile_options(cstdx_headers_cpp PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all -Werror)
-    target_link_options(cstdx_headers_cpp PRIVATE -fsanitize=address,undefined)
-  endif()
-
   add_test(NAME cstdx.headers.cpp COMMAND cstdx_headers_cpp)
   set_tests_properties(cstdx.headers.cpp PROPERTIES LABELS headers)
 endif()
+
+unset(_cstdx_headers_dir)
