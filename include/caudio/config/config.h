@@ -20,7 +20,6 @@
 #include <cstdx/string.h>
 #include <cstdx/vector.h>
 
-#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus

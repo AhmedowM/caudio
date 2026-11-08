@@ -33,8 +33,8 @@ static ca_status ca_from_cx(cx_status status) {
  * the enclosing copy checks it after every push. All copies in one call chain
  * share the same allocator.
  */
-_Thread_local const cx_allocator *ca_impl_copy_alloc;
-_Thread_local ca_status ca_impl_copy_status;
+thread_local const cx_allocator *ca_impl_copy_alloc;
+thread_local ca_status ca_impl_copy_status;
 
 void ca_impl_copy_reset(const cx_allocator *alloc) {
     ca_impl_copy_alloc = alloc ? alloc : cx_allocator_default();

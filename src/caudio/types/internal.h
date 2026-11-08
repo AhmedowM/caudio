@@ -25,8 +25,8 @@ extern const cx_vector_ops ca_impl_track_vector_ops;
  * stash the allocator and the first failure here; the enclosing copy checks it
  * after each push.
  */
-extern _Thread_local const cx_allocator *ca_impl_copy_alloc;
-extern _Thread_local ca_status ca_impl_copy_status;
+extern thread_local const cx_allocator *ca_impl_copy_alloc;
+extern thread_local ca_status ca_impl_copy_status;
 
 /**
  * @brief Start a copy operation and clear the error channel.

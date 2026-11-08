@@ -31,13 +31,13 @@ extern "C" {
  */
 typedef struct ca_file *ca_file_t;
 
-#define CA_FS_INVALID ((ca_file_t)nullptr)
+constexpr ca_file_t CA_FS_INVALID = nullptr;
 
-#define CA_FS_READ     (1u << 0)
-#define CA_FS_WRITE    (1u << 1)
-#define CA_FS_APPEND   (1u << 2)
-#define CA_FS_CREATE   (1u << 3)
-#define CA_FS_TRUNCATE (1u << 4)
+constexpr uint32_t CA_FS_READ     = 1u << 0;
+constexpr uint32_t CA_FS_WRITE    = 1u << 1;
+constexpr uint32_t CA_FS_APPEND   = 1u << 2;
+constexpr uint32_t CA_FS_CREATE   = 1u << 3;
+constexpr uint32_t CA_FS_TRUNCATE = 1u << 4;
 
 CAUDIO_API ca_file_t ca_fs_open(const char *path, uint32_t flags,
                                 ca_error *err);

@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#define CA_ERROR_MAX 256
+constexpr size_t CA_ERROR_MAX = 256;
 
 /**
  * @brief Fixed-size error record.

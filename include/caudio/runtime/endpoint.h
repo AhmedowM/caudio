@@ -22,7 +22,6 @@
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
 
-#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef __cplusplus

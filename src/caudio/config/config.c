@@ -673,8 +673,8 @@ void ca_config_entry_destroy(ca_config_entry *entry) {
  * builder stashes the allocator and the first failure in thread-local state.
  * This is a private channel; it is not shared with the record copy helpers.
  */
-static _Thread_local const cx_allocator *config_copy_alloc;
-static _Thread_local ca_status config_copy_status;
+static thread_local const cx_allocator *config_copy_alloc;
+static thread_local ca_status config_copy_status;
 
 static void config_copy_reset(const cx_allocator *alloc) {
     config_copy_alloc = alloc ? alloc : cx_allocator_default();

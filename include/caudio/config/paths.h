@@ -25,8 +25,6 @@
 #include <cstdx/allocator.h>
 #include <cstdx/string.h>
 
-#include <stdbool.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
