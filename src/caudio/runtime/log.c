@@ -463,7 +463,9 @@ static void log_utc_timestamp(char *buf, size_t size) {
 #else
     struct timespec ts;
 
-    if (timespec_get(&ts, TIME_UTC) == 0) {
+    /* clock_gettime() is POSIX and available on Android API 28; timespec_get()
+     * is C11 but not exposed by older Bionic headers. */
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
         (void)snprintf(buf, size, "0000-00-00T00:00:00.000Z");
         return;
     }

@@ -24,14 +24,14 @@ static long process_id(void) {
 }
 
 static void get_cwd(char *out, size_t size) {
-    out[0] = '.';
-    out[1] = '\0';
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
-    (void)_getcwd(out, (int)size);
+    if (_getcwd(out, (int)size) == nullptr) {
 #else
-    (void)getcwd(out, size);
+    if (getcwd(out, size) == nullptr) {
 #endif
+        out[0] = '.';
+        out[1] = '\0';
+    }
 }
 
 static void make_socket_path(char *out, size_t size, const char *tag) {
