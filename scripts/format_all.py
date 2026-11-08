@@ -4,7 +4,7 @@
 Usage:
     python3 scripts/format_all.py [--check] [--clang-format BIN] [paths...]
 
-Default scope is the whole tree: *.c, *.h, excluding build/ and .git/.
+Default scope is the whole tree: *.c, *.h, excluding build/, .git/, and libs/third_party/.
 Pass explicit paths to limit the run. With --check nothing is modified;
 dirty files are listed and exit code is 1.
 """
@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 EXTENSIONS = {".c", ".h"}
-EXCLUDE_DIRS = {"build", ".git"}
+EXCLUDE_DIRS = {"build", ".git", "third_party"}
 
 
 def repo_root() -> Path:

@@ -5,7 +5,6 @@
 #include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#include <dirent.h>
 #include <io.h>
 #include <sys/stat.h>
 #include <windows.h>

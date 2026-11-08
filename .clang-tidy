@@ -13,7 +13,7 @@
 # Checks are deliberately wide by default; use scripts/tidy_all.py --fix
 # with the curated safe subset.
 
-Checks: '-*,clang-analyzer-*,bugprone-*,concurrency-*,cppcoreguidelines-*,performance-*,readability-*'
+Checks: '-*,clang-analyzer-*,bugprone-*,concurrency-*,cppcoreguidelines-*,performance-*,readability-*,-misc-*'
 WarningsAsErrors: ''
 HeaderFilterRegex: '(src|include|tests)/.*'
 CheckOptions:
