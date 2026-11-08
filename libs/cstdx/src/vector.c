@@ -195,7 +195,7 @@ void cx_impl_vector_destroy(cx_vector *vector) {
 cx_status cx_vector_init(cx_vector **out, size_t element_size,
                          size_t element_align, const cx_vector_ops *ops,
                          const cx_allocator *allocator) {
-    if (out == nullptr) {
+    if (out == nullptr || !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
     }
 
