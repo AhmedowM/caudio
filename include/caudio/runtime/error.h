@@ -1,4 +1,4 @@
-#ifndef CA_RUNTIME_ERROR_H
+﻿#ifndef CA_RUNTIME_ERROR_H
 #define CA_RUNTIME_ERROR_H
 
 /**
@@ -6,7 +6,7 @@
  * @brief Fixed-size error record for caudio runtime APIs.
  *
  * Every fallible ca_runtime function takes an optional `ca_error *err`. When
- * non-NULL it is zeroed on success and initialized on failure. The 256-byte
+ * non-nullptr it is zeroed on success and initialized on failure. The 256-byte
  * fixed size keeps the ABI stable and avoids heap allocation for error text.
  */
 

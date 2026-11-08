@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_LOG_H
+﻿#ifndef CAUDIO_RUNTIME_LOG_H
 #define CAUDIO_RUNTIME_LOG_H
 
 /**
@@ -58,7 +58,7 @@ typedef struct ca_logger ca_logger;
  *
  * @param ctx     Sink context supplied in ca_log_sink.
  * @param level   Severity of this record.
- * @param message Message text; never NULL. May contain embedded newlines.
+ * @param message Message text; never nullptr. May contain embedded newlines.
  * @param len     Message length in bytes, excluding the terminating NUL.
  */
 typedef void (*ca_log_sink_write_fn)(void *ctx, ca_log_level level,
@@ -73,7 +73,7 @@ typedef void (*ca_log_sink_destroy_fn)(void *ctx);
 /**
  * @brief A log sink: write callback, context, and optional destructor.
  *
- * write must be non-NULL. ctx may be NULL. destroy may be NULL.
+ * write must be non-nullptr. ctx may be nullptr. destroy may be nullptr.
  */
 typedef struct ca_log_sink {
     ca_log_sink_write_fn write;
@@ -98,7 +98,7 @@ CAUDIO_API void ca_log_config_init(ca_log_config *config);
  * @brief Create a logger.
  *
  * @param out    Receives the new logger.
- * @param config Optional configuration; NULL means CA_LOG_INFO with no sink.
+ * @param config Optional configuration; nullptr means CA_LOG_INFO with no sink.
  * @param err    Optional error record.
  * @return CA_OK on success.
  */
@@ -107,7 +107,7 @@ CAUDIO_API ca_status ca_logger_create(ca_logger **out,
                                       ca_error *err);
 
 /**
- * @brief Destroy a logger, releasing its sink. NULL and *logger == NULL are
+ * @brief Destroy a logger, releasing its sink. nullptr and *logger == nullptr are
  *        no-ops.
  */
 CAUDIO_API void ca_logger_destroy(ca_logger **logger);
@@ -118,7 +118,7 @@ CAUDIO_API void ca_logger_destroy(ca_logger **logger);
 CAUDIO_API void ca_logger_set_level(ca_logger *logger, ca_log_level level);
 
 /**
- * @brief Return the minimum level, or CA_LOG_OFF for a NULL logger.
+ * @brief Return the minimum level, or CA_LOG_OFF for a nullptr logger.
  */
 CAUDIO_API ca_log_level ca_logger_get_level(const ca_logger *logger);
 
@@ -126,9 +126,9 @@ CAUDIO_API ca_log_level ca_logger_get_level(const ca_logger *logger);
  * @brief Replace the sink. The previous sink is destroyed after the logger
  *        lock is released, so its destructor may call back into the logger.
  *
- * Passing NULL clears the sink.
+ * Passing nullptr clears the sink.
  *
- * @return CA_OK on success, CA_INVALID_ARGUMENT for a NULL logger or a sink
+ * @return CA_OK on success, CA_INVALID_ARGUMENT for a nullptr logger or a sink
  *         with no write callback.
  */
 CAUDIO_API ca_status ca_logger_set_sink(ca_logger *logger,
@@ -138,7 +138,7 @@ CAUDIO_API ca_status ca_logger_set_sink(ca_logger *logger,
 /**
  * @brief Emit an already-formatted message.
  *
- * A NULL logger or message is a no-op. Messages at a level below the
+ * A nullptr logger or message is a no-op. Messages at a level below the
  * configured minimum are dropped.
  */
 CAUDIO_API void ca_logger_write(ca_logger *logger, ca_log_level level,

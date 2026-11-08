@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_MUTEX_H
+﻿#ifndef CAUDIO_RUNTIME_MUTEX_H
 #define CAUDIO_RUNTIME_MUTEX_H
 
 /**
@@ -33,7 +33,7 @@ CAUDIO_API ca_status ca_mutex_create(ca_mutex_t *out, ca_error *err);
 /**
  * @brief Destroy a mutex. Must not be locked or in use by another thread.
  *
- * Passing NULL is a no-op.
+ * Passing nullptr is a no-op.
  */
 CAUDIO_API void ca_mutex_destroy(ca_mutex_t mutex);
 

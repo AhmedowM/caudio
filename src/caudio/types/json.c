@@ -1,4 +1,4 @@
-#include <caudio/types/json.h>
+﻿#include <caudio/types/json.h>
 
 #include "internal.h"
 
@@ -266,9 +266,9 @@ static ca_status json_write_source(ca_json_writer *writer, const char *key,
     ca_source_kind kind = ref ? ref->kind : CA_SOURCE_PATH;
     const char *kind_name = ca_source_kind_name(kind);
     cx_string_view source_key =
-        json_source_value(ref ? ref->key : NULL, kind, fallback);
+        json_source_value(ref ? ref->key : nullptr, kind, fallback);
     cx_string_view display_name =
-        json_source_value(ref ? ref->display_name : NULL, kind, fallback);
+        json_source_value(ref ? ref->display_name : nullptr, kind, fallback);
 
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(ca_json_writer_add_string(writer, "kind", kind_name,
@@ -313,7 +313,7 @@ static bool json_source_kind_from_view(cx_string_view view,
 /**
  * @brief Read a source object into an initialized reference.
  *
- * @p fallback is the track path for `CA_SOURCE_PATH` defaults; NULL for a
+ * @p fallback is the track path for `CA_SOURCE_PATH` defaults; nullptr for a
  * standalone source reference.
  */
 static ca_status json_read_source(ca_source_ref *ref, const ca_json_val *obj,
@@ -366,11 +366,11 @@ ca_status ca_source_ref_write_json(const ca_source_ref *ref,
                                    ca_error *err) {
     if (!writer || !ref) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "ref or writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "ref or writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
-    return json_write_source(writer, key, ref, NULL, err);
+    return json_write_source(writer, key, ref, nullptr, err);
 }
 
 ca_status ca_source_ref_from_json(ca_source_ref *ref, const ca_json_val *val,
@@ -381,7 +381,7 @@ ca_status ca_source_ref_from_json(ca_source_ref *ref, const ca_json_val *val,
     memset(ref, 0, sizeof *ref);
     ca_status status = ca_source_ref_init(ref, alloc);
     if (status == CA_OK) {
-        status = json_read_source(ref, val, NULL, err);
+        status = json_read_source(ref, val, nullptr, err);
     }
     if (status != CA_OK) {
         ca_source_ref_destroy(ref);
@@ -398,7 +398,7 @@ ca_status ca_track_write_json(const ca_track *track, ca_json_writer *writer,
     if (!track || !writer) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "track or writer is NULL");
+                         "track or writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -828,7 +828,7 @@ ca_status ca_device_list_write_json(const ca_device_list *list,
     for (size_t i = 0; i < count; ++i) {
         const ca_device_info *device =
             (const ca_device_info *)cx_vector_ptr(list->devices, i);
-        CA_JSON_TRY(ca_device_info_write_json(device, writer, NULL, err));
+        CA_JSON_TRY(ca_device_info_write_json(device, writer, nullptr, err));
     }
     CA_JSON_TRY(ca_json_writer_end_array(writer, err));
     return ca_json_writer_end_object(writer, err);
@@ -1053,7 +1053,7 @@ static ca_status json_write_top_list(ca_json_writer *writer, const char *key,
     for (size_t i = 0; i < count; ++i) {
         const ca_top_entity *entity =
             (const ca_top_entity *)cx_vector_ptr(list, i);
-        CA_JSON_TRY(ca_top_entity_write_json(entity, writer, NULL, err));
+        CA_JSON_TRY(ca_top_entity_write_json(entity, writer, nullptr, err));
     }
     return ca_json_writer_end_array(writer, err);
 }
@@ -1064,7 +1064,7 @@ static ca_status json_write_track_list(ca_json_writer *writer, const char *key,
     size_t count = list ? cx_vector_length(list) : 0;
     for (size_t i = 0; i < count; ++i) {
         const ca_track *track = (const ca_track *)cx_vector_ptr(list, i);
-        CA_JSON_TRY(ca_track_write_json(track, writer, NULL, err));
+        CA_JSON_TRY(ca_track_write_json(track, writer, nullptr, err));
     }
     return ca_json_writer_end_array(writer, err);
 }
@@ -1610,7 +1610,7 @@ ca_status ca_engine_state_write_json(const ca_engine_state *state,
     for (size_t i = 0; i < count; ++i) {
         const int64_t *value =
             (const int64_t *)cx_vector_ptr(state->shuffle_perm, i);
-        CA_JSON_TRY(ca_json_writer_add_int(writer, NULL, *value, err));
+        CA_JSON_TRY(ca_json_writer_add_int(writer, nullptr, *value, err));
     }
     CA_JSON_TRY(ca_json_writer_end_array(writer, err));
     return ca_json_writer_end_object(writer, err);

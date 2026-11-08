@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_ENDPOINT_H
+﻿#ifndef CAUDIO_RUNTIME_ENDPOINT_H
 #define CAUDIO_RUNTIME_ENDPOINT_H
 
 /**
@@ -95,7 +95,7 @@ CAUDIO_API size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer,
 /**
  * @brief Write exactly @p size bytes.
  *
- * Partial writes are retried internally. @p buffer may be NULL only when
+ * Partial writes are retried internally. @p buffer may be nullptr only when
  * @p size is 0.
  *
  * @return @p size on success, or (size_t)-1 on error with @p err set.
@@ -114,13 +114,13 @@ CAUDIO_API ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err);
 /**
  * @brief Close @p endpoint and set it to CA_ENDPOINT_INVALID.
  *
- * A listening endpoint removes its socket path. NULL and *endpoint == NULL are
+ * A listening endpoint removes its socket path. nullptr and *endpoint == nullptr are
  * no-ops.
  */
 CAUDIO_API void ca_endpoint_close(ca_endpoint **endpoint);
 
 /**
- * @brief Return the endpoint's socket path, or NULL for an accepted endpoint.
+ * @brief Return the endpoint's socket path, or nullptr for an accepted endpoint.
  */
 CAUDIO_API const char *ca_endpoint_name(const ca_endpoint *endpoint);
 

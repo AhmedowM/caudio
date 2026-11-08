@@ -1,4 +1,4 @@
-#include <caudio/runtime/env.h>
+﻿#include <caudio/runtime/env.h>
 
 #include <errno.h>
 #include <stdbool.h>
@@ -200,7 +200,7 @@ ca_status ca_env_get(const char *name, char *out, size_t out_size,
     if (out == nullptr && out_size != 0) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out_size must be 0 when out is NULL");
+                         "out_size must be 0 when out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

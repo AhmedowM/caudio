@@ -1,4 +1,4 @@
-#include <caudio/runtime/shm.h>
+﻿#include <caudio/runtime/shm.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -206,7 +206,7 @@ ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
 
     if (addr == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "addr is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "addr is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -251,7 +251,7 @@ ca_status ca_shm_close(ca_shm_t shm, ca_error *err) {
 
     if (shm == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "shm is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "shm is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

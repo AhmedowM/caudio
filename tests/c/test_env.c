@@ -1,4 +1,4 @@
-#include <caudio.h>
+﻿#include <caudio.h>
 #include <caudio/runtime/env.h>
 
 #include <string.h>
@@ -56,7 +56,7 @@ static int test_set_get(void) {
     CA_CHECK_EQ(5, len);
     CA_CHECK_EQ(0, strcmp(buffer, "hello"));
 
-    /* A NULL out_len is allowed. */
+    /* A nullptr out_len is allowed. */
     CA_CHECK_EQ(CA_OK, ca_env_get(ENV_NAME, buffer, sizeof(buffer), nullptr,
                                   nullptr));
     CA_CHECK_EQ(0, strcmp(buffer, "hello"));
@@ -218,7 +218,6 @@ static int test_utf8_roundtrip(void) {
 
     cleanup(ENV_NAME_UTF8);
 
-    /* "café 世界" */
     const char *value = "caf\xC3\xA9 \xE4\xB8\x96\xE7\x95\x8C";
     size_t expected_len = strlen(value);
     CA_CHECK(expected_len > 0);
@@ -243,7 +242,7 @@ static int test_invalid_args(void) {
     char buffer[8];
     size_t len = 0;
 
-    /* NULL or empty names, and names containing '='. */
+    /* nullptr or empty names, and names containing '='. */
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
                 ca_env_get(nullptr, buffer, sizeof(buffer), &len, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_env_get("", buffer, sizeof(buffer),
@@ -257,7 +256,7 @@ static int test_invalid_args(void) {
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_env_unset("", &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_env_unset("A=B", &err));
 
-    /* NULL value for set. */
+    /* nullptr value for set. */
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_env_set(ENV_NAME, nullptr, true, &err));
 
     /* out / out_size mismatch. */
@@ -266,7 +265,7 @@ static int test_invalid_args(void) {
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
                 ca_env_get(ENV_NAME, buffer, 0, &len, &err));
 
-    /* err == NULL is accepted on every entry point. */
+    /* err == nullptr is accepted on every entry point. */
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_env_get(nullptr, nullptr, 0, nullptr,
                                                 nullptr));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,

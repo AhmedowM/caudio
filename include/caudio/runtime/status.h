@@ -1,4 +1,4 @@
-#ifndef CA_RUNTIME_STATUS_H
+﻿#ifndef CA_RUNTIME_STATUS_H
 #define CA_RUNTIME_STATUS_H
 
 /**
@@ -55,7 +55,7 @@ typedef enum ca_status : uint8_t {
 
 /**
  * @brief Return a human-readable name for a ca_status value.
- * @return Static string; never NULL. Unknown values return "ca_status_unknown".
+ * @return Static string; never nullptr. Unknown values return "ca_status_unknown".
  */
 [[nodiscard]] CAUDIO_API const char *ca_status_name(ca_status status);
 

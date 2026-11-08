@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_SOCKET_H
+﻿#ifndef CAUDIO_RUNTIME_SOCKET_H
 #define CAUDIO_RUNTIME_SOCKET_H
 
 /**
@@ -88,7 +88,7 @@ CAUDIO_API ca_socket_t ca_socket_create(ca_socket_domain domain,
  * `sun_path` capacity (108 bytes on Linux and Windows, 104 on macOS), including
  * the terminating NUL.
  *
- * @return CA_OK on success, CA_INVALID_ARGUMENT for a NULL or empty path, or
+ * @return CA_OK on success, CA_INVALID_ARGUMENT for a nullptr or empty path, or
  *         CA_OVERFLOW if the path does not fit in `sun_path`.
  */
 CAUDIO_API ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
@@ -129,7 +129,7 @@ CAUDIO_API ca_status ca_socket_connect(ca_socket_t sock,
 /**
  * @brief Accept an incoming connection.
  *
- * @param out_addr Receives the peer address, or NULL if not wanted.
+ * @param out_addr Receives the peer address, or nullptr if not wanted.
  * @return New connected socket handle, or CA_SOCKET_INVALID on failure.
  */
 CAUDIO_API ca_socket_t ca_socket_accept(ca_socket_t sock,

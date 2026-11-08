@@ -1,4 +1,4 @@
-#include <caudio/runtime/endpoint.h>
+﻿#include <caudio/runtime/endpoint.h>
 
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/socket.h>
@@ -73,7 +73,7 @@ ca_status ca_endpoint_listen(ca_endpoint **out, const char *name, int backlog,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -82,7 +82,7 @@ ca_status ca_endpoint_listen(ca_endpoint **out, const char *name, int backlog,
 
     if (name == nullptr || name[0] == '\0') {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "name is NULL or empty");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "name is nullptr or empty");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -138,7 +138,7 @@ ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -174,7 +174,7 @@ ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -183,7 +183,7 @@ ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
 
     if (name == nullptr || name[0] == '\0') {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "name is NULL or empty");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "name is nullptr or empty");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -256,7 +256,7 @@ size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer, size_t size,
     if (endpoint == nullptr) {
         if (err) {
             ca_error_init(err);
-            ca_error_set(err, CA_INVALID_ARGUMENT, "endpoint is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "endpoint is nullptr");
         }
         return (size_t)-1;
     }
@@ -318,7 +318,7 @@ ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err) {
 
     if (endpoint == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "endpoint is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "endpoint is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

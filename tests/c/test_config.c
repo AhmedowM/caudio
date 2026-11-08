@@ -1,4 +1,4 @@
-#include <caudio/config/config.h>
+﻿#include <caudio/config/config.h>
 #include <caudio/runtime/env.h>
 #include <caudio/runtime/error.h>
 #include <caudio/runtime/fs.h>
@@ -14,7 +14,7 @@
 
 static bool str_eq(const cx_string *value, const char *expected) {
     if (!value) {
-        return expected == NULL || expected[0] == '\0';
+        return expected == nullptr || expected[0] == '\0';
     }
     return cx_string_view_eq(cx_string_view_of(value),
                              cx_string_view_from_cstr(expected));
@@ -54,7 +54,7 @@ static void assign(cx_string *str, const char *text) {
 
 static void test_defaults(void) {
     ca_config config;
-    CA_CHECK_EQ(CA_OK, ca_config_init(&config, NULL));
+    CA_CHECK_EQ(CA_OK, ca_config_init(&config, nullptr));
     CA_CHECK(str_eq(config.db_path, ""));
     CA_CHECK(str_eq(config.config_path, ""));
     CA_CHECK(str_eq(config.device, "auto"));
@@ -66,16 +66,16 @@ static void test_defaults(void) {
     CA_CHECK(!config.autostart);
 
     ca_config copy;
-    CA_CHECK_EQ(CA_OK, ca_config_copy(&copy, &config, NULL));
+    CA_CHECK_EQ(CA_OK, ca_config_copy(&copy, &config, nullptr));
     CA_CHECK(str_eq(copy.device, "auto"));
     CA_CHECK(str_eq(copy.repeat_default, "off"));
     CA_CHECK_EQ(2, copy.log_level);
     ca_config_destroy(&copy);
     ca_config_destroy(&config);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_init(NULL, NULL));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_copy(NULL, &config, NULL));
-    ca_config_destroy(NULL);
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_init(nullptr, nullptr));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_copy(nullptr, &config, nullptr));
+    ca_config_destroy(nullptr);
 }
 
 static void test_load_missing(cx_allocator *alloc) {
@@ -90,7 +90,7 @@ static void test_load_missing(cx_allocator *alloc) {
     CA_CHECK(config.clear_stops_playback);
     ca_config_destroy(&config);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_load(NULL, NULL, alloc, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_load(nullptr, nullptr, alloc, &err));
 }
 
 static void test_load_full(cx_allocator *alloc) {
@@ -187,8 +187,8 @@ static void test_load_errors(cx_allocator *alloc) {
     CA_CHECK_EQ(2, config.log_level);
     ca_config_destroy(&config);
 
-    /* Explicit malformed path with NULL out. */
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_load(NULL, path, alloc, &err));
+    /* Explicit malformed path with nullptr out. */
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_load(nullptr, path, alloc, &err));
 }
 
 static void test_save_roundtrip(cx_allocator *alloc) {
@@ -241,14 +241,14 @@ static void test_save_roundtrip(cx_allocator *alloc) {
     CA_CHECK_EQ(CA_OK, ca_config_save(&config, alloc, &err));
     CA_CHECK(read_file("caudio_test_config_tmp/no_socket.json", text,
                        sizeof text));
-    CA_CHECK(strstr(text, "socketPath") == NULL);
+    CA_CHECK(strstr(text, "socketPath") == nullptr);
     ca_config_destroy(&config);
 
     /* Saving without a config path is rejected by the filesystem layer. */
     CA_CHECK_EQ(CA_OK, ca_config_init(&config, alloc));
     CA_CHECK_EQ(CA_IO_ERROR, ca_config_save(&config, alloc, &err));
     ca_config_destroy(&config);
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_save(NULL, alloc, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_save(nullptr, alloc, &err));
 }
 
 static void test_raw(cx_allocator *alloc) {
@@ -261,9 +261,9 @@ static void test_raw(cx_allocator *alloc) {
     CA_CHECK_EQ(CA_OK, ca_config_set_raw(path, "flag", "true", alloc, &err));
     CA_CHECK_EQ(CA_OK,
                 ca_config_set_raw(path, "nested", "{\"a\":1}", alloc, &err));
-    CA_CHECK_EQ(CA_OK, ca_config_set_raw(path, "nothing", "null", alloc, &err));
+    CA_CHECK_EQ(CA_OK, ca_config_set_raw(path, "nothing", "NULL", alloc, &err));
 
-    cx_string *value = NULL;
+    cx_string *value = nullptr;
     CA_CHECK_EQ(CA_OK, ca_config_get_raw(path, "name", &value, alloc, &err));
     CA_CHECK(str_eq(value, "Alice"));
     cx_string_destroy(&value);
@@ -281,18 +281,18 @@ static void test_raw(cx_allocator *alloc) {
     cx_string_destroy(&value);
 
     CA_CHECK_EQ(CA_OK, ca_config_get_raw(path, "nothing", &value, alloc, &err));
-    CA_CHECK(str_eq(value, "null"));
+    CA_CHECK(str_eq(value, "NULL"));
     cx_string_destroy(&value);
 
     /* Listing preserves document order. */
-    cx_vector *entries = NULL;
+    cx_vector *entries = nullptr;
     CA_CHECK_EQ(CA_OK, ca_config_list_raw(path, &entries, alloc, &err));
     CA_CHECK_EQ(5, cx_vector_length(entries));
     const char *expected_keys[] = {"name", "count", "flag", "nested", "nothing"};
     for (size_t i = 0; i < 5; ++i) {
         const ca_config_entry *entry =
             (const ca_config_entry *)cx_vector_ptr(entries, i);
-        CA_CHECK(entry != NULL);
+        CA_CHECK(entry != nullptr);
         if (entry) {
             CA_CHECK(str_eq(entry->key, expected_keys[i]));
         }
@@ -363,21 +363,21 @@ static void test_raw(cx_allocator *alloc) {
     ca_config_entries_destroy(&entries);
     CA_CHECK_EQ(CA_OK, ca_config_reset_all_raw("caudio_test_config_tmp/none.json",
                                                &err));
-    CA_CHECK_EQ(CA_OK, ca_config_reset_all_raw(NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_config_reset_all_raw(nullptr, &err));
 
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_config_get_raw(path, NULL, &value, alloc, &err));
+                ca_config_get_raw(path, nullptr, &value, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_config_get_raw(path, "k", NULL, alloc, &err));
+                ca_config_get_raw(path, "k", nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_config_set_raw(path, NULL, "v", alloc, &err));
+                ca_config_set_raw(path, nullptr, "v", alloc, &err));
     CA_CHECK_EQ(CA_IO_ERROR, ca_config_set_raw("", "k", "v", alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_config_list_raw(path, NULL, alloc, &err));
+                ca_config_list_raw(path, nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
                 ca_config_delete_raw(path, "", alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_config_delete_raw(path, NULL, alloc, &err));
+                ca_config_delete_raw(path, nullptr, alloc, &err));
     CA_CHECK_EQ(CA_NOT_FOUND, ca_config_delete_raw(
                                   "caudio_test_config_tmp/none.json", "k", alloc,
                                   &err));
@@ -397,10 +397,10 @@ static void test_entry_lifecycle(cx_allocator *alloc) {
     ca_config_entry_destroy(&copy);
     ca_config_entry_destroy(&entry);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_entry_init(NULL, alloc));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_entry_copy(NULL, &entry, alloc));
-    ca_config_entry_destroy(NULL);
-    ca_config_entries_destroy(NULL);
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_entry_init(nullptr, alloc));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_config_entry_copy(nullptr, &entry, alloc));
+    ca_config_entry_destroy(nullptr);
+    ca_config_entries_destroy(nullptr);
 }
 
 #ifdef _WIN32
@@ -421,7 +421,7 @@ static void test_legacy_fallback(cx_allocator *alloc) {
                                   &err));
 
     ca_config config;
-    CA_CHECK_EQ(CA_OK, ca_config_load(&config, NULL, alloc, &err));
+    CA_CHECK_EQ(CA_OK, ca_config_load(&config, nullptr, alloc, &err));
     CA_CHECK_EQ(4, config.log_level);
     CA_CHECK(str_eq(config.config_path,
                     "caudio_test_config_tmp/legacyhome/.config/caudio/config.json"));
@@ -431,7 +431,7 @@ static void test_legacy_fallback(cx_allocator *alloc) {
 
 int main(void) {
     cx_allocator_counted counted;
-    CA_CHECK_EQ(CX_OK, cx_allocator_counted_init(&counted, NULL));
+    CA_CHECK_EQ(CX_OK, cx_allocator_counted_init(&counted, nullptr));
     cx_allocator alloc = cx_allocator_counted_as_allocator(&counted);
 
     ca_error err;

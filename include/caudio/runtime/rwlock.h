@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_RWLOCK_H
+﻿#ifndef CAUDIO_RUNTIME_RWLOCK_H
 #define CAUDIO_RUNTIME_RWLOCK_H
 
 /**
@@ -33,7 +33,7 @@ CAUDIO_API ca_status ca_rwlock_create(ca_rwlock_t *out, ca_error *err);
 /**
  * @brief Destroy a read-write lock. Must not be held or waited on.
  *
- * Passing NULL is a no-op.
+ * Passing nullptr is a no-op.
  */
 CAUDIO_API void ca_rwlock_destroy(ca_rwlock_t rwlock);
 

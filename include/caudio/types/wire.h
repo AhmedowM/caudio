@@ -1,4 +1,4 @@
-#ifndef CAUDIO_TYPES_WIRE_H
+﻿#ifndef CAUDIO_TYPES_WIRE_H
 #define CAUDIO_TYPES_WIRE_H
 
 /**
@@ -78,7 +78,7 @@ typedef enum ca_engine_event_type : uint8_t {
  * @brief Parse the wire text of a repeat mode.
  * @param text Case-sensitive text.
  * @param out  Receives the parsed value on success.
- * @return true on success, false for unknown text or a NULL argument.
+ * @return true on success, false for unknown text or a nullptr argument.
  */
 [[nodiscard]] CAUDIO_API bool ca_repeat_mode_parse(const char *text,
                                                    ca_repeat_mode *out);
@@ -94,7 +94,7 @@ typedef enum ca_engine_event_type : uint8_t {
  * @brief Parse the wire text of a playback state.
  * @param text Case-sensitive text.
  * @param out  Receives the parsed value on success.
- * @return true on success, false for unknown text or a NULL argument.
+ * @return true on success, false for unknown text or a nullptr argument.
  */
 [[nodiscard]] CAUDIO_API bool ca_playback_state_parse(const char *text,
                                                       ca_playback_state *out);
@@ -109,7 +109,7 @@ typedef enum ca_engine_event_type : uint8_t {
  * @brief Parse a source kind from its serialized name.
  * @param text Case-sensitive name.
  * @param out  Receives the parsed value on success.
- * @return true on success, false for unknown text or a NULL argument.
+ * @return true on success, false for unknown text or a nullptr argument.
  */
 [[nodiscard]] CAUDIO_API bool ca_source_kind_parse(const char *text,
                                                    ca_source_kind *out);
@@ -124,7 +124,7 @@ typedef enum ca_engine_event_type : uint8_t {
 
 /**
  * @brief Parse an engine event type name.
- * @return true on success, false for unknown text or a NULL argument.
+ * @return true on success, false for unknown text or a nullptr argument.
  */
 [[nodiscard]] CAUDIO_API bool ca_engine_event_type_parse(
     const char *text, ca_engine_event_type *out);

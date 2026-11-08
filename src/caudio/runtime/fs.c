@@ -1,4 +1,4 @@
-#include <caudio/runtime/fs.h>
+﻿#include <caudio/runtime/fs.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -73,7 +73,7 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
 
     if (path == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "path is nullptr");
         }
         return CA_FS_INVALID;
     }

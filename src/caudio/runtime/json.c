@@ -1,4 +1,4 @@
-#include <caudio/runtime/json.h>
+﻿#include <caudio/runtime/json.h>
 
 #include <caudio/runtime/fs.h>
 
@@ -28,7 +28,7 @@
  *
  * ca_json exposes yyjson through caudio's error model and allocator contract.
  * All JSON memory is allocated through the supplied cx_allocator (or the
- * default allocator when NULL).
+ * default allocator when nullptr).
  */
 
 /**
@@ -74,13 +74,13 @@ static void *ca_json_malloc(void *ctx, size_t size) {
     }
 
     if (size > SIZE_MAX - sizeof(ca_json_block_hdr)) {
-        return NULL;
+        return nullptr;
     }
 
     ca_json_block_hdr *hdr = (ca_json_block_hdr *)cx_allocator_alloc(
         c->alloc, sizeof(ca_json_block_hdr) + size, 0);
     if (!hdr) {
-        return NULL;
+        return nullptr;
     }
 
     hdr->info.size = size;
@@ -100,11 +100,11 @@ static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
         ca_json_block_hdr *hdr = (ca_json_block_hdr *)ptr - 1;
         cx_allocator_free(c->alloc, hdr,
                           sizeof(ca_json_block_hdr) + hdr->info.size, 0);
-        return NULL;
+        return nullptr;
     }
 
     if (new_size > SIZE_MAX - sizeof(ca_json_block_hdr)) {
-        return NULL;
+        return nullptr;
     }
 
     ca_json_alloc_ctx *c = (ca_json_alloc_ctx *)ctx;
@@ -115,7 +115,7 @@ static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
     ca_json_block_hdr *resized = (ca_json_block_hdr *)cx_allocator_realloc(
         c->alloc, hdr, old_block, new_block, 0);
     if (!resized) {
-        return NULL;
+        return nullptr;
     }
 
     resized->info.size = new_size;
@@ -182,8 +182,8 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
 
     if (type == YYJSON_TYPE_ARR) {
         yyjson_arr_iter iter = yyjson_arr_iter_with(val);
-        const yyjson_val *child = NULL;
-        while ((child = yyjson_arr_iter_next(&iter)) != NULL) {
+        const yyjson_val *child = nullptr;
+        while ((child = yyjson_arr_iter_next(&iter)) != nullptr) {
             ca_status status = json_validate_limits(child, next_depth, err);
             if (status != CA_OK) {
                 return status;
@@ -191,8 +191,8 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
         }
     } else {
         yyjson_obj_iter iter = yyjson_obj_iter_with(val);
-        yyjson_val *key = NULL;
-        while ((key = yyjson_obj_iter_next(&iter)) != NULL) {
+        yyjson_val *key = nullptr;
+        while ((key = yyjson_obj_iter_next(&iter)) != nullptr) {
             const yyjson_val *child = yyjson_obj_iter_get_val(key);
             ca_status status = json_validate_limits(child, next_depth, err);
             if (status != CA_OK) {
@@ -212,16 +212,16 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
 
     if (!out) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
 
-    *out = NULL;
+    *out = nullptr;
 
     if (!text) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "text is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "text is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -251,7 +251,7 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
         return CA_OUT_OF_MEMORY;
     }
 
-    json->doc = NULL;
+    json->doc = nullptr;
     json->alloc = *a;
     json->alc_ctx.alloc = &json->alloc;
 
@@ -308,7 +308,7 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
 static ca_status json_read_all(const char *path, const cx_allocator *alloc,
                                char **out_text, size_t *out_len,
                                size_t *out_capacity, ca_error *err) {
-    *out_text = NULL;
+    *out_text = nullptr;
     *out_len = 0;
     *out_capacity = 0;
 
@@ -409,23 +409,23 @@ ca_status ca_json_parse_file(ca_json **out, const char *path,
 
     if (!out) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
 
-    *out = NULL;
+    *out = nullptr;
 
     if (!path || path[0] == '\0') {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL or empty");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "path is nullptr or empty");
         }
         return CA_INVALID_ARGUMENT;
     }
 
     const cx_allocator *a = alloc ? alloc : cx_allocator_default();
 
-    char *text = NULL;
+    char *text = nullptr;
     size_t len = 0;
     size_t capacity = 0;
     ca_status status = json_read_all(path, a, &text, &len, &capacity, err);
@@ -444,7 +444,7 @@ void ca_json_destroy(ca_json **out) {
     }
 
     ca_json *json = *out;
-    *out = NULL;
+    *out = nullptr;
 
     /* yyjson_doc_free() calls back through json->alc_ctx, so the handle must
      * still be alive here. */
@@ -494,7 +494,7 @@ const char *ca_json_get_string(const ca_json_val *val, size_t *len) {
         if (len) {
             *len = 0;
         }
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *yv = (const yyjson_val *)val;
@@ -502,7 +502,7 @@ const char *ca_json_get_string(const ca_json_val *val, size_t *len) {
         if (len) {
             *len = 0;
         }
-        return NULL;
+        return nullptr;
     }
 
     const char *str = yyjson_get_str(yv);
@@ -569,12 +569,12 @@ size_t ca_json_array_size(const ca_json_val *val) {
 
 const ca_json_val *ca_json_array_get(const ca_json_val *val, size_t idx) {
     if (!val) {
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *yv = (const yyjson_val *)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_ARR) {
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *item = yyjson_arr_get(yv, idx);
@@ -596,12 +596,12 @@ size_t ca_json_object_size(const ca_json_val *val) {
 
 const ca_json_val *ca_json_object_get(const ca_json_val *val, const char *key) {
     if (!val || !key) {
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *yv = (const yyjson_val *)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *item = yyjson_obj_get(yv, key);
@@ -614,20 +614,20 @@ const char *ca_json_object_key(const ca_json_val *val, size_t idx,
         *len = 0;
     }
     if (!val) {
-        return NULL;
+        return nullptr;
     }
 
     const yyjson_val *yv = (const yyjson_val *)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
-        return NULL;
+        return nullptr;
     }
 
     yyjson_obj_iter iter;
     if (!yyjson_obj_iter_init(yv, &iter)) {
-        return NULL;
+        return nullptr;
     }
-    yyjson_val *key = NULL;
-    for (size_t i = 0; (key = yyjson_obj_iter_next(&iter)) != NULL; ++i) {
+    yyjson_val *key = nullptr;
+    for (size_t i = 0; (key = yyjson_obj_iter_next(&iter)) != nullptr; ++i) {
         if (i == idx) {
             if (len) {
                 *len = yyjson_get_len(key);
@@ -635,12 +635,12 @@ const char *ca_json_object_key(const ca_json_val *val, size_t idx,
             return yyjson_get_str(key);
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 const ca_json_val *ca_json_root(const ca_json *json) {
     if (!json) {
-        return NULL;
+        return nullptr;
     }
 
     return (const ca_json_val *)yyjson_doc_get_root(json->doc);
@@ -658,9 +658,9 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
 
     if (!json) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "json is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "json is nullptr");
         }
-        return NULL;
+        return nullptr;
     }
 
     const cx_allocator *a = alloc ? alloc : cx_allocator_default();
@@ -684,7 +684,7 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
             ca_error_set(err, status, "failed to serialize JSON: %s",
                          werr.msg ? werr.msg : "unknown");
         }
-        return NULL;
+        return nullptr;
     }
 
     char *result = (char *)cx_allocator_alloc(a, written + 1, 0);
@@ -694,7 +694,7 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
             ca_error_set(err, CA_OUT_OF_MEMORY,
                          "failed to allocate JSON output");
         }
-        return NULL;
+        return nullptr;
     }
 
     memcpy(result, tmp, written);
@@ -905,11 +905,11 @@ ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
     }
     if (!out) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
-    *out = NULL;
+    *out = nullptr;
 
     const cx_allocator *a = alloc ? alloc : cx_allocator_default();
     ca_json_writer *writer =
@@ -923,7 +923,7 @@ ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
         return CA_OUT_OF_MEMORY;
     }
 
-    writer->builder = NULL;
+    writer->builder = nullptr;
     writer->alloc = *a;
     writer->depth = 0;
     writer->pretty = pretty != 0;
@@ -948,7 +948,7 @@ void ca_json_writer_destroy(ca_json_writer **out) {
     }
 
     ca_json_writer *writer = *out;
-    *out = NULL;
+    *out = nullptr;
 
     cx_string_builder_destroy(&writer->builder);
     cx_allocator_free(&writer->alloc, writer, sizeof(ca_json_writer),
@@ -963,7 +963,7 @@ static ca_status json_begin_container(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1009,7 +1009,7 @@ static ca_status json_end_container(ca_json_writer *writer, uint8_t kind,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1055,7 +1055,7 @@ ca_status ca_json_writer_add_null(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1073,7 +1073,7 @@ ca_status ca_json_writer_add_bool(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1091,7 +1091,7 @@ ca_status ca_json_writer_add_int(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1110,7 +1110,7 @@ ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1125,6 +1125,9 @@ ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
 /**
  * @brief Format a double with the shortest representation that round-trips.
  *
+ * @param buffer The buffer to write the formatted string to.
+ * @param size The size of the buffer.
+ * @param value The double value to format.
  * @return false for non-finite values, which the caller writes as null.
  */
 static bool json_format_double(char *buffer, size_t size, double value) {
@@ -1137,7 +1140,7 @@ static bool json_format_double(char *buffer, size_t size, double value) {
         if (written < 0 || (size_t)written >= size) {
             return false;
         }
-        char *end = NULL;
+        char *end = nullptr;
         double parsed = strtod(buffer, &end);
         if (end && *end == '\0' && parsed == value) {
             break;
@@ -1153,7 +1156,7 @@ ca_status ca_json_writer_add_double(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1188,14 +1191,14 @@ ca_status ca_json_writer_add_string(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
     if (!value && length != 0) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "string value is NULL but length is nonzero");
+                         "string value is nullptr but length is nonzero");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1241,8 +1244,8 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
         }
         size_t count = ca_json_object_size(val);
         for (size_t i = 0; i < count; ++i) {
-            const char *member = ca_json_object_key(val, i, NULL);
-            if (member == NULL) {
+            const char *member = ca_json_object_key(val, i, nullptr);
+            if (member == nullptr) {
                 continue;
             }
             status = json_write_value(writer, member,
@@ -1260,7 +1263,7 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
         }
         size_t count = ca_json_array_size(val);
         for (size_t i = 0; i < count; ++i) {
-            status = json_write_value(writer, NULL, ca_json_array_get(val, i),
+            status = json_write_value(writer, nullptr, ca_json_array_get(val, i),
                                       err);
             if (status != CA_OK) {
                 return status;
@@ -1281,7 +1284,7 @@ ca_status ca_json_writer_add_value(ca_json_writer *writer, const char *key,
     }
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1294,11 +1297,11 @@ ca_status ca_json_writer_finish(ca_json_writer *writer, cx_string **out,
         ca_error_init(err);
     }
     if (out) {
-        *out = NULL;
+        *out = nullptr;
     }
     if (!writer || !out) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "writer or out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer or out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

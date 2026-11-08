@@ -1,4 +1,4 @@
-#include <caudio/runtime/process.h>
+﻿#include <caudio/runtime/process.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +31,7 @@ ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
 
     if (out == nullptr || argv == nullptr || argv[0] == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out or argv is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out or argv is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -138,7 +138,7 @@ ca_status ca_process_wait(ca_process_t process,
 
     if (process == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "process is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "process is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -200,7 +200,7 @@ ca_status ca_process_kill(ca_process_t process, ca_error *err) {
 
     if (process == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "process is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "process is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -231,7 +231,7 @@ ca_status ca_process_release(ca_process_t process, ca_error *err) {
 
     if (process == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "process is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "process is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

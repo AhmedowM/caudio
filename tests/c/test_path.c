@@ -1,4 +1,4 @@
-#include <caudio.h>
+﻿#include <caudio.h>
 #include <caudio/runtime/path.h>
 
 #include <string.h>
@@ -32,7 +32,7 @@ static int test_join(void) {
     CA_CHECK_EQ(CA_OVERFLOW, err.code);
     CA_CHECK_EQ((size_t)-1, n);
 
-    /* NULL args */
+    /* nullptr args */
     n = ca_path_join(nullptr, "bar", out, sizeof(out), &err);
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, err.code);
     CA_CHECK_EQ((size_t)-1, n);

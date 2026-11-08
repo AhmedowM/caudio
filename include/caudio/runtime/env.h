@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_ENV_H
+﻿#ifndef CAUDIO_RUNTIME_ENV_H
 #define CAUDIO_RUNTIME_ENV_H
 
 /**
@@ -25,16 +25,16 @@ extern "C" {
 /**
  * @brief Look up @p name and copy its value into @p out.
  *
- * Passing @c out = NULL with @c out_size = 0 queries the value length without
+ * Passing @c out = nullptr with @c out_size = 0 queries the value length without
  * copying it; @p out_len receives the length in bytes, excluding the NUL.
  *
- * When @p out is non-NULL, at least @p out_size bytes are available. If the
+ * When @p out is non-nullptr, at least @p out_size bytes are available. If the
  * value does not fit, CA_OVERFLOW is returned, @p out is set to an empty
  * string, and @p out_len receives the required length (excluding NUL).
  *
  * @param name    NUL-terminated UTF-8 variable name. Must not be empty or
  *                contain '='.
- * @param out     Destination buffer, or NULL for a length query.
+ * @param out     Destination buffer, or nullptr for a length query.
  * @param out_size Size of @p out in bytes.
  * @param out_len Optional; receives the copied length or 0 on failure.
  * @param err     Optional error record.

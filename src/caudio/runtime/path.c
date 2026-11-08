@@ -1,4 +1,4 @@
-#include <caudio/runtime/path.h>
+﻿#include <caudio/runtime/path.h>
 
 #include <cstdx/allocator.h>
 
@@ -298,7 +298,7 @@ ca_status ca_path_temp_dir(char *out, size_t out_size, size_t *out_len,
     if (out == nullptr && out_size != 0) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out is NULL but out_size is non-zero");
+                         "out is nullptr but out_size is non-zero");
         }
         return CA_INVALID_ARGUMENT;
     }

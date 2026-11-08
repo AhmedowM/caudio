@@ -1,4 +1,4 @@
-#ifndef CAUDIO_TYPES_JSON_H
+﻿#ifndef CAUDIO_TYPES_JSON_H
 #define CAUDIO_TYPES_JSON_H
 
 /**
@@ -7,7 +7,7 @@
  *
  * Every `_write_json` function emits exactly one JSON object into an existing
  * ca_json_writer. Pass @p key when the object is a member of the current
- * object, or NULL when it is an array element or the document root.
+ * object, or nullptr when it is an array element or the document root.
  *
  * Every `_from_json` function initializes @p out (storage need not be
  * initialized) from a JSON object and takes ownership of all allocations. On

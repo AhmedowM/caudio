@@ -1,4 +1,4 @@
-#include <caudio/runtime/log.h>
+﻿#include <caudio/runtime/log.h>
 
 #include <caudio/runtime/mutex.h>
 #include <caudio/runtime/thread.h>
@@ -127,7 +127,7 @@ ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -236,7 +236,7 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
 
     if (logger == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "logger is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "logger is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -246,7 +246,7 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
         if (!sink->write) {
             if (err) {
                 ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "sink.write is NULL");
+                             "sink.write is nullptr");
             }
             return CA_INVALID_ARGUMENT;
         }
@@ -657,7 +657,7 @@ ca_status ca_log_file_open(ca_log_file **out, const char *path,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -666,7 +666,7 @@ ca_status ca_log_file_open(ca_log_file **out, const char *path,
 
     if (path == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "path is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

@@ -1,4 +1,4 @@
-#include <caudio/runtime/cond.h>
+﻿#include <caudio/runtime/cond.h>
 #include <caudio/runtime/mutex.h>
 
 #include <stdlib.h>
@@ -26,7 +26,7 @@ ca_status ca_cond_create(ca_cond_t *out, ca_error *err) {
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -76,7 +76,7 @@ ca_status ca_cond_signal(ca_cond_t cond, ca_error *err) {
 
     if (cond == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "cond is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "cond is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -104,7 +104,7 @@ ca_status ca_cond_broadcast(ca_cond_t cond, ca_error *err) {
 
     if (cond == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "cond is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "cond is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -132,7 +132,7 @@ ca_status ca_cond_wait(ca_cond_t cond, ca_mutex_t mutex, ca_error *err) {
 
     if (cond == nullptr || mutex == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "cond or mutex is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "cond or mutex is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -171,7 +171,7 @@ ca_status ca_cond_timedwait(ca_cond_t cond, ca_mutex_t mutex,
 
     if (cond == nullptr || mutex == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "cond or mutex is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "cond or mutex is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

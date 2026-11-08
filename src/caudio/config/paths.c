@@ -1,4 +1,4 @@
-#include <caudio/config/paths.h>
+﻿#include <caudio/config/paths.h>
 
 #include <caudio/runtime/env.h>
 #include <caudio/runtime/fs.h>
@@ -44,7 +44,7 @@ static ca_status text_append(cx_string *str, const char *text) {
 static bool env_nonempty_to_string(const char *name, cx_string *out) {
     size_t length = 0;
     ca_error err;
-    if (ca_env_get(name, NULL, 0, &length, &err) != CA_OK || length == 0) {
+    if (ca_env_get(name, nullptr, 0, &length, &err) != CA_OK || length == 0) {
         return false;
     }
     if (cx_string_resize(out, length) != CX_OK) {
@@ -65,7 +65,7 @@ static void strip_trailing_separators(cx_string *str) {
         if (last != '/' && last != '\\') {
             break;
         }
-        (void)cx_string_pop_back(str, NULL);
+        (void)cx_string_pop_back(str, nullptr);
         length--;
     }
 }
@@ -85,7 +85,7 @@ static ca_status join_child(cx_string *str, const char *child) {
 static ca_status temp_dir_to_string(cx_string *out) {
     size_t length = 0;
     ca_error err;
-    ca_status status = ca_path_temp_dir(NULL, 0, &length, &err);
+    ca_status status = ca_path_temp_dir(nullptr, 0, &length, &err);
     if (status != CA_OK) {
         return status;
     }
@@ -196,7 +196,7 @@ static ca_status output_begin(cx_string **out, const cx_allocator *alloc) {
     if (!out) {
         return CA_INVALID_ARGUMENT;
     }
-    *out = NULL;
+    *out = nullptr;
     return ca_from_cx(cx_string_init(out, alloc));
 }
 
@@ -207,13 +207,13 @@ static ca_status output_fail(cx_string **out, ca_status status) {
 
 /* Split off the parent directory of @p path into @p out. */
 static ca_status parent_path_to_string(const char *path, cx_string *out) {
-    const char *last = NULL;
+    const char *last = nullptr;
     for (const char *p = path; *p != '\0'; ++p) {
         if (*p == '/' || *p == '\\') {
             last = p;
         }
     }
-    if (last == NULL) {
+    if (last == nullptr) {
         cx_string_clear(out);
         return CA_OK;
     }
@@ -232,7 +232,7 @@ static ca_status parent_path_to_string(const char *path, cx_string *out) {
 }
 
 static ca_status mkdirs(const char *path, ca_error *err) {
-    if (path == NULL || path[0] == '\0') {
+    if (path == nullptr || path[0] == '\0') {
         return CA_OK;
     }
     return ca_fs_mkdirs(path, err);
@@ -244,8 +244,8 @@ static ca_status mkdirs(const char *path, ca_error *err) {
 
 static ca_status paths_str_copy(cx_string **dst, const cx_string *src,
                                 const cx_allocator *alloc) {
-    *dst = NULL;
-    if (src == NULL) {
+    *dst = nullptr;
+    if (src == nullptr) {
         return CA_OK;
     }
     return ca_from_cx(cx_string_from_view(dst, cx_string_view_of(src), alloc));
@@ -315,7 +315,7 @@ void ca_runtime_paths_destroy(ca_runtime_paths *paths) {
 }
 
 static bool path_is_empty(const cx_string *str) {
-    return str == NULL || cx_string_length(str) == 0;
+    return str == nullptr || cx_string_length(str) == 0;
 }
 
 bool ca_runtime_paths_empty(const ca_runtime_paths *paths) {
@@ -334,8 +334,8 @@ static ca_status ensure_path_parent(const cx_string *path, ca_error *err) {
         return CA_OK;
     }
 
-    cx_string *parent = NULL;
-    ca_status status = ca_from_cx(cx_string_init(&parent, NULL));
+    cx_string *parent = nullptr;
+    ca_status status = ca_from_cx(cx_string_init(&parent, nullptr));
     if (status != CA_OK) {
         return status;
     }
@@ -471,7 +471,7 @@ static unsigned char identity_byte(unsigned char c) {
 }
 
 void ca_paths_hex8_for_db(const char *db_path, char out[9]) {
-    if (out == NULL) {
+    if (out == nullptr) {
         return;
     }
     uint64_t hash = UINT64_C(14695981039346656037);

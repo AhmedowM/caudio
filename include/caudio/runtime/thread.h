@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_THREAD_H
+﻿#ifndef CAUDIO_RUNTIME_THREAD_H
 #define CAUDIO_RUNTIME_THREAD_H
 
 /**
@@ -51,7 +51,7 @@ CAUDIO_API ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn,
  * @brief Wait for @p thread to finish and collect its return value.
  *
  * @param thread   Thread handle (must be joinable).
- * @param out_ret  Receives the thread's return value, or NULL if not wanted.
+ * @param out_ret  Receives the thread's return value, or nullptr if not wanted.
  * @param err      Optional error record.
  * @return CA_OK on success.
  */

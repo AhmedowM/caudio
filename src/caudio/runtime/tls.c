@@ -1,4 +1,4 @@
-#include <caudio/runtime/tls.h>
+﻿#include <caudio/runtime/tls.h>
 
 #include <stdlib.h>
 
@@ -26,7 +26,7 @@ ca_status ca_tls_key_create(ca_tls_key_t *out, ca_tls_destructor dest,
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -90,7 +90,7 @@ ca_status ca_tls_set(ca_tls_key_t key, void *value, ca_error *err) {
 
     if (key == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "key is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "key is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -123,7 +123,7 @@ void *ca_tls_get(ca_tls_key_t key, ca_error *err) {
 
     if (key == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "key is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "key is nullptr");
         }
         return nullptr;
     }

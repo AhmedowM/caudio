@@ -1,4 +1,4 @@
-#include <caudio/runtime/file_lock.h>
+﻿#include <caudio/runtime/file_lock.h>
 
 #include <stdlib.h>
 
@@ -18,7 +18,7 @@ ca_status ca_file_lock(void *fd, ca_file_lock_type type, int64_t offset,
 
     if (fd == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "fd is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "fd is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -109,7 +109,7 @@ ca_status ca_file_unlock(void *fd, int64_t offset, int64_t length,
 
     if (fd == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "fd is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "fd is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

@@ -1,4 +1,4 @@
-#include <caudio/runtime/mutex.h>
+﻿#include <caudio/runtime/mutex.h>
 
 #include <stdlib.h>
 
@@ -24,7 +24,7 @@ ca_status ca_mutex_create(ca_mutex_t *out, ca_error *err) {
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -74,7 +74,7 @@ ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error *err) {
 
     if (mutex == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -102,7 +102,7 @@ ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error *err) {
 
     if (mutex == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -142,7 +142,7 @@ ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err) {
 
     if (mutex == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "mutex is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

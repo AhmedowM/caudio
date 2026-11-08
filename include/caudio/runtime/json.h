@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_JSON_H
+﻿#ifndef CAUDIO_RUNTIME_JSON_H
 #define CAUDIO_RUNTIME_JSON_H
 
 /**
@@ -7,7 +7,7 @@
  *
  * ca_json wraps yyjson, exposing it through caudio's error model and
  * allocator contract. All JSON memory is allocated through the supplied
- * cx_allocator (or the default allocator when NULL).
+ * cx_allocator (or the default allocator when nullptr).
  */
 
 #include <caudio/api.h>
@@ -93,7 +93,7 @@ typedef enum ca_json_type {
  * @param out   Receives the new ca_json handle on success.
  * @param text  JSON text (UTF-8, null-terminator not required).
  * @param len   Length of text in bytes, or 0 to use strlen(text).
- * @param alloc Allocator for internal memory; NULL means default allocator.
+ * @param alloc Allocator for internal memory; nullptr means default allocator.
  * @param err   Optional error record.
  * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input or malformed
  *         JSON, CA_OVERFLOW if the input exceeds CA_JSON_MAX_BYTES or the
@@ -111,7 +111,7 @@ CAUDIO_API ca_status ca_json_parse(ca_json **out, const char *text,
  * including Windows.
  *
  * @param path  UTF-8 file path.
- * @param alloc Allocator for internal memory; NULL means default allocator.
+ * @param alloc Allocator for internal memory; nullptr means default allocator.
  * @param err   Optional error record.
  * @return CA_OK on success, CA_INVALID_ARGUMENT on invalid input or malformed
  *         JSON, CA_IO_ERROR if the file cannot be opened or read, CA_OVERFLOW
@@ -126,7 +126,7 @@ CAUDIO_API ca_status ca_json_parse_file(ca_json **out, const char *path,
 /**
  * @brief Destroy a ca_json handle and free all associated memory.
  *
- * Passing NULL or a pointer to NULL is a no-op.
+ * Passing nullptr or a pointer to nullptr is a no-op.
  */
 CAUDIO_API void ca_json_destroy(ca_json **out);
 
@@ -138,8 +138,8 @@ CAUDIO_API ca_json_type ca_json_type_of(const ca_json_val *val);
 /**
  * @brief Get the string value of a JSON string.
  *
- * @param len Receives the byte length of the string (excluding NUL), or NULL.
- * @return Pointer to the string contents, or NULL if val is not a string.
+ * @param len Receives the byte length of the string (excluding NUL), or nullptr.
+ * @return Pointer to the string contents, or nullptr if val is not a string.
  *         The pointer is valid for the lifetime of the owning ca_json.
  */
 CAUDIO_API const char *ca_json_get_string(const ca_json_val *val,
@@ -176,7 +176,7 @@ CAUDIO_API size_t ca_json_array_size(const ca_json_val *val);
 /**
  * @brief Get the element at a given index in a JSON array.
  *
- * @return The element handle, or NULL if val is not an array or idx is
+ * @return The element handle, or nullptr if val is not an array or idx is
  *         out of bounds.
  */
 CAUDIO_API const ca_json_val *ca_json_array_get(const ca_json_val *val,
@@ -192,7 +192,7 @@ CAUDIO_API size_t ca_json_object_size(const ca_json_val *val);
 /**
  * @brief Get the value associated with a key in a JSON object.
  *
- * @return The value handle, or NULL if val is not an object or the key
+ * @return The value handle, or nullptr if val is not an object or the key
  *         is not found.
  */
 CAUDIO_API const ca_json_val *ca_json_object_get(const ca_json_val *val,
@@ -204,7 +204,7 @@ CAUDIO_API const ca_json_val *ca_json_object_get(const ca_json_val *val,
  * @param val Object value to inspect.
  * @param idx Zero-based key index; must be less than ca_json_object_size().
  * @param len Optional; receives the key byte length (excluding NUL).
- * @return The NUL-terminated key, or NULL if @p val is not an object or
+ * @return The NUL-terminated key, or nullptr if @p val is not an object or
  *         @p idx is out of bounds. The pointer is valid for the lifetime of
  *         the owning ca_json.
  */
@@ -214,7 +214,7 @@ CAUDIO_API const char *ca_json_object_key(const ca_json_val *val, size_t idx,
 /**
  * @brief Return the root value of a JSON document.
  *
- * @return The root value handle, or NULL if json is NULL.
+ * @return The root value handle, or nullptr if json is nullptr.
  */
 CAUDIO_API const ca_json_val *ca_json_root(const ca_json *json);
 
@@ -226,10 +226,10 @@ CAUDIO_API const ca_json_val *ca_json_root(const ca_json *json);
  * @param json   The document to serialize.
  * @param pretty If nonzero, produce pretty-printed output (4-space indent).
  * @param len    Receives the byte length of the output (excluding NUL),
- *               or NULL.
- * @param alloc  Allocator for the output string; NULL means default.
+ *               or nullptr.
+ * @param alloc  Allocator for the output string; nullptr means default.
  * @param err    Optional error record.
- * @return A newly allocated NUL-terminated string, or NULL on error.
+ * @return A newly allocated NUL-terminated string, or nullptr on error.
  */
 CAUDIO_API char *ca_json_serialize(const ca_json *json, int pretty,
                                    size_t *len, const cx_allocator *alloc,
@@ -245,7 +245,7 @@ CAUDIO_API char *ca_json_serialize(const ca_json *json, int pretty,
  * inputs.
  *
  * A writer produces exactly one root value. Calling a value function twice at
- * the root, closing an unopened container, or supplying a NULL key for an
+ * the root, closing an unopened container, or supplying a nullptr key for an
  * object member is a CA_INVALID_ARGUMENT error.
  *
  * Create with ca_json_writer_init() and release with
@@ -258,7 +258,7 @@ typedef struct ca_json_writer ca_json_writer;
  *
  * @param out    Receives the new writer on success.
  * @param pretty Nonzero for 2-space pretty printing, zero for compact output.
- * @param alloc  Allocator for the writer and its output; NULL means default.
+ * @param alloc  Allocator for the writer and its output; nullptr means default.
  * @param err    Optional error record.
  * @return CA_OK, CA_INVALID_ARGUMENT, or CA_OUT_OF_MEMORY.
  */
@@ -269,14 +269,14 @@ CAUDIO_API ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
 /**
  * @brief Destroy a writer and free its buffer.
  *
- * Passing NULL, or a pointer to NULL, is a no-op.
+ * Passing nullptr, or a pointer to nullptr, is a no-op.
  */
 CAUDIO_API void ca_json_writer_destroy(ca_json_writer **out);
 
 /**
  * @brief Open an object.
  *
- * @param key Member name when the current container is an object; NULL for an
+ * @param key Member name when the current container is an object; nullptr for an
  *            array element or the document root.
  */
 CAUDIO_API ca_status ca_json_writer_begin_object(ca_json_writer *writer,
@@ -290,7 +290,7 @@ CAUDIO_API ca_status ca_json_writer_end_object(ca_json_writer *writer,
 /**
  * @brief Open an array.
  *
- * @param key Member name when the current container is an object; NULL for an
+ * @param key Member name when the current container is an object; nullptr for an
  *            array element or the document root.
  */
 CAUDIO_API ca_status ca_json_writer_begin_array(ca_json_writer *writer,
@@ -333,7 +333,7 @@ CAUDIO_API ca_status ca_json_writer_add_double(ca_json_writer *writer,
 /**
  * @brief Append a string.
  *
- * @param value  UTF-8 bytes; may be NULL only when @p length is zero.
+ * @param value  UTF-8 bytes; may be nullptr only when @p length is zero.
  * @param length Byte length of @p value.
  */
 CAUDIO_API ca_status ca_json_writer_add_string(ca_json_writer *writer,
@@ -341,7 +341,7 @@ CAUDIO_API ca_status ca_json_writer_add_string(ca_json_writer *writer,
                                                const char *value,
                                                size_t length, ca_error *err);
 
-/** @brief Append a NUL-terminated string. NULL is written as "". */
+/** @brief Append a NUL-terminated string. nullptr is written as "". */
 CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer *writer,
                                              const char *key,
                                              const char *value,
@@ -356,8 +356,8 @@ CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer *writer,
  * result in.
  *
  * @param writer Writer positioned where the value should be emitted.
- * @param key    Object member name, or NULL for array elements and the root.
- * @param val    Value to emit; NULL is written as JSON null.
+ * @param key    Object member name, or nullptr for array elements and the root.
+ * @param val    Value to emit; nullptr is written as JSON null.
  * @param err    Optional error record.
  * @return CA_OK, CA_INVALID_ARGUMENT, CA_JSON_ERROR, or CA_OUT_OF_MEMORY.
  */

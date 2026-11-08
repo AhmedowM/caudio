@@ -1,4 +1,4 @@
-#ifndef CAUDIO_CONFIG_PATHS_H
+﻿#ifndef CAUDIO_CONFIG_PATHS_H
 #define CAUDIO_CONFIG_PATHS_H
 
 /**
@@ -43,8 +43,8 @@ extern "C" {
  * - `imported_media`: directory for app-private imported media copies.
  * - `socket`: explicit local socket/named-pipe endpoint, when used.
  *
- * String members are `cx_string *` handles. NULL and the empty string are
- * both treated as "not supplied"; lifecycle helpers normalize to NULL.
+ * String members are `cx_string *` handles. nullptr and the empty string are
+ * both treated as "not supplied"; lifecycle helpers normalize to nullptr.
  */
 typedef struct ca_runtime_paths {
     cx_string *database;
@@ -71,7 +71,7 @@ CAUDIO_API void ca_runtime_paths_move(ca_runtime_paths *dst,
 /** @brief Release every owned string and zero the structure. */
 CAUDIO_API void ca_runtime_paths_destroy(ca_runtime_paths *paths);
 
-/** @brief Return true when every field is empty (NULL or zero length). */
+/** @brief Return true when every field is empty (nullptr or zero length). */
 CAUDIO_API bool ca_runtime_paths_empty(const ca_runtime_paths *paths);
 
 /**

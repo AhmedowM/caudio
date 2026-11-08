@@ -1,4 +1,4 @@
-#ifndef CAUDIO_TYPES_RECORD_H
+﻿#ifndef CAUDIO_TYPES_RECORD_H
 #define CAUDIO_TYPES_RECORD_H
 
 /**
@@ -13,7 +13,7 @@
  * Ownership rules:
  * - `_init` initializes a record in uninitialized storage. On failure the
  *   record is left zeroed and must not be destroyed.
- * - `_copy` initializes @p dst from @p src using @p alloc (NULL = default).
+ * - `_copy` initializes @p dst from @p src using @p alloc (nullptr = default).
  * - `_move` destroys @p dst's current contents and steals @p src's; @p src is
  *   left zeroed.
  * - `_destroy` releases all owned memory and zeros the record. It is safe to

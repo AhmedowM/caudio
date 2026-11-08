@@ -1,4 +1,4 @@
-#include <caudio/runtime/socket.h>
+﻿#include <caudio/runtime/socket.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -99,7 +99,7 @@ ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
     if (out == nullptr || path == nullptr || path[0] == '\0') {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out or path is NULL or empty");
+                         "out or path is nullptr or empty");
         }
         return CA_INVALID_ARGUMENT;
     }

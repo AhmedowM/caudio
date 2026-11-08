@@ -1,4 +1,4 @@
-#include <caudio/runtime/rwlock.h>
+﻿#include <caudio/runtime/rwlock.h>
 
 #include <stdlib.h>
 
@@ -24,7 +24,7 @@ ca_status ca_rwlock_create(ca_rwlock_t *out, ca_error *err) {
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -74,7 +74,7 @@ ca_status ca_rwlock_rdlock(ca_rwlock_t rwlock, ca_error *err) {
 
     if (rwlock == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -102,7 +102,7 @@ ca_status ca_rwlock_wrlock(ca_rwlock_t rwlock, ca_error *err) {
 
     if (rwlock == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -130,7 +130,7 @@ ca_status ca_rwlock_unlock(ca_rwlock_t rwlock, ca_error *err) {
 
     if (rwlock == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "rwlock is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

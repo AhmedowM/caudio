@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_COND_H
+﻿#ifndef CAUDIO_RUNTIME_COND_H
 #define CAUDIO_RUNTIME_COND_H
 
 /**
@@ -38,7 +38,7 @@ CAUDIO_API ca_status ca_cond_create(ca_cond_t *out, ca_error *err);
 /**
  * @brief Destroy a condition variable. No threads may be waiting on it.
  *
- * Passing NULL is a no-op.
+ * Passing nullptr is a no-op.
  */
 CAUDIO_API void ca_cond_destroy(ca_cond_t cond);
 

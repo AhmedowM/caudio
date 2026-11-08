@@ -1,4 +1,4 @@
-#include <caudio/runtime/thread.h>
+﻿#include <caudio/runtime/thread.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #include <windows.h>
@@ -41,7 +41,7 @@ ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn, void *arg,
     if (out == nullptr || fn == nullptr) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out or fn is NULL");
+                         "out or fn is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -89,7 +89,7 @@ ca_status ca_thread_join(ca_thread_t thread, void **out_ret, ca_error *err) {
 
     if (thread == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "thread is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "thread is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -133,7 +133,7 @@ ca_status ca_thread_detach(ca_thread_t thread, ca_error *err) {
 
     if (thread == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "thread is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "thread is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

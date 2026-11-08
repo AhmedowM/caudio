@@ -1,4 +1,4 @@
-#include <caudio/config/config.h>
+﻿#include <caudio/config/config.h>
 
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/json.h>
@@ -36,7 +36,7 @@ static ca_status text_assign(cx_string *str, const char *text) {
 
 static ca_status text_assign_view(cx_string *str, const char *text,
                                   size_t length) {
-    if (text == NULL) {
+    if (text == nullptr) {
         length = 0;
     }
     return ca_from_cx(
@@ -45,7 +45,7 @@ static ca_status text_assign_view(cx_string *str, const char *text,
 
 static ca_status new_string(cx_string **out, const cx_allocator *alloc,
                             const char *initial) {
-    *out = NULL;
+    *out = nullptr;
     ca_status status = ca_from_cx(cx_string_init(out, alloc));
     if (status != CA_OK) {
         return status;
@@ -58,7 +58,7 @@ static ca_status new_string(cx_string **out, const cx_allocator *alloc,
 }
 
 static bool path_exists(const char *path) {
-    if (path == NULL || path[0] == '\0') {
+    if (path == nullptr || path[0] == '\0') {
         return false;
     }
     ca_error err;
@@ -67,7 +67,7 @@ static bool path_exists(const char *path) {
 
 static ca_status read_text_file(const char *path, cx_string **out,
                                 const cx_allocator *alloc, ca_error *err) {
-    *out = NULL;
+    *out = nullptr;
 
     ca_file_t file = ca_fs_open(path, CA_FS_READ, err);
     if (file == CA_FS_INVALID) {
@@ -135,7 +135,7 @@ static ca_status write_text_file(const char *path, const char *text,
 
 /* Best-effort parent directory creation, mirroring the C++ implementation. */
 static void ensure_parent_dir(const char *path) {
-    if (path == NULL || path[0] == '\0') {
+    if (path == nullptr || path[0] == '\0') {
         return;
     }
 
@@ -151,8 +151,8 @@ static void ensure_parent_dir(const char *path) {
         return;
     }
 
-    cx_string *parent = NULL;
-    cx_status cx = cx_string_init(&parent, NULL);
+    cx_string *parent = nullptr;
+    cx_status cx = cx_string_init(&parent, nullptr);
     if (cx == CX_OK) {
         cx = cx_string_assign_view(
             parent, cx_string_view_from_parts(path, separator));
@@ -173,7 +173,7 @@ static bool json_string_member(const ca_json_val *object, const char *key,
     const ca_json_val *value = ca_json_object_get(object, key);
     size_t len = 0;
     const char *str = ca_json_get_string(value, &len);
-    if (str == NULL) {
+    if (str == nullptr) {
         return false;
     }
     *text = str;
@@ -243,7 +243,7 @@ static bool json_log_level_member(const ca_json_val *object, const char *key,
         return true;
     }
 
-    const char *text = NULL;
+    const char *text = nullptr;
     size_t length = 0;
     if (!json_string_member(object, key, &text, &length)) {
         return false;
@@ -365,7 +365,7 @@ void ca_config_destroy(ca_config *config) {
 static ca_status config_set_default_db_path(ca_config *config,
                                             const cx_allocator *alloc,
                                             ca_error *err) {
-    cx_string *value = NULL;
+    cx_string *value = nullptr;
     ca_status status = ca_paths_default_db_path(&value, alloc, err);
     if (status != CA_OK) {
         return status;
@@ -379,11 +379,11 @@ static ca_status config_set_default_db_path(ca_config *config,
 static ca_status config_set_config_path(ca_config *config, const char *path,
                                         const cx_allocator *alloc,
                                         ca_error *err) {
-    if (path != NULL && path[0] != '\0') {
+    if (path != nullptr && path[0] != '\0') {
         return text_assign(config->config_path, path);
     }
 
-    cx_string *value = NULL;
+    cx_string *value = nullptr;
     ca_status status = ca_paths_default_config_path(&value, alloc, err);
     if (status != CA_OK) {
         return status;
@@ -395,7 +395,7 @@ static ca_status config_set_config_path(ca_config *config, const char *path,
 }
 
 static ca_status config_apply_json(ca_config *config, const ca_json_val *root) {
-    const char *text = NULL;
+    const char *text = nullptr;
     size_t length = 0;
 
     if (json_string_member(root, "dbPath", &text, &length) && length > 0) {
@@ -466,13 +466,13 @@ ca_status ca_config_load(ca_config *out, const char *path,
         return status;
     }
 
-    bool explicit_path = path != NULL && path[0] != '\0';
+    bool explicit_path = path != nullptr && path[0] != '\0';
     const char *config_file = cx_string_cstr(out->config_path);
 
     if (!explicit_path && !path_exists(config_file)) {
         /* Older Windows installs kept the config under $HOME/.config. Read it
          * (and later write back there) instead of silently using defaults. */
-        cx_string *legacy = NULL;
+        cx_string *legacy = nullptr;
         if (ca_paths_legacy_config_path(&legacy, alloc) == CA_OK &&
             cx_string_length(legacy) > 0 &&
             path_exists(cx_string_cstr(legacy))) {
@@ -494,7 +494,7 @@ ca_status ca_config_load(ca_config *out, const char *path,
         return CA_OK;
     }
 
-    cx_string *content = NULL;
+    cx_string *content = nullptr;
     status = read_text_file(config_file, &content, alloc, err);
     if (status != CA_OK) {
         ca_config_destroy(out);
@@ -505,7 +505,7 @@ ca_status ca_config_load(ca_config *out, const char *path,
         return CA_OK;
     }
 
-    ca_json *document = NULL;
+    ca_json *document = nullptr;
     status = ca_json_parse(&document, cx_string_cstr(content),
                            cx_string_length(content), alloc, err);
     cx_string_destroy(&content);
@@ -553,13 +553,13 @@ ca_status ca_config_save(const ca_config *config, const cx_allocator *alloc,
     const char *config_file = cx_string_cstr(config->config_path);
     ensure_parent_dir(config_file);
 
-    ca_json_writer *writer = NULL;
+    ca_json_writer *writer = nullptr;
     ca_status status = ca_json_writer_init(&writer, 1, alloc, err);
     if (status != CA_OK) {
         return status;
     }
 
-    status = ca_json_writer_begin_object(writer, NULL, err);
+    status = ca_json_writer_begin_object(writer, nullptr, err);
     if (status == CA_OK) {
         status = ca_json_writer_add_cstr(writer, "dbPath",
                                          cx_string_cstr(config->db_path), err);
@@ -598,7 +598,7 @@ ca_status ca_config_save(const ca_config *config, const cx_allocator *alloc,
         status = ca_json_writer_end_object(writer, err);
     }
 
-    cx_string *text = NULL;
+    cx_string *text = nullptr;
     if (status == CA_OK) {
         status = ca_json_writer_finish(writer, &text, err);
     }
@@ -641,14 +641,14 @@ ca_status ca_config_entry_copy(ca_config_entry *dst,
         return CA_INVALID_ARGUMENT;
     }
     memset(dst, 0, sizeof *dst);
-    if (src->key != NULL) {
+    if (src->key != nullptr) {
         ca_status status = ca_from_cx(
             cx_string_from_view(&dst->key, cx_string_view_of(src->key), alloc));
         if (status != CA_OK) {
             return status;
         }
     }
-    if (src->value != NULL) {
+    if (src->value != nullptr) {
         ca_status status = ca_from_cx(cx_string_from_view(
             &dst->value, cx_string_view_of(src->value), alloc));
         if (status != CA_OK) {
@@ -693,7 +693,7 @@ static void config_entry_copy_cb(void *dst, const void *src) {
     ca_config_entry *target = (ca_config_entry *)dst;
     memset(target, 0, sizeof *target);
 
-    if (source->key != NULL) {
+    if (source->key != nullptr) {
         ca_status status = ca_from_cx(cx_string_from_view(
             &target->key, cx_string_view_of(source->key), config_copy_alloc));
         if (status != CA_OK) {
@@ -701,7 +701,7 @@ static void config_entry_copy_cb(void *dst, const void *src) {
             return;
         }
     }
-    if (source->value != NULL) {
+    if (source->value != nullptr) {
         ca_status status = ca_from_cx(cx_string_from_view(
             &target->value, cx_string_view_of(source->value),
             config_copy_alloc));
@@ -736,14 +736,14 @@ void ca_config_entries_destroy(cx_vector **out) {
 /* Raw access                                                                */
 /* ------------------------------------------------------------------------- */
 
-/* Serialize a parsed value: strings unquoted, null as "null", else compact. */
+/* Serialize a parsed value: strings unquoted, nullptr as "null", else compact. */
 static ca_status value_to_text(const ca_json_val *value, cx_string **out,
                                const cx_allocator *alloc, ca_error *err) {
-    *out = NULL;
+    *out = nullptr;
 
     size_t length = 0;
     const char *text = ca_json_get_string(value, &length);
-    if (text != NULL) {
+    if (text != nullptr) {
         return ca_from_cx(
             cx_string_from_view(out, cx_string_view_from_parts(text, length),
                                 alloc));
@@ -752,12 +752,12 @@ static ca_status value_to_text(const ca_json_val *value, cx_string **out,
         return ca_from_cx(cx_string_from(out, "null", alloc));
     }
 
-    ca_json_writer *writer = NULL;
+    ca_json_writer *writer = nullptr;
     ca_status status = ca_json_writer_init(&writer, 0, alloc, err);
     if (status != CA_OK) {
         return status;
     }
-    status = ca_json_writer_add_value(writer, NULL, value, err);
+    status = ca_json_writer_add_value(writer, nullptr, value, err);
     if (status == CA_OK) {
         status = ca_json_writer_finish(writer, out, err);
     }
@@ -768,12 +768,12 @@ static ca_status value_to_text(const ca_json_val *value, cx_string **out,
 /* Read and parse @p path. Returns an empty document list when it is absent. */
 static ca_status load_object(const char *path, ca_json **out,
                              const cx_allocator *alloc, ca_error *err) {
-    *out = NULL;
+    *out = nullptr;
     if (!path_exists(path)) {
         return CA_NOT_FOUND;
     }
 
-    cx_string *content = NULL;
+    cx_string *content = nullptr;
     ca_status status = read_text_file(path, &content, alloc, err);
     if (status != CA_OK) {
         return status;
@@ -813,9 +813,9 @@ ca_status ca_config_get_raw(const char *path, const char *key, cx_string **out,
     if (!out || !key) {
         return CA_INVALID_ARGUMENT;
     }
-    *out = NULL;
+    *out = nullptr;
 
-    ca_json *document = NULL;
+    ca_json *document = nullptr;
     ca_status status = load_object(path, &document, alloc, err);
     if (status == CA_NOT_FOUND) {
         if (err) {
@@ -830,7 +830,7 @@ ca_status ca_config_get_raw(const char *path, const char *key, cx_string **out,
 
     const ca_json_val *root = ca_json_root(document);
     const ca_json_val *value = ca_json_object_get(root, key);
-    if (value == NULL) {
+    if (value == nullptr) {
         ca_json_destroy(&document);
         if (err) {
             ca_error_set(err, CA_NOT_FOUND, "key not found");
@@ -853,7 +853,7 @@ static ca_status write_members(ca_json_writer *writer, const ca_json_val *root,
                                const char *replace_text, bool replace_is_json,
                                const ca_json_val *replace_value,
                                ca_error *err) {
-    ca_status status = ca_json_writer_begin_object(writer, NULL, err);
+    ca_status status = ca_json_writer_begin_object(writer, nullptr, err);
     if (status != CA_OK) {
         return status;
     }
@@ -861,14 +861,14 @@ static ca_status write_members(ca_json_writer *writer, const ca_json_val *root,
     bool replaced = false;
     size_t count = ca_json_object_size(root);
     for (size_t i = 0; i < count; ++i) {
-        const char *member = ca_json_object_key(root, i, NULL);
-        if (member == NULL) {
+        const char *member = ca_json_object_key(root, i, nullptr);
+        if (member == nullptr) {
             continue;
         }
-        if (skip != NULL && strcmp(member, skip) == 0) {
+        if (skip != nullptr && strcmp(member, skip) == 0) {
             continue;
         }
-        if (replace_key != NULL && strcmp(member, replace_key) == 0) {
+        if (replace_key != nullptr && strcmp(member, replace_key) == 0) {
             replaced = true;
             if (replace_is_json) {
                 status = ca_json_writer_add_value(writer, member, replace_value,
@@ -886,7 +886,7 @@ static ca_status write_members(ca_json_writer *writer, const ca_json_val *root,
         }
     }
 
-    if (replace_key != NULL && !replaced) {
+    if (replace_key != nullptr && !replaced) {
         if (replace_is_json) {
             status =
                 ca_json_writer_add_value(writer, replace_key, replace_value, err);
@@ -913,14 +913,14 @@ static ca_status write_members_to_file(const char *path,
                                        ca_error *err) {
     ensure_parent_dir(path);
 
-    ca_json_writer *writer = NULL;
+    ca_json_writer *writer = nullptr;
     ca_status status = ca_json_writer_init(&writer, 1, alloc, err);
     if (status != CA_OK) {
         return status;
     }
     status = write_members(writer, root, skip, replace_key, replace_text,
                            replace_is_json, replace_value, err);
-    cx_string *text = NULL;
+    cx_string *text = nullptr;
     if (status == CA_OK) {
         status = ca_json_writer_finish(writer, &text, err);
     }
@@ -939,8 +939,8 @@ static ca_status write_members_to_file(const char *path,
 /* Parse @p path into an object, or return an empty document when unusable. */
 static ca_status load_or_empty(const char *path, ca_json **out,
                                const cx_allocator *alloc, ca_error *err) {
-    *out = NULL;
-    ca_json *document = NULL;
+    *out = nullptr;
+    ca_json *document = nullptr;
     ca_status status = load_object(path, &document, alloc, err);
     if (status == CA_OK) {
         *out = document;
@@ -967,32 +967,32 @@ ca_status ca_config_set_raw(const char *path, const char *key,
     if (!key) {
         return CA_INVALID_ARGUMENT;
     }
-    if (path == NULL || path[0] == '\0') {
+    if (path == nullptr || path[0] == '\0') {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "cannot write config");
         }
         return CA_IO_ERROR;
     }
 
-    ca_json *document = NULL;
+    ca_json *document = nullptr;
     ca_status status = load_or_empty(path, &document, alloc, err);
     if (status != CA_OK) {
         return status;
     }
 
-    ca_json *parsed_value = NULL;
+    ca_json *parsed_value = nullptr;
     bool is_json = false;
     const char *text_value = value ? value : "";
-    if (value != NULL && value[0] != '\0') {
-        if (ca_json_parse(&parsed_value, value, strlen(value), alloc, NULL) ==
+    if (value != nullptr && value[0] != '\0') {
+        if (ca_json_parse(&parsed_value, value, strlen(value), alloc, nullptr) ==
             CA_OK) {
             is_json = true;
         }
     }
 
     status = write_members_to_file(
-        path, ca_json_root(document), NULL, key, text_value, is_json,
-        is_json ? ca_json_root(parsed_value) : NULL, alloc, err);
+        path, ca_json_root(document), nullptr, key, text_value, is_json,
+        is_json ? ca_json_root(parsed_value) : nullptr, alloc, err);
 
     ca_json_destroy(&parsed_value);
     ca_json_destroy(&document);
@@ -1007,7 +1007,7 @@ ca_status ca_config_list_raw(const char *path, cx_vector **out,
     if (!out) {
         return CA_INVALID_ARGUMENT;
     }
-    *out = NULL;
+    *out = nullptr;
 
     if (!path_exists(path)) {
         return ca_from_cx(cx_vector_init(out, sizeof(ca_config_entry),
@@ -1015,7 +1015,7 @@ ca_status ca_config_list_raw(const char *path, cx_vector **out,
                                          &config_entry_ops, alloc));
     }
 
-    ca_json *document = NULL;
+    ca_json *document = nullptr;
     ca_status status = load_object(path, &document, alloc, err);
     if (status == CA_NOT_FOUND || status == CA_INVALID_ARGUMENT) {
         if (err) {
@@ -1042,7 +1042,7 @@ ca_status ca_config_list_raw(const char *path, cx_vector **out,
     for (size_t i = 0; i < count; ++i) {
         size_t key_length = 0;
         const char *key = ca_json_object_key(root, i, &key_length);
-        if (key == NULL || key_length == 0 || strcmp(key, "type") == 0) {
+        if (key == nullptr || key_length == 0 || strcmp(key, "type") == 0) {
             continue;
         }
 
@@ -1052,7 +1052,7 @@ ca_status ca_config_list_raw(const char *path, cx_vector **out,
             break;
         }
         status = text_assign_view(entry.key, key, key_length);
-        cx_string *value_text = NULL;
+        cx_string *value_text = nullptr;
         if (status == CA_OK) {
             status = value_to_text(ca_json_object_get(root, key), &value_text,
                                    alloc, err);
@@ -1097,7 +1097,7 @@ ca_status ca_config_delete_raw(const char *path, const char *key,
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_json *document = NULL;
+    ca_json *document = nullptr;
     ca_status status = load_object(path, &document, alloc, err);
     if (status == CA_NOT_FOUND) {
         if (err) {
@@ -1111,7 +1111,7 @@ ca_status ca_config_delete_raw(const char *path, const char *key,
     }
 
     const ca_json_val *root = ca_json_root(document);
-    if (ca_json_object_get(root, key) == NULL) {
+    if (ca_json_object_get(root, key) == nullptr) {
         ca_json_destroy(&document);
         if (err) {
             ca_error_set(err, CA_NOT_FOUND, "key not found");
@@ -1119,7 +1119,7 @@ ca_status ca_config_delete_raw(const char *path, const char *key,
         return CA_NOT_FOUND;
     }
 
-    status = write_members_to_file(path, root, key, NULL, NULL, false, NULL,
+    status = write_members_to_file(path, root, key, nullptr, nullptr, false, nullptr,
                                    alloc, err);
     ca_json_destroy(&document);
     return status;
@@ -1129,7 +1129,7 @@ ca_status ca_config_reset_all_raw(const char *path, ca_error *err) {
     if (err) {
         ca_error_init(err);
     }
-    if (path == NULL || path[0] == '\0') {
+    if (path == nullptr || path[0] == '\0') {
         return CA_OK;
     }
     if (!path_exists(path)) {

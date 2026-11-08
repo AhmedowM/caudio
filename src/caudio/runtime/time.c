@@ -1,4 +1,4 @@
-#include <caudio/runtime/time.h>
+﻿#include <caudio/runtime/time.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #include <windows.h>
@@ -14,7 +14,7 @@ ca_status ca_time_now(ca_time_us_t *out, ca_error *err) {
 
     if (out == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }

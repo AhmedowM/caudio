@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_PATH_H
+﻿#ifndef CAUDIO_RUNTIME_PATH_H
 #define CAUDIO_RUNTIME_PATH_H
 
 /**
@@ -67,11 +67,11 @@ CAUDIO_API char *ca_path_identity_normalize(char *path);
  * `$TMPDIR` when non-empty, otherwise `/tmp`. The result uses '/' separators
  * and has no trailing separator unless it is a filesystem root.
  *
- * Passing @c out = NULL with @c out_size = 0 queries the length. When the
+ * Passing @c out = nullptr with @c out_size = 0 queries the length. When the
  * buffer is too small, CA_OVERFLOW is returned and @p out_len receives the
  * required length (excluding NUL).
  *
- * @param out      Destination buffer, or NULL for a length query.
+ * @param out      Destination buffer, or nullptr for a length query.
  * @param out_size Size of @p out in bytes.
  * @param out_len  Optional; receives the path length excluding NUL.
  * @param err      Optional error record.

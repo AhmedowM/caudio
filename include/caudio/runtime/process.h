@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_PROCESS_H
+﻿#ifndef CAUDIO_RUNTIME_PROCESS_H
 #define CAUDIO_RUNTIME_PROCESS_H
 
 /**
@@ -35,10 +35,10 @@ typedef struct ca_process_status {
  * @brief Spawn a new process.
  *
  * @param out   Receives the new process handle.
- * @param argv  Null-terminated array of argument strings (argv[0] is the
+ * @param argv  nullptr-terminated array of argument strings (argv[0] is the
  *              program name). The strings must remain valid until the process
  *              is created.
- * @param env   Null-terminated array of "KEY=VALUE" strings, or NULL to
+ * @param env   nullptr-terminated array of "KEY=VALUE" strings, or nullptr to
  *              inherit the caller's environment.
  * @param err   Optional error record.
  * @return CA_OK on success.
@@ -53,7 +53,7 @@ CAUDIO_API ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
  * call and must not be used again.
  *
  * @param process Process handle.
- * @param status  Receives the exit status, or NULL if not wanted.
+ * @param status  Receives the exit status, or nullptr if not wanted.
  * @param err     Optional error record.
  * @return CA_OK on success.
  */

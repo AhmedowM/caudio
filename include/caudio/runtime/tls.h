@@ -1,4 +1,4 @@
-#ifndef CAUDIO_RUNTIME_TLS_H
+﻿#ifndef CAUDIO_RUNTIME_TLS_H
 #define CAUDIO_RUNTIME_TLS_H
 
 /**
@@ -25,12 +25,12 @@ typedef struct ca_tls_key *ca_tls_key_t;
 
 /**
  * @brief TLS destructor signature. Called with the thread's value when the
- *        thread exits (if non-NULL).
+ *        thread exits (if non-nullptr).
  */
 typedef void (*ca_tls_destructor)(void *value);
 
 /**
- * @brief Create a TLS key. @p destructor, if non-NULL, is called with the
+ * @brief Create a TLS key. @p destructor, if non-nullptr, is called with the
  *        thread-local value when a thread exits.
  *
  * @param out   Receives the new key handle.
@@ -44,7 +44,7 @@ CAUDIO_API ca_status ca_tls_key_create(ca_tls_key_t *out,
 /**
  * @brief Destroy a TLS key. Does not invoke destructors for existing values.
  *
- * Passing NULL is a no-op.
+ * Passing nullptr is a no-op.
  */
 CAUDIO_API void ca_tls_key_destroy(ca_tls_key_t key);
 
@@ -57,10 +57,10 @@ CAUDIO_API ca_status ca_tls_set(ca_tls_key_t key, void *value,
                                 ca_error *err);
 
 /**
- * @brief Get the value bound to @p key for the calling thread, or NULL if none
+ * @brief Get the value bound to @p key for the calling thread, or nullptr if none
  *        has been set.
  *
- * @return Thread-local value, or NULL.
+ * @return Thread-local value, or nullptr.
  */
 CAUDIO_API void *ca_tls_get(ca_tls_key_t key, ca_error *err);
 

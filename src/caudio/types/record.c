@@ -1,4 +1,4 @@
-#include <caudio/types/record.h>
+﻿#include <caudio/types/record.h>
 
 #include "internal.h"
 
@@ -76,7 +76,7 @@ static ca_status ca_impl_vector_copy(cx_vector **dst, const cx_vector *src,
                                      size_t element_align,
                                      const cx_vector_ops *ops,
                                      const cx_allocator *alloc) {
-    *dst = NULL;
+    *dst = nullptr;
     ca_status status = ca_from_cx(
         cx_vector_init(dst, element_size, element_align, ops, alloc));
     if (status != CA_OK) {
@@ -857,7 +857,7 @@ ca_status ca_library_stats_init(ca_library_stats *stats,
 static ca_status ca_impl_copy_track_list(bool present, cx_vector **dst,
                                          const cx_vector *src,
                                          const cx_allocator *alloc) {
-    *dst = NULL;
+    *dst = nullptr;
     if (!present) {
         return CA_OK;
     }
@@ -868,7 +868,7 @@ static ca_status ca_impl_copy_track_list(bool present, cx_vector **dst,
 static ca_status ca_impl_copy_top_list(bool present, cx_vector **dst,
                                        const cx_vector *src,
                                        const cx_allocator *alloc) {
-    *dst = NULL;
+    *dst = nullptr;
     if (!present) {
         return CA_OK;
     }
@@ -1322,7 +1322,7 @@ ca_status ca_engine_state_init(ca_engine_state *state,
     state->pre_mute_volume = 0.5f;
 
     return ca_from_cx(cx_vector_init(&state->shuffle_perm, sizeof(int64_t),
-                                     alignof(int64_t), NULL, alloc));
+                                     alignof(int64_t), nullptr, alloc));
 }
 
 ca_status ca_engine_state_copy(ca_engine_state *dst,
@@ -1342,7 +1342,7 @@ ca_status ca_engine_state_copy(ca_engine_state *dst,
     dst->position_ms = src->position_ms;
 
     return ca_impl_vector_copy(&dst->shuffle_perm, src->shuffle_perm,
-                               sizeof(int64_t), alignof(int64_t), NULL,
+                               sizeof(int64_t), alignof(int64_t), nullptr,
                                alloc);
 }
 

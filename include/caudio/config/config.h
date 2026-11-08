@@ -1,4 +1,4 @@
-#ifndef CAUDIO_CONFIG_CONFIG_H
+﻿#ifndef CAUDIO_CONFIG_CONFIG_H
 #define CAUDIO_CONFIG_CONFIG_H
 
 /**
@@ -62,10 +62,10 @@ CAUDIO_API void ca_config_destroy(ca_config *config);
  * @brief Load configuration from @p path, merging over defaults.
  *
  * @param out   Receives the loaded configuration on success.
- * @param path  Config file path; NULL or empty means the default path (with
+ * @param path  Config file path; nullptr or empty means the default path (with
  *              the legacy Windows path as a fallback when the default file
  *              does not exist).
- * @param alloc Allocator for the loaded strings; NULL means default.
+ * @param alloc Allocator for the loaded strings; nullptr means default.
  * @param err   Optional error record.
  * @return CA_OK when the file is missing (defaults are returned), CA_JSON_ERROR
  *         for malformed JSON, CA_INVALID_ARGUMENT when the root is not an
@@ -112,7 +112,7 @@ CAUDIO_API void ca_config_entry_destroy(ca_config_entry *entry);
  * @brief Destroy a vector returned by ca_config_list_raw().
  *
  * Destroys every entry's strings, then the vector itself and sets @p out to
- * NULL. Safe on NULL.
+ * nullptr. Safe on nullptr.
  */
 CAUDIO_API void ca_config_entries_destroy(cx_vector **out);
 
