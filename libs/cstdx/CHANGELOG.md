@@ -7,6 +7,10 @@ Versions follow `MAJOR.MINOR.PATCH`. The ABI is not stable before 1.0.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-08
+
+First `cstdx` release. The feature set below is the v0.1 scope.
+
 ### Added
 
 - Status codes (`cx_status`, `cx_status_name`) and checked arithmetic
@@ -26,6 +30,8 @@ Versions follow `MAJOR.MINOR.PATCH`. The ABI is not stable before 1.0.
 - C++23 differential/property tests (GoogleTest + RapidCheck) for string,
   bytes, vector, and base64.
 - libFuzzer targets for base64, string, and vector.
+- LLVM source-based coverage (`llvm-cov`) in CI, plus an opt-in 1-hour
+  libFuzzer soak.
 - Standalone install/export as `cstdx::cstdx`.
 
 ### Changed
@@ -43,7 +49,3 @@ Versions follow `MAJOR.MINOR.PATCH`. The ABI is not stable before 1.0.
 
 - Legacy `byte_array` and `container` interfaces.
 - Public field access for owned strings, bytes, vectors, and builders.
-
-## [0.1.0] - TBD
-
-First `cstdx` release. The feature set above is the v0.1 scope.
