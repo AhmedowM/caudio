@@ -133,13 +133,20 @@ void cx_impl_bytes_destroy(cx_bytes *bytes) {
 }
 
 cx_status cx_bytes_init(cx_bytes **out, const cx_allocator *allocator) {
-    if (out == nullptr || !cx_allocator_is_valid(allocator)) {
+    if (out == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
 
     *out = nullptr;
 
-    auto resolved = allocator != nullptr ? allocator : cx_allocator_default();
+    cx_bytes staging;
+    auto status = cx_impl_bytes_init(&staging, allocator);
+
+    if (status != CX_OK) {
+        return status;
+    }
+
+    auto resolved = bytes_allocator(&staging);
     auto bytes = (cx_bytes *)cx_allocator_alloc(
         resolved, sizeof(cx_bytes), alignof(cx_bytes));
 
@@ -147,9 +154,7 @@ cx_status cx_bytes_init(cx_bytes **out, const cx_allocator *allocator) {
         return CX_OUT_OF_MEMORY;
     }
 
-    *bytes = (cx_bytes){
-        .allocator = resolved,
-    };
+    *bytes = staging;
     *out = bytes;
     return CX_OK;
 }
