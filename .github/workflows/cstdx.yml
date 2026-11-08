@@ -149,16 +149,16 @@ jobs:
   # Source-based coverage with llvm-cov. Reports line and branch coverage for
   # the cstdx library (test-side code is excluded), publishes an HTML report,
   # and uploads the summary. COVERAGE_MIN_LINES / COVERAGE_MIN_BRANCHES act as
-  # ratchets: 0 reports only. Pull requests additionally gate on coverage of
-  # changed lines.
+  # ratchets: the job fails if line or branch coverage drops below the floor.
+  # Pull requests additionally gate on coverage of changed lines.
   # -------------------------------------------------------------------------
   coverage:
     name: llvm-cov coverage (Clang)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      COVERAGE_MIN_LINES: '0'
-      COVERAGE_MIN_BRANCHES: '0'
+      COVERAGE_MIN_LINES: '80'
+      COVERAGE_MIN_BRANCHES: '70'
       LLVM_COV: llvm-cov-19
       LLVM_PROFDATA: llvm-profdata-19
     steps:
