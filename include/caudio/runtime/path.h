@@ -48,6 +48,38 @@ CAUDIO_API const char *ca_path_dirname(const char *path);
  */
 CAUDIO_API char *ca_path_normalize(char *path);
 
+/**
+ * @brief Normalize a path for identity comparison, in place.
+ *
+ * Converts separators to '/' on every platform and, on Windows, folds ASCII
+ * letters to lower case so that `C:/Music` and `c:\\music` hash identically.
+ * Returns @p path.
+ *
+ * Non-ASCII characters are left untouched on every platform; callers that
+ * need full Unicode case folding must normalize before calling this function.
+ */
+CAUDIO_API char *ca_path_identity_normalize(char *path);
+
+/**
+ * @brief Copy the platform temporary directory path.
+ *
+ * On Windows this is `GetTempPathW` (normally `%TEMP%`); on POSIX it is
+ * `$TMPDIR` when non-empty, otherwise `/tmp`. The result uses '/' separators
+ * and has no trailing separator unless it is a filesystem root.
+ *
+ * Passing @c out = NULL with @c out_size = 0 queries the length. When the
+ * buffer is too small, CA_OVERFLOW is returned and @p out_len receives the
+ * required length (excluding NUL).
+ *
+ * @param out      Destination buffer, or NULL for a length query.
+ * @param out_size Size of @p out in bytes.
+ * @param out_len  Optional; receives the path length excluding NUL.
+ * @param err      Optional error record.
+ * @return CA_OK, CA_OVERFLOW, CA_OUT_OF_MEMORY, or CA_PATH_ERROR.
+ */
+CAUDIO_API ca_status ca_path_temp_dir(char *out, size_t out_size,
+                                      size_t *out_len, ca_error *err);
+
 #ifdef __cplusplus
 }
 #endif
