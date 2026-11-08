@@ -3,7 +3,9 @@
 
 #include <cstdx/allocator.h>
 #include <cstdx/allocator_counted.h>
+#include <cstdx/string.h>
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -551,18 +553,205 @@ static int test_parse_file_unicode(void) {
     return ca_test_finish("json.parse_file_unicode");
 }
 
+static int test_object_keys(void) {
+    ca_json *json = must_parse("{\"a\":1,\"b\":2,\"c\":3}", 0, NULL);
+    const ca_json_val *root = ca_json_root(json);
+    size_t len = 99;
+
+    const char *key = ca_json_object_key(root, 0, &len);
+    CA_CHECK(key != NULL && strcmp(key, "a") == 0);
+    CA_CHECK_EQ(1, len);
+
+    key = ca_json_object_key(root, 1, NULL);
+    CA_CHECK(key != NULL && strcmp(key, "b") == 0);
+
+    key = ca_json_object_key(root, 2, &len);
+    CA_CHECK(key != NULL && strcmp(key, "c") == 0);
+
+    /* Out of range and NULL reset the reported length. */
+    CA_CHECK(ca_json_object_key(root, 3, &len) == NULL);
+    CA_CHECK_EQ(0, len);
+    CA_CHECK(ca_json_object_key(NULL, 0, &len) == NULL);
+    CA_CHECK_EQ(0, len);
+
+    ca_json_destroy(&json);
+
+    /* Arrays have no keys. */
+    json = must_parse("[1]", 0, NULL);
+    CA_CHECK(ca_json_object_key(ca_json_root(json), 0, &len) == NULL);
+    CA_CHECK_EQ(0, len);
+    ca_json_destroy(&json);
+    return ca_test_finish("json.object_keys");
+}
+
+static int test_writer(void) {
+    ca_error err;
+    ca_error_init(&err);
+
+    ca_json_writer *writer = NULL;
+    cx_string *text = NULL;
+
+    /* Pretty output, including nested containers and number formatting. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 1, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_object(writer, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_cstr(writer, "name", "Alice", &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_int(writer, "count", -2, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_uint(
+                           writer, "big", UINT64_C(18446744073709551615),
+                           &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_double(writer, "ratio", 0.5, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_double(writer, "whole", 2.0, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_double(writer, "nan", NAN, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_bool(writer, "ok", true, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_null(writer, "none", &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_array(writer, "list", &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_int(writer, NULL, 1, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_object(writer, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_end_object(writer, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_end_array(writer, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_end_object(writer, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text != NULL);
+    if (text) {
+        const char *expected =
+            "{\n"
+            "  \"name\": \"Alice\",\n"
+            "  \"count\": -2,\n"
+            "  \"big\": 18446744073709551615,\n"
+            "  \"ratio\": 0.5,\n"
+            "  \"whole\": 2.0,\n"
+            "  \"nan\": null,\n"
+            "  \"ok\": true,\n"
+            "  \"none\": null,\n"
+            "  \"list\": [\n"
+            "    1,\n"
+            "    {}\n"
+            "  ]\n"
+            "}";
+        CA_CHECK_EQ(0, strcmp(cx_string_cstr(text), expected));
+    }
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+    CA_CHECK(writer == NULL);
+
+    /* Compact output and a second root value are rejected. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_cstr(writer, NULL, "", &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_int(writer, NULL, 1, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text != NULL && strcmp(cx_string_cstr(text), "\"\"") == 0);
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+
+    /* Object members need a key. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_object(writer, NULL, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_int(writer, NULL, 1, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_end_object(writer, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text != NULL && strcmp(cx_string_cstr(text), "{}") == 0);
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+
+    /* Array elements must not have one. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_array(writer, NULL, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_int(writer, "key", 1, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_end_array(writer, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text != NULL && strcmp(cx_string_cstr(text), "[]") == 0);
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+
+    /* Closing the wrong container and an incomplete document are errors. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_begin_object(writer, NULL, &err));
+    CA_CHECK_EQ(CA_JSON_ERROR, ca_json_writer_end_array(writer, &err));
+    CA_CHECK_EQ(CA_JSON_ERROR, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text == NULL);
+    ca_json_writer_destroy(&writer);
+
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_JSON_ERROR, ca_json_writer_finish(writer, &text, &err));
+    ca_json_writer_destroy(&writer);
+
+    /* The writer enforces the parser's depth cap. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    for (int i = 0; i < CA_JSON_MAX_DEPTH; ++i) {
+        CA_CHECK_EQ(CA_OK, ca_json_writer_begin_array(writer, NULL, &err));
+    }
+    CA_CHECK_EQ(CA_OVERFLOW, ca_json_writer_begin_array(writer, NULL, &err));
+    for (int i = 0; i < CA_JSON_MAX_DEPTH; ++i) {
+        CA_CHECK_EQ(CA_OK, ca_json_writer_end_array(writer, &err));
+    }
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+
+    /* NULL handles and malformed strings are rejected. */
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_json_writer_init(NULL, 0, NULL, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_null(NULL, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_string(writer, NULL, NULL, 1, &err));
+    ca_json_writer_destroy(&writer);
+    ca_json_writer_destroy(NULL);
+
+    return ca_test_finish("json.writer");
+}
+
+static int test_writer_add_value(void) {
+    const char *source = "{\"a\":[1,2.5,{\"b\":null}],\"c\":\"x\"}";
+    ca_json *json = must_parse(source, 0, NULL);
+    ca_error err;
+    ca_error_init(&err);
+
+    cx_string *text = NULL;
+    ca_json_writer *writer = NULL;
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK,
+                ca_json_writer_add_value(writer, NULL, ca_json_root(json), &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    ca_json_writer_destroy(&writer);
+    CA_CHECK(text != NULL);
+    if (text) {
+        CA_CHECK_EQ(0, strcmp(cx_string_cstr(text), source));
+    }
+    cx_string_destroy(&text);
+    ca_json_destroy(&json);
+
+    /* A NULL value is written as JSON null. */
+    CA_CHECK_EQ(CA_OK, ca_json_writer_init(&writer, 0, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_add_value(writer, NULL, NULL, &err));
+    CA_CHECK_EQ(CA_OK, ca_json_writer_finish(writer, &text, &err));
+    CA_CHECK(text != NULL && strcmp(cx_string_cstr(text), "null") == 0);
+    cx_string_destroy(&text);
+    ca_json_writer_destroy(&writer);
+
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
+                ca_json_writer_add_value(NULL, NULL, NULL, &err));
+    return ca_test_finish("json.writer_add_value");
+}
+
 int main(void) {
     int failures = 0;
 
     failures += test_scalars();
     failures += test_arrays();
     failures += test_objects();
+    failures += test_object_keys();
     failures += test_strings();
     failures += test_numbers();
     failures += test_explicit_length();
     failures += test_invalid();
     failures += test_null_handles();
     failures += test_serialize();
+    failures += test_writer();
+    failures += test_writer_add_value();
     failures += test_allocator();
     failures += test_parse_file();
     failures += test_input_limit();

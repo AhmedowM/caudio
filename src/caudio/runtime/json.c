@@ -3,8 +3,14 @@
 #include <caudio/runtime/fs.h>
 
 #include <cstdx/allocator.h>
+#include <cstdx/string.h>
+#include <cstdx/string_builder.h>
+#include <inttypes.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <yyjson.h>
@@ -602,6 +608,36 @@ const ca_json_val *ca_json_object_get(const ca_json_val *val, const char *key) {
     return (const ca_json_val *)item;
 }
 
+const char *ca_json_object_key(const ca_json_val *val, size_t idx,
+                               size_t *len) {
+    if (len) {
+        *len = 0;
+    }
+    if (!val) {
+        return NULL;
+    }
+
+    const yyjson_val *yv = (const yyjson_val *)val;
+    if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
+        return NULL;
+    }
+
+    yyjson_obj_iter iter;
+    if (!yyjson_obj_iter_init(yv, &iter)) {
+        return NULL;
+    }
+    yyjson_val *key = NULL;
+    for (size_t i = 0; (key = yyjson_obj_iter_next(&iter)) != NULL; ++i) {
+        if (i == idx) {
+            if (len) {
+                *len = yyjson_get_len(key);
+            }
+            return yyjson_get_str(key);
+        }
+    }
+    return NULL;
+}
+
 const ca_json_val *ca_json_root(const ca_json *json) {
     if (!json) {
         return NULL;
@@ -669,4 +705,610 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
         *len = written;
     }
     return result;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Incremental writer                                                        */
+/* ------------------------------------------------------------------------- */
+
+enum {
+    CA_JSON_FRAME_ROOT = 0,
+    CA_JSON_FRAME_OBJECT = 1,
+    CA_JSON_FRAME_ARRAY = 2
+};
+
+typedef struct ca_json_frame {
+    uint8_t kind;
+    size_t count;
+} ca_json_frame;
+
+struct ca_json_writer {
+    cx_string_builder *builder;
+    cx_allocator alloc;
+    ca_json_frame frames[(size_t)CA_JSON_MAX_DEPTH + 1];
+    size_t depth;
+    bool pretty;
+    bool root_written;
+};
+
+static ca_status json_from_cx(cx_status status, ca_error *err) {
+    switch (status) {
+    case CX_OK:
+        return CA_OK;
+    case CX_OUT_OF_MEMORY:
+        if (err) {
+            ca_error_set(err, CA_OUT_OF_MEMORY, "JSON writer is out of memory");
+        }
+        return CA_OUT_OF_MEMORY;
+    case CX_INVALID_ARGUMENT:
+        return CA_INVALID_ARGUMENT;
+    case CX_OVERFLOW:
+        return CA_OVERFLOW;
+    default:
+        return CA_INVALID_ARGUMENT;
+    }
+}
+
+static ca_status json_append_cstr(ca_json_writer *writer, const char *text,
+                                  ca_error *err) {
+    return json_from_cx(cx_string_builder_append_cstr(writer->builder, text),
+                        err);
+}
+
+static ca_status json_append_char(ca_json_writer *writer, char value,
+                                  ca_error *err) {
+    return json_from_cx(cx_string_builder_append_char(writer->builder, value),
+                        err);
+}
+
+static ca_status json_append_indent(ca_json_writer *writer, size_t depth,
+                                    ca_error *err) {
+    ca_status status = json_append_char(writer, '\n', err);
+    if (status != CA_OK) {
+        return status;
+    }
+    for (size_t i = 0; i < depth * 2; ++i) {
+        status = json_append_char(writer, ' ', err);
+        if (status != CA_OK) {
+            return status;
+        }
+    }
+    return CA_OK;
+}
+
+static ca_status json_append_escaped(ca_json_writer *writer, const char *data,
+                                     size_t length, ca_error *err) {
+    ca_status status = json_append_char(writer, '"', err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    for (size_t i = 0; i < length; ++i) {
+        unsigned char c = (unsigned char)data[i];
+        switch (c) {
+        case '"':
+            status = json_append_cstr(writer, "\\\"", err);
+            break;
+        case '\\':
+            status = json_append_cstr(writer, "\\\\", err);
+            break;
+        case '\b':
+            status = json_append_cstr(writer, "\\b", err);
+            break;
+        case '\f':
+            status = json_append_cstr(writer, "\\f", err);
+            break;
+        case '\n':
+            status = json_append_cstr(writer, "\\n", err);
+            break;
+        case '\r':
+            status = json_append_cstr(writer, "\\r", err);
+            break;
+        case '\t':
+            status = json_append_cstr(writer, "\\t", err);
+            break;
+        default:
+            if (c < 0x20) {
+                char escaped[7];
+                snprintf(escaped, sizeof escaped, "\\u%04x", (unsigned)c);
+                status = json_append_cstr(writer, escaped, err);
+            } else {
+                status = json_append_char(writer, (char)c, err);
+            }
+            break;
+        }
+        if (status != CA_OK) {
+            return status;
+        }
+    }
+
+    return json_append_char(writer, '"', err);
+}
+
+/**
+ * @brief Emit the separator (and key) for the next value.
+ *
+ * Marks the root as written so a second root value is rejected.
+ */
+static ca_status json_writer_prefix(ca_json_writer *writer, const char *key,
+                                    ca_error *err) {
+    ca_json_frame *frame = &writer->frames[writer->depth];
+
+    if (frame->kind == CA_JSON_FRAME_ROOT) {
+        if (writer->root_written) {
+            if (err) {
+                ca_error_set(err, CA_INVALID_ARGUMENT,
+                             "JSON writer root value already written");
+            }
+            return CA_INVALID_ARGUMENT;
+        }
+        writer->root_written = true;
+        return CA_OK;
+    }
+
+    if (frame->kind == CA_JSON_FRAME_OBJECT) {
+        if (!key) {
+            if (err) {
+                ca_error_set(err, CA_INVALID_ARGUMENT,
+                             "JSON object member requires a key");
+            }
+            return CA_INVALID_ARGUMENT;
+        }
+    } else if (key) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT,
+                         "JSON array element must not have a key");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+
+    ca_status status = CA_OK;
+    if (frame->count > 0) {
+        status = json_append_char(writer, ',', err);
+        if (status != CA_OK) {
+            return status;
+        }
+    }
+
+    if (writer->pretty) {
+        status = json_append_indent(writer, writer->depth, err);
+        if (status != CA_OK) {
+            return status;
+        }
+    }
+
+    if (frame->kind == CA_JSON_FRAME_OBJECT) {
+        status = json_append_escaped(writer, key, strlen(key), err);
+        if (status != CA_OK) {
+            return status;
+        }
+        status = json_append_char(writer, ':', err);
+        if (status != CA_OK) {
+            return status;
+        }
+        if (writer->pretty) {
+            status = json_append_char(writer, ' ', err);
+            if (status != CA_OK) {
+                return status;
+            }
+        }
+    }
+
+    frame->count++;
+    return CA_OK;
+}
+
+ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
+                              const cx_allocator *alloc, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!out) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    *out = NULL;
+
+    const cx_allocator *a = alloc ? alloc : cx_allocator_default();
+    ca_json_writer *writer =
+        (ca_json_writer *)cx_allocator_alloc(a, sizeof(ca_json_writer),
+                                             alignof(ca_json_writer));
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_OUT_OF_MEMORY,
+                         "failed to allocate JSON writer");
+        }
+        return CA_OUT_OF_MEMORY;
+    }
+
+    writer->builder = NULL;
+    writer->alloc = *a;
+    writer->depth = 0;
+    writer->pretty = pretty != 0;
+    writer->root_written = false;
+    writer->frames[0].kind = CA_JSON_FRAME_ROOT;
+    writer->frames[0].count = 0;
+
+    cx_status status = cx_string_builder_init(&writer->builder, alloc);
+    if (status != CX_OK) {
+        cx_allocator_free(a, writer, sizeof(ca_json_writer),
+                          alignof(ca_json_writer));
+        return json_from_cx(status, err);
+    }
+
+    *out = writer;
+    return CA_OK;
+}
+
+void ca_json_writer_destroy(ca_json_writer **out) {
+    if (!out || !*out) {
+        return;
+    }
+
+    ca_json_writer *writer = *out;
+    *out = NULL;
+
+    cx_string_builder_destroy(&writer->builder);
+    cx_allocator_free(&writer->alloc, writer, sizeof(ca_json_writer),
+                      alignof(ca_json_writer));
+}
+
+static ca_status json_begin_container(ca_json_writer *writer, const char *key,
+                                      uint8_t kind, char open,
+                                      ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+
+    if (writer->depth >= (size_t)CA_JSON_MAX_DEPTH) {
+        if (err) {
+            ca_error_set(err, CA_OVERFLOW,
+                         "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
+        }
+        return CA_OVERFLOW;
+    }
+
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    status = json_append_char(writer, open, err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    writer->depth++;
+    writer->frames[writer->depth].kind = kind;
+    writer->frames[writer->depth].count = 0;
+    return CA_OK;
+}
+
+ca_status ca_json_writer_begin_object(ca_json_writer *writer, const char *key,
+                                      ca_error *err) {
+    return json_begin_container(writer, key, CA_JSON_FRAME_OBJECT, '{', err);
+}
+
+ca_status ca_json_writer_begin_array(ca_json_writer *writer, const char *key,
+                                     ca_error *err) {
+    return json_begin_container(writer, key, CA_JSON_FRAME_ARRAY, '[', err);
+}
+
+static ca_status json_end_container(ca_json_writer *writer, uint8_t kind,
+                                    char close, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+
+    ca_json_frame *frame = &writer->frames[writer->depth];
+    if (writer->depth == 0 || frame->kind != kind) {
+        if (err) {
+            ca_error_set(err, CA_JSON_ERROR,
+                         "JSON writer is not inside the expected container");
+        }
+        return CA_JSON_ERROR;
+    }
+
+    ca_status status = CA_OK;
+    if (writer->pretty && frame->count > 0) {
+        status = json_append_indent(writer, writer->depth - 1, err);
+        if (status != CA_OK) {
+            return status;
+        }
+    }
+
+    status = json_append_char(writer, close, err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    writer->depth--;
+    return CA_OK;
+}
+
+ca_status ca_json_writer_end_object(ca_json_writer *writer, ca_error *err) {
+    return json_end_container(writer, CA_JSON_FRAME_OBJECT, '}', err);
+}
+
+ca_status ca_json_writer_end_array(ca_json_writer *writer, ca_error *err) {
+    return json_end_container(writer, CA_JSON_FRAME_ARRAY, ']', err);
+}
+
+ca_status ca_json_writer_add_null(ca_json_writer *writer, const char *key,
+                                  ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+    return json_append_cstr(writer, "null", err);
+}
+
+ca_status ca_json_writer_add_bool(ca_json_writer *writer, const char *key,
+                                  bool value, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+    return json_append_cstr(writer, value ? "true" : "false", err);
+}
+
+ca_status ca_json_writer_add_int(ca_json_writer *writer, const char *key,
+                                 int64_t value, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+    return json_from_cx(
+        cx_string_builder_printf(writer->builder, "%" PRId64, value), err);
+}
+
+ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
+                                  uint64_t value, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+    return json_from_cx(
+        cx_string_builder_printf(writer->builder, "%" PRIu64, value), err);
+}
+
+/**
+ * @brief Format a double with the shortest representation that round-trips.
+ *
+ * @return false for non-finite values, which the caller writes as null.
+ */
+static bool json_format_double(char *buffer, size_t size, double value) {
+    if (!isfinite(value)) {
+        return false;
+    }
+
+    for (int precision = 1; precision <= 17; ++precision) {
+        int written = snprintf(buffer, size, "%.*g", precision, value);
+        if (written < 0 || (size_t)written >= size) {
+            return false;
+        }
+        char *end = NULL;
+        double parsed = strtod(buffer, &end);
+        if (end && *end == '\0' && parsed == value) {
+            break;
+        }
+    }
+    return true;
+}
+
+ca_status ca_json_writer_add_double(ca_json_writer *writer, const char *key,
+                                    double value, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    char buffer[40];
+    if (!json_format_double(buffer, sizeof buffer, value)) {
+        return json_append_cstr(writer, "null", err);
+    }
+
+    status = json_append_cstr(writer, buffer, err);
+    if (status != CA_OK) {
+        return status;
+    }
+
+    /* Keep the floating-point nature of integral values ("2" -> "2.0"), as
+     * the C++ wire format does. */
+    if (!strpbrk(buffer, ".eE")) {
+        status = json_append_cstr(writer, ".0", err);
+    }
+    return status;
+}
+
+ca_status ca_json_writer_add_string(ca_json_writer *writer, const char *key,
+                                    const char *value, size_t length,
+                                    ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    if (!value && length != 0) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT,
+                         "string value is NULL but length is nonzero");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+
+    ca_status status = json_writer_prefix(writer, key, err);
+    if (status != CA_OK) {
+        return status;
+    }
+    return json_append_escaped(writer, value ? value : "", length, err);
+}
+
+ca_status ca_json_writer_add_cstr(ca_json_writer *writer, const char *key,
+                                  const char *value, ca_error *err) {
+    return ca_json_writer_add_string(writer, key, value,
+                                     value ? strlen(value) : 0, err);
+}
+
+static ca_status json_write_value(ca_json_writer *writer, const char *key,
+                                  const ca_json_val *val, ca_error *err) {
+    switch (ca_json_type_of(val)) {
+    case CA_JSON_NULL:
+        return ca_json_writer_add_null(writer, key, err);
+    case CA_JSON_TRUE:
+        return ca_json_writer_add_bool(writer, key, true, err);
+    case CA_JSON_FALSE:
+        return ca_json_writer_add_bool(writer, key, false, err);
+    case CA_JSON_INT:
+        return ca_json_writer_add_int(writer, key, ca_json_get_int(val), err);
+    case CA_JSON_UINT:
+        return ca_json_writer_add_uint(writer, key, ca_json_get_uint(val), err);
+    case CA_JSON_DOUBLE:
+        return ca_json_writer_add_double(writer, key, ca_json_get_double(val),
+                                         err);
+    case CA_JSON_STRING: {
+        size_t length = 0;
+        const char *text = ca_json_get_string(val, &length);
+        return ca_json_writer_add_string(writer, key, text, length, err);
+    }
+    case CA_JSON_OBJECT: {
+        ca_status status = ca_json_writer_begin_object(writer, key, err);
+        if (status != CA_OK) {
+            return status;
+        }
+        size_t count = ca_json_object_size(val);
+        for (size_t i = 0; i < count; ++i) {
+            const char *member = ca_json_object_key(val, i, NULL);
+            if (member == NULL) {
+                continue;
+            }
+            status = json_write_value(writer, member,
+                                      ca_json_object_get(val, member), err);
+            if (status != CA_OK) {
+                return status;
+            }
+        }
+        return ca_json_writer_end_object(writer, err);
+    }
+    case CA_JSON_ARRAY: {
+        ca_status status = ca_json_writer_begin_array(writer, key, err);
+        if (status != CA_OK) {
+            return status;
+        }
+        size_t count = ca_json_array_size(val);
+        for (size_t i = 0; i < count; ++i) {
+            status = json_write_value(writer, NULL, ca_json_array_get(val, i),
+                                      err);
+            if (status != CA_OK) {
+                return status;
+            }
+        }
+        return ca_json_writer_end_array(writer, err);
+    }
+    }
+
+    /* Unreachable for parsed values; emit null for forward compatibility. */
+    return ca_json_writer_add_null(writer, key, err);
+}
+
+ca_status ca_json_writer_add_value(ca_json_writer *writer, const char *key,
+                                   const ca_json_val *val, ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (!writer) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    return json_write_value(writer, key, val, err);
+}
+
+ca_status ca_json_writer_finish(ca_json_writer *writer, cx_string **out,
+                                ca_error *err) {
+    if (err) {
+        ca_error_init(err);
+    }
+    if (out) {
+        *out = NULL;
+    }
+    if (!writer || !out) {
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "writer or out is NULL");
+        }
+        return CA_INVALID_ARGUMENT;
+    }
+    if (writer->depth != 0 || !writer->root_written) {
+        if (err) {
+            ca_error_set(err, CA_JSON_ERROR,
+                         "JSON document is incomplete");
+        }
+        return CA_JSON_ERROR;
+    }
+
+    return json_from_cx(cx_string_builder_finish(writer->builder, out), err);
 }

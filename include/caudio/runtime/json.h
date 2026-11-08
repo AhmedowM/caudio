@@ -15,9 +15,10 @@
 
 #include <stddef.h>
 
-/* Forward-declare cx_allocator from cstdx/allocator.h; only pointers are used
- * in this header, so the full definition is not needed here. */
+/* Forward-declare cstdx types; only pointers are used in this header, so the
+ * full definitions are not needed here. */
 typedef struct cx_allocator cx_allocator;
+typedef struct cx_string cx_string;
 
 /**
  * @defgroup ca_json_limits JSON parsing limits
@@ -198,6 +199,19 @@ CAUDIO_API const ca_json_val *ca_json_object_get(const ca_json_val *val,
                                                  const char *key);
 
 /**
+ * @brief Get the key at @p idx in a JSON object, in document order.
+ *
+ * @param val Object value to inspect.
+ * @param idx Zero-based key index; must be less than ca_json_object_size().
+ * @param len Optional; receives the key byte length (excluding NUL).
+ * @return The NUL-terminated key, or NULL if @p val is not an object or
+ *         @p idx is out of bounds. The pointer is valid for the lifetime of
+ *         the owning ca_json.
+ */
+CAUDIO_API const char *ca_json_object_key(const ca_json_val *val, size_t idx,
+                                          size_t *len);
+
+/**
  * @brief Return the root value of a JSON document.
  *
  * @return The root value handle, or NULL if json is NULL.
@@ -220,6 +234,150 @@ CAUDIO_API const ca_json_val *ca_json_root(const ca_json *json);
 CAUDIO_API char *ca_json_serialize(const ca_json *json, int pretty,
                                    size_t *len, const cx_allocator *alloc,
                                    ca_error *err);
+
+/**
+ * @brief Opaque incremental JSON writer.
+ *
+ * Builds one document by streaming values into an internal string builder.
+ * Containers are opened and closed explicitly; object members carry a key,
+ * array elements and the root value do not. The writer enforces the same
+ * depth cap as the parser (CA_JSON_MAX_DEPTH) and produces valid JSON for all
+ * inputs.
+ *
+ * A writer produces exactly one root value. Calling a value function twice at
+ * the root, closing an unopened container, or supplying a NULL key for an
+ * object member is a CA_INVALID_ARGUMENT error.
+ *
+ * Create with ca_json_writer_init() and release with
+ * ca_json_writer_destroy().
+ */
+typedef struct ca_json_writer ca_json_writer;
+
+/**
+ * @brief Initialize an empty writer.
+ *
+ * @param out    Receives the new writer on success.
+ * @param pretty Nonzero for 2-space pretty printing, zero for compact output.
+ * @param alloc  Allocator for the writer and its output; NULL means default.
+ * @param err    Optional error record.
+ * @return CA_OK, CA_INVALID_ARGUMENT, or CA_OUT_OF_MEMORY.
+ */
+CAUDIO_API ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
+                                         const cx_allocator *alloc,
+                                         ca_error *err);
+
+/**
+ * @brief Destroy a writer and free its buffer.
+ *
+ * Passing NULL, or a pointer to NULL, is a no-op.
+ */
+CAUDIO_API void ca_json_writer_destroy(ca_json_writer **out);
+
+/**
+ * @brief Open an object.
+ *
+ * @param key Member name when the current container is an object; NULL for an
+ *            array element or the document root.
+ */
+CAUDIO_API ca_status ca_json_writer_begin_object(ca_json_writer *writer,
+                                                 const char *key,
+                                                 ca_error *err);
+
+/** @brief Close the current object. */
+CAUDIO_API ca_status ca_json_writer_end_object(ca_json_writer *writer,
+                                               ca_error *err);
+
+/**
+ * @brief Open an array.
+ *
+ * @param key Member name when the current container is an object; NULL for an
+ *            array element or the document root.
+ */
+CAUDIO_API ca_status ca_json_writer_begin_array(ca_json_writer *writer,
+                                                const char *key,
+                                                ca_error *err);
+
+/** @brief Close the current array. */
+CAUDIO_API ca_status ca_json_writer_end_array(ca_json_writer *writer,
+                                              ca_error *err);
+
+/** @brief Append a JSON null. */
+CAUDIO_API ca_status ca_json_writer_add_null(ca_json_writer *writer,
+                                             const char *key, ca_error *err);
+
+/** @brief Append a JSON boolean. */
+CAUDIO_API ca_status ca_json_writer_add_bool(ca_json_writer *writer,
+                                             const char *key, bool value,
+                                             ca_error *err);
+
+/** @brief Append a signed integer. */
+CAUDIO_API ca_status ca_json_writer_add_int(ca_json_writer *writer,
+                                            const char *key, int64_t value,
+                                            ca_error *err);
+
+/** @brief Append an unsigned integer. */
+CAUDIO_API ca_status ca_json_writer_add_uint(ca_json_writer *writer,
+                                             const char *key, uint64_t value,
+                                             ca_error *err);
+
+/**
+ * @brief Append a number.
+ *
+ * Non-finite values (NaN, infinities) have no JSON representation and are
+ * written as null.
+ */
+CAUDIO_API ca_status ca_json_writer_add_double(ca_json_writer *writer,
+                                               const char *key, double value,
+                                               ca_error *err);
+
+/**
+ * @brief Append a string.
+ *
+ * @param value  UTF-8 bytes; may be NULL only when @p length is zero.
+ * @param length Byte length of @p value.
+ */
+CAUDIO_API ca_status ca_json_writer_add_string(ca_json_writer *writer,
+                                               const char *key,
+                                               const char *value,
+                                               size_t length, ca_error *err);
+
+/** @brief Append a NUL-terminated string. NULL is written as "". */
+CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer *writer,
+                                             const char *key,
+                                             const char *value,
+                                             ca_error *err);
+
+/**
+ * @brief Append an existing parsed value, preserving its JSON shape.
+ *
+ * Recursively emits @p val (a value obtained from another document) at the
+ * writer's current position. Objects keep their document key order; numbers
+ * keep their stored subtype. Equivalent to serializing @p val and splicing the
+ * result in.
+ *
+ * @param writer Writer positioned where the value should be emitted.
+ * @param key    Object member name, or NULL for array elements and the root.
+ * @param val    Value to emit; NULL is written as JSON null.
+ * @param err    Optional error record.
+ * @return CA_OK, CA_INVALID_ARGUMENT, CA_JSON_ERROR, or CA_OUT_OF_MEMORY.
+ */
+CAUDIO_API ca_status ca_json_writer_add_value(ca_json_writer *writer,
+                                              const char *key,
+                                              const ca_json_val *val,
+                                              ca_error *err);
+
+/**
+ * @brief Finish the document and move its text into @p out.
+ *
+ * The writer must be at the root with exactly one value written. On success
+ * @p out receives an owned string; use cx_string_destroy() to release it. The
+ * writer remains usable for a new document only after re-initialization.
+ *
+ * @return CA_OK, CA_JSON_ERROR when no value or an unclosed container
+ *         remains, or CA_OUT_OF_MEMORY.
+ */
+CAUDIO_API ca_status ca_json_writer_finish(ca_json_writer *writer,
+                                           cx_string **out, ca_error *err);
 
 #ifdef __cplusplus
 }
