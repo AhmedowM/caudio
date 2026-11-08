@@ -1332,10 +1332,6 @@ ca_status ca_engine_state_copy(ca_engine_state *dst,
         return CA_INVALID_ARGUMENT;
     }
     memset(dst, 0, sizeof *dst);
-    ca_status status = ca_engine_state_init(dst, alloc);
-    if (status != CA_OK) {
-        return status;
-    }
     dst->shuffle_enabled = src->shuffle_enabled;
     dst->repeat_mode = src->repeat_mode;
     dst->cursor_pos = src->cursor_pos;
@@ -1345,13 +1341,9 @@ ca_status ca_engine_state_copy(ca_engine_state *dst,
     dst->pre_mute_volume = src->pre_mute_volume;
     dst->position_ms = src->position_ms;
 
-    status = ca_impl_vector_copy(&dst->shuffle_perm, src->shuffle_perm,
-                                 sizeof(int64_t), alignof(int64_t), NULL,
-                                 alloc);
-    if (status != CA_OK) {
-        ca_engine_state_destroy(dst);
-    }
-    return status;
+    return ca_impl_vector_copy(&dst->shuffle_perm, src->shuffle_perm,
+                               sizeof(int64_t), alignof(int64_t), NULL,
+                               alloc);
 }
 
 void ca_engine_state_move(ca_engine_state *dst, ca_engine_state *src) {

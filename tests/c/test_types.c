@@ -308,6 +308,62 @@ static void test_leak_free(void) {
 
     CA_CHECK(!cx_allocator_counted_has_leaks(&counted));
     CA_CHECK_EQ(0, counted.live_blocks);
+
+    ca_engine_state state;
+    CA_CHECK_EQ(CA_OK, ca_engine_state_init(&state, &alloc));
+    for (int64_t i = 0; i < 3; ++i) {
+        CA_CHECK_EQ(CX_OK,
+                    cx_vector_push_copy(state.shuffle_perm, &i, sizeof i));
+    }
+    ca_engine_state state_copy;
+    CA_CHECK_EQ(CA_OK, ca_engine_state_copy(&state_copy, &state, &alloc));
+    ca_engine_state_destroy(&state_copy);
+    ca_engine_state_destroy(&state);
+
+    CA_CHECK(!cx_allocator_counted_has_leaks(&counted));
+    CA_CHECK_EQ(0, counted.live_blocks);
+
+    ca_library_stats stats;
+    CA_CHECK_EQ(CA_OK, ca_library_stats_init(&stats, &alloc));
+    stats.has_top_tracks = true;
+    stats.top_tracks = NULL;
+    ca_library_stats copy_stats;
+    CA_CHECK_EQ(CA_OK, ca_library_stats_copy(&copy_stats, &stats, &alloc));
+    ca_library_stats_destroy(&copy_stats);
+    ca_library_stats_destroy(&stats);
+
+    CA_CHECK(!cx_allocator_counted_has_leaks(&counted));
+    CA_CHECK_EQ(0, counted.live_blocks);
+
+    ca_track_query query;
+    CA_CHECK_EQ(CA_OK, ca_track_query_init(&query, &alloc));
+    ca_track_query copy_query;
+    CA_CHECK_EQ(CA_OK, ca_track_query_copy(&copy_query, &query, &alloc));
+    ca_track_query_destroy(&copy_query);
+    ca_track_query_destroy(&query);
+
+    ca_engine_event event;
+    CA_CHECK_EQ(CA_OK, ca_engine_event_init(&event, &alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_assign(event.msg, "boom"));
+    ca_engine_event copy_event;
+    CA_CHECK_EQ(CA_OK, ca_engine_event_copy(&copy_event, &event, &alloc));
+    ca_engine_event_destroy(&copy_event);
+    ca_engine_event_destroy(&event);
+
+    ca_playlist playlist;
+    CA_CHECK_EQ(CA_OK, ca_playlist_init(&playlist, &alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_assign(playlist.name, "Favorites"));
+    ca_playlist playlist_copy;
+    CA_CHECK_EQ(CA_OK, ca_playlist_copy(&playlist_copy, &playlist, &alloc));
+    ca_playlist_destroy(&playlist_copy);
+    ca_playlist_destroy(&playlist);
+
+    ca_library library;
+    CA_CHECK_EQ(CA_OK, ca_library_init(&library, &alloc));
+    ca_library_destroy(&library);
+
+    CA_CHECK(!cx_allocator_counted_has_leaks(&counted));
+    CA_CHECK_EQ(0, counted.live_blocks);
     cx_allocator_counted_destroy(&counted);
 }
 

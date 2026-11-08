@@ -137,7 +137,6 @@ static void test_derived_paths(const cx_allocator *alloc) {
     CA_CHECK_EQ(0, strncmp(cx_string_cstr(socket), "\\\\.\\pipe\\caudio-", 16));
     CA_CHECK(strstr(cx_string_cstr(socket), hex) != NULL);
 #else
-    CA_CHECK(ends_with(socket, "/caudio_test_paths_tmp/run/caudio/caudio-"));
     (void)snprintf(expected, sizeof expected, "caudio-%s.sock", hex);
     CA_CHECK(ends_with(socket, expected));
 #endif
