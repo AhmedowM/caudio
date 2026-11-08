@@ -147,13 +147,15 @@ jobs:
 
   # -------------------------------------------------------------------------
   # Source-based coverage with llvm-cov. Reports line and branch coverage for
-  # the cstdx library (test-side code is excluded) and uploads the summary.
-  # COVERAGE_MIN_LINES / COVERAGE_MIN_BRANCHES act as ratchets: 0 reports only.
+  # the cstdx library (test-side code is excluded), publishes an HTML report,
+  # and uploads the summary. COVERAGE_MIN_LINES / COVERAGE_MIN_BRANCHES act as
+  # ratchets: 0 reports only. Pull requests additionally gate on coverage of
+  # changed lines.
   # -------------------------------------------------------------------------
   coverage:
     name: llvm-cov coverage (Clang)
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       COVERAGE_MIN_LINES: '0'
       COVERAGE_MIN_BRANCHES: '0'
@@ -161,12 +163,16 @@ jobs:
       LLVM_PROFDATA: llvm-profdata-19
     steps:
       - uses: actions/checkout@v4
+        with:
+          # diff-cover needs the PR base branch to compute the changed lines.
+          fetch-depth: 0
 
       - name: Install toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang-19 llvm-19 llvm-19-tools ninja-build cmake libclang-rt-19-dev
+            clang-19 llvm-19 llvm-19-tools ninja-build cmake libclang-rt-19-dev \
+            python3-venv
 
       - name: Configure
         working-directory: libs/cstdx
@@ -202,9 +208,31 @@ jobs:
           "$LLVM_COV" export "$library" \
             -instr-profile="${{ github.workspace }}/coverage/cstdx.profdata" \
             -ignore-filename-regex='(^|/)tests/' > "$report/coverage.json"
+          "$LLVM_COV" export "$library" \
+            -instr-profile="${{ github.workspace }}/coverage/cstdx.profdata" \
+            -ignore-filename-regex='(^|/)tests/' -format=lcov \
+            > "$report/coverage.lcov"
+          # diff-cover matches report paths against the git diff, so make the
+          # absolute lcov paths relative to the repository root.
+          sed "s|^SF:${GITHUB_WORKSPACE}/|SF:|" "$report/coverage.lcov" \
+            > "$report/coverage-rel.lcov"
+          "$LLVM_COV" show "$library" \
+            -instr-profile="${{ github.workspace }}/coverage/cstdx.profdata" \
+            -ignore-filename-regex='(^|/)tests/' \
+            -format=html -output-dir="$report/html" -show-branches=count
           python3 - "$report/coverage.json" <<'PY'
           import json, os, sys
-          totals = json.load(open(sys.argv[1]))["data"][0]["totals"]
+
+          report = json.load(open(sys.argv[1],
+                                  encoding="utf-8-sig"))["data"][0]
+          totals = report["totals"]
+
+          print(f"{'metric':<10} {'covered':>8} {'total':>8} {'percent':>8}")
+          for key in ("functions", "regions", "lines", "branches"):
+              item = totals[key]
+              print(f"{key:<10} {item['covered']:>8} {item['count']:>8} "
+                    f"{item['percent']:>7.2f}%")
+
           checks = (("lines", "COVERAGE_MIN_LINES"),
                     ("branches", "COVERAGE_MIN_BRANCHES"))
           failed = False
@@ -214,8 +242,65 @@ jobs:
               print(f"{key}: {pct:.2f}% (minimum {minimum:.2f}%)")
               if minimum > 0 and pct < minimum:
                   failed = True
+
+          summary = [
+              "## cstdx coverage",
+              "",
+              "| Metric | Covered | Total | Percent |",
+              "|---|---:|---:|---:|",
+          ]
+          for key in ("functions", "regions", "lines", "branches"):
+              item = totals[key]
+              summary.append(f"| {key.capitalize()} | {item['covered']} | "
+                             f"{item['count']} | {item['percent']:.2f}% |")
+
+          worst = []
+          for file in report["files"]:
+              branches = file["summary"]["branches"]
+              if branches["count"] == 0:
+                  continue
+              name = file["filename"].replace("\\", "/")
+              index = name.find("/libs/cstdx/")
+              if index >= 0:
+                  name = name[index + 1:]
+              worst.append((branches["percent"], name,
+                            file["summary"]["lines"]["percent"]))
+          worst.sort()
+          summary.extend(["", "### Lowest branch coverage", "",
+                          "| File | Branches | Lines |", "|---|---:|---:|"])
+          for percent, name, line_percent in worst[:10]:
+              summary.append(
+                  f"| `{name}` | {percent:.2f}% | {line_percent:.2f}% |")
+
+          step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if step_summary:
+              with open(step_summary, "a", encoding="utf-8") as handle:
+                  handle.write("\n".join(summary) + "\n")
+
           sys.exit(1 if failed else 0)
           PY
+
+      - name: Diff coverage (changed lines)
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        env:
+          DIFF_COVER_MIN: '90'
+        run: |
+          python3 -m venv .venv-diff-cover
+          .venv-diff-cover/bin/pip install --quiet diff-cover
+          status=0
+          .venv-diff-cover/bin/diff-cover \
+            coverage/report/coverage-rel.lcov \
+            --compare-branch="origin/${{ github.base_ref }}" \
+            --include 'libs/cstdx/**' \
+            --fail-under="$DIFF_COVER_MIN" \
+            --show-uncovered \
+            --format "markdown:coverage/report/diff-cover.md" \
+            | tee coverage/report/diff-cover.txt || status=$?
+          if [ -f coverage/report/diff-cover.md ]; then
+            cat coverage/report/diff-cover.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
 
       - name: Upload coverage report
         if: always()
@@ -225,6 +310,10 @@ jobs:
           path: |
             coverage/report/summary.txt
             coverage/report/coverage.json
+            coverage/report/coverage.lcov
+            coverage/report/diff-cover.txt
+            coverage/report/diff-cover.md
+            coverage/report/html
 
   # -------------------------------------------------------------------------
   # libFuzzer smoke run. Long runs are opt-in from the Actions tab; CI does a
