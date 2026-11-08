@@ -35,10 +35,10 @@ endif()
 
 include(cmake/yyjson.cmake)
 include(cmake/runtime.cmake)
+include(cmake/caudio.cmake)
 
 if(CAUDIO_BUILD_TESTS)
   include(cmake/tests.cmake)
 endif()
 
-include(cmake/caudio.cmake)
 include(cmake/install.cmake)

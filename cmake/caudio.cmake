@@ -5,9 +5,22 @@
 # it as one ABI. cstdx is reached transitively through ca_runtime.
 # Domain components (ca_db, ca_media, …) are added here as they are built.
 
+# Domain layers compiled directly into the umbrella. Globbed with
+# CONFIGURE_DEPENDS so adding an implementation file is enough.
+file(GLOB _caudio_domain_sources CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/src/caudio/types/*.c"
+    "${PROJECT_SOURCE_DIR}/src/caudio/config/*.c"
+)
+file(GLOB _caudio_domain_headers CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/include/caudio/types/*.h"
+    "${PROJECT_SOURCE_DIR}/include/caudio/config/*.h"
+)
+
 if(CAUDIO_BUILD_SHARED)
   add_library(caudio SHARED
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
+      ${_caudio_domain_sources}
+      ${_caudio_domain_headers}
   )
   target_compile_definitions(caudio
       PUBLIC  CAUDIO_SHARED
@@ -16,8 +29,13 @@ if(CAUDIO_BUILD_SHARED)
 else()
   add_library(caudio STATIC
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
+      ${_caudio_domain_sources}
+      ${_caudio_domain_headers}
   )
 endif()
+
+unset(_caudio_domain_sources)
+unset(_caudio_domain_headers)
 
 target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
 

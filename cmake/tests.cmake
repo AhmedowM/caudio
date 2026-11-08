@@ -1,8 +1,8 @@
 # caudio unit tests.
 #
 # Each test is a single translation unit with its own main(). Tests link
-# against ca_runtime::ca_runtime and are registered with CTest under the
-# "unit" label.
+# against caudio::caudio (which pulls in ca_runtime and the domain layers) and
+# are registered with CTest under the "unit" label.
 
 set(_caudio_tests_dir ${PROJECT_SOURCE_DIR}/tests/c)
 
@@ -18,7 +18,7 @@ foreach(_source IN LISTS _caudio_test_sources)
 
     add_executable(caudio_test_${_test} "${_source}")
     target_link_libraries(caudio_test_${_test}
-        PRIVATE ca_runtime::ca_runtime)
+        PRIVATE caudio::caudio)
     target_compile_definitions(caudio_test_${_test}
         PRIVATE ${CAUDIO_POSIX_DEFINITIONS})
     target_include_directories(caudio_test_${_test}
