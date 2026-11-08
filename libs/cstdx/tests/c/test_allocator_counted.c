@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "cx_test.h"
+#include "cx_test_allocators.h"
 
 typedef struct {
     size_t count;
@@ -147,12 +148,125 @@ static int test_compose_with_canary(void) {
     return cx_test_finish("allocator_counted.compose");
 }
 
+static bool visit_stop(void *context, const void *block, size_t size,
+                       size_t alignment) {
+    (void)block;
+    (void)size;
+    (void)alignment;
+    ++*(int *)context;
+    return false;
+}
+
+static int test_visit_edges(void) {
+    cx_allocator_counted counted;
+
+    CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
+
+    auto allocator = cx_allocator_counted_as_allocator(&counted);
+    auto first = cx_allocator_alloc(&allocator, 8, 8);
+    auto second = cx_allocator_alloc(&allocator, 8, 8);
+
+    CX_CHECK(first != nullptr);
+    CX_CHECK(second != nullptr);
+
+    /* Null arguments visit nothing. */
+    CX_CHECK_EQ(0, cx_allocator_counted_visit_leaks(nullptr, visit_leak,
+                                                    nullptr));
+    CX_CHECK_EQ(0, cx_allocator_counted_visit_leaks(&counted, nullptr, nullptr));
+
+    /* A callback returning false stops after the first block. */
+    int seen = 0;
+
+    CX_CHECK_EQ(1, cx_allocator_counted_visit_leaks(&counted, visit_stop,
+                                                    &seen));
+    CX_CHECK_EQ(1, seen);
+
+    cx_allocator_free(&allocator, first, 8, 8);
+    cx_allocator_free(&allocator, second, 8, 8);
+    cx_allocator_counted_destroy(&counted);
+
+    return cx_test_finish("allocator_counted.visit_edges");
+}
+
+static int test_failures_and_lifecycle(void) {
+    cx_allocator_counted counted;
+    cx_allocator invalid = {0};
+
+    CX_CHECK(cx_allocator_counted_init(nullptr, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_allocator_counted_init(&counted, &invalid) ==
+             CX_INVALID_ARGUMENT);
+
+    cx_allocator_failing failing = {
+        .fail_at = 1,
+        .fail_all_after = false,
+    };
+    cx_allocator failing_view = cx_allocator_failing_as_allocator(&failing);
+
+    CX_CHECK(cx_allocator_counted_init(&counted, &failing_view) == CX_OK);
+
+    auto allocator = cx_allocator_counted_as_allocator(&counted);
+
+    /* The inner allocator refuses the block itself. */
+    CX_CHECK(cx_allocator_alloc(&allocator, 16, 8) == nullptr);
+    CX_CHECK_EQ(1, counted.failed_allocations);
+    CX_CHECK_EQ(0, counted.allocations);
+    CX_CHECK_EQ(0, counted.live_blocks);
+
+    /* The block succeeds but its tracking record cannot be allocated. */
+    failing.attempts = 0;
+    failing.fail_at = 2;
+    CX_CHECK(cx_allocator_alloc(&allocator, 16, 8) == nullptr);
+    CX_CHECK_EQ(2, counted.failed_allocations);
+    CX_CHECK_EQ(0, counted.allocations);
+    CX_CHECK_EQ(0, counted.live_blocks);
+
+    failing.fail_at = 0;
+
+    /* Freeing null is a no-op; an untracked pointer is only forwarded.
+     * Allocate it through the same allocator family so the default
+     * allocator's platform-specific release routine matches. */
+    cx_allocator_free(&allocator, nullptr, 16, 8);
+    CX_CHECK_EQ(0, counted.releases);
+
+    void *raw = cx_allocator_alloc(cx_allocator_default(), 16, 8);
+
+    CX_CHECK(raw != nullptr);
+    cx_allocator_free(&allocator, raw, 16, 8);
+    CX_CHECK_EQ(0, counted.releases);
+    CX_CHECK_EQ(0, counted.live_blocks);
+
+    /* Destroying with outstanding blocks releases only their records. */
+    auto tracked = cx_allocator_alloc(&allocator, 24, 8);
+
+    CX_CHECK(tracked != nullptr);
+    CX_CHECK_EQ(1, counted.live_blocks);
+
+    cx_allocator_counted_destroy(&counted);
+    CX_CHECK(counted.inner == nullptr);
+    CX_CHECK_EQ(0, counted.live_blocks);
+    CX_CHECK(counted.blocks == nullptr);
+
+    cx_allocator_free(cx_allocator_default(), tracked, 24, 8);
+
+    /* Destroying never-initialized or null state is harmless. */
+    cx_allocator_counted_destroy(nullptr);
+
+    cx_allocator_counted zeroed = {0};
+
+    cx_allocator_counted_destroy(&zeroed);
+
+    return cx_test_finish("allocator_counted.failures");
+}
+
 int main(void) {
     int failures = 0;
 
     failures += test_counting();
     failures += test_leaks();
     failures += test_compose_with_canary();
+    failures += test_visit_edges();
+    failures += test_failures_and_lifecycle();
 
     return failures == 0 ? 0 : 1;
 }

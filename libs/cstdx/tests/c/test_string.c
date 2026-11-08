@@ -1,9 +1,11 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/string.h>
 
+#include <stdint.h>
 #include <string.h>
 
 #include "cx_test.h"
+#include "cx_test_allocators.h"
 
 static int test_lifecycle(void) {
     cx_string *str = nullptr;
@@ -250,6 +252,248 @@ static int test_counted_allocator(void) {
     return cx_test_finish("string.counted_allocator");
 }
 
+static int test_invalid_arguments(void) {
+    cx_string *str = nullptr;
+    cx_allocator invalid = {0};
+    cx_string_view view = cx_string_view_from_cstr("x");
+    size_t index = 0;
+
+    CX_CHECK(cx_string_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_init(&str, &invalid) == CX_INVALID_ARGUMENT);
+    CX_CHECK(str == nullptr);
+
+    CX_CHECK(cx_string_from(nullptr, "x", nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_from(&str, nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_from_view(nullptr, view, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_from_view(&str, (cx_string_view){nullptr, 1}, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_copy(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_copy(&str, nullptr) == CX_INVALID_ARGUMENT);
+
+    CX_CHECK(cx_string_init(&str, nullptr) == CX_OK);
+
+    CX_CHECK(cx_string_assign(str, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_assign(nullptr, "x") == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_assign_view(nullptr, view) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_assign_view(str, (cx_string_view){nullptr, 1}) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append(str, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append_cstr(str, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append(nullptr, str) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append_view(nullptr, view) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append_view(str, (cx_string_view){nullptr, 1}) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_push_back(nullptr, 'x') == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_pop_back(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_insert(nullptr, 0, view) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_insert(str, 0, (cx_string_view){nullptr, 1}) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_erase(nullptr, 0, 1) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_replace(nullptr, 0, 0, view) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_replace(str, 0, 0, (cx_string_view){nullptr, 1}) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_set(nullptr, 0, 'x') == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_resize(nullptr, 0) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_reserve(nullptr, 1) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_at_mut(nullptr, 0) == nullptr);
+    CX_CHECK(cx_string_at_mut(str, 0) == nullptr);
+    CX_CHECK(cx_string_find(nullptr, view, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_find_cstr(str, nullptr, &index) == CX_INVALID_ARGUMENT);
+    CX_CHECK(!cx_string_contains(nullptr, view));
+
+    cx_string_clear(nullptr);
+    cx_string_swap(nullptr, nullptr);
+    cx_string_swap(str, str);
+    cx_string_move(nullptr, nullptr);
+    cx_string_move(str, nullptr);
+    cx_string_move(str, str);
+    cx_string_destroy(nullptr);
+
+    CX_CHECK(!cx_string_equals(nullptr, str));
+    CX_CHECK(!cx_string_equals(str, nullptr));
+    CX_CHECK(!cx_string_equals_cstr(nullptr, "x"));
+    CX_CHECK(!cx_string_equals_cstr(str, nullptr));
+    CX_CHECK_EQ(CX_STRING_LESS, cx_string_compare(nullptr, str));
+    CX_CHECK_EQ(CX_STRING_GREATER, cx_string_compare(str, nullptr));
+    CX_CHECK_EQ(CX_STRING_EQUAL, cx_string_compare_cstr(nullptr, nullptr));
+    CX_CHECK_EQ(CX_STRING_LESS, cx_string_compare_cstr(nullptr, "x"));
+    CX_CHECK_EQ(CX_STRING_GREATER, cx_string_compare_cstr(str, nullptr));
+
+    auto empty_view = cx_string_view_of(nullptr);
+
+    CX_CHECK(empty_view.data == nullptr);
+    CX_CHECK_EQ(0, empty_view.length);
+
+    cx_string_destroy(&str);
+    CX_CHECK(str == nullptr);
+
+    return cx_test_finish("string.invalid_arguments");
+}
+
+static int test_empty_operations(void) {
+    cx_string *str = nullptr;
+    cx_string_view empty = {nullptr, 0};
+
+    CX_CHECK(cx_string_from(&str, "abcd", nullptr) == CX_OK);
+
+    CX_CHECK(cx_string_append_view(str, empty) == CX_OK);
+    CX_CHECK(cx_string_insert(str, 2, empty) == CX_OK);
+    CX_CHECK(cx_string_erase(str, 4, 0) == CX_OK);
+    CX_CHECK(cx_string_replace(str, 4, 0, empty) == CX_OK);
+    CX_CHECK(cx_string_replace(str, 4, 0, cx_string_view_from_cstr("!")) ==
+             CX_OK);
+    CX_CHECK(strcmp(cx_string_cstr(str), "abcd!") == 0);
+
+    /* A removal count past the end is clamped to the remaining length. */
+    CX_CHECK(cx_string_replace(str, 3, 99, cx_string_view_from_cstr("XY")) ==
+             CX_OK);
+    CX_CHECK(strcmp(cx_string_cstr(str), "abcXY") == 0);
+
+    cx_string_destroy(&str);
+
+    return cx_test_finish("string.empty_operations");
+}
+
+static int test_overflow(void) {
+    cx_string *str = nullptr;
+    cx_string_view huge = {.data = "x", .length = SIZE_MAX};
+
+    CX_CHECK(cx_string_from(&str, "abc", nullptr) == CX_OK);
+
+    /* Growing past SIZE_MAX reports overflow without touching the string. */
+    CX_CHECK(cx_string_resize(str, SIZE_MAX) == CX_OVERFLOW);
+    CX_CHECK(cx_string_append_view(str, huge) == CX_OVERFLOW);
+    CX_CHECK(cx_string_insert(str, 0, huge) == CX_OVERFLOW);
+    CX_CHECK(cx_string_replace(str, 0, 0, huge) == CX_OVERFLOW);
+    CX_CHECK(strcmp(cx_string_cstr(str), "abc") == 0);
+
+    cx_string_destroy(&str);
+
+    return cx_test_finish("string.overflow");
+}
+
+static int test_lifecycle_edges(void) {
+    cx_string *dst = nullptr;
+    cx_string *src = nullptr;
+
+    CX_CHECK(cx_string_from(&dst, "keep", nullptr) == CX_OK);
+    CX_CHECK(cx_string_from(&src, "move", nullptr) == CX_OK);
+
+    /* Moving onto a non-empty destination releases its old buffer. */
+    cx_string_move(dst, src);
+    CX_CHECK(cx_string_equals_cstr(dst, "move"));
+    CX_CHECK(cx_string_empty(src));
+    CX_CHECK(cx_string_is_null(src));
+
+    auto view = cx_string_view_of(dst);
+
+    CX_CHECK_EQ(4, view.length);
+    CX_CHECK(memcmp(view.data, "move", 4) == 0);
+
+    cx_string_destroy(&dst);
+    cx_string_destroy(&src);
+    CX_CHECK(dst == nullptr);
+    CX_CHECK(src == nullptr);
+
+    return cx_test_finish("string.lifecycle_edges");
+}
+
+static int test_allocation_failures(void) {
+    cx_allocator_failing failing = {
+        .fail_at = 1,
+        .fail_all_after = false,
+    };
+    cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
+    cx_string *str = nullptr;
+
+    /* Handle allocation fails. */
+    CX_CHECK(cx_string_init(&str, &allocator) == CX_OUT_OF_MEMORY);
+    CX_CHECK(str == nullptr);
+
+    /* The constructor reports a failed handle allocation. */
+    failing.attempts = 0;
+    failing.fail_at = 1;
+    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("x"),
+                                 &allocator) == CX_OUT_OF_MEMORY);
+    CX_CHECK(str == nullptr);
+
+    /* The constructor frees the handle when the assignment fails. */
+    failing.attempts = 0;
+    failing.fail_at = 2;
+    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("abcdef"),
+                                 &allocator) == CX_OUT_OF_MEMORY);
+    CX_CHECK(str == nullptr);
+
+    failing.attempts = 0;
+    failing.fail_at = 0;
+    CX_CHECK(cx_string_init(&str, &allocator) == CX_OK);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_reserve(str, 64) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_is_null(str));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_assign(str, "hello") == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_empty(str));
+
+    failing.fail_at = 0;
+    CX_CHECK(cx_string_assign(str, "hello") == CX_OK);
+
+    /* Aliased assignments stage a detached copy before growing. */
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_assign_view(str, cx_string_view_of(str)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_resize(str, 128) == CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(5, cx_string_length(str));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_append_view(str, cx_string_view_of(str)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_insert(str, 0, cx_string_view_of(str)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_replace(str, 0, 1, cx_string_view_of(str)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_append_cstr(str, "0123456789abcdef") ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
+
+    CX_CHECK(cx_string_resize(str, 8) == CX_OK);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_push_back(str, 'x') == CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(8, cx_string_length(str));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_insert(str, 0,
+                              cx_string_view_from_cstr("0123456789abcdef")) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(8, cx_string_length(str));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_string_replace(str, 0, 0,
+                               cx_string_view_from_cstr("0123456789abcdef")) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(8, cx_string_length(str));
+
+    failing.fail_at = 0;
+    cx_string_destroy(&str);
+
+    return cx_test_finish("string.failures");
+}
+
 int main(void) {
     int failures = 0;
 
@@ -260,6 +504,11 @@ int main(void) {
     failures += test_aliasing();
     failures += test_search_and_compare();
     failures += test_counted_allocator();
+    failures += test_invalid_arguments();
+    failures += test_empty_operations();
+    failures += test_overflow();
+    failures += test_lifecycle_edges();
+    failures += test_allocation_failures();
 
     return failures == 0 ? 0 : 1;
 }

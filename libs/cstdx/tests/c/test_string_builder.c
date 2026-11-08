@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "cx_test.h"
+#include "cx_test_allocators.h"
 
 static int test_append(void) {
     cx_string_builder *builder = nullptr;
@@ -112,6 +113,102 @@ static int test_counted_allocator(void) {
     return cx_test_finish("string_builder.counted_allocator");
 }
 
+static int test_invalid_arguments(void) {
+    cx_string_builder *builder = nullptr;
+    cx_string_view view = cx_string_view_from_cstr("x");
+    cx_allocator invalid = {0};
+
+    CX_CHECK(cx_string_builder_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_init(&builder, &invalid) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(builder == nullptr);
+
+    cx_string_builder_destroy(nullptr);
+    cx_string_builder_destroy(&builder);
+    CX_CHECK(builder == nullptr);
+
+    CX_CHECK(cx_string_builder_append(nullptr, view) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_append_cstr(nullptr, "x") ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_append_char(nullptr, 'x') ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_printf(nullptr, "%s", "x") ==
+             CX_INVALID_ARGUMENT);
+
+    CX_CHECK(cx_string_builder_init(&builder, nullptr) == CX_OK);
+    CX_CHECK(cx_string_builder_append_cstr(builder, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_printf(builder, nullptr) ==
+             CX_INVALID_ARGUMENT);
+
+    /* A conversion whose width overflows makes vsnprintf report an error. */
+    CX_CHECK(cx_string_builder_printf(
+                 builder, "%999999999999999999999999999d", 1) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK_EQ(0, cx_string_builder_length(builder));
+
+    CX_CHECK(cx_string_builder_finish(nullptr, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_finish(builder, nullptr) ==
+             CX_INVALID_ARGUMENT);
+
+    CX_CHECK(cx_string_builder_view(nullptr).data == nullptr);
+    CX_CHECK_EQ(0, cx_string_builder_view(nullptr).length);
+    CX_CHECK(strcmp(cx_string_builder_cstr(nullptr), "") == 0);
+    CX_CHECK_EQ(0, cx_string_builder_length(nullptr));
+
+    cx_string_builder_destroy(&builder);
+
+    return cx_test_finish("string_builder.invalid_arguments");
+}
+
+static int test_allocation_failures(void) {
+    cx_allocator_failing failing = {
+        .fail_at = 1,
+        .fail_all_after = false,
+    };
+    cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
+    cx_string_builder *builder = nullptr;
+
+    CX_CHECK(cx_string_builder_init(&builder, &allocator) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(builder == nullptr);
+    CX_CHECK_EQ(1, failing.attempts);
+
+    failing.fail_at = 2;
+    failing.attempts = 0;
+
+    CX_CHECK(cx_string_builder_init(&builder, &allocator) == CX_OK);
+    CX_CHECK(builder != nullptr);
+
+    /* The append has to grow the string, and that allocation fails. */
+    CX_CHECK(cx_string_builder_append_cstr(builder, "hello") ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(0, cx_string_builder_length(builder));
+    CX_CHECK_EQ(2, failing.attempts);
+
+    /* Only the exact attempt failed, so this one succeeds. */
+    CX_CHECK(cx_string_builder_append_cstr(builder, "ok") == CX_OK);
+    CX_CHECK(strcmp(cx_string_builder_cstr(builder), "ok") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+
+    CX_CHECK(cx_string_builder_printf(builder, "%s", "0123456789abcdef") ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(strcmp(cx_string_builder_cstr(builder), "ok") == 0);
+
+    failing.fail_at = failing.attempts + 1;
+
+    cx_string *out = nullptr;
+
+    CX_CHECK(cx_string_builder_finish(builder, &out) == CX_OUT_OF_MEMORY);
+    CX_CHECK(out == nullptr);
+
+    cx_string_builder_destroy(&builder);
+
+    return cx_test_finish("string_builder.failures");
+}
+
 int main(void) {
     int failures = 0;
 
@@ -119,6 +216,8 @@ int main(void) {
     failures += test_printf();
     failures += test_finish();
     failures += test_counted_allocator();
+    failures += test_invalid_arguments();
+    failures += test_allocation_failures();
 
     return failures == 0 ? 0 : 1;
 }

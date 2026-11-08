@@ -1,10 +1,12 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/vector.h>
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "cx_test.h"
+#include "cx_test_allocators.h"
 
 static int test_pod(void) {
     cx_vector *vector = nullptr;
@@ -75,6 +77,10 @@ static int test_pod(void) {
     CX_CHECK_EQ(1, cx_vector_capacity(vector));
     CX_CHECK_EQ(42, cx_vector_at(vector, int, 0));
 
+    /* Shrinking an already-tight vector is a no-op. */
+    CX_CHECK(cx_vector_shrink_to_fit(vector) == CX_OK);
+    CX_CHECK_EQ(1, cx_vector_capacity(vector));
+
     cx_vector_destroy(&vector);
     CX_CHECK(vector == nullptr);
     cx_vector_destroy(&vector);
@@ -121,6 +127,157 @@ static int test_errors(void) {
              CX_INVALID_ARGUMENT);
 
     return cx_test_finish("vector.errors");
+}
+
+static void vector_noop_copy(void *dst, const void *src) {
+    memcpy(dst, src, sizeof(int));
+}
+
+static int test_invalid_arguments(void) {
+    cx_vector *vector = nullptr;
+    cx_allocator invalid = {0};
+    int value = 7;
+    size_t size = sizeof(int);
+
+    CX_CHECK(cx_vector_init(&vector, sizeof(int), alignof(int), nullptr,
+                            &invalid) == CX_INVALID_ARGUMENT);
+
+    cx_vector_ops missing_destroy = {
+        .copy = vector_noop_copy,
+        .destroy = nullptr,
+    };
+
+    CX_CHECK(cx_vector_init_of(&vector, int, &missing_destroy, nullptr) ==
+             CX_INVALID_ARGUMENT);
+
+    CX_CHECK(cx_vector_reserve(nullptr, 4) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_shrink_to_fit(nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_push_copy(nullptr, &value, size) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_insert_copy(nullptr, 0, &value, size) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_pop(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_remove(nullptr, 0) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_swap_remove(nullptr, 0) == CX_INVALID_ARGUMENT);
+
+    cx_vector_clear(nullptr);
+
+    CX_CHECK(cx_vector_ptr(nullptr, 0) == nullptr);
+    CX_CHECK(cx_vector_ptr_mut(nullptr, 0) == nullptr);
+    CX_CHECK(cx_vector_ptr_typed(nullptr, 0, size) == nullptr);
+    CX_CHECK(cx_vector_ptr_mut_typed(nullptr, 0, size) == nullptr);
+    CX_CHECK_EQ(0, cx_vector_element_align(nullptr));
+    CX_CHECK(cx_vector_data_ptr(nullptr) == nullptr);
+    CX_CHECK(cx_vector_data_ptr_const(nullptr) == nullptr);
+    CX_CHECK_EQ(0, cx_vector_length(nullptr));
+    CX_CHECK_EQ(0, cx_vector_capacity(nullptr));
+    CX_CHECK_EQ(0, cx_vector_element_size(nullptr));
+    CX_CHECK(cx_vector_empty(nullptr));
+    CX_CHECK_EQ(0, cx_vector_as_slice(nullptr).length);
+
+    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, nullptr) == CX_OK);
+    CX_CHECK(cx_vector_push_value(vector, value) == CX_OK);
+    CX_CHECK(cx_vector_ptr_typed(vector, 0, size + 1) == nullptr);
+    CX_CHECK(cx_vector_ptr_typed(vector, 1, size) == nullptr);
+    CX_CHECK(cx_vector_ptr_mut_typed(vector, 0, size + 1) == nullptr);
+    CX_CHECK(cx_vector_ptr_mut_typed(vector, 1, size) == nullptr);
+    CX_CHECK(cx_vector_ptr_typed(vector, 0, size) != nullptr);
+    CX_CHECK(cx_vector_ptr_mut_typed(vector, 0, size) != nullptr);
+    CX_CHECK(cx_vector_ptr(vector, 0) == cx_vector_ptr_mut(vector, 0));
+
+    /* Popping into the vector's own storage is rejected. */
+    CX_CHECK(cx_vector_pop(vector, cx_vector_ptr_mut(vector, 0)) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK_EQ(1, cx_vector_length(vector));
+
+    cx_vector_destroy(&vector);
+
+    return cx_test_finish("vector.invalid_arguments");
+}
+
+static int test_overflow(void) {
+    cx_vector *vector = nullptr;
+
+    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, nullptr) == CX_OK);
+    CX_CHECK(cx_vector_reserve(vector, SIZE_MAX) == CX_OVERFLOW);
+    CX_CHECK_EQ(0, cx_vector_capacity(vector));
+
+    cx_vector_destroy(&vector);
+
+    return cx_test_finish("vector.overflow");
+}
+
+static int test_allocation_failures(void) {
+    cx_allocator_failing failing = {
+        .fail_at = 1,
+        .fail_all_after = false,
+    };
+    cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
+    cx_vector *vector = nullptr;
+    int value = 7;
+
+    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK(vector == nullptr);
+
+    failing.attempts = 0;
+    failing.fail_at = 0;
+    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) == CX_OK);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(0, cx_vector_length(vector));
+    CX_CHECK_EQ(0, cx_vector_capacity(vector));
+
+    failing.fail_at = 0;
+    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value)) == CX_OK);
+    CX_CHECK_EQ(1, cx_vector_length(vector));
+    CX_CHECK(cx_vector_capacity(vector) >= 8);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_reserve(vector, 64) == CX_OUT_OF_MEMORY);
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_shrink_to_fit(vector) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_capacity(vector) >= 8);
+
+    /* Pushing or inserting an aliased element stages a detached copy. */
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_push_copy(vector, cx_vector_data_ptr(vector),
+                                 sizeof(value)) == CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(1, cx_vector_length(vector));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_insert_copy(vector, 0, cx_vector_data_ptr(vector),
+                                   sizeof(value)) == CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(1, cx_vector_length(vector));
+
+    /* Fill the initial capacity, then force a grow on insert and push. */
+    failing.fail_at = 0;
+
+    for (int i = 0; i < 7; ++i) {
+        CX_CHECK(cx_vector_push_value(vector, i) == CX_OK);
+    }
+
+    CX_CHECK_EQ(8, cx_vector_length(vector));
+
+    int remote = 9;
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_insert_copy(vector, 0, &remote, sizeof(remote)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(8, cx_vector_length(vector));
+
+    failing.fail_at = failing.attempts + 1;
+    CX_CHECK(cx_vector_push_copy(vector, &remote, sizeof(remote)) ==
+             CX_OUT_OF_MEMORY);
+    CX_CHECK_EQ(8, cx_vector_length(vector));
+
+    failing.fail_at = 0;
+    cx_vector_destroy(&vector);
+
+    return cx_test_finish("vector.failures");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -282,6 +439,45 @@ static int test_owning(void) {
     return cx_test_finish("vector.owning");
 }
 
+static const cx_vector_ops owned_ops_no_move = {
+    .copy = owned_copy,
+    .destroy = owned_destroy,
+};
+
+static int test_ops_without_move(void) {
+    cx_vector *vector = nullptr;
+
+    CX_CHECK(cx_vector_init_of(&vector, owned, &owned_ops_no_move, nullptr) ==
+             CX_OK);
+
+    for (int i = 0; i < 3; ++i) {
+        auto item = owned_make(i);
+
+        CX_CHECK(cx_vector_push(vector, &item) == CX_OK);
+        owned_release(&item);
+    }
+
+    CX_CHECK_EQ(3, owned_live);
+
+    auto extra = owned_make(9);
+
+    CX_CHECK(cx_vector_insert_copy(vector, 1, &extra, sizeof(extra)) == CX_OK);
+    owned_release(&extra);
+    CX_CHECK_EQ(4, owned_live);
+
+    /* Removing the last element takes the single-destroy path. */
+    CX_CHECK(cx_vector_swap_remove(vector, 3) == CX_OK);
+    CX_CHECK_EQ(3, owned_live);
+
+    CX_CHECK(cx_vector_remove(vector, 0) == CX_OK);
+    CX_CHECK_EQ(2, owned_live);
+
+    cx_vector_destroy(&vector);
+    CX_CHECK_EQ(0, owned_live);
+
+    return cx_test_finish("vector.ops_without_move");
+}
+
 static int test_counted_allocator(void) {
     cx_allocator_counted counted;
 
@@ -322,7 +518,11 @@ int main(void) {
 
     failures += test_pod();
     failures += test_errors();
+    failures += test_invalid_arguments();
+    failures += test_overflow();
+    failures += test_allocation_failures();
     failures += test_owning();
+    failures += test_ops_without_move();
     failures += test_counted_allocator();
 
     return failures == 0 ? 0 : 1;

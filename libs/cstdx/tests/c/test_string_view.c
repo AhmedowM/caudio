@@ -121,6 +121,38 @@ static int test_split(void) {
     return cx_test_finish("string_view.split");
 }
 
+static int test_edges(void) {
+    auto hello = cx_string_view_from_cstr("hello");
+    auto hell = cx_string_view_from_cstr("hell");
+    auto empty = cx_string_view_from_cstr("");
+    cx_string_view null_nonempty = {nullptr, 3};
+    cx_string_view null_one = {nullptr, 1};
+
+    /* Equality: mismatched lengths, and equal lengths with no data. */
+    CX_CHECK(!cx_string_view_eq(hello, hell));
+    CX_CHECK(!cx_string_view_eq(null_nonempty, null_nonempty));
+
+    /* A longer view sharing a prefix with a shorter one is greater. */
+    CX_CHECK_EQ(CX_STRING_GREATER, cx_string_view_compare(hello, hell));
+
+    /* starts_with: longer prefix, empty prefix, and missing data. */
+    CX_CHECK(!cx_string_view_starts_with(
+        hello, cx_string_view_from_cstr("hellos")));
+    CX_CHECK(cx_string_view_starts_with(hello, empty));
+    CX_CHECK(!cx_string_view_starts_with(hello, null_one));
+
+    /* ends_with: longer suffix, empty suffix, and missing data. */
+    CX_CHECK(!cx_string_view_ends_with(
+        hello, cx_string_view_from_cstr("ohello")));
+    CX_CHECK(cx_string_view_ends_with(hello, empty));
+    CX_CHECK(!cx_string_view_ends_with(hello, null_one));
+
+    /* A null split cursor is accepted and ignored. */
+    cx_string_view_split_init(nullptr, hello, empty);
+
+    return cx_test_finish("string_view.edges");
+}
+
 int main(void) {
     int failures = 0;
 
@@ -128,6 +160,7 @@ int main(void) {
     failures += test_sub();
     failures += test_compare_and_find();
     failures += test_split();
+    failures += test_edges();
 
     return failures == 0 ? 0 : 1;
 }
