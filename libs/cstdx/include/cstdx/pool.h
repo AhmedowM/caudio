@@ -20,11 +20,10 @@
  * Pools are not synchronized. Protect them externally if shared.
  */
 
-#include <stddef.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/api.h>
 #include <cstdx/status.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,8 +37,8 @@ typedef struct cx_pool_chunk cx_pool_chunk;
  * Implementation detail. Do not access these fields from application code.
  */
 struct cx_pool_chunk {
-    cx_pool_chunk *previous;
-    unsigned char *base;
+    cx_pool_chunk* previous;
+    unsigned char* base;
     size_t slots;
     bool owned;
 };
@@ -51,10 +50,10 @@ struct cx_pool_chunk {
  * structure is public so that callers can place it on the stack.
  */
 typedef struct cx_pool {
-    cx_pool_chunk *current;
+    cx_pool_chunk* current;
     cx_pool_chunk first;
-    void *free_list;
-    const cx_allocator *allocator;
+    void* free_list;
+    const cx_allocator* allocator;
     size_t slot_size;
     size_t slot_alignment;
     size_t chunk_slots;
@@ -76,10 +75,8 @@ typedef struct cx_pool {
  * @param allocator Backing allocator, or nullptr for the default allocator.
  * @return @ref CX_OK, @ref CX_INVALID_ARGUMENT, or @ref CX_OVERFLOW.
  */
-[[nodiscard]] CX_API cx_status cx_pool_init(cx_pool *pool, size_t slot_size,
-                                            size_t slot_alignment,
-                                            size_t chunk_slots,
-                                            const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_pool_init(cx_pool* pool, size_t slot_size, size_t slot_alignment,
+                                            size_t chunk_slots, const cx_allocator* allocator);
 
 /**
  * @brief Initialize a pool backed by a caller-provided buffer.
@@ -90,11 +87,8 @@ typedef struct cx_pool {
  *
  * @return @ref CX_OK, @ref CX_INVALID_ARGUMENT, or @ref CX_OVERFLOW.
  */
-[[nodiscard]] CX_API cx_status cx_pool_init_static(cx_pool *pool,
-                                                   void *buffer,
-                                                   size_t buffer_size,
-                                                   size_t slot_size,
-                                                   size_t slot_alignment);
+[[nodiscard]] CX_API cx_status cx_pool_init_static(cx_pool* pool, void* buffer, size_t buffer_size,
+                                                   size_t slot_size, size_t slot_alignment);
 
 /**
  * @brief Release every backing chunk owned by the pool.
@@ -102,7 +96,7 @@ typedef struct cx_pool {
  * A static backing buffer is not freed. The pool must not be used after this
  * call except to initialize it again.
  */
-CX_API void cx_pool_destroy(cx_pool *pool);
+CX_API void cx_pool_destroy(cx_pool* pool);
 
 /**
  * @brief Release every slot and start over.
@@ -110,14 +104,14 @@ CX_API void cx_pool_destroy(cx_pool *pool);
  * The first backing chunk is retained for reuse. Every outstanding slot
  * pointer is invalidated.
  */
-CX_API void cx_pool_reset(cx_pool *pool);
+CX_API void cx_pool_reset(cx_pool* pool);
 
 /**
  * @brief Take one free slot.
  *
  * @return The slot, or nullptr if the pool is exhausted and cannot grow.
  */
-[[nodiscard]] CX_API void *cx_pool_alloc(cx_pool *pool);
+[[nodiscard]] CX_API void* cx_pool_alloc(cx_pool* pool);
 
 /**
  * @brief Return a slot to the pool.
@@ -125,22 +119,22 @@ CX_API void cx_pool_reset(cx_pool *pool);
  * @p slot must have been produced by this pool and must currently be
  * allocated. @p slot nullptr is a no-op.
  */
-CX_API void cx_pool_free(cx_pool *pool, void *slot);
+CX_API void cx_pool_free(cx_pool* pool, void* slot);
 
 /**
  * @brief Number of slots currently handed out.
  */
-[[nodiscard]] CX_API size_t cx_pool_live(const cx_pool *pool);
+[[nodiscard]] CX_API size_t cx_pool_live(const cx_pool* pool);
 
 /**
  * @brief Number of slots across all backing chunks.
  */
-[[nodiscard]] CX_API size_t cx_pool_capacity(const cx_pool *pool);
+[[nodiscard]] CX_API size_t cx_pool_capacity(const cx_pool* pool);
 
 /**
  * @brief Rounded slot size actually used by the pool.
  */
-[[nodiscard]] CX_API size_t cx_pool_slot_size(const cx_pool *pool);
+[[nodiscard]] CX_API size_t cx_pool_slot_size(const cx_pool* pool);
 
 #ifdef __cplusplus
 } /* extern "C" */

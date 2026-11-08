@@ -1,48 +1,41 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/base64.h>
-
 #include <string.h>
 
 #include "cx_test.h"
 
-static bool encode_matches(const void *data, size_t length,
-                           const char *expected) {
-    cx_string *encoded = nullptr;
-    auto status =
-        cx_base64_encode(cx_slice_from_parts(data, length), &encoded, nullptr);
+static bool encode_matches(const void* data, size_t length, const char* expected) {
+    cx_string* encoded = nullptr;
+    auto status = cx_base64_encode(cx_slice_from_parts(data, length), &encoded, nullptr);
 
     if (status != CX_OK) {
         return false;
     }
 
-    bool matches =
-        cx_string_length(encoded) == strlen(expected) &&
-        strcmp(cx_string_cstr(encoded), expected) == 0;
+    bool matches = cx_string_length(encoded) == strlen(expected) &&
+                   strcmp(cx_string_cstr(encoded), expected) == 0;
 
     cx_string_destroy(&encoded);
     return matches;
 }
 
-static bool decode_matches(const char *text, const void *expected,
-                           size_t length) {
-    cx_bytes *decoded = nullptr;
+static bool decode_matches(const char* text, const void* expected, size_t length) {
+    cx_bytes* decoded = nullptr;
     auto status = cx_base64_decode_cstr(text, &decoded, nullptr);
 
     if (status != CX_OK) {
         return false;
     }
 
-    bool matches =
-        cx_bytes_length(decoded) == length &&
-        (length == 0 ||
-         memcmp(cx_bytes_data(decoded), expected, length) == 0);
+    bool matches = cx_bytes_length(decoded) == length &&
+                   (length == 0 || memcmp(cx_bytes_data(decoded), expected, length) == 0);
 
     cx_bytes_destroy(&decoded);
     return matches;
 }
 
-static bool decode_fails(const char *text) {
-    cx_bytes *decoded = nullptr;
+static bool decode_fails(const char* text) {
+    cx_bytes* decoded = nullptr;
     auto status = cx_base64_decode_cstr(text, &decoded, nullptr);
 
     if (status == CX_OK) {
@@ -99,16 +92,14 @@ static int test_invalid(void) {
     CX_CHECK(decode_fails("Zm9="));
     CX_CHECK(decode_fails("===="));
 
-    cx_bytes *decoded = nullptr;
+    cx_bytes* decoded = nullptr;
 
-    CX_CHECK(cx_base64_decode(cx_string_view_from_cstr("Zg=="), nullptr,
-                              nullptr) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_base64_decode(cx_string_view_from_cstr("Zg=="), &decoded,
-                              nullptr) == CX_OK);
+    CX_CHECK(cx_base64_decode(cx_string_view_from_cstr("Zg=="), nullptr, nullptr) ==
+             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_base64_decode(cx_string_view_from_cstr("Zg=="), &decoded, nullptr) == CX_OK);
     CX_CHECK(decoded != nullptr);
     cx_bytes_destroy(&decoded);
-    CX_CHECK(cx_base64_decode_cstr(nullptr, &decoded, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_base64_decode_cstr(nullptr, &decoded, nullptr) == CX_INVALID_ARGUMENT);
 
     return cx_test_finish("base64.invalid");
 }
@@ -138,15 +129,14 @@ static int test_counted_allocator(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_string *encoded = nullptr;
-    cx_bytes *decoded = nullptr;
+    cx_string* encoded = nullptr;
+    cx_bytes* decoded = nullptr;
 
-    CX_CHECK(cx_base64_encode(cx_slice_from_parts("hello world", 11), &encoded,
-                              &allocator) == CX_OK);
+    CX_CHECK(cx_base64_encode(cx_slice_from_parts("hello world", 11), &encoded, &allocator) ==
+             CX_OK);
     CX_CHECK(cx_string_equals_cstr(encoded, "aGVsbG8gd29ybGQ="));
 
-    CX_CHECK(cx_base64_decode(cx_string_view_of(encoded), &decoded,
-                              &allocator) == CX_OK);
+    CX_CHECK(cx_base64_decode(cx_string_view_of(encoded), &decoded, &allocator) == CX_OK);
     CX_CHECK_EQ(11, cx_bytes_length(decoded));
     CX_CHECK(memcmp(cx_bytes_data(decoded), "hello world", 11) == 0);
 

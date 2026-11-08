@@ -11,21 +11,20 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 #include <stdint.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #if !defined(__CYGWIN__)
-        #include <afunix.h>
-    #endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#if !defined(__CYGWIN__)
+#include <afunix.h>
+#endif
 #else
-    #include <sys/socket.h>
-    #include <sys/un.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #endif
 
 #ifdef __cplusplus
@@ -52,7 +51,7 @@ typedef enum ca_socket_type {
 /**
  * @brief Opaque socket handle.
  */
-typedef struct ca_socket *ca_socket_t;
+typedef struct ca_socket* ca_socket_t;
 
 /**
  * @brief Socket address.
@@ -75,11 +74,10 @@ typedef struct ca_socket_addr {
  * @param err     Optional error record.
  * @return New socket handle, or CA_SOCKET_INVALID on failure.
  */
-CAUDIO_API ca_socket_t ca_socket_create(ca_socket_domain domain,
-                                        ca_socket_type type,
-                                        ca_error *err);
+CAUDIO_API ca_socket_t ca_socket_create(ca_socket_domain domain, ca_socket_type type,
+                                        ca_error* err);
 
-#define CA_SOCKET_INVALID ((ca_socket_t)nullptr)
+#define CA_SOCKET_INVALID ((ca_socket_t) nullptr)
 
 /**
  * @brief Fill @p out with the address of a UNIX-domain socket at @p path.
@@ -91,8 +89,7 @@ CAUDIO_API ca_socket_t ca_socket_create(ca_socket_domain domain,
  * @return CA_OK on success, CA_INVALID_ARGUMENT for a nullptr or empty path, or
  *         CA_OVERFLOW if the path does not fit in `sun_path`.
  */
-CAUDIO_API ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
-                                       ca_error *err);
+CAUDIO_API ca_status ca_socket_addr_un(ca_socket_addr_t* out, const char* path, ca_error* err);
 
 /**
  * @brief Bind @p sock to @p addr.
@@ -100,17 +97,14 @@ CAUDIO_API ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
  * @return CA_OK on success, CA_ALREADY_EXISTS if the address is in use, or
  *         another ca_status.
  */
-CAUDIO_API ca_status ca_socket_bind(ca_socket_t sock,
-                                    const ca_socket_addr_t *addr,
-                                    ca_error *err);
+CAUDIO_API ca_status ca_socket_bind(ca_socket_t sock, const ca_socket_addr_t* addr, ca_error* err);
 
 /**
  * @brief Listen for incoming connections on @p sock.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_socket_listen(ca_socket_t sock, int backlog,
-                                      ca_error *err);
+CAUDIO_API ca_status ca_socket_listen(ca_socket_t sock, int backlog, ca_error* err);
 
 /**
  * @brief Connect @p sock to @p addr.
@@ -122,9 +116,8 @@ CAUDIO_API ca_status ca_socket_listen(ca_socket_t sock, int backlog,
  * @return CA_OK on success, CA_BUSY if the connection is not ready yet, or
  *         another ca_status.
  */
-CAUDIO_API ca_status ca_socket_connect(ca_socket_t sock,
-                                       const ca_socket_addr_t *addr,
-                                       ca_error *err);
+CAUDIO_API ca_status ca_socket_connect(ca_socket_t sock, const ca_socket_addr_t* addr,
+                                       ca_error* err);
 
 /**
  * @brief Accept an incoming connection.
@@ -132,17 +125,16 @@ CAUDIO_API ca_status ca_socket_connect(ca_socket_t sock,
  * @param out_addr Receives the peer address, or nullptr if not wanted.
  * @return New connected socket handle, or CA_SOCKET_INVALID on failure.
  */
-CAUDIO_API ca_socket_t ca_socket_accept(ca_socket_t sock,
-                                        ca_socket_addr_t *out_addr,
-                                        ca_error *err);
+CAUDIO_API ca_socket_t ca_socket_accept(ca_socket_t sock, ca_socket_addr_t* out_addr,
+                                        ca_error* err);
 
 /**
  * @brief Send @p len bytes from @p buf on @p sock.
  *
  * @return Bytes sent, or (size_t)-1 on error with @p err set.
  */
-CAUDIO_API size_t ca_socket_send(ca_socket_t sock, const void *buf,
-                                 size_t len, int flags, ca_error *err);
+CAUDIO_API size_t ca_socket_send(ca_socket_t sock, const void* buf, size_t len, int flags,
+                                 ca_error* err);
 
 /**
  * @brief Receive up to @p len bytes into @p buf from @p sock.
@@ -150,8 +142,7 @@ CAUDIO_API size_t ca_socket_send(ca_socket_t sock, const void *buf,
  * @return Bytes received (0 on EOF/connection closed), or (size_t)-1 on
  *         error with @p err set.
  */
-CAUDIO_API size_t ca_socket_recv(ca_socket_t sock, void *buf, size_t len,
-                                 int flags, ca_error *err);
+CAUDIO_API size_t ca_socket_recv(ca_socket_t sock, void* buf, size_t len, int flags, ca_error* err);
 
 /**
  * @brief Close @p sock. Safe to call on CA_SOCKET_INVALID (no-op).
@@ -163,8 +154,7 @@ CAUDIO_API void ca_socket_close(ca_socket_t sock);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_socket_setblocking(ca_socket_t sock, int blocking,
-                                           ca_error *err);
+CAUDIO_API ca_status ca_socket_setblocking(ca_socket_t sock, int blocking, ca_error* err);
 
 /**
  * @brief Wait until @p sock is readable or @p timeout_ms elapses.
@@ -173,8 +163,7 @@ CAUDIO_API ca_status ca_socket_setblocking(ca_socket_t sock, int blocking,
  *                   bounded wait in milliseconds.
  * @return CA_OK if readable, CA_TIMED_OUT on timeout, or another ca_status.
  */
-CAUDIO_API ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms,
-                                             ca_error *err);
+CAUDIO_API ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms, ca_error* err);
 
 #ifdef __cplusplus
 }

@@ -1,23 +1,21 @@
 ﻿#include <caudio/runtime/fs.h>
-
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <stdarg.h>
-#include <stdlib.h>
-
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
-    #include <io.h>
-    #include <sys/stat.h>
-    #include <dirent.h>
+#include <dirent.h>
+#include <io.h>
+#include <sys/stat.h>
+#include <windows.h>
 #else
-    #include <dirent.h>
-    #include <unistd.h>
-    #include <sys/stat.h>
-    #include <sys/types.h>
-    #include <errno.h>
-    #include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #endif
 
 struct ca_file {
@@ -30,9 +28,8 @@ struct ca_file {
 };
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
-static const char *fs_open_mode(uint32_t flags, char *mode_buf,
-                                size_t mode_buf_size) {
-    const char *mode = nullptr;
+static const char* fs_open_mode(uint32_t flags, char* mode_buf, size_t mode_buf_size) {
+    const char* mode = nullptr;
 
     bool read = (flags & CA_FS_READ) != 0;
     bool write = (flags & CA_FS_WRITE) != 0;
@@ -66,7 +63,7 @@ static const char *fs_open_mode(uint32_t flags, char *mode_buf,
 }
 #endif
 
-ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
+ca_file_t ca_fs_open(const char* path, uint32_t flags, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -130,8 +127,8 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
         flagsAndAttributes = FILE_FLAG_SEQUENTIAL_SCAN;
     }
 
-    HANDLE h = CreateFileW(wpath, dwDesiredAccess, dwShareMode, nullptr,
-                           dwCreationDisposition, flagsAndAttributes, nullptr);
+    HANDLE h = CreateFileW(wpath, dwDesiredAccess, dwShareMode, nullptr, dwCreationDisposition,
+                           flagsAndAttributes, nullptr);
     free(wpath);
 
     if (h == INVALID_HANDLE_VALUE) {
@@ -155,7 +152,7 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
     return file;
 #else
     char mode_buf[8] = {0};
-    const char *mode = fs_open_mode(flags, mode_buf, sizeof(mode_buf));
+    const char* mode = fs_open_mode(flags, mode_buf, sizeof(mode_buf));
     if (mode == nullptr) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT, "invalid open flags");
@@ -163,11 +160,10 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
         return CA_FS_INVALID;
     }
 
-    FILE *fp = fopen(path, mode);
+    FILE* fp = fopen(path, mode);
     if (fp == nullptr) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "fopen failed for %s: %s", path,
-                         strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "fopen failed for %s: %s", path, strerror(errno));
         }
         return CA_FS_INVALID;
     }
@@ -190,15 +186,14 @@ ca_file_t ca_fs_open(const char *path, uint32_t flags, ca_error *err) {
 #endif
 }
 
-size_t ca_fs_read(ca_file_t file, void *buf, size_t size, ca_error *err) {
+size_t ca_fs_read(ca_file_t file, void* buf, size_t size, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (file == CA_FS_INVALID || buf == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid file or buffer");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid file or buffer");
         }
         return (size_t)-1;
     }
@@ -224,16 +219,14 @@ size_t ca_fs_read(ca_file_t file, void *buf, size_t size, ca_error *err) {
 #endif
 }
 
-size_t ca_fs_write(ca_file_t file, const void *buf, size_t size,
-                   ca_error *err) {
+size_t ca_fs_write(ca_file_t file, const void* buf, size_t size, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (file == CA_FS_INVALID || buf == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid file or buffer");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid file or buffer");
         }
         return (size_t)-1;
     }
@@ -277,7 +270,7 @@ void ca_fs_close(ca_file_t file) {
     free(file);
 }
 
-uint64_t ca_fs_size(ca_file_t file, ca_error *err) {
+uint64_t ca_fs_size(ca_file_t file, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -302,8 +295,7 @@ uint64_t ca_fs_size(ca_file_t file, ca_error *err) {
     off_t off = lseek(file->fd, 0, SEEK_END);
     if (off < 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "lseek failed: %s",
-                         strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "lseek failed: %s", strerror(errno));
         }
         return (uint64_t)-1;
     }
@@ -311,7 +303,7 @@ uint64_t ca_fs_size(ca_file_t file, ca_error *err) {
 #endif
 }
 
-bool ca_fs_exists(const char *path, ca_error *err) {
+bool ca_fs_exists(const char* path, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -350,7 +342,7 @@ bool ca_fs_exists(const char *path, ca_error *err) {
 #endif
 }
 
-ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
+ca_status ca_fs_mkdirs(const char* path, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -364,7 +356,7 @@ ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
 
     /* Build the path component by component. */
     size_t len = strlen(path);
-    char *buf = (char *)malloc(len + 1);
+    char* buf = (char*)malloc(len + 1);
     if (buf == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
@@ -433,8 +425,7 @@ ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
             if (errCode != ERROR_ALREADY_EXISTS) {
                 status = CA_IO_ERROR;
                 if (err) {
-                    ca_error_set(err, CA_IO_ERROR,
-                                 "CreateDirectoryW failed for %s", buf);
+                    ca_error_set(err, CA_IO_ERROR, "CreateDirectoryW failed for %s", buf);
                 }
                 free(wbuf);
                 break;
@@ -446,9 +437,7 @@ ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
             if (errno != EEXIST) {
                 status = CA_IO_ERROR;
                 if (err) {
-                    ca_error_set(err, CA_IO_ERROR,
-                                 "mkdir failed for %s: %s", buf,
-                                 strerror(errno));
+                    ca_error_set(err, CA_IO_ERROR, "mkdir failed for %s: %s", buf, strerror(errno));
                 }
                 break;
             }
@@ -469,25 +458,23 @@ ca_status ca_fs_mkdirs(const char *path, ca_error *err) {
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 /* Remove all entries inside a directory (not the directory itself).
  * Used as a fallback when rmdir fails with ENOTEMPTY. */
-static ca_status remove_dir_contents(const char *path, ca_error *err) {
-    DIR *dir = opendir(path);
+static ca_status remove_dir_contents(const char* path, ca_error* err) {
+    DIR* dir = opendir(path);
     if (!dir) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "opendir failed for %s: %s",
-                         path, strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "opendir failed for %s: %s", path, strerror(errno));
         }
         return CA_IO_ERROR;
     }
 
-    struct dirent *entry;
+    struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
-        if (strcmp(entry->d_name, ".") == 0 ||
-            strcmp(entry->d_name, "..") == 0) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
         size_t child_len = strlen(path) + 1 + strlen(entry->d_name) + 1;
-        char *child = (char *)malloc(child_len);
+        char* child = (char*)malloc(child_len);
         if (!child) {
             closedir(dir);
             if (err) {
@@ -510,16 +497,16 @@ static ca_status remove_dir_contents(const char *path, ca_error *err) {
             if (status == CA_OK && rmdir(child) != 0) {
                 status = CA_IO_ERROR;
                 if (err) {
-                    ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s",
-                                 child, strerror(errno));
+                    ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s", child,
+                                 strerror(errno));
                 }
             }
         } else {
             if (unlink(child) != 0) {
                 status = CA_IO_ERROR;
                 if (err) {
-                    ca_error_set(err, CA_IO_ERROR, "unlink failed for %s: %s",
-                                 child, strerror(errno));
+                    ca_error_set(err, CA_IO_ERROR, "unlink failed for %s: %s", child,
+                                 strerror(errno));
                 }
             }
         }
@@ -536,7 +523,7 @@ static ca_status remove_dir_contents(const char *path, ca_error *err) {
 }
 #endif
 
-ca_status ca_fs_remove(const char *path, ca_error *err) {
+ca_status ca_fs_remove(const char* path, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -599,8 +586,7 @@ ca_status ca_fs_remove(const char *path, ca_error *err) {
 
     if (rmdir(path) != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s",
-                         path, strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "rmdir failed for %s: %s", path, strerror(errno));
         }
         return CA_IO_ERROR;
     }

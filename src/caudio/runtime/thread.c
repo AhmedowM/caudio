@@ -1,12 +1,12 @@
 ﻿#include <caudio/runtime/thread.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
-    #include <process.h>
+#include <process.h>
+#include <windows.h>
 #else
-    #include <pthread.h>
-    #include <sched.h>
-    #include <errno.h>
+#include <errno.h>
+#include <pthread.h>
+#include <sched.h>
 #endif
 
 #include <stdlib.h>
@@ -14,34 +14,32 @@
 struct ca_thread {
 #if defined(_WIN32) || defined(__CYGWIN__)
     HANDLE handle;
-    DWORD  id;
+    DWORD id;
 #else
     pthread_t handle;
 #endif
     ca_thread_fn fn;
-    void        *arg;
-    void        *ret;
-    int          started;
+    void* arg;
+    void* ret;
+    int started;
 };
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 static DWORD WINAPI thread_proc(LPVOID param) {
-    struct ca_thread *t = (struct ca_thread *)param;
+    struct ca_thread* t = (struct ca_thread*)param;
     t->ret = t->fn(t->arg);
     return 0;
 }
 #endif
 
-ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn, void *arg,
-                           ca_error *err) {
+ca_status ca_thread_create(ca_thread_t* out, ca_thread_fn fn, void* arg, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (out == nullptr || fn == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out or fn is nullptr");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out or fn is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -82,7 +80,7 @@ ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn, void *arg,
     return CA_OK;
 }
 
-ca_status ca_thread_join(ca_thread_t thread, void **out_ret, ca_error *err) {
+ca_status ca_thread_join(ca_thread_t thread, void** out_ret, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -108,7 +106,7 @@ ca_status ca_thread_join(ca_thread_t thread, void **out_ret, ca_error *err) {
 
     CloseHandle(thread->handle);
 #else
-    void *ret = nullptr;
+    void* ret = nullptr;
     int rc = pthread_join(thread->handle, &ret);
     if (rc != 0) {
         if (err) {
@@ -126,7 +124,7 @@ ca_status ca_thread_join(ca_thread_t thread, void **out_ret, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_thread_detach(ca_thread_t thread, ca_error *err) {
+ca_status ca_thread_detach(ca_thread_t thread, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

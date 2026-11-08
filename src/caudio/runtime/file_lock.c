@@ -1,17 +1,16 @@
 ﻿#include <caudio/runtime/file_lock.h>
-
 #include <stdlib.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <fcntl.h>
-    #include <unistd.h>
-    #include <errno.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #endif
 
-ca_status ca_file_lock(void *fd, ca_file_lock_type type, int64_t offset,
-                       int64_t length, int block, ca_error *err) {
+ca_status ca_file_lock(void* fd, ca_file_lock_type type, int64_t offset, int64_t length, int block,
+                       ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -31,9 +30,7 @@ ca_status ca_file_lock(void *fd, ca_file_lock_type type, int64_t offset,
     /* Always use fail-immediately for simplicity and cross-platform
        consistency. A blocking lock can be implemented by retrying. */
     DWORD dwFlags = LOCKFILE_FAIL_IMMEDIATELY;
-    DWORD dwType = (type == CA_FILE_LOCK_WRITE)
-                       ? LOCKFILE_EXCLUSIVE_LOCK
-                       : 0; /* shared */
+    DWORD dwType = (type == CA_FILE_LOCK_WRITE) ? LOCKFILE_EXCLUSIVE_LOCK : 0; /* shared */
 
     /* LockFileEx with a synchronous handle can be problematic on some
        MinGW-w64 toolchains. Use LockFile for blocking locks instead. */
@@ -101,8 +98,7 @@ ca_status ca_file_lock(void *fd, ca_file_lock_type type, int64_t offset,
     return CA_OK;
 }
 
-ca_status ca_file_unlock(void *fd, int64_t offset, int64_t length,
-                         ca_error *err) {
+ca_status ca_file_unlock(void* fd, int64_t offset, int64_t length, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

@@ -13,13 +13,11 @@
  */
 
 #include <caudio/api.h>
-#include <caudio/runtime/error.h>
 #include <caudio/config/paths.h>
-
+#include <caudio/runtime/error.h>
 #include <cstdx/allocator.h>
 #include <cstdx/string.h>
 #include <cstdx/vector.h>
-
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -32,30 +30,29 @@ extern "C" {
  * Maps 1:1 to the `Config` value in the C++ implementation.
  */
 typedef struct ca_config {
-    cx_string *db_path;        /**< SQLite database path. */
-    cx_string *config_path;    /**< Config file path. */
-    cx_string *device;         /**< Audio device id; "auto" for default. */
+    cx_string* db_path;        /**< SQLite database path. */
+    cx_string* config_path;    /**< Config file path. */
+    cx_string* device;         /**< Audio device id; "auto" for default. */
     int32_t log_level;         /**< 0=trace, 1=debug, 2=info, 3=warn, 4=error. */
-    cx_string *socket_path;    /**< Optional explicit socket path. */
+    cx_string* socket_path;    /**< Optional explicit socket path. */
     bool auto_resume_on_play;  /**< Resume persisted track/position on play. */
     bool clear_stops_playback; /**< Clearing the queue also stops playback. */
-    cx_string *repeat_default; /**< "off", "one", or "all". */
+    cx_string* repeat_default; /**< "off", "one", or "all". */
     bool autostart;            /**< Auto-start when adding to an empty queue. */
 } ca_config;
 
 /** @brief Initialize @p config with canonical defaults. */
-CAUDIO_API ca_status ca_config_init(ca_config *config,
-                                    const cx_allocator *alloc);
+CAUDIO_API ca_status ca_config_init(ca_config* config, const cx_allocator* alloc);
 
 /** @brief Deep-copy @p src into @p dst. */
-CAUDIO_API ca_status ca_config_copy(ca_config *dst, const ca_config *src,
-                                    const cx_allocator *alloc);
+CAUDIO_API ca_status ca_config_copy(ca_config* dst, const ca_config* src,
+                                    const cx_allocator* alloc);
 
 /** @brief Move-assign @p src into @p dst, destroying @p dst first. */
-CAUDIO_API void ca_config_move(ca_config *dst, ca_config *src);
+CAUDIO_API void ca_config_move(ca_config* dst, ca_config* src);
 
 /** @brief Release owned strings and zero the record. */
-CAUDIO_API void ca_config_destroy(ca_config *config);
+CAUDIO_API void ca_config_destroy(ca_config* config);
 
 /**
  * @brief Load configuration from @p path, merging over defaults.
@@ -70,8 +67,8 @@ CAUDIO_API void ca_config_destroy(ca_config *config);
  *         for malformed JSON, CA_INVALID_ARGUMENT when the root is not an
  *         object, or an I/O status.
  */
-CAUDIO_API ca_status ca_config_load(ca_config *out, const char *path,
-                                    const cx_allocator *alloc, ca_error *err);
+CAUDIO_API ca_status ca_config_load(ca_config* out, const char* path, const cx_allocator* alloc,
+                                    ca_error* err);
 
 /**
  * @brief Save @p config to its `config_path`.
@@ -81,8 +78,8 @@ CAUDIO_API ca_status ca_config_load(ca_config *out, const char *path,
  * `dbPath`, `device`, `logLevel`, `autoResumeOnPlay`, `clearStopsPlayback`,
  * `repeatDefault`, `autostart`, then `socketPath`.
  */
-CAUDIO_API ca_status ca_config_save(const ca_config *config,
-                                    const cx_allocator *alloc, ca_error *err);
+CAUDIO_API ca_status ca_config_save(const ca_config* config, const cx_allocator* alloc,
+                                    ca_error* err);
 
 /**
  * @brief One raw key/value pair.
@@ -91,21 +88,19 @@ CAUDIO_API ca_status ca_config_save(const ca_config *config,
  * and every other value as compact JSON.
  */
 typedef struct ca_config_entry {
-    cx_string *key;
-    cx_string *value;
+    cx_string* key;
+    cx_string* value;
 } ca_config_entry;
 
 /** @brief Initialize an empty entry. */
-CAUDIO_API ca_status ca_config_entry_init(ca_config_entry *entry,
-                                          const cx_allocator *alloc);
+CAUDIO_API ca_status ca_config_entry_init(ca_config_entry* entry, const cx_allocator* alloc);
 
 /** @brief Deep-copy an entry. */
-CAUDIO_API ca_status ca_config_entry_copy(ca_config_entry *dst,
-                                          const ca_config_entry *src,
-                                          const cx_allocator *alloc);
+CAUDIO_API ca_status ca_config_entry_copy(ca_config_entry* dst, const ca_config_entry* src,
+                                          const cx_allocator* alloc);
 
 /** @brief Release an entry's strings and zero it. */
-CAUDIO_API void ca_config_entry_destroy(ca_config_entry *entry);
+CAUDIO_API void ca_config_entry_destroy(ca_config_entry* entry);
 
 /**
  * @brief Destroy a vector returned by ca_config_list_raw().
@@ -113,7 +108,7 @@ CAUDIO_API void ca_config_entry_destroy(ca_config_entry *entry);
  * Destroys every entry's strings, then the vector itself and sets @p out to
  * nullptr. Safe on nullptr.
  */
-CAUDIO_API void ca_config_entries_destroy(cx_vector **out);
+CAUDIO_API void ca_config_entries_destroy(cx_vector** out);
 
 /**
  * @brief Read a raw value by key.
@@ -122,10 +117,8 @@ CAUDIO_API void ca_config_entries_destroy(cx_vector **out);
  *         when the root is not an object, CA_JSON_ERROR for malformed JSON, or
  *         an I/O status.
  */
-CAUDIO_API ca_status ca_config_get_raw(const char *path, const char *key,
-                                       cx_string **out,
-                                       const cx_allocator *alloc,
-                                       ca_error *err);
+CAUDIO_API ca_status ca_config_get_raw(const char* path, const char* key, cx_string** out,
+                                       const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Set a raw value by key, writing the canonical pretty JSON file.
@@ -134,10 +127,8 @@ CAUDIO_API ca_status ca_config_get_raw(const char *path, const char *key,
  * a JSON string. An empty @p value is stored as an empty string. A missing or
  * corrupt file is replaced by an object containing just this key.
  */
-CAUDIO_API ca_status ca_config_set_raw(const char *path, const char *key,
-                                       const char *value,
-                                       const cx_allocator *alloc,
-                                       ca_error *err);
+CAUDIO_API ca_status ca_config_set_raw(const char* path, const char* key, const char* value,
+                                       const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief List all raw pairs in document order, skipping empty and "type" keys.
@@ -145,9 +136,8 @@ CAUDIO_API ca_status ca_config_set_raw(const char *path, const char *key,
  * A missing or empty file yields an empty vector. An unreadable or malformed
  * file is an error.
  */
-CAUDIO_API ca_status ca_config_list_raw(const char *path, cx_vector **out,
-                                        const cx_allocator *alloc,
-                                        ca_error *err);
+CAUDIO_API ca_status ca_config_list_raw(const char* path, cx_vector** out,
+                                        const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Delete a raw key.
@@ -155,16 +145,15 @@ CAUDIO_API ca_status ca_config_list_raw(const char *path, cx_vector **out,
  * @return CA_OK, CA_INVALID_ARGUMENT for an empty key or non-object root,
  *         CA_NOT_FOUND when the file or key is absent, or an I/O status.
  */
-CAUDIO_API ca_status ca_config_delete_raw(const char *path, const char *key,
-                                          const cx_allocator *alloc,
-                                          ca_error *err);
+CAUDIO_API ca_status ca_config_delete_raw(const char* path, const char* key,
+                                          const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Remove the configuration file entirely.
  *
  * A missing file is a successful no-op.
  */
-CAUDIO_API ca_status ca_config_reset_all_raw(const char *path, ca_error *err);
+CAUDIO_API ca_status ca_config_reset_all_raw(const char* path, ca_error* err);
 
 #ifdef __cplusplus
 }

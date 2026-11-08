@@ -1,5 +1,4 @@
 #include <cstdx/checked.h>
-
 #include <stdint.h>
 
 #include "cx_test.h"

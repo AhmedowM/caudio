@@ -1,16 +1,15 @@
 ﻿#include <caudio/runtime/shm.h>
-
 #include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <fcntl.h>
-    #include <sys/mman.h>
-    #include <sys/stat.h>
-    #include <unistd.h>
-    #include <errno.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 struct ca_shm {
@@ -20,11 +19,10 @@ struct ca_shm {
     int fd;
 #endif
     size_t size;
-    int    created;
+    int created;
 };
 
-ca_shm_t ca_shm_open(const char *name, size_t size, int create,
-                     ca_error *err) {
+ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -38,8 +36,7 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
 
 #if defined(__ANDROID__)
     if (err) {
-        ca_error_set(err, CA_NOT_SUPPORTED,
-                     "shared memory unsupported on Android");
+        ca_error_set(err, CA_NOT_SUPPORTED, "shared memory unsupported on Android");
     }
     (void)name;
     (void)size;
@@ -57,8 +54,8 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     DWORD flProtect = PAGE_READWRITE;
     (void)create;
 
-    shm->handle = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr,
-                                     flProtect, 0, (DWORD)size, nullptr);
+    shm->handle =
+        CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, flProtect, 0, (DWORD)size, nullptr);
     if (shm->handle == nullptr) {
         free(shm);
         if (err) {
@@ -89,10 +86,10 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     }
 
     /* POSIX shm names must start with "/". */
-    const char *shm_name = name;
+    const char* shm_name = name;
     if (name[0] != '/') {
         /* Build "/name". */
-        char *full = (char *)malloc(strlen(name) + 2);
+        char* full = (char*)malloc(strlen(name) + 2);
         if (full == nullptr) {
             free(shm);
             if (err) {
@@ -108,7 +105,7 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
     shm->fd = shm_open(shm_name, flags, mode);
 
     if (name[0] != '/') {
-        free((void *)shm_name);
+        free((void*)shm_name);
     }
 
     if (shm->fd < 0) {
@@ -143,8 +140,7 @@ ca_shm_t ca_shm_open(const char *name, size_t size, int create,
 #endif
 }
 
-ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
-                     void **out, ca_error *err) {
+ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length, void** out, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -158,8 +154,7 @@ ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
 
 #if defined(__ANDROID__)
     if (err) {
-        ca_error_set(err, CA_NOT_SUPPORTED,
-                     "shared memory unsupported on Android");
+        ca_error_set(err, CA_NOT_SUPPORTED, "shared memory unsupported on Android");
     }
     (void)shm;
     (void)offset;
@@ -168,8 +163,7 @@ ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
     return CA_NOT_SUPPORTED;
 #elif defined(_WIN32) || defined(__CYGWIN__)
     DWORD dwDesired = FILE_MAP_READ | FILE_MAP_WRITE;
-    void *addr = MapViewOfFile(shm->handle, dwDesired, 0,
-                               (DWORD)offset, length);
+    void* addr = MapViewOfFile(shm->handle, dwDesired, 0, (DWORD)offset, length);
     if (addr == nullptr) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "MapViewOfFile failed");
@@ -185,8 +179,7 @@ ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
         length = shm->size - offset;
     }
 
-    void *addr = mmap(nullptr, length, prot, flags, shm->fd,
-                      (off_t)offset);
+    void* addr = mmap(nullptr, length, prot, flags, shm->fd, (off_t)offset);
     if (addr == MAP_FAILED) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "mmap failed: %d", errno);
@@ -199,7 +192,7 @@ ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
     return CA_OK;
 }
 
-ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
+ca_status ca_shm_unmap(void* addr, size_t length, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -215,8 +208,7 @@ ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
 
 #if defined(__ANDROID__)
     if (err) {
-        ca_error_set(err, CA_NOT_SUPPORTED,
-                     "shared memory unsupported on Android");
+        ca_error_set(err, CA_NOT_SUPPORTED, "shared memory unsupported on Android");
     }
     (void)addr;
     (void)length;
@@ -244,7 +236,7 @@ ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_shm_close(ca_shm_t shm, ca_error *err) {
+ca_status ca_shm_close(ca_shm_t shm, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -272,7 +264,7 @@ ca_status ca_shm_close(ca_shm_t shm, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_shm_unlink(const char *name, ca_error *err) {
+ca_status ca_shm_unlink(const char* name, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -286,8 +278,7 @@ ca_status ca_shm_unlink(const char *name, ca_error *err) {
 
 #if defined(__ANDROID__)
     if (err) {
-        ca_error_set(err, CA_NOT_SUPPORTED,
-                     "shared memory unsupported on Android");
+        ca_error_set(err, CA_NOT_SUPPORTED, "shared memory unsupported on Android");
     }
     (void)name;
     return CA_NOT_SUPPORTED;
@@ -297,10 +288,10 @@ ca_status ca_shm_unlink(const char *name, ca_error *err) {
     (void)name;
 #else
     /* Build "/name" if needed. */
-    const char *shm_name = name;
-    char *full = nullptr;
+    const char* shm_name = name;
+    char* full = nullptr;
     if (name[0] != '/') {
-        full = (char *)malloc(strlen(name) + 2);
+        full = (char*)malloc(strlen(name) + 2);
         if (full == nullptr) {
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate name");

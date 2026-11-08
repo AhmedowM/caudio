@@ -11,7 +11,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -21,13 +20,13 @@ extern "C" {
 /**
  * @brief Opaque TLS key handle.
  */
-typedef struct ca_tls_key *ca_tls_key_t;
+typedef struct ca_tls_key* ca_tls_key_t;
 
 /**
  * @brief TLS destructor signature. Called with the thread's value when the
  *        thread exits (if non-nullptr).
  */
-typedef void (*ca_tls_destructor)(void *value);
+typedef void (*ca_tls_destructor)(void* value);
 
 /**
  * @brief Create a TLS key. @p destructor, if non-nullptr, is called with the
@@ -38,8 +37,7 @@ typedef void (*ca_tls_destructor)(void *value);
  * @param err   Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_tls_key_create(ca_tls_key_t *out,
-                                       ca_tls_destructor dest, ca_error *err);
+CAUDIO_API ca_status ca_tls_key_create(ca_tls_key_t* out, ca_tls_destructor dest, ca_error* err);
 
 /**
  * @brief Destroy a TLS key. Does not invoke destructors for existing values.
@@ -53,8 +51,7 @@ CAUDIO_API void ca_tls_key_destroy(ca_tls_key_t key);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_tls_set(ca_tls_key_t key, void *value,
-                                ca_error *err);
+CAUDIO_API ca_status ca_tls_set(ca_tls_key_t key, void* value, ca_error* err);
 
 /**
  * @brief Get the value bound to @p key for the calling thread, or nullptr if none
@@ -62,7 +59,7 @@ CAUDIO_API ca_status ca_tls_set(ca_tls_key_t key, void *value,
  *
  * @return Thread-local value, or nullptr.
  */
-CAUDIO_API void *ca_tls_get(ca_tls_key_t key, ca_error *err);
+CAUDIO_API void* ca_tls_get(ca_tls_key_t key, ca_error* err);
 
 #ifdef __cplusplus
 }

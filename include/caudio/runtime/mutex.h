@@ -19,7 +19,7 @@ extern "C" {
 /**
  * @brief Opaque mutex handle.
  */
-typedef struct ca_mutex *ca_mutex_t;
+typedef struct ca_mutex* ca_mutex_t;
 
 /**
  * @brief Create a mutex.
@@ -28,7 +28,7 @@ typedef struct ca_mutex *ca_mutex_t;
  * @param err Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_mutex_create(ca_mutex_t *out, ca_error *err);
+CAUDIO_API ca_status ca_mutex_create(ca_mutex_t* out, ca_error* err);
 
 /**
  * @brief Destroy a mutex. Must not be locked or in use by another thread.
@@ -42,21 +42,21 @@ CAUDIO_API void ca_mutex_destroy(ca_mutex_t mutex);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error *err);
+CAUDIO_API ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error* err);
 
 /**
  * @brief Try to lock @p mutex without blocking.
  *
  * @return CA_OK if acquired, CA_BUSY if already held by another thread.
  */
-CAUDIO_API ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error *err);
+CAUDIO_API ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error* err);
 
 /**
  * @brief Unlock @p mutex. Must be held by the calling thread.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err);
+CAUDIO_API ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error* err);
 
 /**
  * @brief Return the native synchronization primitive handle.
@@ -67,7 +67,7 @@ CAUDIO_API ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err);
  * Intended for use by condition-variable wait primitives in this library.
  * Not part of the stable public ABI; may change between minor versions.
  */
-CAUDIO_API void *ca_mutex_native_handle(ca_mutex_t mutex);
+CAUDIO_API void* ca_mutex_native_handle(ca_mutex_t mutex);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,5 @@
 ﻿#include <caudio/runtime/path.h>
-
 #include <cstdx/allocator.h>
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -12,9 +10,9 @@
 #include <windows.h>
 #endif
 
-static const char *find_last_separator(const char *path) {
-    const char *last = nullptr;
-    for (const char *p = path; *p != '\0'; ++p) {
+static const char* find_last_separator(const char* path) {
+    const char* last = nullptr;
+    for (const char* p = path; *p != '\0'; ++p) {
         if (*p == '/' || *p == '\\') {
             last = p;
         }
@@ -22,14 +20,13 @@ static const char *find_last_separator(const char *path) {
     return last;
 }
 
-size_t ca_path_join(const char *base, const char *child, char *out,
-                    size_t out_size, ca_error *err) {
+size_t ca_path_join(const char* base, const char* child, char* out, size_t out_size,
+                    ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
-    if (base == nullptr || child == nullptr || out == nullptr ||
-        out_size == 0) {
+    if (base == nullptr || child == nullptr || out == nullptr || out_size == 0) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT, "invalid arguments");
         }
@@ -50,8 +47,7 @@ size_t ca_path_join(const char *base, const char *child, char *out,
 
     /* Skip leading separators in child. */
     size_t child_start = 0;
-    while (child_start < child_len &&
-           (child[child_start] == '/' || child[child_start] == '\\')) {
+    while (child_start < child_len && (child[child_start] == '/' || child[child_start] == '\\')) {
         child_start++;
     }
 
@@ -83,13 +79,13 @@ size_t ca_path_join(const char *base, const char *child, char *out,
     return pos;
 }
 
-const char *ca_path_basename(const char *path) {
+const char* ca_path_basename(const char* path) {
     if (path == nullptr) {
         return nullptr;
     }
 
     /* Find the end of the string, skipping trailing separators. */
-    const char *end = path;
+    const char* end = path;
     while (*end != '\0') {
         ++end;
     }
@@ -103,7 +99,7 @@ const char *ca_path_basename(const char *path) {
     }
 
     /* Walk back from end to find the last separator. */
-    const char *start = end;
+    const char* start = end;
     while (start > path && (start[-1] != '/' && start[-1] != '\\')) {
         --start;
     }
@@ -111,12 +107,12 @@ const char *ca_path_basename(const char *path) {
     return start;
 }
 
-const char *ca_path_dirname(const char *path) {
+const char* ca_path_dirname(const char* path) {
     if (path == nullptr) {
         return nullptr;
     }
 
-    const char *last = find_last_separator(path);
+    const char* last = find_last_separator(path);
     if (last == nullptr) {
         return ".";
     }
@@ -126,12 +122,12 @@ const char *ca_path_dirname(const char *path) {
     return path;
 }
 
-char *ca_path_normalize(char *path) {
+char* ca_path_normalize(char* path) {
     if (path == nullptr) {
         return nullptr;
     }
 
-    for (char *p = path; *p != '\0'; ++p) {
+    for (char* p = path; *p != '\0'; ++p) {
         if (*p == '\\') {
             *p = '/';
         }
@@ -140,14 +136,14 @@ char *ca_path_normalize(char *path) {
     return path;
 }
 
-char *ca_path_identity_normalize(char *path) {
+char* ca_path_identity_normalize(char* path) {
     if (path == nullptr) {
         return nullptr;
     }
 
     ca_path_normalize(path);
 #if defined(_WIN32) || defined(__CYGWIN__)
-    for (char *p = path; *p != '\0'; ++p) {
+    for (char* p = path; *p != '\0'; ++p) {
         if (*p >= 'A' && *p <= 'Z') {
             *p = (char)(*p - 'A' + 'a');
         }
@@ -159,20 +155,18 @@ char *ca_path_identity_normalize(char *path) {
 #if defined(_WIN32) || defined(__CYGWIN__)
 
 /* Convert a wide temporary-directory path to canonical UTF-8. */
-static ca_status path_temp_dir_wide(char *out, size_t out_size,
-                                    size_t *out_len, ca_error *err) {
-    const cx_allocator *alloc = cx_allocator_default();
+static ca_status path_temp_dir_wide(char* out, size_t out_size, size_t* out_len, ca_error* err) {
+    const cx_allocator* alloc = cx_allocator_default();
     DWORD capacity = 512;
-    WCHAR *wide = nullptr;
+    WCHAR* wide = nullptr;
     DWORD copied = 0;
 
     for (;;) {
         size_t wide_size = (size_t)capacity * sizeof(WCHAR);
-        wide = (WCHAR *)cx_allocator_alloc(alloc, wide_size, alignof(WCHAR));
+        wide = (WCHAR*)cx_allocator_alloc(alloc, wide_size, alignof(WCHAR));
         if (wide == nullptr) {
             if (err) {
-                ca_error_set(err, CA_OUT_OF_MEMORY,
-                             "failed to allocate temp path");
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate temp path");
             }
             return CA_OUT_OF_MEMORY;
         }
@@ -180,8 +174,7 @@ static ca_status path_temp_dir_wide(char *out, size_t out_size,
         if (copied == 0) {
             cx_allocator_free(alloc, wide, wide_size, alignof(WCHAR));
             if (err) {
-                ca_error_set(err, CA_PATH_ERROR,
-                             "GetTempPathW failed (error %lu)",
+                ca_error_set(err, CA_PATH_ERROR, "GetTempPathW failed (error %lu)",
                              (unsigned long)GetLastError());
             }
             return CA_PATH_ERROR;
@@ -195,11 +188,9 @@ static ca_status path_temp_dir_wide(char *out, size_t out_size,
         capacity = copied;
     }
 
-    int needed = WideCharToMultiByte(CP_UTF8, 0, wide, (int)copied, nullptr, 0,
-                                     nullptr, nullptr);
+    int needed = WideCharToMultiByte(CP_UTF8, 0, wide, (int)copied, nullptr, 0, nullptr, nullptr);
     if (needed <= 0) {
-        cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR),
-                          alignof(WCHAR));
+        cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR), alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_PATH_ERROR, "temp path is not valid UTF-16");
         }
@@ -207,26 +198,22 @@ static ca_status path_temp_dir_wide(char *out, size_t out_size,
     }
 
     size_t utf8_size = (size_t)needed + 1;
-    char *utf8 = (char *)cx_allocator_alloc(alloc, utf8_size, 0);
+    char* utf8 = (char*)cx_allocator_alloc(alloc, utf8_size, 0);
     if (utf8 == nullptr) {
-        cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR),
-                          alignof(WCHAR));
+        cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR), alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate temp path");
         }
         return CA_OUT_OF_MEMORY;
     }
-    WideCharToMultiByte(CP_UTF8, 0, wide, (int)copied, utf8, needed, nullptr,
-                        nullptr);
-    cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR),
-                      alignof(WCHAR));
+    WideCharToMultiByte(CP_UTF8, 0, wide, (int)copied, utf8, needed, nullptr, nullptr);
+    cx_allocator_free(alloc, wide, (size_t)capacity * sizeof(WCHAR), alignof(WCHAR));
     utf8[needed] = '\0';
 
     size_t length = (size_t)needed;
     /* GetTempPathW returns a trailing separator; drop it unless the result is
      * a drive or share root ("C:\" or "\\server\share\"). */
-    while (length > 1 &&
-           (utf8[length - 1] == '\\' || utf8[length - 1] == '/')) {
+    while (length > 1 && (utf8[length - 1] == '\\' || utf8[length - 1] == '/')) {
         if (length == 3 && utf8[1] == ':') {
             break;
         }
@@ -256,9 +243,8 @@ static ca_status path_temp_dir_wide(char *out, size_t out_size,
 
 #else
 
-static ca_status path_temp_dir_posix(char *out, size_t out_size,
-                                     size_t *out_len, ca_error *err) {
-    const char *tmp = getenv("TMPDIR");
+static ca_status path_temp_dir_posix(char* out, size_t out_size, size_t* out_len, ca_error* err) {
+    const char* tmp = getenv("TMPDIR");
     if (tmp == nullptr || tmp[0] == '\0') {
         tmp = "/tmp";
     }
@@ -287,8 +273,7 @@ static ca_status path_temp_dir_posix(char *out, size_t out_size,
 
 #endif
 
-ca_status ca_path_temp_dir(char *out, size_t out_size, size_t *out_len,
-                           ca_error *err) {
+ca_status ca_path_temp_dir(char* out, size_t out_size, size_t* out_len, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -297,8 +282,7 @@ ca_status ca_path_temp_dir(char *out, size_t out_size, size_t *out_len,
     }
     if (out == nullptr && out_size != 0) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out is nullptr but out_size is non-zero");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out is nullptr but out_size is non-zero");
         }
         return CA_INVALID_ARGUMENT;
     }

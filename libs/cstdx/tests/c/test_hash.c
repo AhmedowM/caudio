@@ -1,5 +1,4 @@
 #include <cstdx/hash.h>
-
 #include <string.h>
 
 #include "cx_test.h"
@@ -32,8 +31,7 @@ static int test_incremental(void) {
 
     CX_CHECK(cx_hash_fnv1a_64("foobar", 6) == cx_hasher_finish(&one_shot));
     CX_CHECK(cx_hasher_finish(&one_shot) == cx_hasher_finish(&split));
-    CX_CHECK(cx_hash_fnv1a_64("foobar", 6) ==
-             cx_hash_seeded(cx_slice_from_parts("foobar", 6), 0));
+    CX_CHECK(cx_hash_fnv1a_64("foobar", 6) == cx_hash_seeded(cx_slice_from_parts("foobar", 6), 0));
 
     CX_CHECK(CX_HASH_FNV1A_64_OFFSET == cx_hasher_finish(nullptr));
     CX_CHECK(CX_HASH_FNV1A_64_OFFSET == cx_hash_seeded((cx_slice){}, 0));
@@ -42,8 +40,7 @@ static int test_incremental(void) {
 
     cx_hasher_init(&seeded, 1234);
     cx_hasher_update(&seeded, "foobar", 6);
-    CX_CHECK(cx_hasher_finish(&seeded) ==
-             cx_hash_seeded(cx_slice_from_parts("foobar", 6), 1234));
+    CX_CHECK(cx_hasher_finish(&seeded) == cx_hash_seeded(cx_slice_from_parts("foobar", 6), 1234));
     CX_CHECK(cx_hasher_finish(&seeded) != cx_hash_fnv1a_64("foobar", 6));
 
     cx_hasher_init(nullptr, 0);

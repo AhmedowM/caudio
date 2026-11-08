@@ -14,19 +14,19 @@
  */
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#  if defined(CSTDX_SHARED)
-#    if defined(CSTDX_EXPORTS)
-#      define CX_API __declspec(dllexport)
-#    else
-#      define CX_API __declspec(dllimport)
-#    endif
-#  else
-#    define CX_API
-#  endif
-#elif defined(__GNUC__) || defined(__clang__)
-#  define CX_API __attribute__((visibility("default")))
+#if defined(CSTDX_SHARED)
+#if defined(CSTDX_EXPORTS)
+#define CX_API __declspec(dllexport)
 #else
-#  define CX_API
+#define CX_API __declspec(dllimport)
+#endif
+#else
+#define CX_API
+#endif
+#elif defined(__GNUC__) || defined(__clang__)
+#define CX_API __attribute__((visibility("default")))
+#else
+#define CX_API
 #endif
 
 /**
@@ -38,10 +38,10 @@
  * Expands to nothing on compilers without `__attribute__((format))`.
  */
 #if defined(__GNUC__) || defined(__clang__)
-#  define CX_PRINTF(format_index, first_argument) \
-      __attribute__((format(printf, format_index, first_argument)))
+#define CX_PRINTF(format_index, first_argument)                                                    \
+    __attribute__((format(printf, format_index, first_argument)))
 #else
-#  define CX_PRINTF(format_index, first_argument)
+#define CX_PRINTF(format_index, first_argument)
 #endif
 
 #endif /* CSTDX_API_H */

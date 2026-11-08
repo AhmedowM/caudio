@@ -1,11 +1,10 @@
 #include <caudio.h>
 #include <caudio/runtime/fs.h>
-
 #include <string.h>
 
 #include "ca_test.h"
 
-static const char *TEST_DIR = "caudio_test_fs_dir";
+static const char* TEST_DIR = "caudio_test_fs_dir";
 
 static int test_write_read(void) {
     ca_error err;
@@ -14,12 +13,11 @@ static int test_write_read(void) {
     CA_CHECK_EQ(CA_OK, ca_fs_mkdirs(TEST_DIR, &err));
 
     ca_file_t f = ca_fs_open("caudio_test_fs_dir/hello.txt",
-                             CA_FS_WRITE | CA_FS_CREATE | CA_FS_TRUNCATE,
-                             &err);
+                             CA_FS_WRITE | CA_FS_CREATE | CA_FS_TRUNCATE, &err);
     CA_CHECK(f != CA_FS_INVALID);
     CA_CHECK_EQ(CA_OK, err.code);
 
-    const char *msg = "hello ca_runtime fs";
+    const char* msg = "hello ca_runtime fs";
     size_t written = ca_fs_write(f, msg, strlen(msg), &err);
     CA_CHECK_EQ(CA_OK, err.code);
     CA_CHECK_EQ(strlen(msg), written);
@@ -69,8 +67,7 @@ static int test_remove(void) {
     CA_CHECK(!ca_fs_exists("caudio_test_fs_dir", &err));
 
     /* remove nonexistent path returns error */
-    CA_CHECK_EQ(CA_IO_ERROR,
-                ca_fs_remove("caudio_test_fs_dir/nope.txt", &err));
+    CA_CHECK_EQ(CA_IO_ERROR, ca_fs_remove("caudio_test_fs_dir/nope.txt", &err));
 
     return ca_test_finish("fs.remove");
 }

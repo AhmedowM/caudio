@@ -2,15 +2,14 @@
 #include <caudio/runtime/endpoint.h>
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/time.h>
-
 #include <stdio.h>
 #include <string.h>
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
-    #include <direct.h>
-    #include <process.h>
+#include <direct.h>
+#include <process.h>
 #else
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include "ca_test.h"
@@ -23,7 +22,7 @@ static long process_id(void) {
 #endif
 }
 
-static void get_cwd(char *out, size_t size) {
+static void get_cwd(char* out, size_t size) {
 #if defined(_WIN32) && !defined(__CYGWIN__)
     if (_getcwd(out, (int)size) == nullptr) {
 #else
@@ -34,16 +33,14 @@ static void get_cwd(char *out, size_t size) {
     }
 }
 
-static void make_socket_path(char *out, size_t size, const char *tag) {
+static void make_socket_path(char* out, size_t size, const char* tag) {
     char cwd[512];
     get_cwd(cwd, sizeof(cwd));
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
-    (void)snprintf(out, size, "%s\\caudio_ep_%ld_%s.sock", cwd, process_id(),
-                   tag);
+    (void)snprintf(out, size, "%s\\caudio_ep_%ld_%s.sock", cwd, process_id(), tag);
 #else
-    (void)snprintf(out, size, "%s/caudio_ep_%ld_%s.sock", cwd, process_id(),
-                   tag);
+    (void)snprintf(out, size, "%s/caudio_ep_%ld_%s.sock", cwd, process_id(), tag);
 #endif
 }
 
@@ -55,25 +52,25 @@ static int test_roundtrip(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_endpoint *server = nullptr;
+    ca_endpoint* server = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_listen(&server, path, 4, &err));
     CA_CHECK(server != nullptr);
     CA_CHECK(ca_endpoint_is_server(server));
     CA_CHECK(ca_endpoint_name(server) != nullptr);
     CA_CHECK_EQ(0, strcmp(ca_endpoint_name(server), path));
 
-    ca_endpoint *client = nullptr;
+    ca_endpoint* client = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_connect(&client, path, 2000, &err));
     CA_CHECK(client != nullptr);
     CA_CHECK(!ca_endpoint_is_server(client));
 
-    ca_endpoint *accepted = nullptr;
+    ca_endpoint* accepted = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_accept(server, 2000, &accepted, &err));
     CA_CHECK(accepted != nullptr);
     CA_CHECK(!ca_endpoint_is_server(accepted));
     CA_CHECK(ca_endpoint_name(accepted) == nullptr);
 
-    const char *ping = "ping over af_unix";
+    const char* ping = "ping over af_unix";
     CA_CHECK_EQ((long long)strlen(ping),
                 (long long)ca_endpoint_write(client, ping, strlen(ping), &err));
     CA_CHECK_EQ(CA_OK, err.code);
@@ -83,10 +80,9 @@ static int test_roundtrip(void) {
     CA_CHECK_EQ((long long)strlen(ping), (long long)read);
     CA_CHECK_EQ(0, strcmp(buffer, ping));
 
-    const char *pong = "pong";
+    const char* pong = "pong";
     CA_CHECK_EQ((long long)strlen(pong),
-                (long long)ca_endpoint_write(accepted, pong, strlen(pong),
-                                             &err));
+                (long long)ca_endpoint_write(accepted, pong, strlen(pong), &err));
     memset(buffer, 0, sizeof(buffer));
     read = ca_endpoint_read(client, buffer, sizeof(buffer) - 1, &err);
     CA_CHECK_EQ((long long)strlen(pong), (long long)read);
@@ -118,16 +114,15 @@ static int test_accept_timeout(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_endpoint *server = nullptr;
+    ca_endpoint* server = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_listen(&server, path, 1, &err));
 
-    ca_endpoint *accepted = nullptr;
+    ca_endpoint* accepted = nullptr;
     ca_time_us_t start = 0;
     ca_time_us_t end = 0;
     CA_CHECK_EQ(CA_OK, ca_time_now(&start, nullptr));
 
-    CA_CHECK_EQ(CA_TIMED_OUT,
-                ca_endpoint_accept(server, 50, &accepted, &err));
+    CA_CHECK_EQ(CA_TIMED_OUT, ca_endpoint_accept(server, 50, &accepted, &err));
     CA_CHECK_EQ(CA_TIMED_OUT, err.code);
     CA_CHECK(accepted == nullptr);
 
@@ -135,8 +130,7 @@ static int test_accept_timeout(void) {
     CA_CHECK(end - start >= 40000);
 
     /* timeout 0 polls once and does not block. */
-    CA_CHECK_EQ(CA_TIMED_OUT,
-                ca_endpoint_accept(server, 0, &accepted, &err));
+    CA_CHECK_EQ(CA_TIMED_OUT, ca_endpoint_accept(server, 0, &accepted, &err));
     CA_CHECK(accepted == nullptr);
 
     ca_endpoint_close(&server);
@@ -153,21 +147,19 @@ static int test_connect_missing(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_endpoint *client = nullptr;
+    ca_endpoint* client = nullptr;
     ca_time_us_t start = 0;
     ca_time_us_t end = 0;
 
     CA_CHECK_EQ(CA_OK, ca_time_now(&start, nullptr));
-    CA_CHECK_EQ(CA_TIMED_OUT,
-                ca_endpoint_connect(&client, path, 100, &err));
+    CA_CHECK_EQ(CA_TIMED_OUT, ca_endpoint_connect(&client, path, 100, &err));
     CA_CHECK_EQ(CA_TIMED_OUT, err.code);
     CA_CHECK(client == nullptr);
     CA_CHECK_EQ(CA_OK, ca_time_now(&end, nullptr));
     CA_CHECK(end - start >= 80000);
 
     /* timeout 0 makes exactly one attempt. */
-    CA_CHECK_EQ(CA_TIMED_OUT,
-                ca_endpoint_connect(&client, path, 0, &err));
+    CA_CHECK_EQ(CA_TIMED_OUT, ca_endpoint_connect(&client, path, 0, &err));
     CA_CHECK(client == nullptr);
 
     (void)ca_fs_remove(path, nullptr);
@@ -182,7 +174,7 @@ static int test_relisten(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_endpoint *server = nullptr;
+    ca_endpoint* server = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_listen(&server, path, 1, &err));
     ca_endpoint_close(&server);
     CA_CHECK(!ca_fs_exists(path, nullptr));
@@ -199,15 +191,12 @@ static int test_invalid_args(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_endpoint *endpoint = nullptr;
+    ca_endpoint* endpoint = nullptr;
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_listen(nullptr, "x", 1, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_listen(&endpoint, nullptr, 1, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_listen(nullptr, "x", 1, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_listen(&endpoint, nullptr, 1, &err));
     CA_CHECK(endpoint == nullptr);
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_listen(&endpoint, "", 1, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_listen(&endpoint, "", 1, &err));
     CA_CHECK(endpoint == nullptr);
 
     char long_path[300];
@@ -216,41 +205,33 @@ static int test_invalid_args(void) {
     CA_CHECK_EQ(CA_OVERFLOW, ca_endpoint_listen(&endpoint, long_path, 1, &err));
     CA_CHECK(endpoint == nullptr);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_connect(nullptr, "x", 0, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_connect(&endpoint, nullptr, 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_connect(nullptr, "x", 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_connect(&endpoint, nullptr, 0, &err));
     CA_CHECK(endpoint == nullptr);
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_connect(&endpoint, "", 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_connect(&endpoint, "", 0, &err));
     CA_CHECK(endpoint == nullptr);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_accept(nullptr, 0, &endpoint, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_accept(nullptr, 0, nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_accept(nullptr, 0, &endpoint, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_accept(nullptr, 0, nullptr, &err));
 
     char path[512];
     make_socket_path(path, sizeof(path), "invalid");
     (void)ca_fs_remove(path, nullptr);
 
-    ca_endpoint *server = nullptr;
+    ca_endpoint* server = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_listen(&server, path, 1, &err));
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_accept(server, 0, nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_accept(server, 0, nullptr, &err));
 
     /* A client handle is not a listening endpoint. */
-    ca_endpoint *client = nullptr;
+    ca_endpoint* client = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_connect(&client, path, 2000, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_accept(client, 0, &endpoint, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_accept(client, 0, &endpoint, &err));
     CA_CHECK(endpoint == nullptr);
 
-    ca_endpoint *accepted = nullptr;
+    ca_endpoint* accepted = nullptr;
     CA_CHECK_EQ(CA_OK, ca_endpoint_accept(server, 2000, &accepted, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_endpoint_accept(accepted, 0, &endpoint, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_endpoint_accept(accepted, 0, &endpoint, &err));
 
     CA_CHECK_EQ((size_t)-1, ca_endpoint_read(nullptr, path, 1, &err));
     CA_CHECK_EQ((size_t)-1, ca_endpoint_write(nullptr, path, 1, &err));
@@ -262,7 +243,7 @@ static int test_invalid_args(void) {
     CA_CHECK(!ca_endpoint_is_server(nullptr));
 
     ca_endpoint_close(nullptr);
-    ca_endpoint *none = nullptr;
+    ca_endpoint* none = nullptr;
     ca_endpoint_close(&none);
 
     ca_endpoint_close(&accepted);

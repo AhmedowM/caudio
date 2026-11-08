@@ -1,8 +1,6 @@
 ﻿#include <caudio/runtime/log.h>
-
 #include <caudio/runtime/mutex.h>
 #include <caudio/runtime/thread.h>
-
 #include <inttypes.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -12,7 +10,7 @@
 #include <time.h>
 
 #if defined(_WIN32)
-    #include <windows.h>
+#include <windows.h>
 #endif
 
 /**
@@ -44,11 +42,11 @@ typedef struct log_sink_ref {
 struct ca_logger {
     ca_mutex_t mutex;
     _Atomic int level;
-    log_sink_ref *sink; /* guarded by mutex */
+    log_sink_ref* sink; /* guarded by mutex */
 };
 
-static log_sink_ref *log_sink_ref_new(ca_log_sink sink) {
-    log_sink_ref *ref = (log_sink_ref *)malloc(sizeof(*ref));
+static log_sink_ref* log_sink_ref_new(ca_log_sink sink) {
+    log_sink_ref* ref = (log_sink_ref*)malloc(sizeof(*ref));
     if (ref == nullptr) {
         return nullptr;
     }
@@ -58,11 +56,11 @@ static log_sink_ref *log_sink_ref_new(ca_log_sink sink) {
     return ref;
 }
 
-static void log_sink_ref_acquire(log_sink_ref *ref) {
+static void log_sink_ref_acquire(log_sink_ref* ref) {
     (void)atomic_fetch_add_explicit(&ref->refs, 1, memory_order_relaxed);
 }
 
-static void log_sink_ref_release(log_sink_ref *ref) {
+static void log_sink_ref_release(log_sink_ref* ref) {
     if (ref == nullptr) {
         return;
     }
@@ -80,36 +78,35 @@ static bool log_level_valid(ca_log_level level) {
     return (int)level >= (int)CA_LOG_TRACE && (int)level <= (int)CA_LOG_OFF;
 }
 
-static bool log_level_enabled(const ca_logger *logger, ca_log_level level) {
+static bool log_level_enabled(const ca_logger* logger, ca_log_level level) {
     if (logger == nullptr || !log_level_valid(level) || level == CA_LOG_OFF) {
         return false;
     }
 
-    ca_log_level minimum = (ca_log_level)atomic_load_explicit(
-        &logger->level, memory_order_relaxed);
+    ca_log_level minimum = (ca_log_level)atomic_load_explicit(&logger->level, memory_order_relaxed);
     return minimum != CA_LOG_OFF && level >= minimum;
 }
 
-const char *ca_log_level_name(ca_log_level level) {
+const char* ca_log_level_name(ca_log_level level) {
     switch (level) {
-        case CA_LOG_TRACE:
-            return "TRACE";
-        case CA_LOG_DEBUG:
-            return "DEBUG";
-        case CA_LOG_INFO:
-            return "INFO";
-        case CA_LOG_WARN:
-            return "WARN";
-        case CA_LOG_ERROR:
-            return "ERROR";
-        case CA_LOG_OFF:
-            return "OFF";
-        default:
-            return "UNKNOWN";
+    case CA_LOG_TRACE:
+        return "TRACE";
+    case CA_LOG_DEBUG:
+        return "DEBUG";
+    case CA_LOG_INFO:
+        return "INFO";
+    case CA_LOG_WARN:
+        return "WARN";
+    case CA_LOG_ERROR:
+        return "ERROR";
+    case CA_LOG_OFF:
+        return "OFF";
+    default:
+        return "UNKNOWN";
     }
 }
 
-void ca_log_config_init(ca_log_config *config) {
+void ca_log_config_init(ca_log_config* config) {
     if (config == nullptr) {
         return;
     }
@@ -118,8 +115,7 @@ void ca_log_config_init(ca_log_config *config) {
     config->sink = (ca_log_sink){0};
 }
 
-ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
-                           ca_error *err) {
+ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -139,8 +135,7 @@ ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
     if (config) {
         if (!log_level_valid(config->level)) {
             if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "invalid log level: %d", (int)config->level);
+                ca_error_set(err, CA_INVALID_ARGUMENT, "invalid log level: %d", (int)config->level);
             }
             return CA_INVALID_ARGUMENT;
         }
@@ -148,17 +143,15 @@ ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
         level = config->level;
         sink = config->sink;
 
-        if (!sink.write &&
-            (sink.ctx != nullptr || sink.destroy != nullptr)) {
+        if (!sink.write && (sink.ctx != nullptr || sink.destroy != nullptr)) {
             if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "sink has context or destroy without write");
+                ca_error_set(err, CA_INVALID_ARGUMENT, "sink has context or destroy without write");
             }
             return CA_INVALID_ARGUMENT;
         }
     }
 
-    ca_logger *logger = (ca_logger *)calloc(1, sizeof(*logger));
+    ca_logger* logger = (ca_logger*)calloc(1, sizeof(*logger));
     if (logger == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate logger");
@@ -178,8 +171,7 @@ ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
             ca_mutex_destroy(logger->mutex);
             free(logger);
             if (err) {
-                ca_error_set(err, CA_OUT_OF_MEMORY,
-                             "failed to allocate log sink");
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log sink");
             }
             return CA_OUT_OF_MEMORY;
         }
@@ -191,16 +183,16 @@ ca_status ca_logger_create(ca_logger **out, const ca_log_config *config,
     return CA_OK;
 }
 
-void ca_logger_destroy(ca_logger **logger) {
+void ca_logger_destroy(ca_logger** logger) {
     if (logger == nullptr || *logger == nullptr) {
         return;
     }
 
-    ca_logger *l = *logger;
+    ca_logger* l = *logger;
     *logger = nullptr;
 
     (void)ca_mutex_lock(l->mutex, nullptr);
-    log_sink_ref *sink = l->sink;
+    log_sink_ref* sink = l->sink;
     l->sink = nullptr;
     (void)ca_mutex_unlock(l->mutex, nullptr);
 
@@ -210,7 +202,7 @@ void ca_logger_destroy(ca_logger **logger) {
     free(l);
 }
 
-void ca_logger_set_level(ca_logger *logger, ca_log_level level) {
+void ca_logger_set_level(ca_logger* logger, ca_log_level level) {
     if (logger == nullptr || !log_level_valid(level)) {
         return;
     }
@@ -218,17 +210,15 @@ void ca_logger_set_level(ca_logger *logger, ca_log_level level) {
     atomic_store_explicit(&logger->level, (int)level, memory_order_relaxed);
 }
 
-ca_log_level ca_logger_get_level(const ca_logger *logger) {
+ca_log_level ca_logger_get_level(const ca_logger* logger) {
     if (logger == nullptr) {
         return CA_LOG_OFF;
     }
 
-    return (ca_log_level)atomic_load_explicit(&logger->level,
-                                              memory_order_relaxed);
+    return (ca_log_level)atomic_load_explicit(&logger->level, memory_order_relaxed);
 }
 
-ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
-                             ca_error *err) {
+ca_status ca_logger_set_sink(ca_logger* logger, const ca_log_sink* sink, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -240,12 +230,11 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
         return CA_INVALID_ARGUMENT;
     }
 
-    log_sink_ref *next = nullptr;
+    log_sink_ref* next = nullptr;
     if (sink) {
         if (!sink->write) {
             if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "sink.write is nullptr");
+                ca_error_set(err, CA_INVALID_ARGUMENT, "sink.write is nullptr");
             }
             return CA_INVALID_ARGUMENT;
         }
@@ -253,8 +242,7 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
         next = log_sink_ref_new(*sink);
         if (next == nullptr) {
             if (err) {
-                ca_error_set(err, CA_OUT_OF_MEMORY,
-                             "failed to allocate log sink");
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log sink");
             }
             return CA_OUT_OF_MEMORY;
         }
@@ -267,7 +255,7 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
         return status;
     }
 
-    log_sink_ref *old = logger->sink;
+    log_sink_ref* old = logger->sink;
     logger->sink = next;
 
     status = ca_mutex_unlock(logger->mutex, err);
@@ -280,8 +268,7 @@ ca_status ca_logger_set_sink(ca_logger *logger, const ca_log_sink *sink,
     return status;
 }
 
-void ca_logger_write(ca_logger *logger, ca_log_level level, const char *message,
-                     size_t len) {
+void ca_logger_write(ca_logger* logger, ca_log_level level, const char* message, size_t len) {
     if (message == nullptr || !log_level_enabled(logger, level)) {
         return;
     }
@@ -290,9 +277,8 @@ void ca_logger_write(ca_logger *logger, ca_log_level level, const char *message,
         return;
     }
 
-    ca_log_level minimum = (ca_log_level)atomic_load_explicit(
-        &logger->level, memory_order_relaxed);
-    log_sink_ref *sink = logger->sink;
+    ca_log_level minimum = (ca_log_level)atomic_load_explicit(&logger->level, memory_order_relaxed);
+    log_sink_ref* sink = logger->sink;
     if (sink) {
         log_sink_ref_acquire(sink);
     }
@@ -308,8 +294,7 @@ void ca_logger_write(ca_logger *logger, ca_log_level level, const char *message,
     log_sink_ref_release(sink);
 }
 
-void ca_logger_vlog(ca_logger *logger, ca_log_level level, const char *fmt,
-                    va_list args) {
+void ca_logger_vlog(ca_logger* logger, ca_log_level level, const char* fmt, va_list args) {
     if (fmt == nullptr || !log_level_enabled(logger, level)) {
         return;
     }
@@ -330,7 +315,7 @@ void ca_logger_vlog(ca_logger *logger, ca_log_level level, const char *fmt,
         return;
     }
 
-    char *heap_buffer = (char *)malloc((size_t)needed + 1);
+    char* heap_buffer = (char*)malloc((size_t)needed + 1);
     if (heap_buffer == nullptr) {
         /* Allocation failure must not lose the record entirely. The stack
          * buffer still holds a truncated, NUL-terminated version. */
@@ -346,8 +331,7 @@ void ca_logger_vlog(ca_logger *logger, ca_log_level level, const char *fmt,
     free(heap_buffer);
 }
 
-void ca_logger_log(ca_logger *logger, ca_log_level level, const char *fmt,
-                   ...) {
+void ca_logger_log(ca_logger* logger, ca_log_level level, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     ca_logger_vlog(logger, level, fmt, args);
@@ -360,21 +344,21 @@ void ca_logger_log(ca_logger *logger, ca_log_level level, const char *fmt,
 
 struct ca_log_file {
     ca_mutex_t mutex;
-    FILE *fp;
-    char *path;
+    FILE* fp;
+    char* path;
     size_t max_bytes;
     unsigned max_files;
     uint64_t size;
 };
 
 #if defined(_WIN32)
-static WCHAR *log_utf8_to_wide(const char *text) {
+static WCHAR* log_utf8_to_wide(const char* text) {
     int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
     if (len <= 0) {
         return nullptr;
     }
 
-    WCHAR *wide = (WCHAR *)malloc((size_t)len * sizeof(WCHAR));
+    WCHAR* wide = (WCHAR*)malloc((size_t)len * sizeof(WCHAR));
     if (wide == nullptr) {
         return nullptr;
     }
@@ -387,28 +371,28 @@ static WCHAR *log_utf8_to_wide(const char *text) {
     return wide;
 }
 
-static FILE *log_fopen(const char *path, bool append) {
-    WCHAR *wide = log_utf8_to_wide(path);
+static FILE* log_fopen(const char* path, bool append) {
+    WCHAR* wide = log_utf8_to_wide(path);
     if (wide == nullptr) {
         return nullptr;
     }
 
-    FILE *fp = _wfopen(wide, append ? L"ab" : L"wb");
+    FILE* fp = _wfopen(wide, append ? L"ab" : L"wb");
     free(wide);
     return fp;
 }
 
-static void log_remove_file(const char *path) {
-    WCHAR *wide = log_utf8_to_wide(path);
+static void log_remove_file(const char* path) {
+    WCHAR* wide = log_utf8_to_wide(path);
     if (wide) {
         (void)_wremove(wide);
         free(wide);
     }
 }
 
-static bool log_rename_file(const char *from, const char *to) {
-    WCHAR *wide_from = log_utf8_to_wide(from);
-    WCHAR *wide_to = log_utf8_to_wide(to);
+static bool log_rename_file(const char* from, const char* to) {
+    WCHAR* wide_from = log_utf8_to_wide(from);
+    WCHAR* wide_to = log_utf8_to_wide(to);
     bool ok = false;
 
     if (wide_from && wide_to) {
@@ -420,45 +404,29 @@ static bool log_rename_file(const char *from, const char *to) {
     return ok;
 }
 
-static int log_seek_end(FILE *fp) {
-    return _fseeki64(fp, 0, SEEK_END);
-}
+static int log_seek_end(FILE* fp) { return _fseeki64(fp, 0, SEEK_END); }
 
-static int64_t log_tell(FILE *fp) {
-    return (int64_t)_ftelli64(fp);
-}
+static int64_t log_tell(FILE* fp) { return (int64_t)_ftelli64(fp); }
 #else
-static FILE *log_fopen(const char *path, bool append) {
-    return fopen(path, append ? "ab" : "wb");
-}
+static FILE* log_fopen(const char* path, bool append) { return fopen(path, append ? "ab" : "wb"); }
 
-static void log_remove_file(const char *path) {
-    (void)remove(path);
-}
+static void log_remove_file(const char* path) { (void)remove(path); }
 
-static bool log_rename_file(const char *from, const char *to) {
-    return rename(from, to) == 0;
-}
+static bool log_rename_file(const char* from, const char* to) { return rename(from, to) == 0; }
 
-static int log_seek_end(FILE *fp) {
-    return fseeko(fp, 0, SEEK_END);
-}
+static int log_seek_end(FILE* fp) { return fseeko(fp, 0, SEEK_END); }
 
-static int64_t log_tell(FILE *fp) {
-    return (int64_t)ftello(fp);
-}
+static int64_t log_tell(FILE* fp) { return (int64_t)ftello(fp); }
 #endif
 
-static void log_utc_timestamp(char *buf, size_t size) {
+static void log_utc_timestamp(char* buf, size_t size) {
 #if defined(_WIN32)
     SYSTEMTIME st;
     GetSystemTime(&st);
 
-    (void)snprintf(buf, size, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ",
-                   (unsigned)st.wYear, (unsigned)st.wMonth,
-                   (unsigned)st.wDay, (unsigned)st.wHour,
-                   (unsigned)st.wMinute, (unsigned)st.wSecond,
-                   (unsigned)st.wMilliseconds);
+    (void)snprintf(buf, size, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ", (unsigned)st.wYear,
+                   (unsigned)st.wMonth, (unsigned)st.wDay, (unsigned)st.wHour, (unsigned)st.wMinute,
+                   (unsigned)st.wSecond, (unsigned)st.wMilliseconds);
 #else
     struct timespec ts;
 
@@ -475,14 +443,13 @@ static void log_utc_timestamp(char *buf, size_t size) {
         return;
     }
 
-    (void)snprintf(buf, size, "%04d-%02d-%02dT%02d:%02d:%02d.%03ldZ",
-                   utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
-                   utc.tm_hour, utc.tm_min, utc.tm_sec,
+    (void)snprintf(buf, size, "%04d-%02d-%02dT%02d:%02d:%02d.%03ldZ", utc.tm_year + 1900,
+                   utc.tm_mon + 1, utc.tm_mday, utc.tm_hour, utc.tm_min, utc.tm_sec,
                    (long)(ts.tv_nsec / 1000000L));
 #endif
 }
 
-static void log_file_free(ca_log_file *file) {
+static void log_file_free(ca_log_file* file) {
     if (file == nullptr) {
         return;
     }
@@ -496,7 +463,7 @@ static void log_file_free(ca_log_file *file) {
     free(file);
 }
 
-static bool log_file_open_stream(ca_log_file *file, bool append) {
+static bool log_file_open_stream(ca_log_file* file, bool append) {
     if (file->fp) {
         (void)fclose(file->fp);
         file->fp = nullptr;
@@ -518,7 +485,7 @@ static bool log_file_open_stream(ca_log_file *file, bool append) {
     return true;
 }
 
-static void log_file_invalidate(ca_log_file *file) {
+static void log_file_invalidate(ca_log_file* file) {
     if (file->fp) {
         (void)fclose(file->fp);
         file->fp = nullptr;
@@ -526,13 +493,13 @@ static void log_file_invalidate(ca_log_file *file) {
     file->size = 0;
 }
 
-static char *log_rotated_path(const char *path, unsigned index) {
+static char* log_rotated_path(const char* path, unsigned index) {
     int needed = snprintf(nullptr, 0, "%s.%u", path, index);
     if (needed < 0) {
         return nullptr;
     }
 
-    char *result = (char *)malloc((size_t)needed + 1);
+    char* result = (char*)malloc((size_t)needed + 1);
     if (result == nullptr) {
         return nullptr;
     }
@@ -541,12 +508,12 @@ static char *log_rotated_path(const char *path, unsigned index) {
     return result;
 }
 
-static void log_rotate_files(ca_log_file *file) {
+static void log_rotate_files(ca_log_file* file) {
     if (file->max_files == 0) {
         return;
     }
 
-    char *oldest = log_rotated_path(file->path, file->max_files);
+    char* oldest = log_rotated_path(file->path, file->max_files);
     if (oldest == nullptr) {
         return;
     }
@@ -554,8 +521,8 @@ static void log_rotate_files(ca_log_file *file) {
     free(oldest);
 
     for (unsigned i = file->max_files; i > 1; --i) {
-        char *from = log_rotated_path(file->path, i - 1);
-        char *to = log_rotated_path(file->path, i);
+        char* from = log_rotated_path(file->path, i - 1);
+        char* to = log_rotated_path(file->path, i);
         if (from == nullptr || to == nullptr) {
             free(from);
             free(to);
@@ -567,7 +534,7 @@ static void log_rotate_files(ca_log_file *file) {
         free(to);
     }
 
-    char *first = log_rotated_path(file->path, 1);
+    char* first = log_rotated_path(file->path, 1);
     if (first == nullptr) {
         return;
     }
@@ -575,7 +542,7 @@ static void log_rotate_files(ca_log_file *file) {
     free(first);
 }
 
-static void log_rotate_locked(ca_log_file *file) {
+static void log_rotate_locked(ca_log_file* file) {
     if (file->fp) {
         (void)fclose(file->fp);
         file->fp = nullptr;
@@ -590,9 +557,8 @@ static void log_rotate_locked(ca_log_file *file) {
     }
 }
 
-static void ca_log_file_sink_write(void *ctx, ca_log_level level,
-                                   const char *message, size_t len) {
-    ca_log_file *file = (ca_log_file *)ctx;
+static void ca_log_file_sink_write(void* ctx, ca_log_level level, const char* message, size_t len) {
+    ca_log_file* file = (ca_log_file*)ctx;
     if (file == nullptr || message == nullptr) {
         return;
     }
@@ -610,8 +576,7 @@ static void ca_log_file_sink_write(void *ctx, ca_log_level level,
     log_utc_timestamp(timestamp, sizeof(timestamp));
 
     char header[256];
-    int header_len = snprintf(header, sizeof(header),
-                              "[%s] [%s] [%" PRIu64 "] ", timestamp,
+    int header_len = snprintf(header, sizeof(header), "[%s] [%s] [%" PRIu64 "] ", timestamp,
                               ca_log_level_name(level), ca_thread_self());
     if (header_len < 0 || (size_t)header_len >= sizeof(header)) {
         (void)ca_mutex_unlock(file->mutex, nullptr);
@@ -629,10 +594,9 @@ static void ca_log_file_sink_write(void *ctx, ca_log_level level,
         }
     }
 
-    bool ok = fwrite(header, 1, (size_t)header_len, file->fp) ==
-                  (size_t)header_len &&
-              fwrite(message, 1, len, file->fp) == len &&
-              fputc('\n', file->fp) != EOF && fflush(file->fp) == 0;
+    bool ok = fwrite(header, 1, (size_t)header_len, file->fp) == (size_t)header_len &&
+              fwrite(message, 1, len, file->fp) == len && fputc('\n', file->fp) != EOF &&
+              fflush(file->fp) == 0;
 
     if (ok) {
         file->size += total;
@@ -643,13 +607,10 @@ static void ca_log_file_sink_write(void *ctx, ca_log_level level,
     (void)ca_mutex_unlock(file->mutex, nullptr);
 }
 
-static void ca_log_file_sink_destroy(void *ctx) {
-    log_file_free((ca_log_file *)ctx);
-}
+static void ca_log_file_sink_destroy(void* ctx) { log_file_free((ca_log_file*)ctx); }
 
-ca_status ca_log_file_open(ca_log_file **out, const char *path,
-                           size_t max_bytes, unsigned max_files,
-                           ca_error *err) {
+ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes,
+                           unsigned max_files, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -672,23 +633,21 @@ ca_status ca_log_file_open(ca_log_file **out, const char *path,
 
     if (max_files > 1000) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "max_files exceeds 1000");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "max_files exceeds 1000");
         }
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_log_file *file = (ca_log_file *)calloc(1, sizeof(*file));
+    ca_log_file* file = (ca_log_file*)calloc(1, sizeof(*file));
     if (file == nullptr) {
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate log file sink");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log file sink");
         }
         return CA_OUT_OF_MEMORY;
     }
 
     size_t path_len = strlen(path);
-    file->path = (char *)malloc(path_len + 1);
+    file->path = (char*)malloc(path_len + 1);
     if (file->path == nullptr) {
         free(file);
         if (err) {
@@ -710,8 +669,7 @@ ca_status ca_log_file_open(ca_log_file **out, const char *path,
 
     if (!log_file_open_stream(file, true)) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "failed to open log file: %s",
-                         path);
+            ca_error_set(err, CA_IO_ERROR, "failed to open log file: %s", path);
         }
         ca_mutex_destroy(file->mutex);
         free(file->path);
@@ -723,17 +681,17 @@ ca_status ca_log_file_open(ca_log_file **out, const char *path,
     return CA_OK;
 }
 
-void ca_log_file_close(ca_log_file **file) {
+void ca_log_file_close(ca_log_file** file) {
     if (file == nullptr || *file == nullptr) {
         return;
     }
 
-    ca_log_file *f = *file;
+    ca_log_file* f = *file;
     *file = nullptr;
     log_file_free(f);
 }
 
-ca_log_sink ca_log_file_sink(ca_log_file *file) {
+ca_log_sink ca_log_file_sink(ca_log_file* file) {
     ca_log_sink sink = {0};
 
     if (file) {

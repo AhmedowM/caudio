@@ -18,7 +18,7 @@ int main(void) {
     CX_CHECK(!cx_result_is_success(&failure));
     CX_CHECK(cx_result_is_failure(&failure));
 
-    const cx_error *stored = cx_result_error(&failure);
+    const cx_error* stored = cx_result_error(&failure);
 
     CX_CHECK(stored != nullptr);
     CX_CHECK_EQ(7, stored->code);

@@ -9,9 +9,8 @@
  * wire-stable and form part of the IPC / JSON / on-disk contract.
  */
 
-#include <stdint.h>
-
 #include <caudio/api.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +56,7 @@ typedef enum ca_status : uint8_t {
  * @brief Return a human-readable name for a ca_status value.
  * @return Static string; never nullptr. Unknown values return "ca_status_unknown".
  */
-[[nodiscard]] CAUDIO_API const char *ca_status_name(ca_status status);
+[[nodiscard]] CAUDIO_API const char* ca_status_name(ca_status status);
 
 #ifdef __cplusplus
 }

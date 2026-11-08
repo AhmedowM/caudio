@@ -17,10 +17,7 @@
  * The error message is not copied and must remain valid while it is inspected.
  */
 typedef struct cx_result {
-    enum {
-        CX_RESULT_SUCCESS,
-        CX_RESULT_FAILURE
-    } state;
+    enum { CX_RESULT_SUCCESS, CX_RESULT_FAILURE } state;
 
     /** Error payload, valid only when state is CX_RESULT_FAILURE. */
     cx_error error;

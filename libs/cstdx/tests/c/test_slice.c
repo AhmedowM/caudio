@@ -1,5 +1,4 @@
 #include <cstdx/slice.h>
-
 #include <string.h>
 
 #include "cx_test.h"
@@ -33,7 +32,7 @@ static int test_sub(void) {
 
     CX_CHECK(cx_slice_sub(slice, 1, 3, &sub) == CX_OK);
     CX_CHECK_EQ(3, sub.length);
-    CX_CHECK_EQ(2, *(const uint8_t *)sub.data);
+    CX_CHECK_EQ(2, *(const uint8_t*)sub.data);
 
     CX_CHECK(cx_slice_sub(slice, 5, 0, &sub) == CX_OK);
     CX_CHECK_EQ(0, sub.length);
@@ -86,15 +85,12 @@ static int test_compare_and_search(void) {
 
     size_t index = 0;
 
-    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(left_data + 1, 2),
-                           &index) == CX_OK);
+    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(left_data + 1, 2), &index) == CX_OK);
     CX_CHECK_EQ(1, index);
     CX_CHECK(cx_slice_find(left, empty, &index) == CX_OK);
     CX_CHECK_EQ(0, index);
-    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(left_data, 7), &index) ==
-             CX_NOT_FOUND);
-    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(right_data, 1), &index) ==
-             CX_OK);
+    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(left_data, 7), &index) == CX_NOT_FOUND);
+    CX_CHECK(cx_slice_find(left, cx_slice_from_parts(right_data, 1), &index) == CX_OK);
     CX_CHECK_EQ(0, index);
     CX_CHECK(cx_slice_find(left, other, nullptr) == CX_INVALID_ARGUMENT);
 

@@ -1,23 +1,20 @@
 #include <cstdx/base64.h>
-
-#include <stdint.h>
-
 #include <cstdx/checked.h>
+#include <stdint.h>
 
 #include "bytes_internal.h"
 #include "string_internal.h"
 
 static constexpr char base64_alphabet[64] = {
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+    'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+    'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/',
 };
 
 static bool base64_is_space(char value) {
-    return value == ' ' || value == '\t' || value == '\n' || value == '\r' ||
-           value == '\v' || value == '\f';
+    return value == ' ' || value == '\t' || value == '\n' || value == '\r' || value == '\v' ||
+           value == '\f';
 }
 
 static int base64_value(char value) {
@@ -44,7 +41,7 @@ static int base64_value(char value) {
     return -1;
 }
 
-cx_status cx_base64_encoded_length(size_t input_length, size_t *out) {
+cx_status cx_base64_encoded_length(size_t input_length, size_t* out) {
     if (out == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -66,8 +63,7 @@ cx_status cx_base64_encoded_length(size_t input_length, size_t *out) {
     return CX_OK;
 }
 
-cx_status cx_base64_encode(cx_slice input, cx_string **out,
-                           const cx_allocator *allocator) {
+cx_status cx_base64_encode(cx_slice input, cx_string** out, const cx_allocator* allocator) {
     if (out == nullptr || (input.data == nullptr && input.length != 0) ||
         !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
@@ -75,7 +71,7 @@ cx_status cx_base64_encode(cx_slice input, cx_string **out,
 
     *out = nullptr;
 
-    cx_string *encoded = nullptr;
+    cx_string* encoded = nullptr;
     auto status = cx_string_init(&encoded, allocator);
 
     if (status != CX_OK) {
@@ -98,14 +94,14 @@ cx_status cx_base64_encode(cx_slice input, cx_string **out,
         return status;
     }
 
-    auto data = (const uint8_t *)input.data;
+    auto data = (const uint8_t*)input.data;
     auto text = encoded->data;
     size_t in = 0;
     size_t position = 0;
 
     while (in + 3 <= input.length) {
-        auto triple = ((uint32_t)data[in] << 16) |
-                      ((uint32_t)data[in + 1] << 8) | (uint32_t)data[in + 2];
+        auto triple =
+            ((uint32_t)data[in] << 16) | ((uint32_t)data[in + 1] << 8) | (uint32_t)data[in + 2];
 
         text[position] = base64_alphabet[(triple >> 18) & 0x3F];
         text[position + 1] = base64_alphabet[(triple >> 12) & 0x3F];
@@ -126,8 +122,7 @@ cx_status cx_base64_encode(cx_slice input, cx_string **out,
         text[position + 2] = '=';
         text[position + 3] = '=';
     } else if (remaining == 2) {
-        auto triple =
-            ((uint32_t)data[in] << 16) | ((uint32_t)data[in + 1] << 8);
+        auto triple = ((uint32_t)data[in] << 16) | ((uint32_t)data[in + 1] << 8);
 
         text[position] = base64_alphabet[(triple >> 18) & 0x3F];
         text[position + 1] = base64_alphabet[(triple >> 12) & 0x3F];
@@ -139,8 +134,7 @@ cx_status cx_base64_encode(cx_slice input, cx_string **out,
     return CX_OK;
 }
 
-cx_status cx_base64_decode(cx_string_view input, cx_bytes **out,
-                           const cx_allocator *allocator) {
+cx_status cx_base64_decode(cx_string_view input, cx_bytes** out, const cx_allocator* allocator) {
     if (out == nullptr || (input.data == nullptr && input.length != 0) ||
         !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
@@ -148,7 +142,7 @@ cx_status cx_base64_decode(cx_string_view input, cx_bytes **out,
 
     *out = nullptr;
 
-    cx_bytes *result = nullptr;
+    cx_bytes* result = nullptr;
     auto status = cx_bytes_init(&result, allocator);
 
     if (status != CX_OK) {
@@ -194,8 +188,7 @@ cx_status cx_base64_decode(cx_string_view input, cx_bytes **out,
             return CX_INVALID_ARGUMENT;
         }
 
-        decoded_length = (data_chars / 4) * 3 +
-                         (remainder == 2 ? 1 : remainder == 3 ? 2 : 0);
+        decoded_length = (data_chars / 4) * 3 + (remainder == 2 ? 1 : remainder == 3 ? 2 : 0);
     } else if (padding == 1) {
         if (remainder != 3) {
             cx_bytes_destroy(&result);
@@ -275,8 +268,7 @@ cx_status cx_base64_decode(cx_string_view input, cx_bytes **out,
     return CX_OK;
 }
 
-cx_status cx_base64_decode_cstr(const char *input, cx_bytes **out,
-                                const cx_allocator *allocator) {
+cx_status cx_base64_decode_cstr(const char* input, cx_bytes** out, const cx_allocator* allocator) {
     if (input == nullptr) {
         return CX_INVALID_ARGUMENT;
     }

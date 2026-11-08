@@ -13,9 +13,8 @@
  * renumber or remove an existing one.
  */
 
-#include <stdint.h>
-
 #include <cstdx/api.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,14 +64,12 @@ typedef enum cx_status : uint8_t {
  * The returned pointer has static storage duration and must not be freed.
  * Unknown values return the string "CX_UNKNOWN".
  */
-[[nodiscard]] CX_API const char *cx_status_name(cx_status status);
+[[nodiscard]] CX_API const char* cx_status_name(cx_status status);
 
 /**
  * @brief Test whether a status represents success.
  */
-[[nodiscard]] static inline bool cx_status_is_ok(cx_status status) {
-    return status == CX_OK;
-}
+[[nodiscard]] static inline bool cx_status_is_ok(cx_status status) { return status == CX_OK; }
 
 #ifdef __cplusplus
 } /* extern "C" */

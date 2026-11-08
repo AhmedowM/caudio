@@ -1,16 +1,14 @@
 ﻿#include <caudio/runtime/endpoint.h>
-
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/socket.h>
 #include <caudio/runtime/time.h>
-
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
-    #include <sys/stat.h>
+#include <sys/stat.h>
 #endif
 
 /**
@@ -20,39 +18,36 @@
 
 struct ca_endpoint {
     ca_socket_t socket;
-    char *name;
+    char* name;
     bool server;
 };
 
-static ca_status endpoint_error_code(const ca_error *err,
-                                     ca_status fallback) {
+static ca_status endpoint_error_code(const ca_error* err, ca_status fallback) {
     if (err != nullptr && err->code != CA_OK) {
         return err->code;
     }
     return fallback;
 }
 
-static ca_status endpoint_wrap(ca_endpoint **out, ca_socket_t socket,
-                               const char *name, bool server, ca_error *err) {
-    ca_endpoint *endpoint = (ca_endpoint *)calloc(1, sizeof(*endpoint));
+static ca_status endpoint_wrap(ca_endpoint** out, ca_socket_t socket, const char* name, bool server,
+                               ca_error* err) {
+    ca_endpoint* endpoint = (ca_endpoint*)calloc(1, sizeof(*endpoint));
     if (endpoint == nullptr) {
         ca_socket_close(socket);
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate endpoint");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate endpoint");
         }
         return CA_OUT_OF_MEMORY;
     }
 
     if (name != nullptr) {
         size_t len = strlen(name);
-        endpoint->name = (char *)malloc(len + 1);
+        endpoint->name = (char*)malloc(len + 1);
         if (endpoint->name == nullptr) {
             ca_socket_close(socket);
             free(endpoint);
             if (err) {
-                ca_error_set(err, CA_OUT_OF_MEMORY,
-                             "failed to copy endpoint name");
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to copy endpoint name");
             }
             return CA_OUT_OF_MEMORY;
         }
@@ -65,8 +60,7 @@ static ca_status endpoint_wrap(ca_endpoint **out, ca_socket_t socket,
     return CA_OK;
 }
 
-ca_status ca_endpoint_listen(ca_endpoint **out, const char *name, int backlog,
-                             ca_error *err) {
+ca_status ca_endpoint_listen(ca_endpoint** out, const char* name, int backlog, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -93,8 +87,7 @@ ca_status ca_endpoint_listen(ca_endpoint **out, const char *name, int backlog,
         return status;
     }
 
-    ca_socket_t socket = ca_socket_create(CA_SOCKET_DOMAIN_UNIX,
-                                          CA_SOCKET_TYPE_STREAM, err);
+    ca_socket_t socket = ca_socket_create(CA_SOCKET_DOMAIN_UNIX, CA_SOCKET_TYPE_STREAM, err);
     if (socket == CA_SOCKET_INVALID) {
         return endpoint_error_code(err, CA_ENDPOINT_ERROR);
     }
@@ -130,8 +123,8 @@ ca_status ca_endpoint_listen(ca_endpoint **out, const char *name, int backlog,
     return status;
 }
 
-ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
-                             ca_endpoint **out, ca_error *err) {
+ca_status ca_endpoint_accept(ca_endpoint* server, int timeout_ms, ca_endpoint** out,
+                             ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -147,8 +140,7 @@ ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
 
     if (server == nullptr || !server->server) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "not a listening endpoint");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "not a listening endpoint");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -166,8 +158,7 @@ ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
     return endpoint_wrap(out, client, nullptr, false, err);
 }
 
-ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
-                              int timeout_ms, ca_error *err) {
+ca_status ca_endpoint_connect(ca_endpoint** out, const char* name, int timeout_ms, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -205,8 +196,7 @@ ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
     }
 
     for (;;) {
-        ca_socket_t socket = ca_socket_create(CA_SOCKET_DOMAIN_UNIX,
-                                              CA_SOCKET_TYPE_STREAM, err);
+        ca_socket_t socket = ca_socket_create(CA_SOCKET_DOMAIN_UNIX, CA_SOCKET_TYPE_STREAM, err);
         if (socket == CA_SOCKET_INVALID) {
             return endpoint_error_code(err, CA_ENDPOINT_ERROR);
         }
@@ -232,8 +222,7 @@ ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
 
             if (now >= deadline) {
                 if (err) {
-                    ca_error_set(err, CA_TIMED_OUT,
-                                 "endpoint connect timed out: %s", name);
+                    ca_error_set(err, CA_TIMED_OUT, "endpoint connect timed out: %s", name);
                 }
                 return CA_TIMED_OUT;
             }
@@ -251,8 +240,7 @@ ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
     }
 }
 
-size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer, size_t size,
-                        ca_error *err) {
+size_t ca_endpoint_read(ca_endpoint* endpoint, void* buffer, size_t size, ca_error* err) {
     if (endpoint == nullptr) {
         if (err) {
             ca_error_init(err);
@@ -264,21 +252,19 @@ size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer, size_t size,
     return ca_socket_recv(endpoint->socket, buffer, size, 0, err);
 }
 
-size_t ca_endpoint_write(ca_endpoint *endpoint, const void *buffer,
-                         size_t size, ca_error *err) {
+size_t ca_endpoint_write(ca_endpoint* endpoint, const void* buffer, size_t size, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (endpoint == nullptr || (buffer == nullptr && size > 0)) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid endpoint or buffer");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid endpoint or buffer");
         }
         return (size_t)-1;
     }
 
-    const char *bytes = (const char *)buffer;
+    const char* bytes = (const char*)buffer;
     size_t total = 0;
 
     while (total < size) {
@@ -291,16 +277,14 @@ size_t ca_endpoint_write(ca_endpoint *endpoint, const void *buffer,
         }
 #endif
 
-        size_t sent = ca_socket_send(endpoint->socket, bytes + total, chunk, 0,
-                                     err);
+        size_t sent = ca_socket_send(endpoint->socket, bytes + total, chunk, 0, err);
         if (sent == (size_t)-1) {
             return (size_t)-1;
         }
 
         if (sent == 0) {
             if (err) {
-                ca_error_set(err, CA_ENDPOINT_ERROR,
-                             "endpoint closed during write");
+                ca_error_set(err, CA_ENDPOINT_ERROR, "endpoint closed during write");
             }
             return (size_t)-1;
         }
@@ -311,7 +295,7 @@ size_t ca_endpoint_write(ca_endpoint *endpoint, const void *buffer,
     return total;
 }
 
-ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err) {
+ca_status ca_endpoint_flush(ca_endpoint* endpoint, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -326,12 +310,12 @@ ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err) {
     return CA_OK;
 }
 
-void ca_endpoint_close(ca_endpoint **endpoint) {
+void ca_endpoint_close(ca_endpoint** endpoint) {
     if (endpoint == nullptr || *endpoint == nullptr) {
         return;
     }
 
-    ca_endpoint *ep = *endpoint;
+    ca_endpoint* ep = *endpoint;
     *endpoint = nullptr;
 
     ca_socket_close(ep->socket);
@@ -344,10 +328,10 @@ void ca_endpoint_close(ca_endpoint **endpoint) {
     free(ep);
 }
 
-const char *ca_endpoint_name(const ca_endpoint *endpoint) {
+const char* ca_endpoint_name(const ca_endpoint* endpoint) {
     return endpoint != nullptr ? endpoint->name : nullptr;
 }
 
-bool ca_endpoint_is_server(const ca_endpoint *endpoint) {
+bool ca_endpoint_is_server(const ca_endpoint* endpoint) {
     return endpoint != nullptr && endpoint->server;
 }

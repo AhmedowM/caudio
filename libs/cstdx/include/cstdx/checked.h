@@ -10,9 +10,8 @@
  * not compiler builtins.
  */
 
-#include <stddef.h>
-
 #include <cstdx/api.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +23,7 @@ extern "C" {
  * @param[out] out Receives the sum on success. Untouched on overflow.
  * @return @c true if the sum does not fit in @c size_t.
  */
-[[nodiscard]] CX_API bool cx_add_overflow(size_t a, size_t b, size_t *out);
+[[nodiscard]] CX_API bool cx_add_overflow(size_t a, size_t b, size_t* out);
 
 /**
  * @brief Compute @p a * @p b, detecting overflow.
@@ -32,7 +31,7 @@ extern "C" {
  * @param[out] out Receives the product on success. Untouched on overflow.
  * @return @c true if the product does not fit in @c size_t.
  */
-[[nodiscard]] CX_API bool cx_mul_overflow(size_t a, size_t b, size_t *out);
+[[nodiscard]] CX_API bool cx_mul_overflow(size_t a, size_t b, size_t* out);
 
 /**
  * @brief Test whether @p value is a nonzero power of two.
@@ -48,8 +47,7 @@ extern "C" {
  * @return @c true on success, @c false if @p alignment is invalid or the
  *         rounded value does not fit in @c size_t.
  */
-[[nodiscard]] CX_API bool cx_align_up(size_t value, size_t alignment,
-                                      size_t *out);
+[[nodiscard]] CX_API bool cx_align_up(size_t value, size_t alignment, size_t* out);
 
 #ifdef __cplusplus
 } /* extern "C" */

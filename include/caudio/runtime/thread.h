@@ -11,7 +11,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 #include <stdint.h>
 
@@ -22,7 +21,7 @@ extern "C" {
 /**
  * @brief Opaque thread handle.
  */
-typedef struct ca_thread *ca_thread_t;
+typedef struct ca_thread* ca_thread_t;
 
 /**
  * @brief Thread entry point signature.
@@ -30,7 +29,7 @@ typedef struct ca_thread *ca_thread_t;
  * @param arg Opaque argument passed from ca_thread_create.
  * @return Opaque return value, retrieved with ca_thread_join.
  */
-typedef void *(*ca_thread_fn)(void *arg);
+typedef void* (*ca_thread_fn)(void* arg);
 
 /**
  * @brief Create and start a thread.
@@ -44,8 +43,7 @@ typedef void *(*ca_thread_fn)(void *arg);
  * @param err Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn,
-                                      void *arg, ca_error *err);
+CAUDIO_API ca_status ca_thread_create(ca_thread_t* out, ca_thread_fn fn, void* arg, ca_error* err);
 
 /**
  * @brief Wait for @p thread to finish and collect its return value.
@@ -55,8 +53,7 @@ CAUDIO_API ca_status ca_thread_create(ca_thread_t *out, ca_thread_fn fn,
  * @param err      Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_thread_join(ca_thread_t thread, void **out_ret,
-                                    ca_error *err);
+CAUDIO_API ca_status ca_thread_join(ca_thread_t thread, void** out_ret, ca_error* err);
 
 /**
  * @brief Detach @p thread so its resources are reclaimed automatically on
@@ -64,7 +61,7 @@ CAUDIO_API ca_status ca_thread_join(ca_thread_t thread, void **out_ret,
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_thread_detach(ca_thread_t thread, ca_error *err);
+CAUDIO_API ca_status ca_thread_detach(ca_thread_t thread, ca_error* err);
 
 /**
  * @brief Yield the CPU (hint to the scheduler).

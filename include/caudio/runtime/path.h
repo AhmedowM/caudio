@@ -11,7 +11,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -25,14 +24,14 @@ extern "C" {
  * A '/' separator is inserted if needed. Returns the number of bytes written
  * (excluding NUL), or (size_t)-1 on truncation with @p err set.
  */
-CAUDIO_API size_t ca_path_join(const char *base, const char *child, char *out,
-                               size_t out_size, ca_error *err);
+CAUDIO_API size_t ca_path_join(const char* base, const char* child, char* out, size_t out_size,
+                               ca_error* err);
 
 /**
  * @brief Return a pointer to the base name (after the last separator) of
  *        @p path, or @p path itself if there is no separator.
  */
-CAUDIO_API const char *ca_path_basename(const char *path);
+CAUDIO_API const char* ca_path_basename(const char* path);
 
 /**
  * @brief Return a pointer to the directory portion (up to the last
@@ -40,13 +39,13 @@ CAUDIO_API const char *ca_path_basename(const char *path);
  *        points into @p path (not NUL-terminated on its own); the caller must
  *        copy it if a NUL-terminated string is needed.
  */
-CAUDIO_API const char *ca_path_dirname(const char *path);
+CAUDIO_API const char* ca_path_dirname(const char* path);
 
 /**
  * @brief Normalize separators in-place: '\\' -> '/' on all platforms.
  *        Returns @p path.
  */
-CAUDIO_API char *ca_path_normalize(char *path);
+CAUDIO_API char* ca_path_normalize(char* path);
 
 /**
  * @brief Normalize a path for identity comparison, in place.
@@ -58,7 +57,7 @@ CAUDIO_API char *ca_path_normalize(char *path);
  * Non-ASCII characters are left untouched on every platform; callers that
  * need full Unicode case folding must normalize before calling this function.
  */
-CAUDIO_API char *ca_path_identity_normalize(char *path);
+CAUDIO_API char* ca_path_identity_normalize(char* path);
 
 /**
  * @brief Copy the platform temporary directory path.
@@ -77,8 +76,7 @@ CAUDIO_API char *ca_path_identity_normalize(char *path);
  * @param err      Optional error record.
  * @return CA_OK, CA_OVERFLOW, CA_OUT_OF_MEMORY, or CA_PATH_ERROR.
  */
-CAUDIO_API ca_status ca_path_temp_dir(char *out, size_t out_size,
-                                      size_t *out_len, ca_error *err);
+CAUDIO_API ca_status ca_path_temp_dir(char* out, size_t out_size, size_t* out_len, ca_error* err);
 
 #ifdef __cplusplus
 }

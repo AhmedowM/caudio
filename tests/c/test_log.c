@@ -1,7 +1,6 @@
 #include <caudio.h>
 #include <caudio/runtime/log.h>
 #include <caudio/runtime/thread.h>
-
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,18 +19,15 @@ typedef struct capture {
     int count;
 } capture;
 
-static void capture_init(capture *cap) {
+static void capture_init(capture* cap) {
     memset(cap, 0, sizeof(*cap));
     (void)ca_mutex_create(&cap->mutex, nullptr);
 }
 
-static void capture_destroy(capture *cap) {
-    ca_mutex_destroy(cap->mutex);
-}
+static void capture_destroy(capture* cap) { ca_mutex_destroy(cap->mutex); }
 
-static void capture_write(void *ctx, ca_log_level level, const char *message,
-                          size_t len) {
-    capture *cap = (capture *)ctx;
+static void capture_write(void* ctx, ca_log_level level, const char* message, size_t len) {
+    capture* cap = (capture*)ctx;
     (void)ca_mutex_lock(cap->mutex, nullptr);
 
     cap->level = level;
@@ -46,21 +42,19 @@ static void capture_write(void *ctx, ca_log_level level, const char *message,
     (void)ca_mutex_unlock(cap->mutex, nullptr);
 }
 
-static void noop_write(void *ctx, ca_log_level level, const char *message,
-                       size_t len) {
+static void noop_write(void* ctx, ca_log_level level, const char* message, size_t len) {
     (void)ctx;
     (void)level;
     (void)message;
     (void)len;
 }
 
-static void count_destroy(void *ctx) {
-    int *counter = (int *)ctx;
+static void count_destroy(void* ctx) {
+    int* counter = (int*)ctx;
     (*counter)++;
 }
 
-static int make_capture_logger(ca_logger **out, capture *cap,
-                               ca_log_level level) {
+static int make_capture_logger(ca_logger** out, capture* cap, ca_log_level level) {
     ca_log_config config;
     ca_log_config_init(&config);
     config.level = level;
@@ -107,7 +101,7 @@ static int test_levels_and_callback(void) {
     capture cap;
     capture_init(&cap);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK(make_capture_logger(&logger, &cap, CA_LOG_INFO));
 
     ca_logger_log(logger, CA_LOG_TRACE, "trace %d", 1);
@@ -152,7 +146,7 @@ static int test_explicit_length(void) {
     capture cap;
     capture_init(&cap);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK(make_capture_logger(&logger, &cap, CA_LOG_INFO));
 
     const char payload[] = {'a', '\0', 'b'};
@@ -177,7 +171,7 @@ static int test_long_format(void) {
     capture cap;
     capture_init(&cap);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK(make_capture_logger(&logger, &cap, CA_LOG_INFO));
 
     char long_text[2048];
@@ -208,7 +202,7 @@ static int test_sink_ownership(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
     CA_CHECK(logger != nullptr);
 
@@ -228,17 +222,16 @@ static int test_sink_ownership(void) {
 }
 
 typedef struct reentrant_ctx {
-    ca_logger *logger;
+    ca_logger* logger;
     int count;
 } reentrant_ctx;
 
-static void reentrant_write(void *ctx, ca_log_level level,
-                            const char *message, size_t len) {
+static void reentrant_write(void* ctx, ca_log_level level, const char* message, size_t len) {
     (void)level;
     (void)message;
     (void)len;
 
-    reentrant_ctx *state = (reentrant_ctx *)ctx;
+    reentrant_ctx* state = (reentrant_ctx*)ctx;
     state->count++;
 
     /* Reading the level and logging again must not deadlock: the logger
@@ -257,7 +250,7 @@ static int test_reentrancy(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     reentrant_ctx state = {logger, 0};
@@ -272,14 +265,13 @@ static int test_reentrancy(void) {
 }
 
 typedef struct thread_state {
-    ca_logger *logger;
+    ca_logger* logger;
     int iterations;
 } thread_state;
 
 static _Atomic int thread_count = 0;
 
-static void count_write(void *ctx, ca_log_level level, const char *message,
-                        size_t len) {
+static void count_write(void* ctx, ca_log_level level, const char* message, size_t len) {
     (void)ctx;
     (void)level;
     (void)message;
@@ -287,8 +279,8 @@ static void count_write(void *ctx, ca_log_level level, const char *message,
     (void)atomic_fetch_add(&thread_count, 1);
 }
 
-static void *thread_body(void *arg) {
-    thread_state *state = (thread_state *)arg;
+static void* thread_body(void* arg) {
+    thread_state* state = (thread_state*)arg;
 
     for (int i = 0; i < state->iterations; ++i) {
         ca_logger_log(state->logger, CA_LOG_INFO, "thread %d message %d", i, i);
@@ -306,7 +298,7 @@ static int test_threaded(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     atomic_store(&thread_count, 0);
@@ -319,8 +311,7 @@ static int test_threaded(void) {
     for (int i = 0; i < THREADS; ++i) {
         states[i].logger = logger;
         states[i].iterations = ITERATIONS;
-        if (ca_thread_create(&threads[i], thread_body, &states[i], &err) ==
-            CA_OK) {
+        if (ca_thread_create(&threads[i], thread_body, &states[i], &err) == CA_OK) {
             created++;
         }
     }
@@ -343,23 +334,22 @@ typedef struct race_sink_ctx {
 
 static _Atomic int race_destroyed = 0;
 
-static void race_sink_write(void *ctx, ca_log_level level,
-                            const char *message, size_t len) {
+static void race_sink_write(void* ctx, ca_log_level level, const char* message, size_t len) {
     (void)level;
     (void)message;
     (void)len;
 
-    race_sink_ctx *state = (race_sink_ctx *)ctx;
+    race_sink_ctx* state = (race_sink_ctx*)ctx;
     (void)atomic_fetch_add(&state->calls, 1);
 }
 
-static void race_sink_destroy(void *ctx) {
+static void race_sink_destroy(void* ctx) {
     free(ctx);
     (void)atomic_fetch_add(&race_destroyed, 1);
 }
 
-static void *race_writer(void *arg) {
-    ca_logger *logger = (ca_logger *)arg;
+static void* race_writer(void* arg) {
+    ca_logger* logger = (ca_logger*)arg;
 
     for (int i = 0; i < 2000; ++i) {
         ca_logger_log(logger, CA_LOG_INFO, "race %d", i);
@@ -372,7 +362,7 @@ static int test_sink_replacement_race(void) {
     ca_error err;
     ca_error_init(&err);
 
-    race_sink_ctx *initial = (race_sink_ctx *)malloc(sizeof(*initial));
+    race_sink_ctx* initial = (race_sink_ctx*)malloc(sizeof(*initial));
     CA_CHECK(initial != nullptr);
     if (initial == nullptr) {
         return ca_test_finish("log.sink_race");
@@ -386,7 +376,7 @@ static int test_sink_replacement_race(void) {
     config.sink.ctx = initial;
     config.sink.destroy = race_sink_destroy;
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
     if (logger == nullptr) {
         free(initial);
@@ -400,7 +390,7 @@ static int test_sink_replacement_race(void) {
 
     int replaced = 0;
     for (int i = 0; i < 200; ++i) {
-        race_sink_ctx *ctx = (race_sink_ctx *)malloc(sizeof(*ctx));
+        race_sink_ctx* ctx = (race_sink_ctx*)malloc(sizeof(*ctx));
         if (ctx == nullptr) {
             break;
         }
@@ -427,8 +417,8 @@ static int test_sink_replacement_race(void) {
     return ca_test_finish("log.sink_race");
 }
 
-static size_t read_file(const char *path, char *buf, size_t size) {
-    FILE *fp = fopen(path, "rb");
+static size_t read_file(const char* path, char* buf, size_t size) {
+    FILE* fp = fopen(path, "rb");
     if (fp == nullptr) {
         return 0;
     }
@@ -439,7 +429,7 @@ static size_t read_file(const char *path, char *buf, size_t size) {
     return read;
 }
 
-static int count_lines(const char *path) {
+static int count_lines(const char* path) {
     char buffer[16384];
     size_t len = read_file(path, buffer, sizeof(buffer));
     int lines = 0;
@@ -459,7 +449,7 @@ static int test_file_sink(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_log_file *file = nullptr;
+    ca_log_file* file = nullptr;
     CA_CHECK_EQ(CA_OK, ca_log_file_open(&file, LOG_FILE, 0, 0, &err));
     CA_CHECK(file != nullptr);
 
@@ -469,7 +459,7 @@ static int test_file_sink(void) {
     config.sink = ca_log_file_sink(file);
     file = nullptr; /* ownership moved into the logger */
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     ca_logger_log(logger, CA_LOG_INFO, "first line");
@@ -499,7 +489,7 @@ static int test_file_sink(void) {
     return ca_test_finish("log.file_sink");
 }
 
-static int count_archived_lines(const char *path, unsigned archives) {
+static int count_archived_lines(const char* path, unsigned archives) {
     int lines = count_lines(path);
 
     for (unsigned i = 1; i <= archives; ++i) {
@@ -511,7 +501,7 @@ static int count_archived_lines(const char *path, unsigned archives) {
     return lines;
 }
 
-static void remove_archives(const char *path, unsigned archives) {
+static void remove_archives(const char* path, unsigned archives) {
     (void)remove(path);
 
     for (unsigned i = 1; i <= archives; ++i) {
@@ -528,9 +518,8 @@ static int test_file_rotation(void) {
     ca_error_init(&err);
 
     /* max_files is large enough to retain all 30 records. */
-    ca_log_file *file = nullptr;
-    CA_CHECK_EQ(CA_OK,
-                ca_log_file_open(&file, ROTATE_FILE, 512, 10, &err));
+    ca_log_file* file = nullptr;
+    CA_CHECK_EQ(CA_OK, ca_log_file_open(&file, ROTATE_FILE, 512, 10, &err));
 
     ca_log_config config;
     ca_log_config_init(&config);
@@ -538,7 +527,7 @@ static int test_file_rotation(void) {
     config.sink = ca_log_file_sink(file);
     file = nullptr;
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     for (int i = 0; i < 30; ++i) {
@@ -546,7 +535,7 @@ static int test_file_rotation(void) {
     }
     ca_logger_destroy(&logger);
 
-    FILE *check = fopen(ROTATE_FILE, "rb");
+    FILE* check = fopen(ROTATE_FILE, "rb");
     CA_CHECK(check != nullptr);
     if (check) {
         (void)fclose(check);
@@ -572,13 +561,13 @@ static int test_file_rotation(void) {
 }
 
 static int test_file_rotation_limit(void) {
-    const char *path = "caudio_test_log_rotate_limit.log";
+    const char* path = "caudio_test_log_rotate_limit.log";
     (void)remove_archives(path, 4);
 
     ca_error err;
     ca_error_init(&err);
 
-    ca_log_file *file = nullptr;
+    ca_log_file* file = nullptr;
     CA_CHECK_EQ(CA_OK, ca_log_file_open(&file, path, 128, 2, &err));
 
     ca_log_config config;
@@ -587,7 +576,7 @@ static int test_file_rotation_limit(void) {
     config.sink = ca_log_file_sink(file);
     file = nullptr;
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     for (int i = 0; i < 30; ++i) {
@@ -595,7 +584,7 @@ static int test_file_rotation_limit(void) {
     }
     ca_logger_destroy(&logger);
 
-    FILE *check = fopen(path, "rb");
+    FILE* check = fopen(path, "rb");
     CA_CHECK(check != nullptr);
     if (check) {
         (void)fclose(check);
@@ -623,14 +612,14 @@ static int test_file_rotation_limit(void) {
 }
 
 static int test_file_truncate_rotation(void) {
-    const char *path = "caudio_test_log_truncate.log";
+    const char* path = "caudio_test_log_truncate.log";
     (void)remove(path);
     (void)remove("caudio_test_log_truncate.log.1");
 
     ca_error err;
     ca_error_init(&err);
 
-    ca_log_file *file = nullptr;
+    ca_log_file* file = nullptr;
     CA_CHECK_EQ(CA_OK, ca_log_file_open(&file, path, 128, 0, &err));
 
     ca_log_config config;
@@ -639,7 +628,7 @@ static int test_file_truncate_rotation(void) {
     config.sink = ca_log_file_sink(file);
     file = nullptr;
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_OK, ca_logger_create(&logger, &config, &err));
 
     for (int i = 0; i < 20; ++i) {
@@ -647,7 +636,7 @@ static int test_file_truncate_rotation(void) {
     }
     ca_logger_destroy(&logger);
 
-    FILE *check = fopen(path, "rb");
+    FILE* check = fopen(path, "rb");
     CA_CHECK(check != nullptr);
     if (check) {
         (void)fclose(check);
@@ -667,7 +656,7 @@ static int test_invalid_args(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_logger *logger = nullptr;
+    ca_logger* logger = nullptr;
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_logger_create(nullptr, nullptr, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, err.code);
 
@@ -688,10 +677,8 @@ static int test_invalid_args(void) {
     CA_CHECK(logger != nullptr);
 
     ca_log_sink bad_sink = {nullptr, &config, count_destroy};
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_logger_set_sink(logger, &bad_sink, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_logger_set_sink(nullptr, &bad_sink, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_logger_set_sink(logger, &bad_sink, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_logger_set_sink(nullptr, &bad_sink, &err));
 
     ca_logger_write(nullptr, CA_LOG_INFO, "ignored", 7);
     ca_logger_log(nullptr, CA_LOG_INFO, "%s", "ignored");
@@ -702,22 +689,17 @@ static int test_invalid_args(void) {
     ca_logger_destroy(nullptr);
     ca_logger_destroy(&logger);
 
-    ca_log_file *file = (ca_log_file *)(uintptr_t)1;
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_log_file_open(nullptr, "x", 0, 0, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_log_file_open(&file, nullptr, 0, 0, &err));
+    ca_log_file* file = (ca_log_file*)(uintptr_t)1;
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_log_file_open(nullptr, "x", 0, 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_log_file_open(&file, nullptr, 0, 0, &err));
     CA_CHECK(file == nullptr);
 
     file = nullptr;
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_log_file_open(&file, "x", 0, 1001, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_log_file_open(&file, "x", 0, 1001, &err));
     CA_CHECK(file == nullptr);
 
     file = nullptr;
-    CA_CHECK_EQ(CA_IO_ERROR,
-                ca_log_file_open(&file, "caudio_missing_dir/log.txt", 0, 0,
-                                 &err));
+    CA_CHECK_EQ(CA_IO_ERROR, ca_log_file_open(&file, "caudio_missing_dir/log.txt", 0, 0, &err));
     CA_CHECK(file == nullptr);
 
     ca_log_file_close(nullptr);

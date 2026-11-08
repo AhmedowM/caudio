@@ -1,5 +1,4 @@
 #include <cstdx/status.h>
-
 #include <string.h>
 
 #include "cx_test.h"
@@ -14,8 +13,7 @@ int main(void) {
     CX_CHECK(!cx_status_is_ok(CX_OUT_OF_MEMORY));
 
     CX_CHECK(strcmp(cx_status_name(CX_OK), "CX_OK") == 0);
-    CX_CHECK(strcmp(cx_status_name(CX_INVALID_ARGUMENT),
-                     "CX_INVALID_ARGUMENT") == 0);
+    CX_CHECK(strcmp(cx_status_name(CX_INVALID_ARGUMENT), "CX_INVALID_ARGUMENT") == 0);
     CX_CHECK(strcmp(cx_status_name(CX_OUT_OF_MEMORY), "CX_OUT_OF_MEMORY") == 0);
     CX_CHECK(strcmp(cx_status_name(CX_INTERNAL), "CX_INTERNAL") == 0);
 

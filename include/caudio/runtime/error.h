@@ -10,10 +10,9 @@
  * fixed size keeps the ABI stable and avoids heap allocation for error text.
  */
 
-#include <stddef.h>
-
 #include <caudio/api.h>
 #include <caudio/runtime/status.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,14 +31,14 @@ typedef struct ca_error {
 /**
  * @brief Initialize an error record to the success state.
  */
-CAUDIO_API void ca_error_init(ca_error *err);
+CAUDIO_API void ca_error_init(ca_error* err);
 
 /**
  * @brief Set an error record from a status code and a printf-style message.
  *
  * Safe truncation: the message is always NUL-terminated.
  */
-CAUDIO_API void ca_error_set(ca_error *err, ca_status code, const char *fmt, ...);
+CAUDIO_API void ca_error_set(ca_error* err, ca_status code, const char* fmt, ...);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,4 @@
 #include <cstdx/arena.h>
-
 #include <stdint.h>
 #include <string.h>
 
@@ -15,8 +14,7 @@ static int test_basic(void) {
     CX_CHECK_EQ(0, cx_arena_bytes_used(&arena));
     CX_CHECK_EQ(0, cx_arena_bytes_reserved(&arena));
 
-    auto values =
-        (int *)cx_arena_alloc(&arena, sizeof(int) * 4, alignof(int));
+    auto values = (int*)cx_arena_alloc(&arena, sizeof(int) * 4, alignof(int));
 
     CX_CHECK(values != nullptr);
     if (values != nullptr) {
@@ -35,7 +33,7 @@ static int test_basic(void) {
     CX_CHECK(overaligned != nullptr);
     CX_CHECK(((uintptr_t)overaligned % 64) == 0);
 
-    auto zeroed = (unsigned char *)cx_arena_alloc_zeroed(&arena, 64, 8);
+    auto zeroed = (unsigned char*)cx_arena_alloc_zeroed(&arena, 64, 8);
 
     CX_CHECK(zeroed != nullptr);
     if (zeroed != nullptr) {
@@ -70,7 +68,7 @@ static int test_realloc(void) {
 
     CX_CHECK(cx_arena_init(&arena, nullptr) == CX_OK);
 
-    auto last = (char *)cx_arena_alloc(&arena, 8, 1);
+    auto last = (char*)cx_arena_alloc(&arena, 8, 1);
 
     CX_CHECK(last != nullptr);
     if (last != nullptr) {
@@ -97,8 +95,8 @@ static int test_realloc(void) {
     CX_CHECK(cx_arena_realloc(&arena, shrunk, 4, 0, 1) == nullptr);
 
     /* A block that is not the most recent one cannot grow in place. */
-    auto first = (char *)cx_arena_alloc(&arena, 8, 1);
-    auto second = (char *)cx_arena_alloc(&arena, 8, 1);
+    auto first = (char*)cx_arena_alloc(&arena, 8, 1);
+    auto second = (char*)cx_arena_alloc(&arena, 8, 1);
 
     CX_CHECK(first != nullptr);
     CX_CHECK(second != nullptr);
@@ -126,15 +124,14 @@ static int test_static(void) {
     CX_CHECK(cx_arena_init_static(&arena, buffer, sizeof(buffer)) == CX_OK);
     CX_CHECK_EQ(sizeof(buffer), cx_arena_bytes_reserved(&arena));
 
-    auto block = (unsigned char *)cx_arena_alloc(&arena, 100, 1);
+    auto block = (unsigned char*)cx_arena_alloc(&arena, 100, 1);
 
     CX_CHECK(block != nullptr);
     CX_CHECK((uintptr_t)block >= (uintptr_t)buffer);
     CX_CHECK((uintptr_t)block < (uintptr_t)buffer + sizeof(buffer));
 
     /* Growing past the static buffer cannot fall back to a new chunk. */
-    CX_CHECK(cx_arena_realloc(&arena, block, 100, sizeof(buffer) + 1, 1) ==
-             nullptr);
+    CX_CHECK(cx_arena_realloc(&arena, block, 100, sizeof(buffer) + 1, 1) == nullptr);
 
     CX_CHECK(cx_arena_alloc(&arena, sizeof(buffer), 1) == nullptr);
 
@@ -142,7 +139,7 @@ static int test_static(void) {
     CX_CHECK_EQ(0, cx_arena_bytes_used(&arena));
     CX_CHECK_EQ(sizeof(buffer), cx_arena_bytes_reserved(&arena));
 
-    block = (unsigned char *)cx_arena_alloc(&arena, 100, 1);
+    block = (unsigned char*)cx_arena_alloc(&arena, 100, 1);
     CX_CHECK(block != nullptr);
 
     cx_arena_destroy(&arena);
@@ -160,14 +157,14 @@ static int test_mark_rewind(void) {
 
     CX_CHECK(cx_arena_init(&arena, nullptr) == CX_OK);
 
-    auto first = (char *)cx_arena_alloc(&arena, 16, 1);
+    auto first = (char*)cx_arena_alloc(&arena, 16, 1);
 
     CX_CHECK(first != nullptr);
 
     auto used_before_mark = cx_arena_bytes_used(&arena);
     auto checkpoint = cx_arena_mark(&arena);
 
-    auto temporary = (char *)cx_arena_alloc(&arena, 16, 1);
+    auto temporary = (char*)cx_arena_alloc(&arena, 16, 1);
 
     CX_CHECK(temporary != nullptr);
     CX_CHECK(cx_arena_bytes_used(&arena) > used_before_mark);
@@ -175,7 +172,7 @@ static int test_mark_rewind(void) {
     cx_arena_rewind(&arena, checkpoint);
     CX_CHECK_EQ(used_before_mark, cx_arena_bytes_used(&arena));
 
-    auto reused = (char *)cx_arena_alloc(&arena, 16, 1);
+    auto reused = (char*)cx_arena_alloc(&arena, 16, 1);
 
     CX_CHECK(reused == temporary);
 
@@ -237,10 +234,8 @@ static int test_invalid_arguments(void) {
     CX_CHECK(cx_arena_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_arena_init(&arena, &invalid) == CX_INVALID_ARGUMENT);
 
-    CX_CHECK(cx_arena_init_with_capacity(nullptr, 64, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_arena_init_with_capacity(&arena, 64, &invalid) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_arena_init_with_capacity(nullptr, 64, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_arena_init_with_capacity(&arena, 64, &invalid) == CX_INVALID_ARGUMENT);
 
     /* A zero capacity still succeeds; it just keeps the default chunk size. */
     CX_CHECK(cx_arena_init_with_capacity(&arena, 0, nullptr) == CX_OK);
@@ -255,10 +250,8 @@ static int test_invalid_arguments(void) {
     CX_CHECK_EQ(0, cx_arena_bytes_used(nullptr));
     CX_CHECK_EQ(0, cx_arena_bytes_reserved(nullptr));
 
-    CX_CHECK(cx_arena_init_static(nullptr, buffer, sizeof(buffer)) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_arena_init_static(&arena, nullptr, sizeof(buffer)) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_arena_init_static(nullptr, buffer, sizeof(buffer)) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_arena_init_static(&arena, nullptr, sizeof(buffer)) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_arena_init_static(&arena, buffer, 0) == CX_INVALID_ARGUMENT);
 
     auto empty_view = cx_arena_as_allocator(nullptr);
@@ -308,8 +301,7 @@ static int test_allocator_failures(void) {
     /* The initial chunk requested by the constructor cannot be allocated. */
     failing.attempts = 0;
     failing.fail_at = 1;
-    CX_CHECK(cx_arena_init_with_capacity(&arena, 64, &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_arena_init_with_capacity(&arena, 64, &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(arena.current == nullptr);
 
     /* The chunk header fails after its data block was allocated, so the
@@ -358,7 +350,7 @@ static int test_realloc_beyond_chunk(void) {
 
     CX_CHECK(cx_arena_init_with_capacity(&arena, 64, nullptr) == CX_OK);
 
-    auto first = (char *)cx_arena_alloc(&arena, 8, 1);
+    auto first = (char*)cx_arena_alloc(&arena, 8, 1);
 
     CX_CHECK(first != nullptr);
 
@@ -367,7 +359,7 @@ static int test_realloc_beyond_chunk(void) {
     }
 
     /* The last block cannot grow in place past the chunk, so it moves. */
-    auto moved = (char *)cx_arena_realloc(&arena, first, 8, 200, 1);
+    auto moved = (char*)cx_arena_realloc(&arena, first, 8, 200, 1);
 
     CX_CHECK(moved != nullptr);
     CX_CHECK(moved != first);

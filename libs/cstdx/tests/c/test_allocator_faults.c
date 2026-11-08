@@ -48,8 +48,7 @@ static int test_failing_init_with_capacity(void) {
     auto allocator = cx_allocator_failing_as_allocator(&failing);
     cx_arena arena;
 
-    CX_CHECK(cx_arena_init_with_capacity(&arena, 4'096, &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_arena_init_with_capacity(&arena, 4'096, &allocator) == CX_OUT_OF_MEMORY);
 
     return cx_test_finish("allocator_faults.failing_init");
 }

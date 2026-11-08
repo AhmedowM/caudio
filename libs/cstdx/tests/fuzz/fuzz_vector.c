@@ -1,5 +1,4 @@
 #include <cstdx/vector.h>
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,11 +7,10 @@
 /**
  * Fuzz cx_vector push/access/pop for a trivially copyable element type.
  */
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    cx_vector *vector = nullptr;
+int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    cx_vector* vector = nullptr;
 
-    if (cx_vector_init(&vector, sizeof(int), alignof(int), nullptr, nullptr) !=
-        CX_OK) {
+    if (cx_vector_init(&vector, sizeof(int), alignof(int), nullptr, nullptr) != CX_OK) {
         return 0;
     }
 

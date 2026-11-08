@@ -1,10 +1,8 @@
-#include <cstdx/pool.h>
-
 #include <assert.h>
+#include <cstdx/checked.h>
+#include <cstdx/pool.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <cstdx/checked.h>
 
 static constexpr size_t pool_default_chunk_slots = 64;
 
@@ -17,23 +15,23 @@ static size_t pool_normalize_alignment(size_t alignment) {
         return 0;
     }
 
-    if (alignment < alignof(void *)) {
-        alignment = alignof(void *);
+    if (alignment < alignof(void*)) {
+        alignment = alignof(void*);
     }
 
     return alignment;
 }
 
-static void pool_thread_chunk(cx_pool *pool, cx_pool_chunk *chunk) {
+static void pool_thread_chunk(cx_pool* pool, cx_pool_chunk* chunk) {
     for (auto i = chunk->slots; i-- > 0;) {
         auto slot = chunk->base + i * pool->slot_size;
 
-        *(void **)slot = pool->free_list;
+        *(void**)slot = pool->free_list;
         pool->free_list = slot;
     }
 }
 
-static bool pool_grow(cx_pool *pool) {
+static bool pool_grow(cx_pool* pool) {
     if (pool->is_static) {
         return false;
     }
@@ -51,14 +49,13 @@ static bool pool_grow(cx_pool *pool) {
         return false;
     }
 
-    cx_pool_chunk *chunk;
+    cx_pool_chunk* chunk;
 
     if (pool->current == &pool->first && pool->first.base == nullptr) {
         chunk = &pool->first;
         chunk->previous = nullptr;
     } else {
-        chunk = cx_allocator_alloc(allocator, sizeof(*chunk),
-                                   alignof(cx_pool_chunk));
+        chunk = cx_allocator_alloc(allocator, sizeof(*chunk), alignof(cx_pool_chunk));
 
         if (chunk == nullptr) {
             cx_allocator_free(allocator, base, bytes, pool->slot_alignment);
@@ -82,11 +79,9 @@ static bool pool_grow(cx_pool *pool) {
 /* Lifecycle                                                                 */
 /* ------------------------------------------------------------------------- */
 
-static cx_status pool_configure(cx_pool *pool, size_t slot_size,
-                                size_t slot_alignment, size_t chunk_slots,
-                                const cx_allocator *allocator) {
-    if (pool == nullptr || slot_size == 0 ||
-        !cx_allocator_is_valid(allocator)) {
+static cx_status pool_configure(cx_pool* pool, size_t slot_size, size_t slot_alignment,
+                                size_t chunk_slots, const cx_allocator* allocator) {
+    if (pool == nullptr || slot_size == 0 || !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
     }
 
@@ -102,8 +97,8 @@ static cx_status pool_configure(cx_pool *pool, size_t slot_size,
         return CX_OVERFLOW;
     }
 
-    if (rounded < sizeof(void *)) {
-        if (!cx_align_up(sizeof(void *), slot_alignment, &rounded)) {
+    if (rounded < sizeof(void*)) {
+        if (!cx_align_up(sizeof(void*), slot_alignment, &rounded)) {
             return CX_OVERFLOW;
         }
     }
@@ -112,22 +107,19 @@ static cx_status pool_configure(cx_pool *pool, size_t slot_size,
 
     pool->slot_size = rounded;
     pool->slot_alignment = slot_alignment;
-    pool->chunk_slots =
-        chunk_slots != 0 ? chunk_slots : pool_default_chunk_slots;
-    pool->allocator =
-        allocator != nullptr ? allocator : cx_allocator_default();
+    pool->chunk_slots = chunk_slots != 0 ? chunk_slots : pool_default_chunk_slots;
+    pool->allocator = allocator != nullptr ? allocator : cx_allocator_default();
     pool->current = &pool->first;
     return CX_OK;
 }
 
-cx_status cx_pool_init(cx_pool *pool, size_t slot_size, size_t slot_alignment,
-                       size_t chunk_slots, const cx_allocator *allocator) {
-    return pool_configure(pool, slot_size, slot_alignment, chunk_slots,
-                          allocator);
+cx_status cx_pool_init(cx_pool* pool, size_t slot_size, size_t slot_alignment, size_t chunk_slots,
+                       const cx_allocator* allocator) {
+    return pool_configure(pool, slot_size, slot_alignment, chunk_slots, allocator);
 }
 
-cx_status cx_pool_init_static(cx_pool *pool, void *buffer, size_t buffer_size,
-                              size_t slot_size, size_t slot_alignment) {
+cx_status cx_pool_init_static(cx_pool* pool, void* buffer, size_t buffer_size, size_t slot_size,
+                              size_t slot_alignment) {
     auto status = pool_configure(pool, slot_size, slot_alignment, 0, nullptr);
 
     if (status != CX_OK) {
@@ -140,8 +132,7 @@ cx_status cx_pool_init_static(cx_pool *pool, void *buffer, size_t buffer_size,
 
     auto base = (uintptr_t)buffer;
     auto aligned =
-        (base + (uintptr_t)(pool->slot_alignment - 1)) &
-        ~((uintptr_t)pool->slot_alignment - 1);
+        (base + (uintptr_t)(pool->slot_alignment - 1)) & ~((uintptr_t)pool->slot_alignment - 1);
     auto skip = (size_t)(aligned - base);
 
     if (skip >= buffer_size) {
@@ -154,7 +145,7 @@ cx_status cx_pool_init_static(cx_pool *pool, void *buffer, size_t buffer_size,
         return CX_INVALID_ARGUMENT;
     }
 
-    pool->first.base = (unsigned char *)aligned;
+    pool->first.base = (unsigned char*)aligned;
     pool->first.slots = slots;
     pool->current = &pool->first;
     pool->capacity = slots;
@@ -163,7 +154,7 @@ cx_status cx_pool_init_static(cx_pool *pool, void *buffer, size_t buffer_size,
     return CX_OK;
 }
 
-void cx_pool_destroy(cx_pool *pool) {
+void cx_pool_destroy(cx_pool* pool) {
     if (pool == nullptr || pool->current == nullptr) {
         return;
     }
@@ -172,24 +163,21 @@ void cx_pool_destroy(cx_pool *pool) {
         while (pool->current != &pool->first) {
             auto chunk = pool->current;
             pool->current = chunk->previous;
-            cx_allocator_free(pool->allocator, chunk->base,
-                              chunk->slots * pool->slot_size,
+            cx_allocator_free(pool->allocator, chunk->base, chunk->slots * pool->slot_size,
                               pool->slot_alignment);
-            cx_allocator_free(pool->allocator, chunk, sizeof(*chunk),
-                              alignof(cx_pool_chunk));
+            cx_allocator_free(pool->allocator, chunk, sizeof(*chunk), alignof(cx_pool_chunk));
         }
 
         if (pool->first.owned && pool->first.base != nullptr) {
             cx_allocator_free(pool->allocator, pool->first.base,
-                              pool->first.slots * pool->slot_size,
-                              pool->slot_alignment);
+                              pool->first.slots * pool->slot_size, pool->slot_alignment);
         }
     }
 
     memset(pool, 0, sizeof(*pool));
 }
 
-void cx_pool_reset(cx_pool *pool) {
+void cx_pool_reset(cx_pool* pool) {
     if (pool == nullptr || pool->current == nullptr) {
         return;
     }
@@ -206,11 +194,9 @@ void cx_pool_reset(cx_pool *pool) {
     while (pool->current != &pool->first) {
         auto chunk = pool->current;
         pool->current = chunk->previous;
-        cx_allocator_free(pool->allocator, chunk->base,
-                          chunk->slots * pool->slot_size,
+        cx_allocator_free(pool->allocator, chunk->base, chunk->slots * pool->slot_size,
                           pool->slot_alignment);
-        cx_allocator_free(pool->allocator, chunk, sizeof(*chunk),
-                          alignof(cx_pool_chunk));
+        cx_allocator_free(pool->allocator, chunk, sizeof(*chunk), alignof(cx_pool_chunk));
     }
 
     pool->live = 0;
@@ -229,7 +215,7 @@ void cx_pool_reset(cx_pool *pool) {
 /* Allocation                                                                */
 /* ------------------------------------------------------------------------- */
 
-void *cx_pool_alloc(cx_pool *pool) {
+void* cx_pool_alloc(cx_pool* pool) {
     if (pool == nullptr || pool->current == nullptr) {
         return nullptr;
     }
@@ -240,14 +226,14 @@ void *cx_pool_alloc(cx_pool *pool) {
 
     auto slot = pool->free_list;
 
-    pool->free_list = *(void **)slot;
+    pool->free_list = *(void**)slot;
     pool->live++;
     return slot;
 }
 
 #ifndef NDEBUG
 
-static bool pool_contains(const cx_pool *pool, const void *slot) {
+static bool pool_contains(const cx_pool* pool, const void* slot) {
     auto address = (uintptr_t)slot;
     auto chunk = pool->current;
 
@@ -267,7 +253,7 @@ static bool pool_contains(const cx_pool *pool, const void *slot) {
 
 #endif /* !NDEBUG */
 
-void cx_pool_free(cx_pool *pool, void *slot) {
+void cx_pool_free(cx_pool* pool, void* slot) {
     if (pool == nullptr || slot == nullptr) {
         return;
     }
@@ -276,7 +262,7 @@ void cx_pool_free(cx_pool *pool, void *slot) {
     assert(pool_contains(pool, slot));
 #endif
 
-    *(void **)slot = pool->free_list;
+    *(void**)slot = pool->free_list;
     pool->free_list = slot;
     pool->live--;
 }
@@ -285,14 +271,8 @@ void cx_pool_free(cx_pool *pool, void *slot) {
 /* Introspection                                                             */
 /* ------------------------------------------------------------------------- */
 
-size_t cx_pool_live(const cx_pool *pool) {
-    return pool != nullptr ? pool->live : 0;
-}
+size_t cx_pool_live(const cx_pool* pool) { return pool != nullptr ? pool->live : 0; }
 
-size_t cx_pool_capacity(const cx_pool *pool) {
-    return pool != nullptr ? pool->capacity : 0;
-}
+size_t cx_pool_capacity(const cx_pool* pool) { return pool != nullptr ? pool->capacity : 0; }
 
-size_t cx_pool_slot_size(const cx_pool *pool) {
-    return pool != nullptr ? pool->slot_size : 0;
-}
+size_t cx_pool_slot_size(const cx_pool* pool) { return pool != nullptr ? pool->slot_size : 0; }

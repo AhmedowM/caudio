@@ -20,8 +20,8 @@ extern "C" {
  * @brief Lock type.
  */
 typedef enum ca_file_lock_type {
-    CA_FILE_LOCK_READ = 0,   /* shared lock */
-    CA_FILE_LOCK_WRITE = 1,  /* exclusive lock */
+    CA_FILE_LOCK_READ = 0,  /* shared lock */
+    CA_FILE_LOCK_WRITE = 1, /* exclusive lock */
 } ca_file_lock_type;
 
 /**
@@ -35,17 +35,15 @@ typedef enum ca_file_lock_type {
  * @param err       Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_file_lock(void *fd, ca_file_lock_type type,
-                                  int64_t offset, int64_t length, int block,
-                                  ca_error *err);
+CAUDIO_API ca_status ca_file_lock(void* fd, ca_file_lock_type type, int64_t offset, int64_t length,
+                                  int block, ca_error* err);
 
 /**
  * @brief Unlock a previously locked region.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_file_unlock(void *fd, int64_t offset,
-                                    int64_t length, ca_error *err);
+CAUDIO_API ca_status ca_file_unlock(void* fd, int64_t offset, int64_t length, ca_error* err);
 
 #ifdef __cplusplus
 }

@@ -12,7 +12,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 /* Forward-declare cstdx types; only pointers are used in this header, so the
@@ -102,9 +101,8 @@ typedef enum ca_json_type {
  *         document exceeds CA_JSON_MAX_DEPTH or CA_JSON_MAX_CONTAINER,
  *         CA_OUT_OF_MEMORY on allocation failure.
  */
-CAUDIO_API ca_status ca_json_parse(ca_json **out, const char *text,
-                                   size_t len, const cx_allocator *alloc,
-                                   ca_error *err);
+CAUDIO_API ca_status ca_json_parse(ca_json** out, const char* text, size_t len,
+                                   const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Parse JSON from a file path.
@@ -121,21 +119,20 @@ CAUDIO_API ca_status ca_json_parse(ca_json **out, const char *text,
  *         CA_JSON_MAX_DEPTH or CA_JSON_MAX_CONTAINER, CA_OUT_OF_MEMORY on
  *         allocation failure.
  */
-CAUDIO_API ca_status ca_json_parse_file(ca_json **out, const char *path,
-                                        const cx_allocator *alloc,
-                                        ca_error *err);
+CAUDIO_API ca_status ca_json_parse_file(ca_json** out, const char* path, const cx_allocator* alloc,
+                                        ca_error* err);
 
 /**
  * @brief Destroy a ca_json handle and free all associated memory.
  *
  * Passing nullptr or a pointer to nullptr is a no-op.
  */
-CAUDIO_API void ca_json_destroy(ca_json **out);
+CAUDIO_API void ca_json_destroy(ca_json** out);
 
 /**
  * @brief Return the type of a JSON value.
  */
-CAUDIO_API ca_json_type ca_json_type_of(const ca_json_val *val);
+CAUDIO_API ca_json_type ca_json_type_of(const ca_json_val* val);
 
 /**
  * @brief Get the string value of a JSON string.
@@ -144,36 +141,35 @@ CAUDIO_API ca_json_type ca_json_type_of(const ca_json_val *val);
  * @return Pointer to the string contents, or nullptr if val is not a string.
  *         The pointer is valid for the lifetime of the owning ca_json.
  */
-CAUDIO_API const char *ca_json_get_string(const ca_json_val *val,
-                                          size_t *len);
+CAUDIO_API const char* ca_json_get_string(const ca_json_val* val, size_t* len);
 
 /**
  * @brief Get the signed integer value of a JSON number.
  *
  * @return The value, or 0 if val is not a number.
  */
-CAUDIO_API int64_t ca_json_get_int(const ca_json_val *val);
+CAUDIO_API int64_t ca_json_get_int(const ca_json_val* val);
 
 /**
  * @brief Get the unsigned integer value of a JSON number.
  *
  * @return The value, or 0 if val is not a number.
  */
-CAUDIO_API uint64_t ca_json_get_uint(const ca_json_val *val);
+CAUDIO_API uint64_t ca_json_get_uint(const ca_json_val* val);
 
 /**
  * @brief Get the floating-point value of a JSON number.
  *
  * @return The value, or 0.0 if val is not a number.
  */
-CAUDIO_API double ca_json_get_double(const ca_json_val *val);
+CAUDIO_API double ca_json_get_double(const ca_json_val* val);
 
 /**
  * @brief Get the number of elements in a JSON array.
  *
  * @return The element count, or 0 if val is not an array.
  */
-CAUDIO_API size_t ca_json_array_size(const ca_json_val *val);
+CAUDIO_API size_t ca_json_array_size(const ca_json_val* val);
 
 /**
  * @brief Get the element at a given index in a JSON array.
@@ -181,15 +177,14 @@ CAUDIO_API size_t ca_json_array_size(const ca_json_val *val);
  * @return The element handle, or nullptr if val is not an array or idx is
  *         out of bounds.
  */
-CAUDIO_API const ca_json_val *ca_json_array_get(const ca_json_val *val,
-                                                size_t idx);
+CAUDIO_API const ca_json_val* ca_json_array_get(const ca_json_val* val, size_t idx);
 
 /**
  * @brief Get the number of key/value pairs in a JSON object.
  *
  * @return The pair count, or 0 if val is not an object.
  */
-CAUDIO_API size_t ca_json_object_size(const ca_json_val *val);
+CAUDIO_API size_t ca_json_object_size(const ca_json_val* val);
 
 /**
  * @brief Get the value associated with a key in a JSON object.
@@ -197,8 +192,7 @@ CAUDIO_API size_t ca_json_object_size(const ca_json_val *val);
  * @return The value handle, or nullptr if val is not an object or the key
  *         is not found.
  */
-CAUDIO_API const ca_json_val *ca_json_object_get(const ca_json_val *val,
-                                                 const char *key);
+CAUDIO_API const ca_json_val* ca_json_object_get(const ca_json_val* val, const char* key);
 
 /**
  * @brief Get the key at @p idx in a JSON object, in document order.
@@ -210,15 +204,14 @@ CAUDIO_API const ca_json_val *ca_json_object_get(const ca_json_val *val,
  *         @p idx is out of bounds. The pointer is valid for the lifetime of
  *         the owning ca_json.
  */
-CAUDIO_API const char *ca_json_object_key(const ca_json_val *val, size_t idx,
-                                          size_t *len);
+CAUDIO_API const char* ca_json_object_key(const ca_json_val* val, size_t idx, size_t* len);
 
 /**
  * @brief Return the root value of a JSON document.
  *
  * @return The root value handle, or nullptr if json is nullptr.
  */
-CAUDIO_API const ca_json_val *ca_json_root(const ca_json *json);
+CAUDIO_API const ca_json_val* ca_json_root(const ca_json* json);
 
 /**
  * @brief Serialize a JSON document to a newly allocated string.
@@ -233,9 +226,8 @@ CAUDIO_API const ca_json_val *ca_json_root(const ca_json *json);
  * @param err    Optional error record.
  * @return A newly allocated NUL-terminated string, or nullptr on error.
  */
-CAUDIO_API char *ca_json_serialize(const ca_json *json, int pretty,
-                                   size_t *len, const cx_allocator *alloc,
-                                   ca_error *err);
+CAUDIO_API char* ca_json_serialize(const ca_json* json, int pretty, size_t* len,
+                                   const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Opaque incremental JSON writer.
@@ -264,16 +256,15 @@ typedef struct ca_json_writer ca_json_writer;
  * @param err    Optional error record.
  * @return CA_OK, CA_INVALID_ARGUMENT, or CA_OUT_OF_MEMORY.
  */
-CAUDIO_API ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
-                                         const cx_allocator *alloc,
-                                         ca_error *err);
+CAUDIO_API ca_status ca_json_writer_init(ca_json_writer** out, int pretty,
+                                         const cx_allocator* alloc, ca_error* err);
 
 /**
  * @brief Destroy a writer and free its buffer.
  *
  * Passing nullptr, or a pointer to nullptr, is a no-op.
  */
-CAUDIO_API void ca_json_writer_destroy(ca_json_writer **out);
+CAUDIO_API void ca_json_writer_destroy(ca_json_writer** out);
 
 /**
  * @brief Open an object.
@@ -281,13 +272,11 @@ CAUDIO_API void ca_json_writer_destroy(ca_json_writer **out);
  * @param key Member name when the current container is an object; nullptr for an
  *            array element or the document root.
  */
-CAUDIO_API ca_status ca_json_writer_begin_object(ca_json_writer *writer,
-                                                 const char *key,
-                                                 ca_error *err);
+CAUDIO_API ca_status ca_json_writer_begin_object(ca_json_writer* writer, const char* key,
+                                                 ca_error* err);
 
 /** @brief Close the current object. */
-CAUDIO_API ca_status ca_json_writer_end_object(ca_json_writer *writer,
-                                               ca_error *err);
+CAUDIO_API ca_status ca_json_writer_end_object(ca_json_writer* writer, ca_error* err);
 
 /**
  * @brief Open an array.
@@ -295,32 +284,27 @@ CAUDIO_API ca_status ca_json_writer_end_object(ca_json_writer *writer,
  * @param key Member name when the current container is an object; nullptr for an
  *            array element or the document root.
  */
-CAUDIO_API ca_status ca_json_writer_begin_array(ca_json_writer *writer,
-                                                const char *key,
-                                                ca_error *err);
+CAUDIO_API ca_status ca_json_writer_begin_array(ca_json_writer* writer, const char* key,
+                                                ca_error* err);
 
 /** @brief Close the current array. */
-CAUDIO_API ca_status ca_json_writer_end_array(ca_json_writer *writer,
-                                              ca_error *err);
+CAUDIO_API ca_status ca_json_writer_end_array(ca_json_writer* writer, ca_error* err);
 
 /** @brief Append a JSON null. */
-CAUDIO_API ca_status ca_json_writer_add_null(ca_json_writer *writer,
-                                             const char *key, ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_null(ca_json_writer* writer, const char* key,
+                                             ca_error* err);
 
 /** @brief Append a JSON boolean. */
-CAUDIO_API ca_status ca_json_writer_add_bool(ca_json_writer *writer,
-                                             const char *key, bool value,
-                                             ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_bool(ca_json_writer* writer, const char* key, bool value,
+                                             ca_error* err);
 
 /** @brief Append a signed integer. */
-CAUDIO_API ca_status ca_json_writer_add_int(ca_json_writer *writer,
-                                            const char *key, int64_t value,
-                                            ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_int(ca_json_writer* writer, const char* key, int64_t value,
+                                            ca_error* err);
 
 /** @brief Append an unsigned integer. */
-CAUDIO_API ca_status ca_json_writer_add_uint(ca_json_writer *writer,
-                                             const char *key, uint64_t value,
-                                             ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_uint(ca_json_writer* writer, const char* key,
+                                             uint64_t value, ca_error* err);
 
 /**
  * @brief Append a number.
@@ -328,9 +312,8 @@ CAUDIO_API ca_status ca_json_writer_add_uint(ca_json_writer *writer,
  * Non-finite values (NaN, infinities) have no JSON representation and are
  * written as null.
  */
-CAUDIO_API ca_status ca_json_writer_add_double(ca_json_writer *writer,
-                                               const char *key, double value,
-                                               ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_double(ca_json_writer* writer, const char* key,
+                                               double value, ca_error* err);
 
 /**
  * @brief Append a string.
@@ -338,16 +321,12 @@ CAUDIO_API ca_status ca_json_writer_add_double(ca_json_writer *writer,
  * @param value  UTF-8 bytes; may be nullptr only when @p length is zero.
  * @param length Byte length of @p value.
  */
-CAUDIO_API ca_status ca_json_writer_add_string(ca_json_writer *writer,
-                                               const char *key,
-                                               const char *value,
-                                               size_t length, ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_string(ca_json_writer* writer, const char* key,
+                                               const char* value, size_t length, ca_error* err);
 
 /** @brief Append a NUL-terminated string. nullptr is written as "". */
-CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer *writer,
-                                             const char *key,
-                                             const char *value,
-                                             ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer* writer, const char* key,
+                                             const char* value, ca_error* err);
 
 /**
  * @brief Append an existing parsed value, preserving its JSON shape.
@@ -363,10 +342,8 @@ CAUDIO_API ca_status ca_json_writer_add_cstr(ca_json_writer *writer,
  * @param err    Optional error record.
  * @return CA_OK, CA_INVALID_ARGUMENT, CA_JSON_ERROR, or CA_OUT_OF_MEMORY.
  */
-CAUDIO_API ca_status ca_json_writer_add_value(ca_json_writer *writer,
-                                              const char *key,
-                                              const ca_json_val *val,
-                                              ca_error *err);
+CAUDIO_API ca_status ca_json_writer_add_value(ca_json_writer* writer, const char* key,
+                                              const ca_json_val* val, ca_error* err);
 
 /**
  * @brief Finish the document and move its text into @p out.
@@ -378,8 +355,7 @@ CAUDIO_API ca_status ca_json_writer_add_value(ca_json_writer *writer,
  * @return CA_OK, CA_JSON_ERROR when no value or an unclosed container
  *         remains, or CA_OUT_OF_MEMORY.
  */
-CAUDIO_API ca_status ca_json_writer_finish(ca_json_writer *writer,
-                                           cx_string **out, ca_error *err);
+CAUDIO_API ca_status ca_json_writer_finish(ca_json_writer* writer, cx_string** out, ca_error* err);
 
 #ifdef __cplusplus
 }

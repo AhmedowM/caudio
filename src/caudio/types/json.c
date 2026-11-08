@@ -1,28 +1,26 @@
 ﻿#include <caudio/types/json.h>
-
-#include "internal.h"
-
 #include <cstdx/string.h>
 #include <cstdx/string_view.h>
-
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
+#include "internal.h"
+
 /* Fail-fast helper for the writer calls: every helper returns ca_status. */
-#define CA_JSON_TRY(expr)                                                     \
-    do {                                                                      \
-        ca_status ca_json_try_status = (expr);                                \
-        if (ca_json_try_status != CA_OK) {                                    \
-            return ca_json_try_status;                                        \
-        }                                                                     \
+#define CA_JSON_TRY(expr)                                                                          \
+    do {                                                                                           \
+        ca_status ca_json_try_status = (expr);                                                     \
+        if (ca_json_try_status != CA_OK) {                                                         \
+            return ca_json_try_status;                                                             \
+        }                                                                                          \
     } while (0)
 
 /* ------------------------------------------------------------------------- */
 /* Status and string helpers                                                 */
 /* ------------------------------------------------------------------------- */
 
-static ca_status json_from_cx(cx_status status, ca_error *err) {
+static ca_status json_from_cx(cx_status status, ca_error* err) {
     switch (status) {
     case CX_OK:
         return CA_OK;
@@ -40,22 +38,19 @@ static ca_status json_from_cx(cx_status status, ca_error *err) {
     }
 }
 
-static cx_string_view json_empty_view(void) {
-    return cx_string_view_from_parts("", 0);
-}
+static cx_string_view json_empty_view(void) { return cx_string_view_from_parts("", 0); }
 
-static cx_string_view json_str_view(const cx_string *str) {
+static cx_string_view json_str_view(const cx_string* str) {
     return str ? cx_string_view_of(str) : json_empty_view();
 }
 
-static ca_status json_add_str(ca_json_writer *writer, const char *key,
-                              const cx_string *value, ca_error *err) {
+static ca_status json_add_str(ca_json_writer* writer, const char* key, const cx_string* value,
+                              ca_error* err) {
     cx_string_view view = json_str_view(value);
     return ca_json_writer_add_string(writer, key, view.data, view.length, err);
 }
 
-static ca_status json_assign_view(cx_string *dst, cx_string_view view,
-                                  ca_error *err) {
+static ca_status json_assign_view(cx_string* dst, cx_string_view view, ca_error* err) {
     if (!dst) {
         return CA_OK;
     }
@@ -71,7 +66,7 @@ static ca_status json_assign_view(cx_string *dst, cx_string_view view,
  * document may spell the same number either way (and the C++ implementation
  * accepts any number for a numeric member). Normalize here.
  */
-static bool json_number_int(const ca_json_val *val, int64_t *out) {
+static bool json_number_int(const ca_json_val* val, int64_t* out) {
     switch (ca_json_type_of(val)) {
     case CA_JSON_INT:
         *out = ca_json_get_int(val);
@@ -87,7 +82,7 @@ static bool json_number_int(const ca_json_val *val, int64_t *out) {
     }
 }
 
-static bool json_number_double(const ca_json_val *val, double *out) {
+static bool json_number_double(const ca_json_val* val, double* out) {
     switch (ca_json_type_of(val)) {
     case CA_JSON_INT:
         *out = (double)ca_json_get_int(val);
@@ -103,36 +98,32 @@ static bool json_number_double(const ca_json_val *val, double *out) {
     }
 }
 
-static bool json_is_object(const ca_json_val *val) {
+static bool json_is_object(const ca_json_val* val) {
     return val && ca_json_type_of(val) == CA_JSON_OBJECT;
 }
 
-static bool json_is_array(const ca_json_val *val) {
+static bool json_is_array(const ca_json_val* val) {
     return val && ca_json_type_of(val) == CA_JSON_ARRAY;
 }
 
-static int64_t json_int_member(const ca_json_val *obj, const char *key,
-                               int64_t fallback) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static int64_t json_int_member(const ca_json_val* obj, const char* key, int64_t fallback) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     int64_t value = 0;
     return json_number_int(val, &value) ? value : fallback;
 }
 
-static int32_t json_i32_member(const ca_json_val *obj, const char *key,
-                               int32_t fallback) {
+static int32_t json_i32_member(const ca_json_val* obj, const char* key, int32_t fallback) {
     return (int32_t)json_int_member(obj, key, fallback);
 }
 
-static double json_double_member(const ca_json_val *obj, const char *key,
-                                 double fallback) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static double json_double_member(const ca_json_val* obj, const char* key, double fallback) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     double value = 0.0;
     return json_number_double(val, &value) ? value : fallback;
 }
 
-static bool json_bool_member(const ca_json_val *obj, const char *key,
-                             bool fallback) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static bool json_bool_member(const ca_json_val* obj, const char* key, bool fallback) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     ca_json_type type = ca_json_type_of(val);
     if (type == CA_JSON_TRUE) {
         return true;
@@ -143,21 +134,21 @@ static bool json_bool_member(const ca_json_val *obj, const char *key,
     return fallback;
 }
 
-static ca_status json_read_str(const ca_json_val *obj, const char *key,
-                               cx_string *dst, ca_error *err) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static ca_status json_read_str(const ca_json_val* obj, const char* key, cx_string* dst,
+                               ca_error* err) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     cx_string_view view = json_empty_view();
     if (val && ca_json_type_of(val) == CA_JSON_STRING) {
         size_t length = 0;
-        const char *data = ca_json_get_string(val, &length);
+        const char* data = ca_json_get_string(val, &length);
         view = cx_string_view_from_parts(data ? data : "", length);
     }
     return json_assign_view(dst, view, err);
 }
 
-static void json_read_optional_int(const ca_json_val *obj, const char *key,
-                                   bool *has, int64_t *out) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static void json_read_optional_int(const ca_json_val* obj, const char* key, bool* has,
+                                   int64_t* out) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     int64_t value = 0;
     if (json_number_int(val, &value)) {
         *has = true;
@@ -168,9 +159,8 @@ static void json_read_optional_int(const ca_json_val *obj, const char *key,
     }
 }
 
-static void json_read_optional_bool(const ca_json_val *obj, const char *key,
-                                    bool *has, bool *out) {
-    const ca_json_val *val = ca_json_object_get(obj, key);
+static void json_read_optional_bool(const ca_json_val* obj, const char* key, bool* has, bool* out) {
+    const ca_json_val* val = ca_json_object_get(obj, key);
     ca_json_type type = ca_json_type_of(val);
     if (type == CA_JSON_TRUE || type == CA_JSON_FALSE) {
         *has = true;
@@ -198,8 +188,7 @@ static int json_hex_digit(char c) {
     return -1;
 }
 
-static void json_fingerprint_to_hex(const uint8_t fingerprint[32],
-                                    char out[65]) {
+static void json_fingerprint_to_hex(const uint8_t fingerprint[32], char out[65]) {
     static const char digits[] = "0123456789abcdef";
     for (size_t i = 0; i < 32; ++i) {
         out[i * 2] = digits[fingerprint[i] >> 4];
@@ -208,8 +197,7 @@ static void json_fingerprint_to_hex(const uint8_t fingerprint[32],
     out[64] = '\0';
 }
 
-static bool json_fingerprint_from_hex(const char *text, size_t length,
-                                      uint8_t out[32]) {
+static bool json_fingerprint_from_hex(const char* text, size_t length, uint8_t out[32]) {
     if (length != 64) {
         return false;
     }
@@ -231,7 +219,7 @@ static bool json_fingerprint_from_hex(const char *text, size_t length,
  * offset basis and the post-mix step. Changing any constant breaks import
  * compatibility with existing JSON exports.
  */
-static void json_fallback_fingerprint(const cx_string *path, uint8_t out[32]) {
+static void json_fallback_fingerprint(const cx_string* path, uint8_t out[32]) {
     uint64_t h = UINT64_C(1469598103934665603);
     cx_string_view view = json_str_view(path);
     for (size_t i = 0; i < view.length; ++i) {
@@ -248,9 +236,8 @@ static void json_fallback_fingerprint(const cx_string *path, uint8_t out[32]) {
 /* Source identity                                                           */
 /* ------------------------------------------------------------------------- */
 
-static cx_string_view json_source_value(const cx_string *value,
-                                        ca_source_kind kind,
-                                        const cx_string *fallback) {
+static cx_string_view json_source_value(const cx_string* value, ca_source_kind kind,
+                                        const cx_string* fallback) {
     if (value && !cx_string_empty(value)) {
         return cx_string_view_of(value);
     }
@@ -260,26 +247,21 @@ static cx_string_view json_source_value(const cx_string *value,
     return json_empty_view();
 }
 
-static ca_status json_write_source(ca_json_writer *writer, const char *key,
-                                   const ca_source_ref *ref,
-                                   const cx_string *fallback, ca_error *err) {
+static ca_status json_write_source(ca_json_writer* writer, const char* key,
+                                   const ca_source_ref* ref, const cx_string* fallback,
+                                   ca_error* err) {
     ca_source_kind kind = ref ? ref->kind : CA_SOURCE_PATH;
-    const char *kind_name = ca_source_kind_name(kind);
-    cx_string_view source_key =
-        json_source_value(ref ? ref->key : nullptr, kind, fallback);
+    const char* kind_name = ca_source_kind_name(kind);
+    cx_string_view source_key = json_source_value(ref ? ref->key : nullptr, kind, fallback);
     cx_string_view display_name =
         json_source_value(ref ? ref->display_name : nullptr, kind, fallback);
 
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
-    CA_JSON_TRY(ca_json_writer_add_string(writer, "kind", kind_name,
-                                          strlen(kind_name), err));
-    CA_JSON_TRY(ca_json_writer_add_string(writer, "key", source_key.data,
-                                          source_key.length, err));
-    CA_JSON_TRY(ca_json_writer_add_string(writer, "display_name",
-                                          display_name.data,
+    CA_JSON_TRY(ca_json_writer_add_string(writer, "kind", kind_name, strlen(kind_name), err));
+    CA_JSON_TRY(ca_json_writer_add_string(writer, "key", source_key.data, source_key.length, err));
+    CA_JSON_TRY(ca_json_writer_add_string(writer, "display_name", display_name.data,
                                           display_name.length, err));
-    CA_JSON_TRY(ca_json_writer_add_bool(writer, "available",
-                                        ref ? ref->available : true, err));
+    CA_JSON_TRY(ca_json_writer_add_bool(writer, "available", ref ? ref->available : true, err));
     return ca_json_writer_end_object(writer, err);
 }
 
@@ -289,8 +271,7 @@ static ca_status json_write_source(ca_json_writer *writer, const char *key,
  * Uses the exact spellings of `sourceKindFromName` without requiring a
  * NUL-terminated copy.
  */
-static bool json_source_kind_from_view(cx_string_view view,
-                                       ca_source_kind *out) {
+static bool json_source_kind_from_view(cx_string_view view, ca_source_kind* out) {
     if (cx_string_view_eq(view, cx_string_view_from_cstr("path"))) {
         *out = CA_SOURCE_PATH;
         return true;
@@ -316,8 +297,8 @@ static bool json_source_kind_from_view(cx_string_view view,
  * @p fallback is the track path for `CA_SOURCE_PATH` defaults; nullptr for a
  * standalone source reference.
  */
-static ca_status json_read_source(ca_source_ref *ref, const ca_json_val *obj,
-                                  const cx_string *fallback, ca_error *err) {
+static ca_status json_read_source(ca_source_ref* ref, const ca_json_val* obj,
+                                  const cx_string* fallback, ca_error* err) {
     cx_string_view fallback_view = json_str_view(fallback);
 
     ref->kind = CA_SOURCE_PATH;
@@ -330,10 +311,10 @@ static ca_status json_read_source(ca_source_ref *ref, const ca_json_val *obj,
     }
 
     cx_string_view kind_view = json_empty_view();
-    const ca_json_val *kind_val = ca_json_object_get(obj, "kind");
+    const ca_json_val* kind_val = ca_json_object_get(obj, "kind");
     if (kind_val && ca_json_type_of(kind_val) == CA_JSON_STRING) {
         size_t length = 0;
-        const char *data = ca_json_get_string(kind_val, &length);
+        const char* data = ca_json_get_string(kind_val, &length);
         kind_view = cx_string_view_from_parts(data ? data : "", length);
     } else {
         kind_view = cx_string_view_from_cstr("path");
@@ -361,9 +342,8 @@ static ca_status json_read_source(ca_source_ref *ref, const ca_json_val *obj,
     return CA_OK;
 }
 
-ca_status ca_source_ref_write_json(const ca_source_ref *ref,
-                                   ca_json_writer *writer, const char *key,
-                                   ca_error *err) {
+ca_status ca_source_ref_write_json(const ca_source_ref* ref, ca_json_writer* writer,
+                                   const char* key, ca_error* err) {
     if (!writer || !ref) {
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT, "ref or writer is nullptr");
@@ -373,8 +353,8 @@ ca_status ca_source_ref_write_json(const ca_source_ref *ref,
     return json_write_source(writer, key, ref, nullptr, err);
 }
 
-ca_status ca_source_ref_from_json(ca_source_ref *ref, const ca_json_val *val,
-                                  const cx_allocator *alloc, ca_error *err) {
+ca_status ca_source_ref_from_json(ca_source_ref* ref, const ca_json_val* val,
+                                  const cx_allocator* alloc, ca_error* err) {
     if (!ref) {
         return CA_INVALID_ARGUMENT;
     }
@@ -393,12 +373,11 @@ ca_status ca_source_ref_from_json(ca_source_ref *ref, const ca_json_val *val,
 /* Track                                                                     */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_track_write_json(const ca_track *track, ca_json_writer *writer,
-                              const char *key, ca_error *err) {
+ca_status ca_track_write_json(const ca_track* track, ca_json_writer* writer, const char* key,
+                              ca_error* err) {
     if (!track || !writer) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "track or writer is nullptr");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "track or writer is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -410,54 +389,39 @@ ca_status ca_track_write_json(const ca_track *track, ca_json_writer *writer,
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", track->id, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "size", track->size, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "mtime", track->mtime, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_double(writer, "duration", track->duration, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_uint(writer, "sample_rate", track->sample_rate, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_uint(writer, "channels", track->channels, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "duration", track->duration, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "sample_rate", track->sample_rate, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "channels", track->channels, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "bitrate", track->bitrate, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "year", track->year, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_num", track->track_num, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "disc_num", track->disc_num, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_num", track->track_num, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "disc_num", track->disc_num, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "rating", track->rating, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "play_count", track->play_count, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "last_played", track->last_played, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "date_added", track->date_added, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "last_scanned",
-                                       track->last_scanned, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "play_count", track->play_count, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "last_played", track->last_played, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "date_added", track->date_added, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "last_scanned", track->last_scanned, err));
     CA_JSON_TRY(ca_json_writer_add_bool(writer, "dirty", track->dirty, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "library_id", track->library_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "deleted_at", track->deleted_at, err));
-    CA_JSON_TRY(ca_json_writer_add_string(writer, "fingerprint",
-                                          fingerprint_hex,
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "library_id", track->library_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "deleted_at", track->deleted_at, err));
+    CA_JSON_TRY(ca_json_writer_add_string(writer, "fingerprint", fingerprint_hex,
                                           sizeof fingerprint_hex - 1, err));
     CA_JSON_TRY(json_add_str(writer, "path", track->path, err));
-    CA_JSON_TRY(
-        json_write_source(writer, "source", &track->source, track->path, err));
+    CA_JSON_TRY(json_write_source(writer, "source", &track->source, track->path, err));
     CA_JSON_TRY(json_add_str(writer, "title", track->title, err));
     CA_JSON_TRY(json_add_str(writer, "artist", track->artist, err));
     CA_JSON_TRY(json_add_str(writer, "album", track->album, err));
     CA_JSON_TRY(json_add_str(writer, "album_artist", track->album_artist, err));
     CA_JSON_TRY(json_add_str(writer, "genre", track->genre, err));
-    CA_JSON_TRY(
-        json_add_str(writer, "cover_art_path", track->cover_art_path, err));
+    CA_JSON_TRY(json_add_str(writer, "cover_art_path", track->cover_art_path, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_track_from_json(ca_track *track, const ca_json_val *val,
-                             const cx_allocator *alloc, ca_error *err) {
+ca_status ca_track_from_json(ca_track* track, const ca_json_val* val, const cx_allocator* alloc,
+                             ca_error* err) {
     if (!track || !json_is_object(val)) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "track destination or JSON object is missing");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "track destination or JSON object is missing");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -483,8 +447,7 @@ ca_status ca_track_from_json(ca_track *track, const ca_json_val *val,
     track->last_played = json_int_member(val, "last_played", 0);
     track->date_added = json_int_member(val, "date_added", 0);
     track->last_scanned = json_int_member(val, "last_scanned", 0);
-    track->dirty = json_bool_member(val, "dirty", false) ||
-                   json_int_member(val, "dirty", 0) != 0;
+    track->dirty = json_bool_member(val, "dirty", false) || json_int_member(val, "dirty", 0) != 0;
     track->library_id = json_int_member(val, "library_id", 1);
     if (track->library_id == 0) {
         track->library_id = 1;
@@ -493,9 +456,8 @@ ca_status ca_track_from_json(ca_track *track, const ca_json_val *val,
 
     status = json_read_str(val, "path", track->path, err);
     if (status == CA_OK) {
-        status = json_read_source(&track->source,
-                                  ca_json_object_get(val, "source"),
-                                  track->path, err);
+        status =
+            json_read_source(&track->source, ca_json_object_get(val, "source"), track->path, err);
     }
     if (status == CA_OK) {
         status = json_read_str(val, "title", track->title, err);
@@ -513,18 +475,16 @@ ca_status ca_track_from_json(ca_track *track, const ca_json_val *val,
         status = json_read_str(val, "genre", track->genre, err);
     }
     if (status == CA_OK) {
-        status = json_read_str(val, "cover_art_path", track->cover_art_path,
-                               err);
+        status = json_read_str(val, "cover_art_path", track->cover_art_path, err);
     }
     if (status == CA_OK) {
-        const ca_json_val *fp_value = ca_json_object_get(val, "fingerprint");
+        const ca_json_val* fp_value = ca_json_object_get(val, "fingerprint");
         bool decoded = false;
         if (fp_value && ca_json_type_of(fp_value) == CA_JSON_STRING) {
             size_t length = 0;
-            const char *data = ca_json_get_string(fp_value, &length);
+            const char* data = ca_json_get_string(fp_value, &length);
             if (data) {
-                decoded =
-                    json_fingerprint_from_hex(data, length, track->fingerprint);
+                decoded = json_fingerprint_from_hex(data, length, track->fingerprint);
             }
         }
         if (!decoded) {
@@ -542,9 +502,8 @@ ca_status ca_track_from_json(ca_track *track, const ca_json_val *val,
 /* Playlist                                                                  */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_playlist_write_json(const ca_playlist *playlist,
-                                 ca_json_writer *writer, const char *key,
-                                 ca_error *err) {
+ca_status ca_playlist_write_json(const ca_playlist* playlist, ca_json_writer* writer,
+                                 const char* key, ca_error* err) {
     if (!playlist || !writer) {
         return CA_INVALID_ARGUMENT;
     }
@@ -552,19 +511,15 @@ ca_status ca_playlist_write_json(const ca_playlist *playlist,
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", playlist->id, err));
     CA_JSON_TRY(json_add_str(writer, "name", playlist->name, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "type", playlist->type, err));
-    CA_JSON_TRY(
-        json_add_str(writer, "smart_query", playlist->smart_query, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "created", playlist->created,
-                                       err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "modified", playlist->modified, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "library_id", playlist->library_id, err));
+    CA_JSON_TRY(json_add_str(writer, "smart_query", playlist->smart_query, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "created", playlist->created, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "modified", playlist->modified, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "library_id", playlist->library_id, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_playlist_from_json(ca_playlist *playlist, const ca_json_val *val,
-                                const cx_allocator *alloc, ca_error *err) {
+ca_status ca_playlist_from_json(ca_playlist* playlist, const ca_json_val* val,
+                                const cx_allocator* alloc, ca_error* err) {
     if (!playlist || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -594,26 +549,22 @@ ca_status ca_playlist_from_json(ca_playlist *playlist, const ca_json_val *val,
 /* Queue item                                                                */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_queue_item_write_json(const ca_queue_item *item,
-                                   ca_json_writer *writer, const char *key,
-                                   ca_error *err) {
+ca_status ca_queue_item_write_json(const ca_queue_item* item, ca_json_writer* writer,
+                                   const char* key, ca_error* err) {
     if (!item || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", item->id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "queue_id", item->queue_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_id", item->track_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "position", item->position, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "queue_id", item->queue_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_id", item->track_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "position", item->position, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "added", item->added, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_queue_item_from_json(ca_queue_item *item, const ca_json_val *val,
-                                  const cx_allocator *alloc, ca_error *err) {
+ca_status ca_queue_item_from_json(ca_queue_item* item, const ca_json_val* val,
+                                  const cx_allocator* alloc, ca_error* err) {
     (void)alloc;
     if (!item || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
@@ -632,38 +583,28 @@ ca_status ca_queue_item_from_json(ca_queue_item *item, const ca_json_val *val,
 /* History entry                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_history_entry_write_json(const ca_history_entry *entry,
-                                      ca_json_writer *writer, const char *key,
-                                      ca_error *err) {
+ca_status ca_history_entry_write_json(const ca_history_entry* entry, ca_json_writer* writer,
+                                      const char* key, ca_error* err) {
     if (!entry || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", entry->id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_id", entry->track_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "started_at", entry->started_at, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "completed_at",
-                                       entry->completed_at, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "position_ms", entry->position_ms, err));
-    CA_JSON_TRY(ca_json_writer_add_double(writer, "completion_pct",
-                                          entry->completion_pct, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "queue_id", entry->queue_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_id", entry->track_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "started_at", entry->started_at, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "completed_at", entry->completed_at, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "position_ms", entry->position_ms, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "completion_pct", entry->completion_pct, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "queue_id", entry->queue_id, err));
     CA_JSON_TRY(json_add_str(writer, "title", entry->title, err));
     CA_JSON_TRY(json_add_str(writer, "artist", entry->artist, err));
     CA_JSON_TRY(json_add_str(writer, "path", entry->path, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_double(writer, "duration", entry->duration, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "duration", entry->duration, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_history_entry_from_json(ca_history_entry *entry,
-                                     const ca_json_val *val,
-                                     const cx_allocator *alloc,
-                                     ca_error *err) {
+ca_status ca_history_entry_from_json(ca_history_entry* entry, const ca_json_val* val,
+                                     const cx_allocator* alloc, ca_error* err) {
     if (!entry || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -699,26 +640,22 @@ ca_status ca_history_entry_from_json(ca_history_entry *entry,
 /* Bookmark                                                                  */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_bookmark_write_json(const ca_bookmark *bookmark,
-                                 ca_json_writer *writer, const char *key,
-                                 ca_error *err) {
+ca_status ca_bookmark_write_json(const ca_bookmark* bookmark, ca_json_writer* writer,
+                                 const char* key, ca_error* err) {
     if (!bookmark || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", bookmark->id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_id", bookmark->track_id, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "position_ms",
-                                       bookmark->position_ms, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_id", bookmark->track_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "position_ms", bookmark->position_ms, err));
     CA_JSON_TRY(json_add_str(writer, "note", bookmark->note, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "created", bookmark->created, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "created", bookmark->created, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_bookmark_from_json(ca_bookmark *bookmark, const ca_json_val *val,
-                                const cx_allocator *alloc, ca_error *err) {
+ca_status ca_bookmark_from_json(ca_bookmark* bookmark, const ca_json_val* val,
+                                const cx_allocator* alloc, ca_error* err) {
     if (!bookmark || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -744,23 +681,20 @@ ca_status ca_bookmark_from_json(ca_bookmark *bookmark, const ca_json_val *val,
 /* Device info / list                                                        */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_device_info_write_json(const ca_device_info *device,
-                                    ca_json_writer *writer, const char *key,
-                                    ca_error *err) {
+ca_status ca_device_info_write_json(const ca_device_info* device, ca_json_writer* writer,
+                                    const char* key, ca_error* err) {
     if (!device || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(json_add_str(writer, "id", device->id, err));
     CA_JSON_TRY(json_add_str(writer, "name", device->name, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_bool(writer, "isDefault", device->is_default, err));
+    CA_JSON_TRY(ca_json_writer_add_bool(writer, "isDefault", device->is_default, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_device_info_from_json(ca_device_info *device,
-                                   const ca_json_val *val,
-                                   const cx_allocator *alloc, ca_error *err) {
+ca_status ca_device_info_from_json(ca_device_info* device, const ca_json_val* val,
+                                   const cx_allocator* alloc, ca_error* err) {
     if (!device || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -781,11 +715,9 @@ ca_status ca_device_info_from_json(ca_device_info *device,
     return status;
 }
 
-static ca_status json_read_device_list(cx_vector **out, const ca_json_val *arr,
-                                       const cx_allocator *alloc,
-                                       ca_error *err) {
-    cx_status cx = cx_vector_init(out, sizeof(ca_device_info),
-                                  alignof(ca_device_info),
+static ca_status json_read_device_list(cx_vector** out, const ca_json_val* arr,
+                                       const cx_allocator* alloc, ca_error* err) {
+    cx_status cx = cx_vector_init(out, sizeof(ca_device_info), alignof(ca_device_info),
                                   &ca_impl_device_info_vector_ops, alloc);
     if (cx != CX_OK) {
         return json_from_cx(cx, err);
@@ -796,8 +728,7 @@ static ca_status json_read_device_list(cx_vector **out, const ca_json_val *arr,
     for (size_t i = 0; i < count; ++i) {
         ca_device_info element;
         ca_status status =
-            ca_device_info_from_json(&element, ca_json_array_get(arr, i),
-                                     alloc, err);
+            ca_device_info_from_json(&element, ca_json_array_get(arr, i), alloc, err);
         if (status != CA_OK) {
             cx_vector_destroy(out);
             return status;
@@ -816,9 +747,8 @@ static ca_status json_read_device_list(cx_vector **out, const ca_json_val *arr,
     return CA_OK;
 }
 
-ca_status ca_device_list_write_json(const ca_device_list *list,
-                                    ca_json_writer *writer, const char *key,
-                                    ca_error *err) {
+ca_status ca_device_list_write_json(const ca_device_list* list, ca_json_writer* writer,
+                                    const char* key, ca_error* err) {
     if (!list || !writer) {
         return CA_INVALID_ARGUMENT;
     }
@@ -826,17 +756,15 @@ ca_status ca_device_list_write_json(const ca_device_list *list,
     CA_JSON_TRY(ca_json_writer_begin_array(writer, "devices", err));
     size_t count = list->devices ? cx_vector_length(list->devices) : 0;
     for (size_t i = 0; i < count; ++i) {
-        const ca_device_info *device =
-            (const ca_device_info *)cx_vector_ptr(list->devices, i);
+        const ca_device_info* device = (const ca_device_info*)cx_vector_ptr(list->devices, i);
         CA_JSON_TRY(ca_device_info_write_json(device, writer, nullptr, err));
     }
     CA_JSON_TRY(ca_json_writer_end_array(writer, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_device_list_from_json(ca_device_list *list,
-                                   const ca_json_val *val,
-                                   const cx_allocator *alloc, ca_error *err) {
+ca_status ca_device_list_from_json(ca_device_list* list, const ca_json_val* val,
+                                   const cx_allocator* alloc, ca_error* err) {
     if (!list || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -846,7 +774,7 @@ ca_status ca_device_list_from_json(ca_device_list *list,
         return status;
     }
 
-    const ca_json_val *devices = ca_json_object_get(val, "devices");
+    const ca_json_val* devices = ca_json_object_get(val, "devices");
     if (json_is_array(devices)) {
         cx_vector_destroy(&list->devices);
         status = json_read_device_list(&list->devices, devices, alloc, err);
@@ -861,9 +789,8 @@ ca_status ca_device_list_from_json(ca_device_list *list,
 /* Track metadata                                                            */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_track_metadata_write_json(const ca_track_metadata *metadata,
-                                       ca_json_writer *writer,
-                                       const char *key, ca_error *err) {
+ca_status ca_track_metadata_write_json(const ca_track_metadata* metadata, ca_json_writer* writer,
+                                       const char* key, ca_error* err) {
     if (!metadata || !writer) {
         return CA_INVALID_ARGUMENT;
     }
@@ -871,36 +798,25 @@ ca_status ca_track_metadata_write_json(const ca_track_metadata *metadata,
     CA_JSON_TRY(json_add_str(writer, "title", metadata->title, err));
     CA_JSON_TRY(json_add_str(writer, "artist", metadata->artist, err));
     CA_JSON_TRY(json_add_str(writer, "album", metadata->album, err));
-    CA_JSON_TRY(
-        json_add_str(writer, "album_artist", metadata->album_artist, err));
+    CA_JSON_TRY(json_add_str(writer, "album_artist", metadata->album_artist, err));
     CA_JSON_TRY(json_add_str(writer, "genre", metadata->genre, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "year", metadata->year, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_num", metadata->track_num, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "disc_num", metadata->disc_num, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_double(writer, "duration", metadata->duration, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "sample_rate", metadata->sample_rate,
-                               err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "channels", metadata->channels, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "bitrate", metadata->bitrate, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_num", metadata->track_num, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "disc_num", metadata->disc_num, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "duration", metadata->duration, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "sample_rate", metadata->sample_rate, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "channels", metadata->channels, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "bitrate", metadata->bitrate, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_track_metadata_from_json(ca_track_metadata *metadata,
-                                      const ca_json_val *val,
-                                      const cx_allocator *alloc,
-                                      ca_error *err) {
+ca_status ca_track_metadata_from_json(ca_track_metadata* metadata, const ca_json_val* val,
+                                      const cx_allocator* alloc, ca_error* err) {
     if (!metadata || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
     memset(metadata, 0, sizeof *metadata);
-    ca_status status =
-        ca_track_metadata_init(metadata, alloc);
+    ca_status status = ca_track_metadata_init(metadata, alloc);
     if (status != CA_OK) {
         return status;
     }
@@ -921,8 +837,7 @@ ca_status ca_track_metadata_from_json(ca_track_metadata *metadata,
         status = json_read_str(val, "album", metadata->album, err);
     }
     if (status == CA_OK) {
-        status =
-            json_read_str(val, "album_artist", metadata->album_artist, err);
+        status = json_read_str(val, "album_artist", metadata->album_artist, err);
     }
     if (status == CA_OK) {
         status = json_read_str(val, "genre", metadata->genre, err);
@@ -937,24 +852,20 @@ ca_status ca_track_metadata_from_json(ca_track_metadata *metadata,
 /* Top entity                                                                */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_top_entity_write_json(const ca_top_entity *entity,
-                                   ca_json_writer *writer, const char *key,
-                                   ca_error *err) {
+ca_status ca_top_entity_write_json(const ca_top_entity* entity, ca_json_writer* writer,
+                                   const char* key, ca_error* err) {
     if (!entity || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(json_add_str(writer, "name", entity->name, err));
-    CA_JSON_TRY(ca_json_writer_add_uint(writer, "track_count",
-                                        (uint64_t)entity->track_count, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "total_plays", entity->total_plays, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "track_count", (uint64_t)entity->track_count, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_plays", entity->total_plays, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_top_entity_from_json(ca_top_entity *entity,
-                                  const ca_json_val *val,
-                                  const cx_allocator *alloc, ca_error *err) {
+ca_status ca_top_entity_from_json(ca_top_entity* entity, const ca_json_val* val,
+                                  const cx_allocator* alloc, ca_error* err) {
     if (!entity || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -979,11 +890,10 @@ ca_status ca_top_entity_from_json(ca_top_entity *entity,
 /* Library stats                                                             */
 /* ------------------------------------------------------------------------- */
 
-static ca_status json_read_track_list(cx_vector **out, const ca_json_val *arr,
-                                      const cx_allocator *alloc,
-                                      ca_error *err) {
-    cx_status cx = cx_vector_init(out, sizeof(ca_track), alignof(ca_track),
-                                  &ca_impl_track_vector_ops, alloc);
+static ca_status json_read_track_list(cx_vector** out, const ca_json_val* arr,
+                                      const cx_allocator* alloc, ca_error* err) {
+    cx_status cx =
+        cx_vector_init(out, sizeof(ca_track), alignof(ca_track), &ca_impl_track_vector_ops, alloc);
     if (cx != CX_OK) {
         return json_from_cx(cx, err);
     }
@@ -992,8 +902,7 @@ static ca_status json_read_track_list(cx_vector **out, const ca_json_val *arr,
     size_t count = ca_json_array_size(arr);
     for (size_t i = 0; i < count; ++i) {
         ca_track element;
-        ca_status status =
-            ca_track_from_json(&element, ca_json_array_get(arr, i), alloc, err);
+        ca_status status = ca_track_from_json(&element, ca_json_array_get(arr, i), alloc, err);
         if (status != CA_OK) {
             cx_vector_destroy(out);
             return status;
@@ -1012,10 +921,9 @@ static ca_status json_read_track_list(cx_vector **out, const ca_json_val *arr,
     return CA_OK;
 }
 
-static ca_status json_read_top_list(cx_vector **out, const ca_json_val *arr,
-                                    const cx_allocator *alloc, ca_error *err) {
-    cx_status cx = cx_vector_init(out, sizeof(ca_top_entity),
-                                  alignof(ca_top_entity),
+static ca_status json_read_top_list(cx_vector** out, const ca_json_val* arr,
+                                    const cx_allocator* alloc, ca_error* err) {
+    cx_status cx = cx_vector_init(out, sizeof(ca_top_entity), alignof(ca_top_entity),
                                   &ca_impl_top_entity_vector_ops, alloc);
     if (cx != CX_OK) {
         return json_from_cx(cx, err);
@@ -1025,9 +933,7 @@ static ca_status json_read_top_list(cx_vector **out, const ca_json_val *arr,
     size_t count = ca_json_array_size(arr);
     for (size_t i = 0; i < count; ++i) {
         ca_top_entity element;
-        ca_status status =
-            ca_top_entity_from_json(&element, ca_json_array_get(arr, i),
-                                    alloc, err);
+        ca_status status = ca_top_entity_from_json(&element, ca_json_array_get(arr, i), alloc, err);
         if (status != CA_OK) {
             cx_vector_destroy(out);
             return status;
@@ -1046,69 +952,57 @@ static ca_status json_read_top_list(cx_vector **out, const ca_json_val *arr,
     return CA_OK;
 }
 
-static ca_status json_write_top_list(ca_json_writer *writer, const char *key,
-                                     const cx_vector *list, ca_error *err) {
+static ca_status json_write_top_list(ca_json_writer* writer, const char* key, const cx_vector* list,
+                                     ca_error* err) {
     CA_JSON_TRY(ca_json_writer_begin_array(writer, key, err));
     size_t count = list ? cx_vector_length(list) : 0;
     for (size_t i = 0; i < count; ++i) {
-        const ca_top_entity *entity =
-            (const ca_top_entity *)cx_vector_ptr(list, i);
+        const ca_top_entity* entity = (const ca_top_entity*)cx_vector_ptr(list, i);
         CA_JSON_TRY(ca_top_entity_write_json(entity, writer, nullptr, err));
     }
     return ca_json_writer_end_array(writer, err);
 }
 
-static ca_status json_write_track_list(ca_json_writer *writer, const char *key,
-                                       const cx_vector *list, ca_error *err) {
+static ca_status json_write_track_list(ca_json_writer* writer, const char* key,
+                                       const cx_vector* list, ca_error* err) {
     CA_JSON_TRY(ca_json_writer_begin_array(writer, key, err));
     size_t count = list ? cx_vector_length(list) : 0;
     for (size_t i = 0; i < count; ++i) {
-        const ca_track *track = (const ca_track *)cx_vector_ptr(list, i);
+        const ca_track* track = (const ca_track*)cx_vector_ptr(list, i);
         CA_JSON_TRY(ca_track_write_json(track, writer, nullptr, err));
     }
     return ca_json_writer_end_array(writer, err);
 }
 
-ca_status ca_library_stats_write_json(const ca_library_stats *stats,
-                                      ca_json_writer *writer, const char *key,
-                                      ca_error *err) {
+ca_status ca_library_stats_write_json(const ca_library_stats* stats, ca_json_writer* writer,
+                                      const char* key, ca_error* err) {
     if (!stats || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
-    CA_JSON_TRY(ca_json_writer_add_uint(writer, "tracks",
-                                        (uint64_t)stats->tracks, err));
-    CA_JSON_TRY(ca_json_writer_add_uint(writer, "queues",
-                                        (uint64_t)stats->queues, err));
-    CA_JSON_TRY(ca_json_writer_add_uint(writer, "playlists",
-                                        (uint64_t)stats->playlists, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_duration_ms",
-                                       stats->total_duration_ms, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_play_time_ms",
-                                       stats->total_play_time_ms, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "tracks", (uint64_t)stats->tracks, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "queues", (uint64_t)stats->queues, err));
+    CA_JSON_TRY(ca_json_writer_add_uint(writer, "playlists", (uint64_t)stats->playlists, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_duration_ms", stats->total_duration_ms, err));
+    CA_JSON_TRY(
+        ca_json_writer_add_int(writer, "total_play_time_ms", stats->total_play_time_ms, err));
     if (stats->has_top_tracks) {
-        CA_JSON_TRY(
-            json_write_track_list(writer, "top_tracks", stats->top_tracks, err));
+        CA_JSON_TRY(json_write_track_list(writer, "top_tracks", stats->top_tracks, err));
     }
     if (stats->has_top_albums) {
-        CA_JSON_TRY(
-            json_write_top_list(writer, "top_albums", stats->top_albums, err));
+        CA_JSON_TRY(json_write_top_list(writer, "top_albums", stats->top_albums, err));
     }
     if (stats->has_top_genres) {
-        CA_JSON_TRY(
-            json_write_top_list(writer, "top_genres", stats->top_genres, err));
+        CA_JSON_TRY(json_write_top_list(writer, "top_genres", stats->top_genres, err));
     }
     if (stats->has_top_artists) {
-        CA_JSON_TRY(
-            json_write_top_list(writer, "top_artists", stats->top_artists, err));
+        CA_JSON_TRY(json_write_top_list(writer, "top_artists", stats->top_artists, err));
     }
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_library_stats_from_json(ca_library_stats *stats,
-                                     const ca_json_val *val,
-                                     const cx_allocator *alloc,
-                                     ca_error *err) {
+ca_status ca_library_stats_from_json(ca_library_stats* stats, const ca_json_val* val,
+                                     const cx_allocator* alloc, ca_error* err) {
     if (!stats || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1127,7 +1021,7 @@ ca_status ca_library_stats_from_json(ca_library_stats *stats,
     stats->total_duration_ms = json_int_member(val, "total_duration_ms", 0);
     stats->total_play_time_ms = json_int_member(val, "total_play_time_ms", 0);
 
-    const ca_json_val *top = ca_json_object_get(val, "top_tracks");
+    const ca_json_val* top = ca_json_object_get(val, "top_tracks");
     if (json_is_array(top)) {
         stats->has_top_tracks = true;
         status = json_read_track_list(&stats->top_tracks, top, alloc, err);
@@ -1136,24 +1030,21 @@ ca_status ca_library_stats_from_json(ca_library_stats *stats,
         top = ca_json_object_get(val, "top_albums");
         if (json_is_array(top)) {
             stats->has_top_albums = true;
-            status =
-                json_read_top_list(&stats->top_albums, top, alloc, err);
+            status = json_read_top_list(&stats->top_albums, top, alloc, err);
         }
     }
     if (status == CA_OK) {
         top = ca_json_object_get(val, "top_genres");
         if (json_is_array(top)) {
             stats->has_top_genres = true;
-            status =
-                json_read_top_list(&stats->top_genres, top, alloc, err);
+            status = json_read_top_list(&stats->top_genres, top, alloc, err);
         }
     }
     if (status == CA_OK) {
         top = ca_json_object_get(val, "top_artists");
         if (json_is_array(top)) {
             stats->has_top_artists = true;
-            status =
-                json_read_top_list(&stats->top_artists, top, alloc, err);
+            status = json_read_top_list(&stats->top_artists, top, alloc, err);
         }
     }
     if (status != CA_OK) {
@@ -1166,24 +1057,22 @@ ca_status ca_library_stats_from_json(ca_library_stats *stats,
 /* Queue                                                                     */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_queue_write_json(const ca_queue *queue, ca_json_writer *writer,
-                              const char *key, ca_error *err) {
+ca_status ca_queue_write_json(const ca_queue* queue, ca_json_writer* writer, const char* key,
+                              ca_error* err) {
     if (!queue || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", queue->id, err));
     CA_JSON_TRY(json_add_str(writer, "name", queue->name, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "repeat_mode", queue->repeat_mode, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "repeat_mode", queue->repeat_mode, err));
     CA_JSON_TRY(ca_json_writer_add_bool(writer, "temp", queue->temp, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "library_id", queue->library_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "library_id", queue->library_id, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_queue_from_json(ca_queue *queue, const ca_json_val *val,
-                             const cx_allocator *alloc, ca_error *err) {
+ca_status ca_queue_from_json(ca_queue* queue, const ca_json_val* val, const cx_allocator* alloc,
+                             ca_error* err) {
     if (!queue || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1209,9 +1098,8 @@ ca_status ca_queue_from_json(ca_queue *queue, const ca_json_val *val,
 /* Library                                                                   */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_library_write_json(const ca_library *library,
-                                ca_json_writer *writer, const char *key,
-                                ca_error *err) {
+ca_status ca_library_write_json(const ca_library* library, ca_json_writer* writer, const char* key,
+                                ca_error* err) {
     if (!library || !writer) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1219,21 +1107,16 @@ ca_status ca_library_write_json(const ca_library *library,
     CA_JSON_TRY(ca_json_writer_add_int(writer, "id", library->id, err));
     CA_JSON_TRY(json_add_str(writer, "path", library->path, err));
     CA_JSON_TRY(json_add_str(writer, "name", library->name, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "date_added",
-                                       library->date_added, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "last_scanned",
-                                       library->last_scanned, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_bool(writer, "auto_scan", library->auto_scan, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_bool(writer, "recursive", library->recursive, err));
-    CA_JSON_TRY(
-        json_add_str(writer, "extensions", library->extensions, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "date_added", library->date_added, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "last_scanned", library->last_scanned, err));
+    CA_JSON_TRY(ca_json_writer_add_bool(writer, "auto_scan", library->auto_scan, err));
+    CA_JSON_TRY(ca_json_writer_add_bool(writer, "recursive", library->recursive, err));
+    CA_JSON_TRY(json_add_str(writer, "extensions", library->extensions, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_library_from_json(ca_library *library, const ca_json_val *val,
-                               const cx_allocator *alloc, ca_error *err) {
+ca_status ca_library_from_json(ca_library* library, const ca_json_val* val,
+                               const cx_allocator* alloc, ca_error* err) {
     if (!library || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1266,34 +1149,24 @@ ca_status ca_library_from_json(ca_library *library, const ca_json_val *val,
 /* Playback statistics                                                       */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_playback_stats_write_json(const ca_playback_stats *stats,
-                                       ca_json_writer *writer,
-                                       const char *key, ca_error *err) {
+ca_status ca_playback_stats_write_json(const ca_playback_stats* stats, ca_json_writer* writer,
+                                       const char* key, ca_error* err) {
     if (!stats || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "num_tracks", stats->num_tracks, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_playlists",
-                                       stats->num_playlists, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_queue_items",
-                                       stats->num_queue_items, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "num_history", stats->num_history, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_bookmarks",
-                                       stats->num_bookmarks, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_libraries",
-                                       stats->num_libraries, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_duration_ms",
-                                       stats->total_duration_ms, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_tracks", stats->num_tracks, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_playlists", stats->num_playlists, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_queue_items", stats->num_queue_items, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_history", stats->num_history, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_bookmarks", stats->num_bookmarks, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "num_libraries", stats->num_libraries, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "total_duration_ms", stats->total_duration_ms, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_playback_stats_from_json(ca_playback_stats *stats,
-                                      const ca_json_val *val,
-                                      const cx_allocator *alloc,
-                                      ca_error *err) {
+ca_status ca_playback_stats_from_json(ca_playback_stats* stats, const ca_json_val* val,
+                                      const cx_allocator* alloc, ca_error* err) {
     (void)alloc;
     if (!stats || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
@@ -1314,36 +1187,32 @@ ca_status ca_playback_stats_from_json(ca_playback_stats *stats,
 /* Track query                                                               */
 /* ------------------------------------------------------------------------- */
 
-static ca_status json_write_optional_int(ca_json_writer *writer,
-                                         const char *key, bool has,
-                                         int64_t value, ca_error *err) {
+static ca_status json_write_optional_int(ca_json_writer* writer, const char* key, bool has,
+                                         int64_t value, ca_error* err) {
     if (!has) {
         return ca_json_writer_add_null(writer, key, err);
     }
     return ca_json_writer_add_int(writer, key, value, err);
 }
 
-static ca_status json_write_optional_double(ca_json_writer *writer,
-                                            const char *key, bool has,
-                                            double value, ca_error *err) {
+static ca_status json_write_optional_double(ca_json_writer* writer, const char* key, bool has,
+                                            double value, ca_error* err) {
     if (!has) {
         return ca_json_writer_add_null(writer, key, err);
     }
     return ca_json_writer_add_double(writer, key, value, err);
 }
 
-static ca_status json_write_optional_bool(ca_json_writer *writer,
-                                          const char *key, bool has,
-                                          bool value, ca_error *err) {
+static ca_status json_write_optional_bool(ca_json_writer* writer, const char* key, bool has,
+                                          bool value, ca_error* err) {
     if (!has) {
         return ca_json_writer_add_null(writer, key, err);
     }
     return ca_json_writer_add_bool(writer, key, value, err);
 }
 
-ca_status ca_track_query_write_json(const ca_track_query *query,
-                                    ca_json_writer *writer, const char *key,
-                                    ca_error *err) {
+ca_status ca_track_query_write_json(const ca_track_query* query, ca_json_writer* writer,
+                                    const char* key, ca_error* err) {
     if (!query || !writer) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1351,32 +1220,22 @@ ca_status ca_track_query_write_json(const ca_track_query *query,
     CA_JSON_TRY(json_add_str(writer, "artist", query->artist, err));
     CA_JSON_TRY(json_add_str(writer, "album", query->album, err));
     CA_JSON_TRY(json_add_str(writer, "genre", query->genre, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "year", query->has_year,
-                                        query->year, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "year_min",
-                                        query->has_year_min, query->year_min,
-                                        err));
-    CA_JSON_TRY(json_write_optional_int(writer, "year_max",
-                                        query->has_year_max, query->year_max,
-                                        err));
-    CA_JSON_TRY(json_write_optional_int(writer, "library_id",
-                                        query->has_library_id,
+    CA_JSON_TRY(json_write_optional_int(writer, "year", query->has_year, query->year, err));
+    CA_JSON_TRY(
+        json_write_optional_int(writer, "year_min", query->has_year_min, query->year_min, err));
+    CA_JSON_TRY(
+        json_write_optional_int(writer, "year_max", query->has_year_max, query->year_max, err));
+    CA_JSON_TRY(json_write_optional_int(writer, "library_id", query->has_library_id,
                                         query->library_id, err));
-    CA_JSON_TRY(json_write_optional_bool(writer, "dirty", query->has_dirty,
-                                         query->dirty, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "rating", query->has_rating,
-                                        query->rating, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "play_count_min",
-                                        query->has_play_count_min,
+    CA_JSON_TRY(json_write_optional_bool(writer, "dirty", query->has_dirty, query->dirty, err));
+    CA_JSON_TRY(json_write_optional_int(writer, "rating", query->has_rating, query->rating, err));
+    CA_JSON_TRY(json_write_optional_int(writer, "play_count_min", query->has_play_count_min,
                                         query->play_count_min, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "play_count_max",
-                                        query->has_play_count_max,
+    CA_JSON_TRY(json_write_optional_int(writer, "play_count_max", query->has_play_count_max,
                                         query->play_count_max, err));
-    CA_JSON_TRY(json_write_optional_double(writer, "duration_min",
-                                           query->has_duration_min,
+    CA_JSON_TRY(json_write_optional_double(writer, "duration_min", query->has_duration_min,
                                            query->duration_min, err));
-    CA_JSON_TRY(json_write_optional_double(writer, "duration_max",
-                                           query->has_duration_max,
+    CA_JSON_TRY(json_write_optional_double(writer, "duration_max", query->has_duration_max,
                                            query->duration_max, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "limit", query->limit, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "offset", query->offset, err));
@@ -1386,9 +1245,8 @@ ca_status ca_track_query_write_json(const ca_track_query *query,
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_track_query_from_json(ca_track_query *query,
-                                   const ca_json_val *val,
-                                   const cx_allocator *alloc, ca_error *err) {
+ca_status ca_track_query_from_json(ca_track_query* query, const ca_json_val* val,
+                                   const cx_allocator* alloc, ca_error* err) {
     if (!query || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1416,7 +1274,7 @@ ca_status ca_track_query_from_json(ca_track_query *query,
                            &query->play_count_max);
 
     /* Durations are doubles so fractional seconds survive. */
-    const ca_json_val *dur = ca_json_object_get(val, "duration_min");
+    const ca_json_val* dur = ca_json_object_get(val, "duration_min");
     double duration = 0.0;
     if (json_number_double(dur, &duration)) {
         query->has_duration_min = true;
@@ -1463,37 +1321,30 @@ ca_status ca_track_query_from_json(ca_track_query *query,
 /* History query                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_history_query_write_json(const ca_history_query *query,
-                                      ca_json_writer *writer, const char *key,
-                                      ca_error *err) {
+ca_status ca_history_query_write_json(const ca_history_query* query, ca_json_writer* writer,
+                                      const char* key, ca_error* err) {
     if (!query || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
-    CA_JSON_TRY(json_write_optional_int(writer, "track_id",
-                                        query->has_track_id, query->track_id,
-                                        err));
-    CA_JSON_TRY(json_write_optional_int(writer, "queue_id",
-                                        query->has_queue_id, query->queue_id,
-                                        err));
+    CA_JSON_TRY(
+        json_write_optional_int(writer, "track_id", query->has_track_id, query->track_id, err));
+    CA_JSON_TRY(
+        json_write_optional_int(writer, "queue_id", query->has_queue_id, query->queue_id, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "limit", query->limit, err));
     CA_JSON_TRY(ca_json_writer_add_int(writer, "offset", query->offset, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_history_query_from_json(ca_history_query *query,
-                                     const ca_json_val *val,
-                                     const cx_allocator *alloc,
-                                     ca_error *err) {
+ca_status ca_history_query_from_json(ca_history_query* query, const ca_json_val* val,
+                                     const cx_allocator* alloc, ca_error* err) {
     (void)alloc;
     if (!query || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
     memset(query, 0, sizeof *query);
-    json_read_optional_int(val, "track_id", &query->has_track_id,
-                           &query->track_id);
-    json_read_optional_int(val, "queue_id", &query->has_queue_id,
-                           &query->queue_id);
+    json_read_optional_int(val, "track_id", &query->has_track_id, &query->track_id);
+    json_read_optional_int(val, "queue_id", &query->has_queue_id, &query->queue_id);
     query->limit = (int)json_int_member(val, "limit", 0);
     query->offset = (int)json_int_member(val, "offset", 0);
     (void)err;
@@ -1504,32 +1355,24 @@ ca_status ca_history_query_from_json(ca_history_query *query,
 /* Engine event                                                              */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_engine_event_write_json(const ca_engine_event *event,
-                                     ca_json_writer *writer, const char *key,
-                                     ca_error *err) {
+ca_status ca_engine_event_write_json(const ca_engine_event* event, ca_json_writer* writer,
+                                     const char* key, ca_error* err) {
     if (!event || !writer) {
         return CA_INVALID_ARGUMENT;
     }
-    const char *type_name = ca_engine_event_type_name(event->type);
+    const char* type_name = ca_engine_event_type_name(event->type);
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
-    CA_JSON_TRY(ca_json_writer_add_string(writer, "type", type_name,
-                                          strlen(type_name), err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "track_id", event->track_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "queue_id", event->queue_id, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_double(writer, "position", event->position, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_double(writer, "duration", event->duration, err));
+    CA_JSON_TRY(ca_json_writer_add_string(writer, "type", type_name, strlen(type_name), err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "track_id", event->track_id, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "queue_id", event->queue_id, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "position", event->position, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "duration", event->duration, err));
     CA_JSON_TRY(json_add_str(writer, "msg", event->msg, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_engine_event_from_json(ca_engine_event *event,
-                                    const ca_json_val *val,
-                                    const cx_allocator *alloc,
-                                    ca_error *err) {
+ca_status ca_engine_event_from_json(ca_engine_event* event, const ca_json_val* val,
+                                    const cx_allocator* alloc, ca_error* err) {
     if (!event || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1539,27 +1382,22 @@ ca_status ca_engine_event_from_json(ca_engine_event *event,
         return status;
     }
 
-    const ca_json_val *type_val = ca_json_object_get(val, "type");
+    const ca_json_val* type_val = ca_json_object_get(val, "type");
     if (type_val && ca_json_type_of(type_val) == CA_JSON_STRING) {
         size_t length = 0;
-        const char *data = ca_json_get_string(type_val, &length);
+        const char* data = ca_json_get_string(type_val, &length);
         cx_string_view view = cx_string_view_from_parts(data ? data : "", length);
         if (cx_string_view_eq(view, cx_string_view_from_cstr("None"))) {
             event->type = CA_ENGINE_EVENT_NONE;
-        } else if (cx_string_view_eq(
-                       view, cx_string_view_from_cstr("TrackStarted"))) {
+        } else if (cx_string_view_eq(view, cx_string_view_from_cstr("TrackStarted"))) {
             event->type = CA_ENGINE_EVENT_TRACK_STARTED;
-        } else if (cx_string_view_eq(
-                       view, cx_string_view_from_cstr("TrackEnded"))) {
+        } else if (cx_string_view_eq(view, cx_string_view_from_cstr("TrackEnded"))) {
             event->type = CA_ENGINE_EVENT_TRACK_ENDED;
-        } else if (cx_string_view_eq(
-                       view, cx_string_view_from_cstr("QueueChanged"))) {
+        } else if (cx_string_view_eq(view, cx_string_view_from_cstr("QueueChanged"))) {
             event->type = CA_ENGINE_EVENT_QUEUE_CHANGED;
-        } else if (cx_string_view_eq(
-                       view, cx_string_view_from_cstr("Progress"))) {
+        } else if (cx_string_view_eq(view, cx_string_view_from_cstr("Progress"))) {
             event->type = CA_ENGINE_EVENT_PROGRESS;
-        } else if (cx_string_view_eq(
-                       view, cx_string_view_from_cstr("Error"))) {
+        } else if (cx_string_view_eq(view, cx_string_view_from_cstr("Error"))) {
             event->type = CA_ENGINE_EVENT_ERROR;
         }
     }
@@ -1580,46 +1418,34 @@ ca_status ca_engine_event_from_json(ca_engine_event *event,
 /* Engine state                                                              */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_engine_state_write_json(const ca_engine_state *state,
-                                     ca_json_writer *writer, const char *key,
-                                     ca_error *err) {
+ca_status ca_engine_state_write_json(const ca_engine_state* state, ca_json_writer* writer,
+                                     const char* key, ca_error* err) {
     if (!state || !writer) {
         return CA_INVALID_ARGUMENT;
     }
     CA_JSON_TRY(ca_json_writer_begin_object(writer, key, err));
     CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "shuffle_enabled",
-                               state->shuffle_enabled ? 1 : 0, err));
+        ca_json_writer_add_int(writer, "shuffle_enabled", state->shuffle_enabled ? 1 : 0, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "repeat_mode", state->repeat_mode, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "cursor_pos", state->cursor_pos, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "current_track_id", state->current_track_id, err));
+    CA_JSON_TRY(ca_json_writer_add_double(writer, "volume", (double)state->volume, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "active_queue_id", state->active_queue_id, err));
     CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "repeat_mode", state->repeat_mode, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "cursor_pos", state->cursor_pos,
-                                       err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "current_track_id",
-                                       state->current_track_id, err));
-    CA_JSON_TRY(ca_json_writer_add_double(writer, "volume",
-                                          (double)state->volume, err));
-    CA_JSON_TRY(ca_json_writer_add_int(writer, "active_queue_id",
-                                       state->active_queue_id, err));
-    CA_JSON_TRY(ca_json_writer_add_double(writer, "pre_mute_volume",
-                                          (double)state->pre_mute_volume, err));
-    CA_JSON_TRY(
-        ca_json_writer_add_int(writer, "position_ms", state->position_ms, err));
+        ca_json_writer_add_double(writer, "pre_mute_volume", (double)state->pre_mute_volume, err));
+    CA_JSON_TRY(ca_json_writer_add_int(writer, "position_ms", state->position_ms, err));
     CA_JSON_TRY(ca_json_writer_begin_array(writer, "shuffle_perm", err));
-    size_t count = state->shuffle_perm ? cx_vector_length(state->shuffle_perm)
-                                       : 0;
+    size_t count = state->shuffle_perm ? cx_vector_length(state->shuffle_perm) : 0;
     for (size_t i = 0; i < count; ++i) {
-        const int64_t *value =
-            (const int64_t *)cx_vector_ptr(state->shuffle_perm, i);
+        const int64_t* value = (const int64_t*)cx_vector_ptr(state->shuffle_perm, i);
         CA_JSON_TRY(ca_json_writer_add_int(writer, nullptr, *value, err));
     }
     CA_JSON_TRY(ca_json_writer_end_array(writer, err));
     return ca_json_writer_end_object(writer, err);
 }
 
-ca_status ca_engine_state_from_json(ca_engine_state *state,
-                                    const ca_json_val *val,
-                                    const cx_allocator *alloc,
-                                    ca_error *err) {
+ca_status ca_engine_state_from_json(ca_engine_state* state, const ca_json_val* val,
+                                    const cx_allocator* alloc, ca_error* err) {
     if (!state || !json_is_object(val)) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1629,26 +1455,22 @@ ca_status ca_engine_state_from_json(ca_engine_state *state,
         return status;
     }
 
-    state->shuffle_enabled =
-        json_int_member(val, "shuffle_enabled", 0) != 0 ? 1 : 0;
-    state->repeat_mode =
-        (ca_repeat_mode)json_i32_member(val, "repeat_mode", 0);
+    state->shuffle_enabled = json_int_member(val, "shuffle_enabled", 0) != 0 ? 1 : 0;
+    state->repeat_mode = (ca_repeat_mode)json_i32_member(val, "repeat_mode", 0);
     state->cursor_pos = json_int_member(val, "cursor_pos", 0);
     state->current_track_id = json_int_member(val, "current_track_id", 0);
     state->volume = (float)json_double_member(val, "volume", 1.0);
     state->active_queue_id = json_int_member(val, "active_queue_id", 1);
-    state->pre_mute_volume =
-        (float)json_double_member(val, "pre_mute_volume", 0.5);
+    state->pre_mute_volume = (float)json_double_member(val, "pre_mute_volume", 0.5);
     state->position_ms = json_int_member(val, "position_ms", 0);
 
-    const ca_json_val *perm = ca_json_object_get(val, "shuffle_perm");
+    const ca_json_val* perm = ca_json_object_get(val, "shuffle_perm");
     if (json_is_array(perm)) {
         size_t count = ca_json_array_size(perm);
         for (size_t i = 0; i < count; ++i) {
             int64_t value = 0;
             (void)json_number_int(ca_json_array_get(perm, i), &value);
-            cx_status cx = cx_vector_push_copy(state->shuffle_perm, &value,
-                                               sizeof value);
+            cx_status cx = cx_vector_push_copy(state->shuffle_perm, &value, sizeof value);
             if (cx != CX_OK) {
                 ca_engine_state_destroy(state);
                 return json_from_cx(cx, err);

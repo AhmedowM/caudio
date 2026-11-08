@@ -19,7 +19,7 @@
  * `fail_at` fails; otherwise only the exact attempt fails.
  */
 typedef struct cx_allocator_failing {
-    const cx_allocator *inner;
+    const cx_allocator* inner;
     size_t fail_at;
     size_t attempts;
     bool fail_all_after;
@@ -30,17 +30,15 @@ typedef struct cx_allocator_null {
     unsigned char unused;
 } cx_allocator_null;
 
-static inline void *cx_allocator_failing_alloc(void *state, size_t size,
-                                               size_t alignment) {
-    auto failing = (cx_allocator_failing *)state;
+static inline void* cx_allocator_failing_alloc(void* state, size_t size, size_t alignment) {
+    auto failing = (cx_allocator_failing*)state;
     failing->attempts++;
 
     auto failed = false;
 
     if (failing->fail_at != 0) {
-        failed = failing->fail_all_after
-                     ? failing->attempts >= failing->fail_at
-                     : failing->attempts == failing->fail_at;
+        failed = failing->fail_all_after ? failing->attempts >= failing->fail_at
+                                         : failing->attempts == failing->fail_at;
     }
 
     if (failed) {
@@ -50,15 +48,14 @@ static inline void *cx_allocator_failing_alloc(void *state, size_t size,
     return cx_allocator_alloc(failing->inner, size, alignment);
 }
 
-static inline void cx_allocator_failing_free(void *state, void *ptr,
-                                             size_t size, size_t alignment) {
-    auto failing = (cx_allocator_failing *)state;
+static inline void cx_allocator_failing_free(void* state, void* ptr, size_t size,
+                                             size_t alignment) {
+    auto failing = (cx_allocator_failing*)state;
 
     cx_allocator_free(failing->inner, ptr, size, alignment);
 }
 
-static inline cx_allocator cx_allocator_failing_as_allocator(
-    cx_allocator_failing *failing) {
+static inline cx_allocator cx_allocator_failing_as_allocator(cx_allocator_failing* failing) {
     if (failing->inner == nullptr) {
         failing->inner = cx_allocator_default();
     }
@@ -71,21 +68,19 @@ static inline cx_allocator cx_allocator_failing_as_allocator(
     };
 }
 
-static inline void *cx_allocator_null_alloc(void *state,
-                                            [[maybe_unused]] size_t size,
+static inline void* cx_allocator_null_alloc(void* state, [[maybe_unused]] size_t size,
                                             [[maybe_unused]] size_t alignment) {
     (void)state;
     return nullptr;
 }
 
-static inline void cx_allocator_null_free(
-    void *state, [[maybe_unused]] void *ptr,
-    [[maybe_unused]] size_t size, [[maybe_unused]] size_t alignment) {
+static inline void cx_allocator_null_free(void* state, [[maybe_unused]] void* ptr,
+                                          [[maybe_unused]] size_t size,
+                                          [[maybe_unused]] size_t alignment) {
     (void)state;
 }
 
-static inline cx_allocator cx_allocator_null_as_allocator(
-    cx_allocator_null *allocator) {
+static inline cx_allocator cx_allocator_null_as_allocator(cx_allocator_null* allocator) {
     return (cx_allocator){
         .state = allocator,
         .alloc = cx_allocator_null_alloc,

@@ -46,14 +46,10 @@ static int test_null_args(void) {
     ca_error err;
     ca_error_init(&err);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_mutex_lock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_mutex_unlock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_mutex_trylock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_mutex_create(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_mutex_lock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_mutex_unlock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_mutex_trylock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_mutex_create(nullptr, &err));
 
     return ca_test_finish("mutex.null_args");
 }

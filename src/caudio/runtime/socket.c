@@ -1,19 +1,18 @@
 ﻿#include <caudio/runtime/socket.h>
-
 #include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <poll.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <errno.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #endif
 
 struct ca_socket {
@@ -48,8 +47,8 @@ static ca_status socket_bind_status(int code) {
 }
 
 static ca_status socket_connect_status(int code) {
-    if (code == WSAECONNREFUSED || code == WSAEWOULDBLOCK ||
-        code == WSAEINPROGRESS || code == WSAEINTR) {
+    if (code == WSAECONNREFUSED || code == WSAEWOULDBLOCK || code == WSAEINPROGRESS ||
+        code == WSAEINTR) {
         return CA_BUSY;
     }
     if (code == WSAEACCES) {
@@ -72,8 +71,8 @@ static ca_status socket_bind_status(int code) {
 }
 
 static ca_status socket_connect_status(int code) {
-    if (code == ECONNREFUSED || code == ENOENT || code == EAGAIN ||
-        code == EINPROGRESS || code == EINTR
+    if (code == ECONNREFUSED || code == ENOENT || code == EAGAIN || code == EINPROGRESS ||
+        code == EINTR
 #if EWOULDBLOCK != EAGAIN
         || code == EWOULDBLOCK
 #endif
@@ -90,16 +89,14 @@ static ca_status socket_connect_status(int code) {
 }
 #endif
 
-ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
-                            ca_error *err) {
+ca_status ca_socket_addr_un(ca_socket_addr_t* out, const char* path, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (out == nullptr || path == nullptr || path[0] == '\0') {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out or path is nullptr or empty");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out or path is nullptr or empty");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -111,8 +108,7 @@ ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
 
     if (path_len >= sizeof(un.sun_path)) {
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "UNIX socket path needs %zu bytes; limit is %zu",
+            ca_error_set(err, CA_OVERFLOW, "UNIX socket path needs %zu bytes; limit is %zu",
                          path_len + 1, sizeof(un.sun_path));
         }
         return CA_OVERFLOW;
@@ -123,16 +119,13 @@ ca_status ca_socket_addr_un(ca_socket_addr_t *out, const char *path,
 
     memset(out, 0, sizeof(*out));
     out->domain = CA_SOCKET_DOMAIN_UNIX;
-    memcpy(&out->addr.storage, &un,
-           offsetof(struct sockaddr_un, sun_path) + path_len + 1);
-    out->len =
-        (socklen_t)(offsetof(struct sockaddr_un, sun_path) + path_len + 1);
+    memcpy(&out->addr.storage, &un, offsetof(struct sockaddr_un, sun_path) + path_len + 1);
+    out->len = (socklen_t)(offsetof(struct sockaddr_un, sun_path) + path_len + 1);
 
     return CA_OK;
 }
 
-ca_socket_t ca_socket_create(ca_socket_domain domain,
-                             ca_socket_type type, ca_error *err) {
+ca_socket_t ca_socket_create(ca_socket_domain domain, ca_socket_type type, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -149,36 +142,36 @@ ca_socket_t ca_socket_create(ca_socket_domain domain,
     int af = 0, st = 0, proto = 0;
 
     switch (domain) {
-        case CA_SOCKET_DOMAIN_INET:
-            af = AF_INET;
-            break;
-        case CA_SOCKET_DOMAIN_INET6:
-            af = AF_INET6;
-            break;
-        case CA_SOCKET_DOMAIN_UNIX:
-            af = AF_UNIX;
-            break;
-        default:
-            if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT, "invalid domain");
-            }
-            return CA_SOCKET_INVALID;
+    case CA_SOCKET_DOMAIN_INET:
+        af = AF_INET;
+        break;
+    case CA_SOCKET_DOMAIN_INET6:
+        af = AF_INET6;
+        break;
+    case CA_SOCKET_DOMAIN_UNIX:
+        af = AF_UNIX;
+        break;
+    default:
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid domain");
+        }
+        return CA_SOCKET_INVALID;
     }
 
     switch (type) {
-        case CA_SOCKET_TYPE_STREAM:
-            st = SOCK_STREAM;
-            proto = 0;
-            break;
-        case CA_SOCKET_TYPE_DGRAM:
-            st = SOCK_DGRAM;
-            proto = 0;
-            break;
-        default:
-            if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT, "invalid type");
-            }
-            return CA_SOCKET_INVALID;
+    case CA_SOCKET_TYPE_STREAM:
+        st = SOCK_STREAM;
+        proto = 0;
+        break;
+    case CA_SOCKET_TYPE_DGRAM:
+        st = SOCK_DGRAM;
+        proto = 0;
+        break;
+    default:
+        if (err) {
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid type");
+        }
+        return CA_SOCKET_INVALID;
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -221,37 +214,32 @@ ca_socket_t ca_socket_create(ca_socket_domain domain,
     return sock;
 }
 
-ca_status ca_socket_bind(ca_socket_t sock,
-                         const ca_socket_addr_t *addr, ca_error *err) {
+ca_status ca_socket_bind(ca_socket_t sock, const ca_socket_addr_t* addr, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (sock == CA_SOCKET_INVALID || addr == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid socket or addr");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid socket or addr");
         }
         return CA_INVALID_ARGUMENT;
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    if (bind(sock->handle, (const struct sockaddr *)&addr->addr.storage,
-             addr->len) == SOCKET_ERROR) {
+    if (bind(sock->handle, (const struct sockaddr*)&addr->addr.storage, addr->len) ==
+        SOCKET_ERROR) {
         int code = WSAGetLastError();
         if (err) {
-            ca_error_set(err, socket_bind_status(code), "bind failed: %d",
-                         code);
+            ca_error_set(err, socket_bind_status(code), "bind failed: %d", code);
         }
         return socket_bind_status(code);
     }
 #else
-    if (bind(sock->fd, (const struct sockaddr *)&addr->addr.storage,
-             addr->len) != 0) {
+    if (bind(sock->fd, (const struct sockaddr*)&addr->addr.storage, addr->len) != 0) {
         int code = errno;
         if (err) {
-            ca_error_set(err, socket_bind_status(code), "bind failed: %d",
-                         code);
+            ca_error_set(err, socket_bind_status(code), "bind failed: %d", code);
         }
         return socket_bind_status(code);
     }
@@ -260,7 +248,7 @@ ca_status ca_socket_bind(ca_socket_t sock,
     return CA_OK;
 }
 
-ca_status ca_socket_listen(ca_socket_t sock, int backlog, ca_error *err) {
+ca_status ca_socket_listen(ca_socket_t sock, int backlog, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -291,37 +279,32 @@ ca_status ca_socket_listen(ca_socket_t sock, int backlog, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_socket_connect(ca_socket_t sock,
-                            const ca_socket_addr_t *addr, ca_error *err) {
+ca_status ca_socket_connect(ca_socket_t sock, const ca_socket_addr_t* addr, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (sock == CA_SOCKET_INVALID || addr == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid socket or addr");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid socket or addr");
         }
         return CA_INVALID_ARGUMENT;
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    if (connect(sock->handle, (const struct sockaddr *)&addr->addr.storage,
-                addr->len) == SOCKET_ERROR) {
+    if (connect(sock->handle, (const struct sockaddr*)&addr->addr.storage, addr->len) ==
+        SOCKET_ERROR) {
         int code = WSAGetLastError();
         if (err) {
-            ca_error_set(err, socket_connect_status(code),
-                         "connect failed: %d", code);
+            ca_error_set(err, socket_connect_status(code), "connect failed: %d", code);
         }
         return socket_connect_status(code);
     }
 #else
-    if (connect(sock->fd, (const struct sockaddr *)&addr->addr.storage,
-                addr->len) != 0) {
+    if (connect(sock->fd, (const struct sockaddr*)&addr->addr.storage, addr->len) != 0) {
         int code = errno;
         if (err) {
-            ca_error_set(err, socket_connect_status(code),
-                         "connect failed: %d", code);
+            ca_error_set(err, socket_connect_status(code), "connect failed: %d", code);
         }
         return socket_connect_status(code);
     }
@@ -330,8 +313,7 @@ ca_status ca_socket_connect(ca_socket_t sock,
     return CA_OK;
 }
 
-ca_socket_t ca_socket_accept(ca_socket_t sock,
-                             ca_socket_addr_t *out_addr, ca_error *err) {
+ca_socket_t ca_socket_accept(ca_socket_t sock, ca_socket_addr_t* out_addr, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -385,22 +367,20 @@ ca_socket_t ca_socket_accept(ca_socket_t sock,
     return new_sock;
 }
 
-size_t ca_socket_send(ca_socket_t sock, const void *buf, size_t len,
-                      int flags, ca_error *err) {
+size_t ca_socket_send(ca_socket_t sock, const void* buf, size_t len, int flags, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (sock == CA_SOCKET_INVALID || buf == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid socket or buf");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid socket or buf");
         }
         return (size_t)-1;
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    int sent = send(sock->handle, (const char *)buf, (int)len, flags);
+    int sent = send(sock->handle, (const char*)buf, (int)len, flags);
     if (sent == SOCKET_ERROR) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "send failed");
@@ -420,22 +400,20 @@ size_t ca_socket_send(ca_socket_t sock, const void *buf, size_t len,
 #endif
 }
 
-size_t ca_socket_recv(ca_socket_t sock, void *buf, size_t len, int flags,
-                      ca_error *err) {
+size_t ca_socket_recv(ca_socket_t sock, void* buf, size_t len, int flags, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (sock == CA_SOCKET_INVALID || buf == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid socket or buf");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid socket or buf");
         }
         return (size_t)-1;
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    int received = recv(sock->handle, (char *)buf, (int)len, flags);
+    int received = recv(sock->handle, (char*)buf, (int)len, flags);
     if (received == SOCKET_ERROR) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "recv failed");
@@ -469,8 +447,7 @@ void ca_socket_close(ca_socket_t sock) {
     free(sock);
 }
 
-ca_status ca_socket_setblocking(ca_socket_t sock, int blocking,
-                                ca_error *err) {
+ca_status ca_socket_setblocking(ca_socket_t sock, int blocking, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -516,8 +493,7 @@ ca_status ca_socket_setblocking(ca_socket_t sock, int blocking,
     return CA_OK;
 }
 
-ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms,
-                                  ca_error *err) {
+ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -535,7 +511,7 @@ ca_status ca_socket_wait_readable(ca_socket_t sock, int timeout_ms,
     FD_SET(sock->handle, &readfds);
 
     struct timeval tv;
-    struct timeval *ptv = nullptr;
+    struct timeval* ptv = nullptr;
     if (timeout_ms >= 0) {
         tv.tv_sec = timeout_ms / 1000;
         tv.tv_usec = (timeout_ms % 1000) * 1000;

@@ -18,11 +18,10 @@
  * synchronize externally.
  */
 
-#include <stddef.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/api.h>
 #include <cstdx/status.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,10 +37,10 @@ struct cx_allocator_canary_block;
  */
 typedef struct cx_allocator_canary {
     /** Allocator that receives the real requests. */
-    const cx_allocator *inner;
+    const cx_allocator* inner;
 
     /** Internal list of outstanding blocks. */
-    struct cx_allocator_canary_block *blocks;
+    struct cx_allocator_canary_block* blocks;
 
     /** Live blocks currently owned by the caller. */
     size_t live_blocks;
@@ -56,23 +55,22 @@ typedef struct cx_allocator_canary {
  * @param canary State to initialize. Must not be nullptr.
  * @param inner Allocator to wrap, or nullptr for `cx_allocator_default`.
  */
-[[nodiscard]] CX_API cx_status cx_allocator_canary_init(
-    cx_allocator_canary *canary, const cx_allocator *inner);
+[[nodiscard]] CX_API cx_status cx_allocator_canary_init(cx_allocator_canary* canary,
+                                                        const cx_allocator* inner);
 
 /**
  * @brief Release the internal tracking records.
  *
  * Outstanding caller blocks are not freed: the caller still owns them.
  */
-CX_API void cx_allocator_canary_destroy(cx_allocator_canary *canary);
+CX_API void cx_allocator_canary_destroy(cx_allocator_canary* canary);
 
 /**
  * @brief Build an allocator view over @p canary.
  *
  * The view is valid while @p canary lives and is not re-initialized.
  */
-[[nodiscard]] CX_API cx_allocator cx_allocator_canary_as_allocator(
-    cx_allocator_canary *canary);
+[[nodiscard]] CX_API cx_allocator cx_allocator_canary_as_allocator(cx_allocator_canary* canary);
 
 /**
  * @brief Verify the guards around @p block.
@@ -81,14 +79,13 @@ CX_API void cx_allocator_canary_destroy(cx_allocator_canary *canary);
  *         not produced by this decorator, and `CX_INVALID_STATE` when a guard
  *         byte was changed.
  */
-[[nodiscard]] CX_API cx_status cx_allocator_canary_check(
-    const cx_allocator_canary *canary, const void *block);
+[[nodiscard]] CX_API cx_status cx_allocator_canary_check(const cx_allocator_canary* canary,
+                                                         const void* block);
 
 /**
  * @brief Test whether any guard has been damaged.
  */
-[[nodiscard]] CX_API bool cx_allocator_canary_has_corruption(
-    const cx_allocator_canary *canary);
+[[nodiscard]] CX_API bool cx_allocator_canary_has_corruption(const cx_allocator_canary* canary);
 
 #ifdef __cplusplus
 } /* extern "C" */

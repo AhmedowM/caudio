@@ -1,15 +1,14 @@
 #include <caudio.h>
 #include <caudio/runtime/socket.h>
-
 #include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
-    #include <sys/socket.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #endif
 
 #include "ca_test.h"
@@ -18,8 +17,7 @@ static int test_create_bind_listen(void) {
     ca_error err;
     ca_error_init(&err);
 
-    ca_socket_t srv = ca_socket_create(CA_SOCKET_DOMAIN_INET,
-                                       CA_SOCKET_TYPE_STREAM, &err);
+    ca_socket_t srv = ca_socket_create(CA_SOCKET_DOMAIN_INET, CA_SOCKET_TYPE_STREAM, &err);
     CA_CHECK(srv != CA_SOCKET_INVALID);
     CA_CHECK_EQ(CA_OK, err.code);
 
@@ -48,8 +46,7 @@ static int test_connect_send_recv(void) {
     ca_error_init(&err);
 
     /* Server socket on a fixed high port. */
-    ca_socket_t srv = ca_socket_create(CA_SOCKET_DOMAIN_INET,
-                                       CA_SOCKET_TYPE_STREAM, &err);
+    ca_socket_t srv = ca_socket_create(CA_SOCKET_DOMAIN_INET, CA_SOCKET_TYPE_STREAM, &err);
     CA_CHECK(srv != CA_SOCKET_INVALID);
 
     struct sockaddr_in saddr = {0};
@@ -66,8 +63,7 @@ static int test_connect_send_recv(void) {
     CA_CHECK_EQ(CA_OK, ca_socket_listen(srv, 4, &err));
 
     /* Client connects. */
-    ca_socket_t cli = ca_socket_create(CA_SOCKET_DOMAIN_INET,
-                                       CA_SOCKET_TYPE_STREAM, &err);
+    ca_socket_t cli = ca_socket_create(CA_SOCKET_DOMAIN_INET, CA_SOCKET_TYPE_STREAM, &err);
     CA_CHECK(cli != CA_SOCKET_INVALID);
 
     CA_CHECK_EQ(CA_OK, ca_socket_connect(cli, &sa, &err));
@@ -78,9 +74,8 @@ static int test_connect_send_recv(void) {
     CA_CHECK_EQ(CA_OK, err.code);
 
     /* Client sends, server receives. */
-    const char *msg = "hello socket";
-    CA_CHECK_EQ(strlen(msg),
-                ca_socket_send(cli, msg, strlen(msg), 0, &err));
+    const char* msg = "hello socket";
+    CA_CHECK_EQ(strlen(msg), ca_socket_send(cli, msg, strlen(msg), 0, &err));
     CA_CHECK_EQ(CA_OK, err.code);
 
     char buf[64] = {0};
@@ -90,9 +85,8 @@ static int test_connect_send_recv(void) {
     CA_CHECK_EQ(0, strcmp(buf, msg));
 
     /* Server sends back, client receives. */
-    const char *reply = "pong";
-    CA_CHECK_EQ(strlen(reply),
-                ca_socket_send(conn, reply, strlen(reply), 0, &err));
+    const char* reply = "pong";
+    CA_CHECK_EQ(strlen(reply), ca_socket_send(conn, reply, strlen(reply), 0, &err));
     CA_CHECK_EQ(CA_OK, err.code);
 
     memset(buf, 0, sizeof(buf));
@@ -119,8 +113,7 @@ static int test_addr_un(void) {
     CA_CHECK_EQ(CA_SOCKET_DOMAIN_UNIX, sa.domain);
     CA_CHECK(sa.len > 0);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_addr_un(nullptr, "caudio_test.sock", &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_addr_un(nullptr, "caudio_test.sock", &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_addr_un(&sa, nullptr, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_addr_un(&sa, "", &err));
 
@@ -136,20 +129,13 @@ static int test_null_args(void) {
     ca_error err;
     ca_error_init(&err);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_bind(CA_SOCKET_INVALID, nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_listen(CA_SOCKET_INVALID, 4, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_connect(CA_SOCKET_INVALID, nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_setblocking(CA_SOCKET_INVALID, 1, &err));
-    CA_CHECK_EQ((size_t)-1,
-                ca_socket_send(CA_SOCKET_INVALID, "x", 1, 0, &err));
-    CA_CHECK_EQ((size_t)-1,
-                ca_socket_recv(CA_SOCKET_INVALID, "x", 1, 0, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_socket_wait_readable(CA_SOCKET_INVALID, 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_bind(CA_SOCKET_INVALID, nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_listen(CA_SOCKET_INVALID, 4, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_connect(CA_SOCKET_INVALID, nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_setblocking(CA_SOCKET_INVALID, 1, &err));
+    CA_CHECK_EQ((size_t)-1, ca_socket_send(CA_SOCKET_INVALID, "x", 1, 0, &err));
+    CA_CHECK_EQ((size_t)-1, ca_socket_recv(CA_SOCKET_INVALID, "x", 1, 0, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_socket_wait_readable(CA_SOCKET_INVALID, 0, &err));
 
     return ca_test_finish("socket.null_args");
 }

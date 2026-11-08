@@ -22,12 +22,11 @@
  * @ref cx_allocator view. A checkpoint must not be reused after a reset.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/api.h>
 #include <cstdx/status.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,8 +40,8 @@ typedef struct cx_arena_chunk cx_arena_chunk;
  * Implementation detail. Do not access these fields from application code.
  */
 struct cx_arena_chunk {
-    cx_arena_chunk *previous;
-    unsigned char *data;
+    cx_arena_chunk* previous;
+    unsigned char* data;
     size_t capacity;
     size_t used;
     bool owned;
@@ -55,7 +54,7 @@ struct cx_arena_chunk {
  * or destroyed.
  */
 typedef struct cx_arena_checkpoint {
-    cx_arena_chunk *chunk;
+    cx_arena_chunk* chunk;
     size_t offset;
     uint64_t epoch;
 } cx_arena_checkpoint;
@@ -67,9 +66,9 @@ typedef struct cx_arena_checkpoint {
  * structure is public so that callers can place it on the stack.
  */
 typedef struct cx_arena {
-    cx_arena_chunk *current;
+    cx_arena_chunk* current;
     cx_arena_chunk first;
-    const cx_allocator *allocator;
+    const cx_allocator* allocator;
     size_t chunk_size;
     size_t used;
     size_t reserved;
@@ -86,8 +85,7 @@ typedef struct cx_arena {
  * @return @ref CX_OK, or @ref CX_INVALID_ARGUMENT if @p arena is nullptr or
  *         @p allocator is not usable.
  */
-[[nodiscard]] CX_API cx_status cx_arena_init(cx_arena *arena,
-                                             const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_arena_init(cx_arena* arena, const cx_allocator* allocator);
 
 /**
  * @brief Initialize an arena and preallocate a first chunk of @p capacity
@@ -95,8 +93,8 @@ typedef struct cx_arena {
  *
  * @return @ref CX_OK, @ref CX_INVALID_ARGUMENT, or @ref CX_OUT_OF_MEMORY.
  */
-[[nodiscard]] CX_API cx_status cx_arena_init_with_capacity(
-    cx_arena *arena, size_t capacity, const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_arena_init_with_capacity(cx_arena* arena, size_t capacity,
+                                                           const cx_allocator* allocator);
 
 /**
  * @brief Initialize an arena backed by a caller-provided buffer.
@@ -111,9 +109,7 @@ typedef struct cx_arena {
  * @return @ref CX_OK, or @ref CX_INVALID_ARGUMENT if @p arena or @p buffer
  *         is nullptr or @p size is zero.
  */
-[[nodiscard]] CX_API cx_status cx_arena_init_static(cx_arena *arena,
-                                                    void *buffer,
-                                                    size_t size);
+[[nodiscard]] CX_API cx_status cx_arena_init_static(cx_arena* arena, void* buffer, size_t size);
 
 /**
  * @brief Release every chunk owned by the arena.
@@ -121,7 +117,7 @@ typedef struct cx_arena {
  * A static backing buffer is not freed. The arena must not be used after
  * this call except to initialize it again.
  */
-CX_API void cx_arena_destroy(cx_arena *arena);
+CX_API void cx_arena_destroy(cx_arena* arena);
 
 /**
  * @brief Reclaim every allocation and start over.
@@ -131,7 +127,7 @@ CX_API void cx_arena_destroy(cx_arena *arena);
  * arena the caller-provided buffer is reused. Every outstanding pointer and
  * checkpoint is invalidated.
  */
-CX_API void cx_arena_reset(cx_arena *arena);
+CX_API void cx_arena_reset(cx_arena* arena);
 
 /**
  * @brief Allocate @p size bytes aligned to @p alignment.
@@ -140,14 +136,12 @@ CX_API void cx_arena_reset(cx_arena *arena);
  * @return The block, or nullptr if the request does not fit and the arena cannot
  *         grow.
  */
-[[nodiscard]] CX_API void *cx_arena_alloc(cx_arena *arena, size_t size,
-                                          size_t alignment);
+[[nodiscard]] CX_API void* cx_arena_alloc(cx_arena* arena, size_t size, size_t alignment);
 
 /**
  * @brief Allocate @p size zeroed bytes aligned to @p alignment.
  */
-[[nodiscard]] CX_API void *cx_arena_alloc_zeroed(cx_arena *arena, size_t size,
-                                                 size_t alignment);
+[[nodiscard]] CX_API void* cx_arena_alloc_zeroed(cx_arena* arena, size_t size, size_t alignment);
 
 /**
  * @brief Resize a block previously allocated from the arena.
@@ -160,16 +154,15 @@ CX_API void cx_arena_reset(cx_arena *arena);
  * @param new_size New size. Zero returns nullptr; nothing is reclaimed.
  * @return The resized block, or nullptr on failure.
  */
-[[nodiscard]] CX_API void *cx_arena_realloc(cx_arena *arena, void *ptr,
-                                            size_t old_size, size_t new_size,
-                                            size_t alignment);
+[[nodiscard]] CX_API void* cx_arena_realloc(cx_arena* arena, void* ptr, size_t old_size,
+                                            size_t new_size, size_t alignment);
 
 /**
  * @brief Capture the current allocation point.
  *
  * Returns a zeroed checkpoint if @p arena is nullptr.
  */
-[[nodiscard]] CX_API cx_arena_checkpoint cx_arena_mark(const cx_arena *arena);
+[[nodiscard]] CX_API cx_arena_checkpoint cx_arena_mark(const cx_arena* arena);
 
 /**
  * @brief Release everything allocated after @p checkpoint.
@@ -177,17 +170,17 @@ CX_API void cx_arena_reset(cx_arena *arena);
  * The checkpoint must come from the same arena and the same epoch; a stale
  * checkpoint is ignored in release builds and aborts a debug build.
  */
-CX_API void cx_arena_rewind(cx_arena *arena, cx_arena_checkpoint checkpoint);
+CX_API void cx_arena_rewind(cx_arena* arena, cx_arena_checkpoint checkpoint);
 
 /**
  * @brief Number of bytes handed out, including alignment padding.
  */
-[[nodiscard]] CX_API size_t cx_arena_bytes_used(const cx_arena *arena);
+[[nodiscard]] CX_API size_t cx_arena_bytes_used(const cx_arena* arena);
 
 /**
  * @brief Number of bytes currently reserved in backing chunks.
  */
-[[nodiscard]] CX_API size_t cx_arena_bytes_reserved(const cx_arena *arena);
+[[nodiscard]] CX_API size_t cx_arena_bytes_reserved(const cx_arena* arena);
 
 /**
  * @brief Build an @ref cx_allocator that allocates from @p arena.
@@ -198,7 +191,7 @@ CX_API void cx_arena_rewind(cx_arena *arena, cx_arena_checkpoint checkpoint);
  *
  * Returns a zeroed allocator if @p arena is nullptr.
  */
-[[nodiscard]] CX_API cx_allocator cx_arena_as_allocator(cx_arena *arena);
+[[nodiscard]] CX_API cx_allocator cx_arena_as_allocator(cx_arena* arena);
 
 #ifdef __cplusplus
 } /* extern "C" */

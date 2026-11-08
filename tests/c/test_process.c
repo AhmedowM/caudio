@@ -1,7 +1,6 @@
 #include <caudio.h>
 #include <caudio/runtime/process.h>
 #include <caudio/runtime/time.h>
-
 #include <string.h>
 
 #include "ca_test.h"
@@ -24,9 +23,9 @@ static int test_spawn_wait(void) {
 
     ca_process_t p = nullptr;
 #if defined(_WIN32) || defined(__CYGWIN__)
-    char *argv[] = {(char *)PROG_ECHO, (char *)ECHO_ARGS, nullptr};
+    char* argv[] = {(char*)PROG_ECHO, (char*)ECHO_ARGS, nullptr};
 #else
-    char *argv[] = {(char *)PROG_ECHO, (char *)ECHO_ARGS, nullptr};
+    char* argv[] = {(char*)PROG_ECHO, (char*)ECHO_ARGS, nullptr};
 #endif
 
     CA_CHECK_EQ(CA_OK, ca_process_spawn(&p, argv, nullptr, &err));
@@ -55,9 +54,9 @@ static int test_kill(void) {
 
     /* Spawn a long-running process, then kill it. */
 #if defined(_WIN32) || defined(__CYGWIN__)
-    char *argv[] = {(char *)PROG_SLEEP, (char *)SLEEP_ARGS, nullptr};
+    char* argv[] = {(char*)PROG_SLEEP, (char*)SLEEP_ARGS, nullptr};
 #else
-    char *argv[] = {(char *)PROG_SLEEP, (char *)SLEEP_ARGS, nullptr};
+    char* argv[] = {(char*)PROG_SLEEP, (char*)SLEEP_ARGS, nullptr};
 #endif
 
     ca_process_t p = nullptr;
@@ -84,7 +83,7 @@ static int test_release(void) {
     ca_error err;
     ca_error_init(&err);
 
-    char *argv[] = {(char *)PROG_ECHO, (char *)ECHO_ARGS, nullptr};
+    char* argv[] = {(char*)PROG_ECHO, (char*)ECHO_ARGS, nullptr};
 
     ca_process_t p = nullptr;
     CA_CHECK_EQ(CA_OK, ca_process_spawn(&p, argv, nullptr, &err));

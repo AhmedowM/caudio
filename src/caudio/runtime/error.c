@@ -1,10 +1,9 @@
 #include <caudio/runtime/error.h>
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
-void ca_error_init(ca_error *err) {
+void ca_error_init(ca_error* err) {
     if (err == nullptr) {
         return;
     }
@@ -13,7 +12,7 @@ void ca_error_init(ca_error *err) {
     err->message[0] = '\0';
 }
 
-void ca_error_set(ca_error *err, ca_status code, const char *fmt, ...) {
+void ca_error_set(ca_error* err, ca_status code, const char* fmt, ...) {
     if (err == nullptr) {
         return;
     }

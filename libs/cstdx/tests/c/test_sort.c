@@ -4,9 +4,9 @@
 
 #include "cx_test.h"
 
-static int compare_int(const void *left, const void *right) {
-    int a = *(const int *)left;
-    int b = *(const int *)right;
+static int compare_int(const void* left, const void* right) {
+    int a = *(const int*)left;
+    int b = *(const int*)right;
 
     return (a > b) - (a < b);
 }
@@ -22,28 +22,23 @@ static int test_int_array(void) {
 
     int sorted[] = {1, 2, 3};
 
-    CX_CHECK(cx_sort(sorted, 3, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
+    CX_CHECK(cx_sort(sorted, 3, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
     CX_CHECK_EQ(1, sorted[0]);
     CX_CHECK_EQ(3, sorted[2]);
 
     int reversed[] = {3, 2, 1};
 
-    CX_CHECK(cx_sort(reversed, 3, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
+    CX_CHECK(cx_sort(reversed, 3, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
     CX_CHECK_EQ(1, reversed[0]);
     CX_CHECK_EQ(3, reversed[2]);
 
     int single[] = {42};
 
-    CX_CHECK(cx_sort(single, 1, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
+    CX_CHECK(cx_sort(single, 1, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
     CX_CHECK_EQ(42, single[0]);
 
-    CX_CHECK(cx_sort(nullptr, 0, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
-    CX_CHECK(cx_sort(nullptr, 1, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
+    CX_CHECK(cx_sort(nullptr, 0, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
+    CX_CHECK(cx_sort(nullptr, 1, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
 
     return cx_test_finish("sort.int_array");
 }
@@ -53,9 +48,9 @@ typedef struct record {
     int order;
 } record;
 
-static int compare_record(const void *left, const void *right) {
-    auto a = (const record *)left;
-    auto b = (const record *)right;
+static int compare_record(const void* left, const void* right) {
+    auto a = (const record*)left;
+    auto b = (const record*)right;
 
     return (a->key > b->key) - (a->key < b->key);
 }
@@ -87,7 +82,7 @@ static int test_vector(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) == CX_OK);
 
@@ -103,8 +98,7 @@ static int test_vector(void) {
         CX_CHECK_EQ(i + 1, cx_vector_at(vector, int, i));
     }
 
-    CX_CHECK(cx_sort_vector(nullptr, compare_int, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_sort_vector(nullptr, compare_int, nullptr) == CX_INVALID_ARGUMENT);
 
     cx_vector_destroy(&vector);
     CX_CHECK(vector == nullptr);
@@ -119,16 +113,12 @@ static int test_errors(void) {
 
     CX_CHECK(cx_sort(values, 2, sizeof(int), alignof(int), nullptr, nullptr) ==
              CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_sort(values, 2, 0, alignof(int), compare_int, nullptr) ==
+    CX_CHECK(cx_sort(values, 2, 0, alignof(int), compare_int, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_sort(values, 2, sizeof(int), 3, compare_int, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_sort(nullptr, 2, sizeof(int), alignof(int), compare_int, nullptr) ==
              CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_sort(values, 2, sizeof(int), 3, compare_int, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_sort(nullptr, 2, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_sort((int[]){1}, 1, 0, alignof(int), compare_int, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_sort(nullptr, 0, sizeof(int), alignof(int), compare_int,
-                     nullptr) == CX_OK);
+    CX_CHECK(cx_sort((int[]){1}, 1, 0, alignof(int), compare_int, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_sort(nullptr, 0, sizeof(int), alignof(int), compare_int, nullptr) == CX_OK);
 
     return cx_test_finish("sort.errors");
 }

@@ -19,7 +19,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -46,7 +45,7 @@ typedef enum ca_log_level {
  *
  * Returns "UNKNOWN" for values outside the enum range.
  */
-CAUDIO_API const char *ca_log_level_name(ca_log_level level);
+CAUDIO_API const char* ca_log_level_name(ca_log_level level);
 
 /**
  * @brief Opaque logger handle.
@@ -61,14 +60,14 @@ typedef struct ca_logger ca_logger;
  * @param message Message text; never nullptr. May contain embedded newlines.
  * @param len     Message length in bytes, excluding the terminating NUL.
  */
-typedef void (*ca_log_sink_write_fn)(void *ctx, ca_log_level level,
-                                     const char *message, size_t len);
+typedef void (*ca_log_sink_write_fn)(void* ctx, ca_log_level level, const char* message,
+                                     size_t len);
 
 /**
  * @brief Sink teardown callback, called once when the logger releases the
  *        sink. Must not log through the same logger.
  */
-typedef void (*ca_log_sink_destroy_fn)(void *ctx);
+typedef void (*ca_log_sink_destroy_fn)(void* ctx);
 
 /**
  * @brief A log sink: write callback, context, and optional destructor.
@@ -77,7 +76,7 @@ typedef void (*ca_log_sink_destroy_fn)(void *ctx);
  */
 typedef struct ca_log_sink {
     ca_log_sink_write_fn write;
-    void *ctx;
+    void* ctx;
     ca_log_sink_destroy_fn destroy;
 } ca_log_sink;
 
@@ -92,7 +91,7 @@ typedef struct ca_log_config {
 /**
  * @brief Initialize @p config to defaults: CA_LOG_INFO and no sink.
  */
-CAUDIO_API void ca_log_config_init(ca_log_config *config);
+CAUDIO_API void ca_log_config_init(ca_log_config* config);
 
 /**
  * @brief Create a logger.
@@ -102,25 +101,23 @@ CAUDIO_API void ca_log_config_init(ca_log_config *config);
  * @param err    Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_logger_create(ca_logger **out,
-                                      const ca_log_config *config,
-                                      ca_error *err);
+CAUDIO_API ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_error* err);
 
 /**
  * @brief Destroy a logger, releasing its sink. nullptr and *logger == nullptr are
  *        no-ops.
  */
-CAUDIO_API void ca_logger_destroy(ca_logger **logger);
+CAUDIO_API void ca_logger_destroy(ca_logger** logger);
 
 /**
  * @brief Set the minimum level. Invalid values are ignored.
  */
-CAUDIO_API void ca_logger_set_level(ca_logger *logger, ca_log_level level);
+CAUDIO_API void ca_logger_set_level(ca_logger* logger, ca_log_level level);
 
 /**
  * @brief Return the minimum level, or CA_LOG_OFF for a nullptr logger.
  */
-CAUDIO_API ca_log_level ca_logger_get_level(const ca_logger *logger);
+CAUDIO_API ca_log_level ca_logger_get_level(const ca_logger* logger);
 
 /**
  * @brief Replace the sink. The previous sink is destroyed after the logger
@@ -131,9 +128,7 @@ CAUDIO_API ca_log_level ca_logger_get_level(const ca_logger *logger);
  * @return CA_OK on success, CA_INVALID_ARGUMENT for a nullptr logger or a sink
  *         with no write callback.
  */
-CAUDIO_API ca_status ca_logger_set_sink(ca_logger *logger,
-                                        const ca_log_sink *sink,
-                                        ca_error *err);
+CAUDIO_API ca_status ca_logger_set_sink(ca_logger* logger, const ca_log_sink* sink, ca_error* err);
 
 /**
  * @brief Emit an already-formatted message.
@@ -141,20 +136,20 @@ CAUDIO_API ca_status ca_logger_set_sink(ca_logger *logger,
  * A nullptr logger or message is a no-op. Messages at a level below the
  * configured minimum are dropped.
  */
-CAUDIO_API void ca_logger_write(ca_logger *logger, ca_log_level level,
-                                const char *message, size_t len);
+CAUDIO_API void ca_logger_write(ca_logger* logger, ca_log_level level, const char* message,
+                                size_t len);
 
 /**
  * @brief Emit a printf-style message.
  */
-CAUDIO_API void ca_logger_vlog(ca_logger *logger, ca_log_level level,
-                               const char *fmt, va_list args);
+CAUDIO_API void ca_logger_vlog(ca_logger* logger, ca_log_level level, const char* fmt,
+                               va_list args);
 
 /**
  * @brief Emit a printf-style message.
  */
-CAUDIO_API void ca_logger_log(ca_logger *logger, ca_log_level level,
-                              const char *fmt, ...) CA_PRINTF(3, 4);
+CAUDIO_API void ca_logger_log(ca_logger* logger, ca_log_level level, const char* fmt, ...)
+    CA_PRINTF(3, 4);
 
 /**
  * @brief Opaque file sink.
@@ -176,9 +171,8 @@ typedef struct ca_log_file ca_log_file;
  * @param err       Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_log_file_open(ca_log_file **out, const char *path,
-                                      size_t max_bytes, unsigned max_files,
-                                      ca_error *err);
+CAUDIO_API ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes,
+                                      unsigned max_files, ca_error* err);
 
 /**
  * @brief Close a file sink that has not been handed to a logger.
@@ -186,7 +180,7 @@ CAUDIO_API ca_status ca_log_file_open(ca_log_file **out, const char *path,
  * After ca_log_file_sink() is given to a logger, the logger owns the sink.
  * Calling ca_log_file_close() on the same handle then is a use-after-free.
  */
-CAUDIO_API void ca_log_file_close(ca_log_file **file);
+CAUDIO_API void ca_log_file_close(ca_log_file** file);
 
 /**
  * @brief Return a sink for @p file.
@@ -197,7 +191,7 @@ CAUDIO_API void ca_log_file_close(ca_log_file **file);
  * The file sink is internally synchronized and may be used by several logger
  * callers concurrently.
  */
-CAUDIO_API ca_log_sink ca_log_file_sink(ca_log_file *file);
+CAUDIO_API ca_log_sink ca_log_file_sink(ca_log_file* file);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,4 @@
 #include <cstdx/allocator_canary.h>
-
 #include <stdint.h>
 #include <string.h>
 
@@ -12,7 +11,7 @@ static int test_guards(void) {
     CX_CHECK(canary.inner == cx_allocator_default());
 
     auto allocator = cx_allocator_canary_as_allocator(&canary);
-    auto block = (unsigned char *)cx_allocator_alloc(&allocator, 32, 16);
+    auto block = (unsigned char*)cx_allocator_alloc(&allocator, 32, 16);
 
     CX_CHECK(block != nullptr);
     CX_CHECK(((uintptr_t)block % 16) == 0);
@@ -39,7 +38,7 @@ static int test_overflow(void) {
     CX_CHECK(cx_allocator_canary_init(&canary, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_canary_as_allocator(&canary);
-    auto block = (unsigned char *)cx_allocator_alloc(&allocator, 16, 8);
+    auto block = (unsigned char*)cx_allocator_alloc(&allocator, 16, 8);
 
     CX_CHECK(block != nullptr);
     block[16] = 0xFF;
@@ -60,7 +59,7 @@ static int test_underflow(void) {
     CX_CHECK(cx_allocator_canary_init(&canary, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_canary_as_allocator(&canary);
-    auto block = (unsigned char *)cx_allocator_alloc(&allocator, 16, 8);
+    auto block = (unsigned char*)cx_allocator_alloc(&allocator, 16, 8);
 
     CX_CHECK(block != nullptr);
     block[-1] = 0xFF;
@@ -83,8 +82,7 @@ static int test_unknown_block(void) {
 
     CX_CHECK(foreign != nullptr);
     CX_CHECK_EQ(CX_NOT_FOUND, cx_allocator_canary_check(&canary, foreign));
-    CX_CHECK_EQ(CX_INVALID_ARGUMENT,
-                cx_allocator_canary_check(&canary, nullptr));
+    CX_CHECK_EQ(CX_INVALID_ARGUMENT, cx_allocator_canary_check(&canary, nullptr));
 
     cx_allocator_free(nullptr, foreign, 16, 8);
 
@@ -99,7 +97,7 @@ static int test_realloc(void) {
     CX_CHECK(cx_allocator_canary_init(&canary, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_canary_as_allocator(&canary);
-    auto block = (unsigned char *)cx_allocator_alloc(&allocator, 16, 8);
+    auto block = (unsigned char*)cx_allocator_alloc(&allocator, 16, 8);
 
     CX_CHECK(block != nullptr);
     memcpy(block, "abcdefghijklmno", 16);

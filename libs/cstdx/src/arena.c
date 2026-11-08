@@ -1,9 +1,7 @@
-#include <cstdx/arena.h>
-
 #include <assert.h>
-#include <string.h>
-
+#include <cstdx/arena.h>
 #include <cstdx/checked.h>
+#include <string.h>
 
 static constexpr size_t arena_default_chunk_size = 4096;
 
@@ -20,7 +18,7 @@ static size_t arena_normalize_alignment(size_t alignment) {
  * @p alignment. Adds @p alignment bytes of slack so that the next chunk can
  * always produce an aligned address.
  */
-static bool arena_grow(cx_arena *arena, size_t required, size_t alignment) {
+static bool arena_grow(cx_arena* arena, size_t required, size_t alignment) {
     if (arena->is_static) {
         return false;
     }
@@ -38,25 +36,22 @@ static bool arena_grow(cx_arena *arena, size_t required, size_t alignment) {
     }
 
     auto allocator = arena->allocator;
-    auto data =
-        cx_allocator_alloc(allocator, capacity, alignof(max_align_t));
+    auto data = cx_allocator_alloc(allocator, capacity, alignof(max_align_t));
 
     if (data == nullptr) {
         return false;
     }
 
-    cx_arena_chunk *chunk;
+    cx_arena_chunk* chunk;
 
     if (arena->current == &arena->first && arena->first.data == nullptr) {
         chunk = &arena->first;
         chunk->previous = nullptr;
     } else {
-        chunk = cx_allocator_alloc(allocator, sizeof(*chunk),
-                                   alignof(cx_arena_chunk));
+        chunk = cx_allocator_alloc(allocator, sizeof(*chunk), alignof(cx_arena_chunk));
 
         if (chunk == nullptr) {
-            cx_allocator_free(allocator, data, capacity,
-                              alignof(max_align_t));
+            cx_allocator_free(allocator, data, capacity, alignof(max_align_t));
             return false;
         }
 
@@ -77,7 +72,7 @@ static bool arena_grow(cx_arena *arena, size_t required, size_t alignment) {
 /* Lifecycle                                                                 */
 /* ------------------------------------------------------------------------- */
 
-cx_status cx_arena_init(cx_arena *arena, const cx_allocator *allocator) {
+cx_status cx_arena_init(cx_arena* arena, const cx_allocator* allocator) {
     if (arena == nullptr || !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
     }
@@ -85,15 +80,14 @@ cx_status cx_arena_init(cx_arena *arena, const cx_allocator *allocator) {
     memset(arena, 0, sizeof(*arena));
 
     arena->current = &arena->first;
-    arena->allocator =
-        allocator != nullptr ? allocator : cx_allocator_default();
+    arena->allocator = allocator != nullptr ? allocator : cx_allocator_default();
     arena->chunk_size = arena_default_chunk_size;
     arena->epoch = 1;
     return CX_OK;
 }
 
-cx_status cx_arena_init_with_capacity(cx_arena *arena, size_t capacity,
-                                      const cx_allocator *allocator) {
+cx_status cx_arena_init_with_capacity(cx_arena* arena, size_t capacity,
+                                      const cx_allocator* allocator) {
     auto status = cx_arena_init(arena, allocator);
 
     if (status != CX_OK || capacity == 0) {
@@ -110,14 +104,14 @@ cx_status cx_arena_init_with_capacity(cx_arena *arena, size_t capacity,
     return CX_OK;
 }
 
-cx_status cx_arena_init_static(cx_arena *arena, void *buffer, size_t size) {
+cx_status cx_arena_init_static(cx_arena* arena, void* buffer, size_t size) {
     if (arena == nullptr || buffer == nullptr || size == 0) {
         return CX_INVALID_ARGUMENT;
     }
 
     memset(arena, 0, sizeof(*arena));
 
-    arena->first.data = (unsigned char *)buffer;
+    arena->first.data = (unsigned char*)buffer;
     arena->first.capacity = size;
     arena->current = &arena->first;
     arena->allocator = cx_allocator_default();
@@ -127,7 +121,7 @@ cx_status cx_arena_init_static(cx_arena *arena, void *buffer, size_t size) {
     return CX_OK;
 }
 
-void cx_arena_destroy(cx_arena *arena) {
+void cx_arena_destroy(cx_arena* arena) {
     if (arena == nullptr || arena->current == nullptr) {
         return;
     }
@@ -136,22 +130,20 @@ void cx_arena_destroy(cx_arena *arena) {
         while (arena->current != &arena->first) {
             auto chunk = arena->current;
             arena->current = chunk->previous;
-            cx_allocator_free(arena->allocator, chunk->data, chunk->capacity,
-                              alignof(max_align_t));
-            cx_allocator_free(arena->allocator, chunk, sizeof(*chunk),
-                              alignof(cx_arena_chunk));
+            cx_allocator_free(arena->allocator, chunk->data, chunk->capacity, alignof(max_align_t));
+            cx_allocator_free(arena->allocator, chunk, sizeof(*chunk), alignof(cx_arena_chunk));
         }
 
         if (arena->first.owned && arena->first.data != nullptr) {
-            cx_allocator_free(arena->allocator, arena->first.data,
-                              arena->first.capacity, alignof(max_align_t));
+            cx_allocator_free(arena->allocator, arena->first.data, arena->first.capacity,
+                              alignof(max_align_t));
         }
     }
 
     memset(arena, 0, sizeof(*arena));
 }
 
-void cx_arena_reset(cx_arena *arena) {
+void cx_arena_reset(cx_arena* arena) {
     if (arena == nullptr || arena->current == nullptr) {
         return;
     }
@@ -167,10 +159,8 @@ void cx_arena_reset(cx_arena *arena) {
     while (arena->current != &arena->first) {
         auto chunk = arena->current;
         arena->current = chunk->previous;
-        cx_allocator_free(arena->allocator, chunk->data, chunk->capacity,
-                          alignof(max_align_t));
-        cx_allocator_free(arena->allocator, chunk, sizeof(*chunk),
-                          alignof(cx_arena_chunk));
+        cx_allocator_free(arena->allocator, chunk->data, chunk->capacity, alignof(max_align_t));
+        cx_allocator_free(arena->allocator, chunk, sizeof(*chunk), alignof(cx_arena_chunk));
     }
 
     arena->first.used = 0;
@@ -185,7 +175,7 @@ void cx_arena_reset(cx_arena *arena) {
 /* Allocation                                                                */
 /* ------------------------------------------------------------------------- */
 
-void *cx_arena_alloc(cx_arena *arena, size_t size, size_t alignment) {
+void* cx_arena_alloc(cx_arena* arena, size_t size, size_t alignment) {
     if (arena == nullptr || arena->current == nullptr || size == 0) {
         return nullptr;
     }
@@ -202,17 +192,14 @@ void *cx_arena_alloc(cx_arena *arena, size_t size, size_t alignment) {
         if (chunk->data != nullptr) {
             auto base = (uintptr_t)chunk->data;
             auto address = base + (uintptr_t)chunk->used;
-            auto aligned =
-                (address + (uintptr_t)(alignment - 1)) &
-                ~((uintptr_t)alignment - 1);
+            auto aligned = (address + (uintptr_t)(alignment - 1)) & ~((uintptr_t)alignment - 1);
             auto offset = (size_t)(aligned - base);
             size_t end;
 
-            if (!cx_add_overflow(offset, size, &end) &&
-                end <= chunk->capacity) {
+            if (!cx_add_overflow(offset, size, &end) && end <= chunk->capacity) {
                 arena->used += end - chunk->used;
                 chunk->used = end;
-                return (void *)aligned;
+                return (void*)aligned;
             }
         }
 
@@ -222,7 +209,7 @@ void *cx_arena_alloc(cx_arena *arena, size_t size, size_t alignment) {
     }
 }
 
-void *cx_arena_alloc_zeroed(cx_arena *arena, size_t size, size_t alignment) {
+void* cx_arena_alloc_zeroed(cx_arena* arena, size_t size, size_t alignment) {
     auto block = cx_arena_alloc(arena, size, alignment);
 
     if (block != nullptr) {
@@ -232,8 +219,8 @@ void *cx_arena_alloc_zeroed(cx_arena *arena, size_t size, size_t alignment) {
     return block;
 }
 
-void *cx_arena_realloc(cx_arena *arena, void *ptr, size_t old_size,
-                       size_t new_size, size_t alignment) {
+void* cx_arena_realloc(cx_arena* arena, void* ptr, size_t old_size, size_t new_size,
+                       size_t alignment) {
     if (arena == nullptr || arena->current == nullptr) {
         return nullptr;
     }
@@ -260,8 +247,7 @@ void *cx_arena_realloc(cx_arena *arena, void *ptr, size_t old_size,
         auto end = base + (uintptr_t)chunk->used;
         auto address = (uintptr_t)ptr;
 
-        if (address >= base && address < end &&
-            address + (uintptr_t)old_size == end) {
+        if (address >= base && address < end && address + (uintptr_t)old_size == end) {
             if (new_size <= old_size) {
                 auto shrink = old_size - new_size;
 
@@ -294,7 +280,7 @@ void *cx_arena_realloc(cx_arena *arena, void *ptr, size_t old_size,
 /* Checkpoints                                                               */
 /* ------------------------------------------------------------------------- */
 
-cx_arena_checkpoint cx_arena_mark(const cx_arena *arena) {
+cx_arena_checkpoint cx_arena_mark(const cx_arena* arena) {
     cx_arena_checkpoint checkpoint = {};
 
     if (arena == nullptr || arena->current == nullptr) {
@@ -307,7 +293,7 @@ cx_arena_checkpoint cx_arena_mark(const cx_arena *arena) {
     return checkpoint;
 }
 
-void cx_arena_rewind(cx_arena *arena, cx_arena_checkpoint checkpoint) {
+void cx_arena_rewind(cx_arena* arena, cx_arena_checkpoint checkpoint) {
     if (arena == nullptr || arena->current == nullptr) {
         return;
     }
@@ -338,10 +324,8 @@ void cx_arena_rewind(cx_arena *arena, cx_arena_checkpoint checkpoint) {
         arena->current = chunk->previous;
         arena->used -= chunk->used;
         arena->reserved -= chunk->capacity;
-        cx_allocator_free(arena->allocator, chunk->data, chunk->capacity,
-                          alignof(max_align_t));
-        cx_allocator_free(arena->allocator, chunk, sizeof(*chunk),
-                          alignof(cx_arena_chunk));
+        cx_allocator_free(arena->allocator, chunk->data, chunk->capacity, alignof(max_align_t));
+        cx_allocator_free(arena->allocator, chunk, sizeof(*chunk), alignof(cx_arena_chunk));
     }
 
     arena->used -= arena->current->used - checkpoint.offset;
@@ -352,11 +336,9 @@ void cx_arena_rewind(cx_arena *arena, cx_arena_checkpoint checkpoint) {
 /* Introspection                                                             */
 /* ------------------------------------------------------------------------- */
 
-size_t cx_arena_bytes_used(const cx_arena *arena) {
-    return arena != nullptr ? arena->used : 0;
-}
+size_t cx_arena_bytes_used(const cx_arena* arena) { return arena != nullptr ? arena->used : 0; }
 
-size_t cx_arena_bytes_reserved(const cx_arena *arena) {
+size_t cx_arena_bytes_reserved(const cx_arena* arena) {
     return arena != nullptr ? arena->reserved : 0;
 }
 
@@ -364,20 +346,18 @@ size_t cx_arena_bytes_reserved(const cx_arena *arena) {
 /* Allocator view                                                            */
 /* ------------------------------------------------------------------------- */
 
-static void *arena_view_alloc(void *state, size_t size, size_t alignment) {
-    return cx_arena_alloc((cx_arena *)state, size, alignment);
+static void* arena_view_alloc(void* state, size_t size, size_t alignment) {
+    return cx_arena_alloc((cx_arena*)state, size, alignment);
 }
 
-static void *arena_view_realloc(void *state, void *ptr, size_t old_size,
-                                size_t new_size, size_t alignment) {
-    return cx_arena_realloc((cx_arena *)state, ptr, old_size, new_size,
-                            alignment);
+static void* arena_view_realloc(void* state, void* ptr, size_t old_size, size_t new_size,
+                                size_t alignment) {
+    return cx_arena_realloc((cx_arena*)state, ptr, old_size, new_size, alignment);
 }
 
-static void arena_view_free(void *, void *, size_t, size_t) {
-}
+static void arena_view_free(void*, void*, size_t, size_t) {}
 
-cx_allocator cx_arena_as_allocator(cx_arena *arena) {
+cx_allocator cx_arena_as_allocator(cx_arena* arena) {
     cx_allocator view = {};
 
     if (arena != nullptr) {

@@ -1,8 +1,7 @@
 #include <caudio/types/wire.h>
-
 #include <string.h>
 
-const char *ca_repeat_mode_name(ca_repeat_mode mode) {
+const char* ca_repeat_mode_name(ca_repeat_mode mode) {
     switch (mode) {
     case CA_REPEAT_OFF:
         return "Off";
@@ -15,7 +14,7 @@ const char *ca_repeat_mode_name(ca_repeat_mode mode) {
     }
 }
 
-bool ca_repeat_mode_parse(const char *text, ca_repeat_mode *out) {
+bool ca_repeat_mode_parse(const char* text, ca_repeat_mode* out) {
     if (!text || !out) {
         return false;
     }
@@ -34,7 +33,7 @@ bool ca_repeat_mode_parse(const char *text, ca_repeat_mode *out) {
     return false;
 }
 
-const char *ca_playback_state_name(ca_playback_state state) {
+const char* ca_playback_state_name(ca_playback_state state) {
     switch (state) {
     case CA_PLAYBACK_STOPPED:
         return "Stopped";
@@ -49,7 +48,7 @@ const char *ca_playback_state_name(ca_playback_state state) {
     }
 }
 
-bool ca_playback_state_parse(const char *text, ca_playback_state *out) {
+bool ca_playback_state_parse(const char* text, ca_playback_state* out) {
     if (!text || !out) {
         return false;
     }
@@ -72,7 +71,7 @@ bool ca_playback_state_parse(const char *text, ca_playback_state *out) {
     return false;
 }
 
-const char *ca_source_kind_name(ca_source_kind kind) {
+const char* ca_source_kind_name(ca_source_kind kind) {
     switch (kind) {
     case CA_SOURCE_PATH:
         return "path";
@@ -87,7 +86,7 @@ const char *ca_source_kind_name(ca_source_kind kind) {
     }
 }
 
-bool ca_source_kind_parse(const char *text, ca_source_kind *out) {
+bool ca_source_kind_parse(const char* text, ca_source_kind* out) {
     if (!text || !out) {
         return false;
     }
@@ -110,7 +109,7 @@ bool ca_source_kind_parse(const char *text, ca_source_kind *out) {
     return false;
 }
 
-const char *ca_engine_event_type_name(ca_engine_event_type type) {
+const char* ca_engine_event_type_name(ca_engine_event_type type) {
     switch (type) {
     case CA_ENGINE_EVENT_NONE:
         return "None";
@@ -129,7 +128,7 @@ const char *ca_engine_event_type_name(ca_engine_event_type type) {
     }
 }
 
-bool ca_engine_event_type_parse(const char *text, ca_engine_event_type *out) {
+bool ca_engine_event_type_parse(const char* text, ca_engine_event_type* out) {
     if (!text || !out) {
         return false;
     }

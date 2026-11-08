@@ -2,34 +2,30 @@
 #include <caudio/runtime/env.h>
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/path.h>
-
 #include <cstdx/allocator_counted.h>
 #include <cstdx/string.h>
 #include <cstdx/string_view.h>
-
 #include <string.h>
 
 #include "ca_test.h"
 
-static bool str_eq(const cx_string *value, const char *expected) {
+static bool str_eq(const cx_string* value, const char* expected) {
     if (!value) {
         return expected == nullptr || expected[0] == '\0';
     }
-    return cx_string_view_eq(cx_string_view_of(value),
-                             cx_string_view_from_cstr(expected));
+    return cx_string_view_eq(cx_string_view_of(value), cx_string_view_from_cstr(expected));
 }
 
-static bool ends_with(const cx_string *value, const char *suffix) {
+static bool ends_with(const cx_string* value, const char* suffix) {
     size_t value_len = cx_string_length(value);
     size_t suffix_len = strlen(suffix);
     if (suffix_len > value_len) {
         return false;
     }
-    return memcmp(cx_string_cstr(value) + value_len - suffix_len, suffix,
-                  suffix_len) == 0;
+    return memcmp(cx_string_cstr(value) + value_len - suffix_len, suffix, suffix_len) == 0;
 }
 
-static bool contains(const cx_string *value, const char *needle) {
+static bool contains(const cx_string* value, const char* needle) {
     return strstr(cx_string_cstr(value), needle) != nullptr;
 }
 
@@ -69,12 +65,12 @@ static void test_hex8(void) {
     CA_CHECK(strcmp(hex, "4fd0bfc1") == 0);
 }
 
-static void set_env(const char *name, const char *value) {
+static void set_env(const char* name, const char* value) {
     ca_error err;
     CA_CHECK_EQ(CA_OK, ca_env_set(name, value, true, &err));
 }
 
-static void test_default_paths(const cx_allocator *alloc) {
+static void test_default_paths(const cx_allocator* alloc) {
     /* Pin every discovery variable to a controlled tree. */
     set_env("LOCALAPPDATA", "caudio_test_paths_tmp/localapp");
     set_env("XDG_DATA_HOME", "caudio_test_paths_tmp/data");
@@ -84,7 +80,7 @@ static void test_default_paths(const cx_allocator *alloc) {
     set_env("USERPROFILE", "caudio_test_paths_tmp/home");
     set_env("TMPDIR", "caudio_test_paths_tmp/tmp");
 
-    cx_string *db = nullptr;
+    cx_string* db = nullptr;
     ca_error err;
     CA_CHECK_EQ(CA_OK, ca_paths_default_db_path(&db, alloc, &err));
     CA_CHECK(ends_with(db, "/caudio/library.db"));
@@ -96,7 +92,7 @@ static void test_default_paths(const cx_allocator *alloc) {
 #endif
     cx_string_destroy(&db);
 
-    cx_string *config = nullptr;
+    cx_string* config = nullptr;
     CA_CHECK_EQ(CA_OK, ca_paths_default_config_path(&config, alloc, &err));
     CA_CHECK(ends_with(config, "/caudio/config.json"));
 #ifdef _WIN32
@@ -106,7 +102,7 @@ static void test_default_paths(const cx_allocator *alloc) {
 #endif
     cx_string_destroy(&config);
 
-    cx_string *legacy = nullptr;
+    cx_string* legacy = nullptr;
     CA_CHECK_EQ(CA_OK, ca_paths_legacy_config_path(&legacy, alloc));
 #ifdef _WIN32
     CA_CHECK(str_eq(legacy, "caudio_test_paths_tmp/home/.config/caudio/config.json"));
@@ -117,21 +113,19 @@ static void test_default_paths(const cx_allocator *alloc) {
 
     /* nullptr out is rejected. */
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_default_db_path(nullptr, alloc, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_paths_default_config_path(nullptr, alloc, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_default_config_path(nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_legacy_config_path(nullptr, alloc));
 }
 
-static void test_derived_paths(const cx_allocator *alloc) {
+static void test_derived_paths(const cx_allocator* alloc) {
     char hex[9];
     ca_paths_hex8_for_db("/music/library.db", hex);
 
     char expected[64];
     ca_error err;
 
-    cx_string *socket = nullptr;
-    CA_CHECK_EQ(CA_OK,
-                ca_paths_socket_for("/music/library.db", &socket, alloc, &err));
+    cx_string* socket = nullptr;
+    CA_CHECK_EQ(CA_OK, ca_paths_socket_for("/music/library.db", &socket, alloc, &err));
 #ifdef _WIN32
     (void)expected;
     CA_CHECK_EQ(0, strncmp(cx_string_cstr(socket), "\\\\.\\pipe\\caudio-", 16));
@@ -142,23 +136,20 @@ static void test_derived_paths(const cx_allocator *alloc) {
 #endif
     cx_string_destroy(&socket);
 
-    cx_string *pid = nullptr;
-    CA_CHECK_EQ(CA_OK,
-                ca_paths_pid_for("/music/library.db", &pid, alloc, &err));
+    cx_string* pid = nullptr;
+    CA_CHECK_EQ(CA_OK, ca_paths_pid_for("/music/library.db", &pid, alloc, &err));
     (void)snprintf(expected, sizeof expected, "caudio-%s.pid", hex);
     CA_CHECK(ends_with(pid, expected));
     cx_string_destroy(&pid);
 
-    cx_string *lock = nullptr;
-    CA_CHECK_EQ(CA_OK,
-                ca_paths_lock_for("/music/library.db", &lock, alloc, &err));
+    cx_string* lock = nullptr;
+    CA_CHECK_EQ(CA_OK, ca_paths_lock_for("/music/library.db", &lock, alloc, &err));
     (void)snprintf(expected, sizeof expected, "caudio-%s.lock", hex);
     CA_CHECK(ends_with(lock, expected));
     cx_string_destroy(&lock);
 
-    cx_string *log = nullptr;
-    CA_CHECK_EQ(CA_OK,
-                ca_paths_log_for("/music/library.db", &log, alloc, &err));
+    cx_string* log = nullptr;
+    CA_CHECK_EQ(CA_OK, ca_paths_log_for("/music/library.db", &log, alloc, &err));
     CA_CHECK(str_eq(log, "/music/caudio.log"));
     cx_string_destroy(&log);
 
@@ -172,8 +163,7 @@ static void test_derived_paths(const cx_allocator *alloc) {
     CA_CHECK(ends_with(pid, ".pid"));
     cx_string_destroy(&pid);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_paths_socket_for("/x", nullptr, alloc, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_socket_for("/x", nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_pid_for("/x", nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_lock_for("/x", nullptr, alloc, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_paths_log_for("/x", nullptr, alloc, &err));
@@ -215,7 +205,7 @@ static void test_runtime_path_helpers(void) {
     CA_CHECK(ca_path_identity_normalize(nullptr) == nullptr);
 }
 
-static void test_runtime_paths_lifecycle(const cx_allocator *alloc) {
+static void test_runtime_paths_lifecycle(const cx_allocator* alloc) {
     ca_error err;
     CA_CHECK_EQ(CA_OK, ca_fs_mkdirs("caudio_test_paths_tmp", &err));
 
@@ -223,18 +213,13 @@ static void test_runtime_paths_lifecycle(const cx_allocator *alloc) {
     CA_CHECK_EQ(CA_OK, ca_runtime_paths_init(&paths, alloc));
     CA_CHECK(ca_runtime_paths_empty(&paths));
 
-    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.database,
-                                      "caudio_test_paths_tmp/db/library.db",
-                                      alloc));
-    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.configuration,
-                                      "caudio_test_paths_tmp/cfg/config.json",
-                                      alloc));
     CA_CHECK_EQ(CX_OK,
-                cx_string_from(&paths.logs, "caudio_test_paths_tmp/logs", alloc));
-    CA_CHECK_EQ(CX_OK,
-                cx_string_from(&paths.cache, "caudio_test_paths_tmp/cache", alloc));
-    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.imported_media,
-                                      "caudio_test_paths_tmp/media", alloc));
+                cx_string_from(&paths.database, "caudio_test_paths_tmp/db/library.db", alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.configuration, "caudio_test_paths_tmp/cfg/config.json",
+                                      alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.logs, "caudio_test_paths_tmp/logs", alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.cache, "caudio_test_paths_tmp/cache", alloc));
+    CA_CHECK_EQ(CX_OK, cx_string_from(&paths.imported_media, "caudio_test_paths_tmp/media", alloc));
     CA_CHECK_EQ(CX_OK, cx_string_from(&paths.socket, "explicit.sock", alloc));
     CA_CHECK(!ca_runtime_paths_empty(&paths));
 
@@ -270,10 +255,8 @@ static void test_runtime_paths_lifecycle(const cx_allocator *alloc) {
     ca_runtime_paths_destroy(nullptr);
     CA_CHECK(ca_runtime_paths_empty(nullptr));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_runtime_paths_ensure_directories(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_runtime_paths_copy(nullptr, &paths, alloc));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_runtime_paths_copy(&copy, nullptr, alloc));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_runtime_paths_copy(nullptr, &paths, alloc));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_runtime_paths_copy(&copy, nullptr, alloc));
 
     ca_runtime_paths empty;
     CA_CHECK_EQ(CA_OK, ca_runtime_paths_init(&empty, alloc));
@@ -286,11 +269,11 @@ static void test_leak_free(void) {
     CA_CHECK_EQ(CX_OK, cx_allocator_counted_init(&counted, nullptr));
     cx_allocator alloc = cx_allocator_counted_as_allocator(&counted);
 
-    cx_string *db = nullptr;
+    cx_string* db = nullptr;
     CA_CHECK_EQ(CA_OK, ca_paths_default_db_path(&db, &alloc, nullptr));
     cx_string_destroy(&db);
 
-    cx_string *socket = nullptr;
+    cx_string* socket = nullptr;
     CA_CHECK_EQ(CA_OK, ca_paths_socket_for("/a/b", &socket, &alloc, nullptr));
     cx_string_destroy(&socket);
 

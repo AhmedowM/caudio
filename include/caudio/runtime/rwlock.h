@@ -19,7 +19,7 @@ extern "C" {
 /**
  * @brief Opaque read-write lock handle.
  */
-typedef struct ca_rwlock *ca_rwlock_t;
+typedef struct ca_rwlock* ca_rwlock_t;
 
 /**
  * @brief Create a read-write lock.
@@ -28,7 +28,7 @@ typedef struct ca_rwlock *ca_rwlock_t;
  * @param err Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_rwlock_create(ca_rwlock_t *out, ca_error *err);
+CAUDIO_API ca_status ca_rwlock_create(ca_rwlock_t* out, ca_error* err);
 
 /**
  * @brief Destroy a read-write lock. Must not be held or waited on.
@@ -42,21 +42,21 @@ CAUDIO_API void ca_rwlock_destroy(ca_rwlock_t rwlock);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_rwlock_rdlock(ca_rwlock_t rwlock, ca_error *err);
+CAUDIO_API ca_status ca_rwlock_rdlock(ca_rwlock_t rwlock, ca_error* err);
 
 /**
  * @brief Acquire the write lock, blocking until available.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_rwlock_wrlock(ca_rwlock_t rwlock, ca_error *err);
+CAUDIO_API ca_status ca_rwlock_wrlock(ca_rwlock_t rwlock, ca_error* err);
 
 /**
  * @brief Release the read or write lock. Must be held by the calling thread.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_rwlock_unlock(ca_rwlock_t rwlock, ca_error *err);
+CAUDIO_API ca_status ca_rwlock_unlock(ca_rwlock_t rwlock, ca_error* err);
 
 #ifdef __cplusplus
 }

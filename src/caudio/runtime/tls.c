@@ -1,12 +1,11 @@
 ﻿#include <caudio/runtime/tls.h>
-
 #include <stdlib.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <pthread.h>
-    #include <errno.h>
+#include <errno.h>
+#include <pthread.h>
 #endif
 
 struct ca_tls_key {
@@ -18,8 +17,7 @@ struct ca_tls_key {
     ca_tls_destructor destructor;
 };
 
-ca_status ca_tls_key_create(ca_tls_key_t *out, ca_tls_destructor dest,
-                            ca_error *err) {
+ca_status ca_tls_key_create(ca_tls_key_t* out, ca_tls_destructor dest, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -58,8 +56,7 @@ ca_status ca_tls_key_create(ca_tls_key_t *out, ca_tls_destructor dest,
     if (rc != 0) {
         free(key);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_key_create failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_key_create failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -83,7 +80,7 @@ void ca_tls_key_destroy(ca_tls_key_t key) {
     free(key);
 }
 
-ca_status ca_tls_set(ca_tls_key_t key, void *value, ca_error *err) {
+ca_status ca_tls_set(ca_tls_key_t key, void* value, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -106,8 +103,7 @@ ca_status ca_tls_set(ca_tls_key_t key, void *value, ca_error *err) {
     int rc = pthread_setspecific(key->key, value);
     if (rc != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_setspecific failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_setspecific failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -116,7 +112,7 @@ ca_status ca_tls_set(ca_tls_key_t key, void *value, ca_error *err) {
     return CA_OK;
 }
 
-void *ca_tls_get(ca_tls_key_t key, ca_error *err) {
+void* ca_tls_get(ca_tls_key_t key, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

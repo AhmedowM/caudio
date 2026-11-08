@@ -1,30 +1,29 @@
 ﻿#include <caudio/runtime/process.h>
-
 #include <stdlib.h>
 #include <string.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
-    #include <stdio.h>
+#include <stdio.h>
+#include <windows.h>
 #else
-    #include <unistd.h>
-    #include <sys/wait.h>
-    #include <errno.h>
-    #include <signal.h>
-    #include <spawn.h>
+#include <errno.h>
+#include <signal.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 struct ca_process {
 #if defined(_WIN32) || defined(__CYGWIN__)
     HANDLE handle;
-    DWORD  id;
+    DWORD id;
 #else
     pid_t pid;
 #endif
 };
 
-ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
-                           char *const env[], ca_error *err) {
+ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const env[],
+                           ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -53,7 +52,7 @@ ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
         cmd_len += strlen(argv[i]) + 1; /* arg + space/separator */
     }
 
-    char *cmdline = (char *)malloc(cmd_len + 1);
+    char* cmdline = (char*)malloc(cmd_len + 1);
     if (cmdline == nullptr) {
         free(p);
         if (err) {
@@ -99,8 +98,7 @@ ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
     MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wcmd, wlen);
     free(cmdline);
 
-    BOOL ok = CreateProcessW(nullptr, wcmd, nullptr, nullptr, FALSE,
-                             0, nullptr, nullptr, &si, &pi);
+    BOOL ok = CreateProcessW(nullptr, wcmd, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
     free(wcmd);
 
     if (!ok) {
@@ -129,9 +127,7 @@ ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
     return CA_OK;
 }
 
-ca_status ca_process_wait(ca_process_t process,
-                          ca_process_status *status,
-                          ca_error *err) {
+ca_status ca_process_wait(ca_process_t process, ca_process_status* status, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -193,7 +189,7 @@ ca_status ca_process_wait(ca_process_t process,
     return CA_OK;
 }
 
-ca_status ca_process_kill(ca_process_t process, ca_error *err) {
+ca_status ca_process_kill(ca_process_t process, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -224,7 +220,7 @@ ca_status ca_process_kill(ca_process_t process, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_process_release(ca_process_t process, ca_error *err) {
+ca_status ca_process_release(ca_process_t process, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

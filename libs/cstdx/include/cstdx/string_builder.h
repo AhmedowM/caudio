@@ -10,13 +10,12 @@
  * when random access or explicit reserve/resize is needed.
  */
 
-#include <stddef.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/api.h>
 #include <cstdx/status.h>
 #include <cstdx/string.h>
 #include <cstdx/string_view.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,8 +37,8 @@ typedef struct cx_string_builder cx_string_builder;
  *
  * @return `CX_OK`, `CX_INVALID_ARGUMENT`, or `CX_OUT_OF_MEMORY`.
  */
-[[nodiscard]] CX_API cx_status cx_string_builder_init(
-    cx_string_builder **out, const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_string_builder_init(cx_string_builder** out,
+                                                      const cx_allocator* allocator);
 
 /**
  * @brief Release the builder handle and set @p out to nullptr.
@@ -47,51 +46,48 @@ typedef struct cx_string_builder cx_string_builder;
  * Passing nullptr, or a pointer to nullptr, is a no-op. A second destroy of
  * the same variable is therefore safe.
  */
-CX_API void cx_string_builder_destroy(cx_string_builder **out);
+CX_API void cx_string_builder_destroy(cx_string_builder** out);
 
 /**
  * @brief Append a view.
  */
-[[nodiscard]] CX_API cx_status cx_string_builder_append(
-    cx_string_builder *builder, cx_string_view view);
+[[nodiscard]] CX_API cx_status cx_string_builder_append(cx_string_builder* builder,
+                                                        cx_string_view view);
 
 /**
  * @brief Append a NUL-terminated string.
  */
-[[nodiscard]] CX_API cx_status cx_string_builder_append_cstr(
-    cx_string_builder *builder, const char *cstr);
+[[nodiscard]] CX_API cx_status cx_string_builder_append_cstr(cx_string_builder* builder,
+                                                             const char* cstr);
 
 /**
  * @brief Append one byte.
  */
-[[nodiscard]] CX_API cx_status cx_string_builder_append_char(
-    cx_string_builder *builder, char value);
+[[nodiscard]] CX_API cx_status cx_string_builder_append_char(cx_string_builder* builder,
+                                                             char value);
 
 /**
  * @brief Append formatted output.
  *
  * Uses the C `printf` format language.
  */
-CX_API CX_PRINTF(2, 3) cx_status cx_string_builder_printf(
-    cx_string_builder *builder, const char *format, ...);
+CX_API CX_PRINTF(2, 3) cx_status
+    cx_string_builder_printf(cx_string_builder* builder, const char* format, ...);
 
 /**
  * @brief Borrowed view over the current contents.
  */
-[[nodiscard]] CX_API cx_string_view cx_string_builder_view(
-    const cx_string_builder *builder);
+[[nodiscard]] CX_API cx_string_view cx_string_builder_view(const cx_string_builder* builder);
 
 /**
  * @brief Borrowed NUL-terminated contents.
  */
-[[nodiscard]] CX_API const char *cx_string_builder_cstr(
-    const cx_string_builder *builder);
+[[nodiscard]] CX_API const char* cx_string_builder_cstr(const cx_string_builder* builder);
 
 /**
  * @brief Current length in bytes.
  */
-[[nodiscard]] CX_API size_t cx_string_builder_length(
-    const cx_string_builder *builder);
+[[nodiscard]] CX_API size_t cx_string_builder_length(const cx_string_builder* builder);
 
 /**
  * @brief Move the contents into a new string handle and leave the builder
@@ -102,8 +98,8 @@ CX_API CX_PRINTF(2, 3) cx_status cx_string_builder_printf(
  *
  * The builder keeps its allocator and can be used again.
  */
-[[nodiscard]] CX_API cx_status cx_string_builder_finish(
-    cx_string_builder *builder, cx_string **out);
+[[nodiscard]] CX_API cx_status cx_string_builder_finish(cx_string_builder* builder,
+                                                        cx_string** out);
 
 #ifdef __cplusplus
 } /* extern "C" */

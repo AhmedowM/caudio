@@ -1,6 +1,5 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/vector.h>
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +8,7 @@
 #include "cx_test_allocators.h"
 
 static int test_pod(void) {
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, nullptr) == CX_OK);
     CX_CHECK(vector != nullptr);
@@ -62,7 +61,7 @@ static int test_pod(void) {
 
     CX_CHECK_EQ((size_t)9 * sizeof(int), slice.length);
     CX_CHECK(slice.data == cx_vector_data_ptr(vector));
-    CX_CHECK(cx_vector_data(vector, int) == (int *)cx_vector_data_ptr(vector));
+    CX_CHECK(cx_vector_data(vector, int) == (int*)cx_vector_data_ptr(vector));
 
     cx_vector_clear(vector);
     CX_CHECK(cx_vector_empty(vector));
@@ -89,24 +88,18 @@ static int test_pod(void) {
 }
 
 static int test_errors(void) {
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
-    CX_CHECK(cx_vector_init(nullptr, 4, 4, nullptr, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_init(&vector, 0, 4, nullptr, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_init(&vector, 4, 3, nullptr, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init(nullptr, 4, 4, nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init(&vector, 0, 4, nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init(&vector, 4, 3, nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, nullptr) == CX_OK);
 
     int value = 7;
 
-    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value) + 1) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_push_copy(vector, nullptr, sizeof(value)) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_insert_copy(vector, 1, &value, sizeof(value)) ==
-             CX_OUT_OF_RANGE);
+    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value) + 1) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_push_copy(vector, nullptr, sizeof(value)) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_insert_copy(vector, 1, &value, sizeof(value)) == CX_OUT_OF_RANGE);
     CX_CHECK(cx_vector_insert_copy(vector, 0, &value, sizeof(value)) == CX_OK);
     CX_CHECK(cx_vector_insert_copy(vector, 1, &value, sizeof(value)) == CX_OK);
     CX_CHECK_EQ(2, cx_vector_length(vector));
@@ -123,39 +116,33 @@ static int test_errors(void) {
 
     cx_vector_ops bad = {};
 
-    CX_CHECK(cx_vector_init_of(&vector, int, &bad, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init_of(&vector, int, &bad, nullptr) == CX_INVALID_ARGUMENT);
 
     return cx_test_finish("vector.errors");
 }
 
-static void vector_noop_copy(void *dst, const void *src) {
-    memcpy(dst, src, sizeof(int));
-}
+static void vector_noop_copy(void* dst, const void* src) { memcpy(dst, src, sizeof(int)); }
 
 static int test_invalid_arguments(void) {
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
     cx_allocator invalid = {0};
     int value = 7;
     size_t size = sizeof(int);
 
-    CX_CHECK(cx_vector_init(&vector, sizeof(int), alignof(int), nullptr,
-                            &invalid) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init(&vector, sizeof(int), alignof(int), nullptr, &invalid) ==
+             CX_INVALID_ARGUMENT);
 
     cx_vector_ops missing_destroy = {
         .copy = vector_noop_copy,
         .destroy = nullptr,
     };
 
-    CX_CHECK(cx_vector_init_of(&vector, int, &missing_destroy, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_init_of(&vector, int, &missing_destroy, nullptr) == CX_INVALID_ARGUMENT);
 
     CX_CHECK(cx_vector_reserve(nullptr, 4) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_vector_shrink_to_fit(nullptr) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_push_copy(nullptr, &value, size) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_vector_insert_copy(nullptr, 0, &value, size) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_push_copy(nullptr, &value, size) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_insert_copy(nullptr, 0, &value, size) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_vector_pop(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_vector_remove(nullptr, 0) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_vector_swap_remove(nullptr, 0) == CX_INVALID_ARGUMENT);
@@ -186,8 +173,7 @@ static int test_invalid_arguments(void) {
     CX_CHECK(cx_vector_ptr(vector, 0) == cx_vector_ptr_mut(vector, 0));
 
     /* Popping into the vector's own storage is rejected. */
-    CX_CHECK(cx_vector_pop(vector, cx_vector_ptr_mut(vector, 0)) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_vector_pop(vector, cx_vector_ptr_mut(vector, 0)) == CX_INVALID_ARGUMENT);
     CX_CHECK_EQ(1, cx_vector_length(vector));
 
     cx_vector_destroy(&vector);
@@ -196,7 +182,7 @@ static int test_invalid_arguments(void) {
 }
 
 static int test_overflow(void) {
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, nullptr) == CX_OK);
     CX_CHECK(cx_vector_reserve(vector, SIZE_MAX) == CX_OVERFLOW);
@@ -213,11 +199,10 @@ static int test_allocation_failures(void) {
         .fail_all_after = false,
     };
     cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
     int value = 7;
 
-    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(vector == nullptr);
 
     failing.attempts = 0;
@@ -225,8 +210,7 @@ static int test_allocation_failures(void) {
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) == CX_OK);
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_push_copy(vector, &value, sizeof(value)) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(0, cx_vector_length(vector));
     CX_CHECK_EQ(0, cx_vector_capacity(vector));
 
@@ -244,13 +228,13 @@ static int test_allocation_failures(void) {
 
     /* Pushing or inserting an aliased element stages a detached copy. */
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_vector_push_copy(vector, cx_vector_data_ptr(vector),
-                                 sizeof(value)) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_push_copy(vector, cx_vector_data_ptr(vector), sizeof(value)) ==
+             CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(1, cx_vector_length(vector));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_vector_insert_copy(vector, 0, cx_vector_data_ptr(vector),
-                                   sizeof(value)) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_insert_copy(vector, 0, cx_vector_data_ptr(vector), sizeof(value)) ==
+             CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(1, cx_vector_length(vector));
 
     /* Fill the initial capacity, then force a grow on insert and push. */
@@ -265,13 +249,11 @@ static int test_allocation_failures(void) {
     int remote = 9;
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_vector_insert_copy(vector, 0, &remote, sizeof(remote)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_insert_copy(vector, 0, &remote, sizeof(remote)) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(8, cx_vector_length(vector));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_vector_push_copy(vector, &remote, sizeof(remote)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_vector_push_copy(vector, &remote, sizeof(remote)) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(8, cx_vector_length(vector));
 
     failing.fail_at = 0;
@@ -285,7 +267,7 @@ static int test_allocation_failures(void) {
 /* ------------------------------------------------------------------------- */
 
 typedef struct owned {
-    int *value;
+    int* value;
 } owned;
 
 static int owned_live = 0;
@@ -305,16 +287,16 @@ static owned owned_make(int value) {
     return item;
 }
 
-static void owned_release(owned *item) {
+static void owned_release(owned* item) {
     if (item->value != nullptr) {
         free(item->value);
         item->value = nullptr;
     }
 }
 
-static void owned_copy(void *dst, const void *src) {
-    auto destination = (owned *)dst;
-    auto source = (const owned *)src;
+static void owned_copy(void* dst, const void* src) {
+    auto destination = (owned*)dst;
+    auto source = (const owned*)src;
 
     destination->value = malloc(sizeof(int));
 
@@ -326,17 +308,17 @@ static void owned_copy(void *dst, const void *src) {
     owned_copies++;
 }
 
-static void owned_move(void *dst, void *src) {
-    auto destination = (owned *)dst;
-    auto source = (owned *)src;
+static void owned_move(void* dst, void* src) {
+    auto destination = (owned*)dst;
+    auto source = (owned*)src;
 
     destination->value = source->value;
     source->value = nullptr;
     owned_moves++;
 }
 
-static void owned_destroy(void *element) {
-    auto item = (owned *)element;
+static void owned_destroy(void* element) {
+    auto item = (owned*)element;
 
     if (item->value != nullptr) {
         free(item->value);
@@ -359,10 +341,9 @@ static int test_owning(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
-    CX_CHECK(cx_vector_init_of(&vector, owned, &owned_ops, &allocator) ==
-             CX_OK);
+    CX_CHECK(cx_vector_init_of(&vector, owned, &owned_ops, &allocator) == CX_OK);
     CX_CHECK_EQ(sizeof(owned), cx_vector_element_size(vector));
 
     for (int i = 0; i < 5; ++i) {
@@ -404,7 +385,7 @@ static int test_owning(void) {
     owned_destroy(&popped);
     CX_CHECK_EQ(3, owned_live);
 
-    owned *first = cx_vector_ptr_mut(vector, 0);
+    owned* first = cx_vector_ptr_mut(vector, 0);
 
     CX_CHECK(first != nullptr);
     CX_CHECK(cx_vector_push(vector, first) == CX_OK);
@@ -445,10 +426,9 @@ static const cx_vector_ops owned_ops_no_move = {
 };
 
 static int test_ops_without_move(void) {
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
-    CX_CHECK(cx_vector_init_of(&vector, owned, &owned_ops_no_move, nullptr) ==
-             CX_OK);
+    CX_CHECK(cx_vector_init_of(&vector, owned, &owned_ops_no_move, nullptr) == CX_OK);
 
     for (int i = 0; i < 3; ++i) {
         auto item = owned_make(i);
@@ -484,7 +464,7 @@ static int test_counted_allocator(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_vector *vector = nullptr;
+    cx_vector* vector = nullptr;
 
     CX_CHECK(cx_vector_init_of(&vector, int, nullptr, &allocator) == CX_OK);
 

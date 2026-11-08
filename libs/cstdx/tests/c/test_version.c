@@ -1,5 +1,4 @@
 #include <cstdx/version.h>
-
 #include <string.h>
 
 #include "cx_test.h"

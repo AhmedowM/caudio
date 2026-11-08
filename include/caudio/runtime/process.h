@@ -11,7 +11,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -21,14 +20,14 @@ extern "C" {
 /**
  * @brief Opaque process handle.
  */
-typedef struct ca_process *ca_process_t;
+typedef struct ca_process* ca_process_t;
 
 /**
  * @brief Process exit status.
  */
 typedef struct ca_process_status {
-    int exited;   /* nonzero if the process exited normally */
-    int code;     /* exit code if exited, signal number if terminated */
+    int exited; /* nonzero if the process exited normally */
+    int code;   /* exit code if exited, signal number if terminated */
 } ca_process_status;
 
 /**
@@ -43,8 +42,8 @@ typedef struct ca_process_status {
  * @param err   Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
-                                      char *const env[], ca_error *err);
+CAUDIO_API ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const env[],
+                                      ca_error* err);
 
 /**
  * @brief Wait for @p process to exit and collect its status.
@@ -57,16 +56,15 @@ CAUDIO_API ca_status ca_process_spawn(ca_process_t *out, char *const argv[],
  * @param err     Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_process_wait(ca_process_t process,
-                                     ca_process_status *status,
-                                     ca_error *err);
+CAUDIO_API ca_status ca_process_wait(ca_process_t process, ca_process_status* status,
+                                     ca_error* err);
 
 /**
  * @brief Terminate @p process immediately.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_process_kill(ca_process_t process, ca_error *err);
+CAUDIO_API ca_status ca_process_kill(ca_process_t process, ca_error* err);
 
 /**
  * @brief Return the process ID of the calling process.
@@ -81,7 +79,7 @@ CAUDIO_API int ca_process_self(void);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_process_release(ca_process_t process, ca_error *err);
+CAUDIO_API ca_status ca_process_release(ca_process_t process, ca_error* err);
 
 #ifdef __cplusplus
 }

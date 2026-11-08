@@ -27,7 +27,7 @@ int main(void) {
     CX_CHECK(cx_expected_has_error(&has_error));
     CX_CHECK(cx_expected_value(&has_error) == nullptr);
 
-    const cx_error *stored = cx_expected_error(&has_error);
+    const cx_error* stored = cx_expected_error(&has_error);
 
     CX_CHECK(stored != nullptr);
     CX_CHECK_EQ(9, stored->code);

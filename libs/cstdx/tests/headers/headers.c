@@ -5,10 +5,10 @@
  * missing include or a C++-incompatible construct is caught in CI.
  */
 
-#include <cstdx/api.h>
 #include <cstdx/allocator.h>
 #include <cstdx/allocator_canary.h>
 #include <cstdx/allocator_counted.h>
+#include <cstdx/api.h>
 #include <cstdx/arena.h>
 #include <cstdx/base64.h>
 #include <cstdx/bytes.h>
@@ -28,6 +28,4 @@
 #include <cstdx/vector.h>
 #include <cstdx/version.h>
 
-int main(void) {
-    return 0;
-}
+int main(void) { return 0; }

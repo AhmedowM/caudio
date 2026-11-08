@@ -13,27 +13,26 @@
 
 static int ca_test_failures = 0;
 
-#define CA_CHECK(cond)                                                        \
-    do {                                                                      \
-        if (!(cond)) {                                                        \
-            fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__,            \
-                    __LINE__, #cond);                                         \
-            ca_test_failures++;                                               \
-        }                                                                     \
+#define CA_CHECK(cond)                                                                             \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #cond);               \
+            ca_test_failures++;                                                                    \
+        }                                                                                          \
     } while (0)
 
-#define CA_CHECK_EQ(expected, actual)                                         \
-    do {                                                                      \
-        long long ca_expected = (long long)(expected);                        \
-        long long ca_actual = (long long)(actual);                            \
-        if (ca_expected != ca_actual) {                                       \
-            fprintf(stderr, "%s:%d: expected %lld, got %lld\n", __FILE__,     \
-                    __LINE__, ca_expected, ca_actual);                        \
-            ca_test_failures++;                                               \
-        }                                                                     \
+#define CA_CHECK_EQ(expected, actual)                                                              \
+    do {                                                                                           \
+        long long ca_expected = (long long)(expected);                                             \
+        long long ca_actual = (long long)(actual);                                                 \
+        if (ca_expected != ca_actual) {                                                            \
+            fprintf(stderr, "%s:%d: expected %lld, got %lld\n", __FILE__, __LINE__, ca_expected,   \
+                    ca_actual);                                                                    \
+            ca_test_failures++;                                                                    \
+        }                                                                                          \
     } while (0)
 
-static inline int ca_test_finish(const char *name) {
+static inline int ca_test_finish(const char* name) {
     if (ca_test_failures == 0) {
         printf("%s: ok\n", name);
         return 0;

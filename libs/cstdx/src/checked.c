@@ -1,22 +1,21 @@
 #include <cstdx/checked.h>
-
 #include <stdint.h>
 
 #if __has_include(<stdckdint.h>)
-#  include <stdckdint.h>
-#  define CX_HAS_STDCKDINT 1
+#include <stdckdint.h>
+#define CX_HAS_STDCKDINT 1
 #else
-#  define CX_HAS_STDCKDINT 0
+#define CX_HAS_STDCKDINT 0
 #endif
 
 #if __has_include(<stdbit.h>)
-#  include <stdbit.h>
-#  define CX_HAS_STDBIT 1
+#include <stdbit.h>
+#define CX_HAS_STDBIT 1
 #else
-#  define CX_HAS_STDBIT 0
+#define CX_HAS_STDBIT 0
 #endif
 
-bool cx_add_overflow(size_t a, size_t b, size_t *out) {
+bool cx_add_overflow(size_t a, size_t b, size_t* out) {
 #if CX_HAS_STDCKDINT
     return ckd_add(out, a, b);
 #else
@@ -29,7 +28,7 @@ bool cx_add_overflow(size_t a, size_t b, size_t *out) {
 #endif
 }
 
-bool cx_mul_overflow(size_t a, size_t b, size_t *out) {
+bool cx_mul_overflow(size_t a, size_t b, size_t* out) {
 #if CX_HAS_STDCKDINT
     return ckd_mul(out, a, b);
 #else
@@ -51,7 +50,7 @@ bool cx_is_power_of_two(size_t value) {
 #endif
 }
 
-bool cx_align_up(size_t value, size_t alignment, size_t *out) {
+bool cx_align_up(size_t value, size_t alignment, size_t* out) {
     if (!cx_is_power_of_two(alignment)) {
         return false;
     }

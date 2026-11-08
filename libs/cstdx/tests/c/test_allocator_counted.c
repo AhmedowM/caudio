@@ -1,8 +1,6 @@
-#include <cstdx/allocator_counted.h>
-
 #include <cstdx/allocator_canary.h>
+#include <cstdx/allocator_counted.h>
 #include <cstdx/checked.h>
-
 #include <stdint.h>
 
 #include "cx_test.h"
@@ -13,9 +11,8 @@ typedef struct {
     size_t bytes;
 } leak_totals;
 
-static bool visit_leak(void *context, const void *block, size_t size,
-                       size_t alignment) {
-    auto totals = (leak_totals *)context;
+static bool visit_leak(void* context, const void* block, size_t size, size_t alignment) {
+    auto totals = (leak_totals*)context;
 
     totals->count++;
     totals->bytes += size;
@@ -69,7 +66,7 @@ static int test_counting(void) {
     CX_CHECK_EQ(0, counted.live_bytes);
     CX_CHECK(!cx_allocator_counted_has_leaks(&counted));
 
-    auto zeroed = (unsigned char *)cx_allocator_alloc_zeroed(&allocator, 16, 8);
+    auto zeroed = (unsigned char*)cx_allocator_alloc_zeroed(&allocator, 16, 8);
 
     CX_CHECK(zeroed != nullptr);
     if (zeroed != nullptr) {
@@ -107,8 +104,7 @@ static int test_leaks(void) {
 
     leak_totals totals = {};
 
-    CX_CHECK_EQ(2, cx_allocator_counted_visit_leaks(&counted, visit_leak,
-                                                    &totals));
+    CX_CHECK_EQ(2, cx_allocator_counted_visit_leaks(&counted, visit_leak, &totals));
     CX_CHECK_EQ(2, totals.count);
     CX_CHECK_EQ(24, totals.bytes);
 
@@ -148,12 +144,11 @@ static int test_compose_with_canary(void) {
     return cx_test_finish("allocator_counted.compose");
 }
 
-static bool visit_stop(void *context, const void *block, size_t size,
-                       size_t alignment) {
+static bool visit_stop(void* context, const void* block, size_t size, size_t alignment) {
     (void)block;
     (void)size;
     (void)alignment;
-    ++*(int *)context;
+    ++*(int*)context;
     return false;
 }
 
@@ -170,15 +165,13 @@ static int test_visit_edges(void) {
     CX_CHECK(second != nullptr);
 
     /* Null arguments visit nothing. */
-    CX_CHECK_EQ(0, cx_allocator_counted_visit_leaks(nullptr, visit_leak,
-                                                    nullptr));
+    CX_CHECK_EQ(0, cx_allocator_counted_visit_leaks(nullptr, visit_leak, nullptr));
     CX_CHECK_EQ(0, cx_allocator_counted_visit_leaks(&counted, nullptr, nullptr));
 
     /* A callback returning false stops after the first block. */
     int seen = 0;
 
-    CX_CHECK_EQ(1, cx_allocator_counted_visit_leaks(&counted, visit_stop,
-                                                    &seen));
+    CX_CHECK_EQ(1, cx_allocator_counted_visit_leaks(&counted, visit_stop, &seen));
     CX_CHECK_EQ(1, seen);
 
     cx_allocator_free(&allocator, first, 8, 8);
@@ -192,10 +185,8 @@ static int test_failures_and_lifecycle(void) {
     cx_allocator_counted counted;
     cx_allocator invalid = {0};
 
-    CX_CHECK(cx_allocator_counted_init(nullptr, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_allocator_counted_init(&counted, &invalid) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_allocator_counted_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_allocator_counted_init(&counted, &invalid) == CX_INVALID_ARGUMENT);
 
     cx_allocator_failing failing = {
         .fail_at = 1,
@@ -229,7 +220,7 @@ static int test_failures_and_lifecycle(void) {
     cx_allocator_free(&allocator, nullptr, 16, 8);
     CX_CHECK_EQ(0, counted.releases);
 
-    void *raw = cx_allocator_alloc(cx_allocator_default(), 16, 8);
+    void* raw = cx_allocator_alloc(cx_allocator_default(), 16, 8);
 
     CX_CHECK(raw != nullptr);
     cx_allocator_free(&allocator, raw, 16, 8);

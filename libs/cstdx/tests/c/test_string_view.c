@@ -1,14 +1,12 @@
 #include <cstdx/string_view.h>
-
 #include <string.h>
 
 #include "cx_test.h"
 
-static bool matches(cx_string_view view, const char *cstr) {
+static bool matches(cx_string_view view, const char* cstr) {
     auto length = strlen(cstr);
 
-    return view.length == length &&
-           (length == 0 || memcmp(view.data, cstr, length) == 0);
+    return view.length == length && (length == 0 || memcmp(view.data, cstr, length) == 0);
 }
 
 static int test_construction(void) {
@@ -58,8 +56,8 @@ static int test_compare_and_find(void) {
 
     CX_CHECK(cx_string_view_eq(hello, hello));
     CX_CHECK(!cx_string_view_eq(hello, world));
-    CX_CHECK(cx_string_view_eq(cx_string_view_from_cstr(""),
-                               cx_string_view_from_parts(nullptr, 0)));
+    CX_CHECK(
+        cx_string_view_eq(cx_string_view_from_cstr(""), cx_string_view_from_parts(nullptr, 0)));
     CX_CHECK_EQ(CX_STRING_LESS, cx_string_view_compare(hell, hello));
     CX_CHECK_EQ(CX_STRING_GREATER, cx_string_view_compare(world, hello));
     CX_CHECK_EQ(CX_STRING_EQUAL, cx_string_view_compare(hello, hello));
@@ -71,16 +69,14 @@ static int test_compare_and_find(void) {
     auto haystack = cx_string_view_from_cstr("hello world");
     size_t index = 0;
 
-    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("world"),
-                                 &index) == CX_OK);
+    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("world"), &index) == CX_OK);
     CX_CHECK_EQ(6, index);
-    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr(""),
-                                 &index) == CX_OK);
+    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr(""), &index) == CX_OK);
     CX_CHECK_EQ(0, index);
-    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("xyz"),
-                                 &index) == CX_NOT_FOUND);
-    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("world"),
-                                 nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("xyz"), &index) ==
+             CX_NOT_FOUND);
+    CX_CHECK(cx_string_view_find(haystack, cx_string_view_from_cstr("world"), nullptr) ==
+             CX_INVALID_ARGUMENT);
 
     return cx_test_finish("string_view.compare_and_find");
 }
@@ -104,8 +100,7 @@ static int test_split(void) {
     CX_CHECK(matches(piece, ""));
     CX_CHECK(!cx_string_view_split_next(&split, &piece));
 
-    cx_string_view_split_init(&split, cx_string_view_from_cstr(""),
-                              cx_string_view_from_cstr(","));
+    cx_string_view_split_init(&split, cx_string_view_from_cstr(""), cx_string_view_from_cstr(","));
     CX_CHECK(cx_string_view_split_next(&split, &piece));
     CX_CHECK(matches(piece, ""));
     CX_CHECK(!cx_string_view_split_next(&split, &piece));
@@ -136,14 +131,12 @@ static int test_edges(void) {
     CX_CHECK_EQ(CX_STRING_GREATER, cx_string_view_compare(hello, hell));
 
     /* starts_with: longer prefix, empty prefix, and missing data. */
-    CX_CHECK(!cx_string_view_starts_with(
-        hello, cx_string_view_from_cstr("hellos")));
+    CX_CHECK(!cx_string_view_starts_with(hello, cx_string_view_from_cstr("hellos")));
     CX_CHECK(cx_string_view_starts_with(hello, empty));
     CX_CHECK(!cx_string_view_starts_with(hello, null_one));
 
     /* ends_with: longer suffix, empty suffix, and missing data. */
-    CX_CHECK(!cx_string_view_ends_with(
-        hello, cx_string_view_from_cstr("ohello")));
+    CX_CHECK(!cx_string_view_ends_with(hello, cx_string_view_from_cstr("ohello")));
     CX_CHECK(cx_string_view_ends_with(hello, empty));
     CX_CHECK(!cx_string_view_ends_with(hello, null_one));
 

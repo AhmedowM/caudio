@@ -30,7 +30,7 @@
 #include <caudio/runtime/shm.h>
 #include <caudio/runtime/socket.h>
 #include <caudio/runtime/status.h>
-#include <caudio/runtime/tls.h>
 #include <caudio/runtime/time.h>
+#include <caudio/runtime/tls.h>
 
 #endif /* CAUDIO_H */

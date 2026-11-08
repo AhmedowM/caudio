@@ -9,16 +9,16 @@
 #include <cstdx/bytes.h>
 
 struct cx_bytes {
-    uint8_t *data;
+    uint8_t* data;
     size_t length;
     size_t capacity;
-    const cx_allocator *allocator;
+    const cx_allocator* allocator;
 };
 
 /**
  * @brief Initialize caller-owned buffer storage without allocating a handle.
  */
-cx_status cx_impl_bytes_init(cx_bytes *bytes, const cx_allocator *allocator);
+cx_status cx_impl_bytes_init(cx_bytes* bytes, const cx_allocator* allocator);
 
 /**
  * @brief Release the buffer and reset the caller-owned storage.
@@ -26,6 +26,6 @@ cx_status cx_impl_bytes_init(cx_bytes *bytes, const cx_allocator *allocator);
  * Does not free @p bytes itself. The allocator is preserved so the storage can
  * be reused.
  */
-void cx_impl_bytes_destroy(cx_bytes *bytes);
+void cx_impl_bytes_destroy(cx_bytes* bytes);
 
 #endif /* CSTDX_BYTES_INTERNAL_H */

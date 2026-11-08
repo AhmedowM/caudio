@@ -40,9 +40,8 @@
  * call sites.
  */
 
-#include <stddef.h>
-
 #include <cstdx/api.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,8 +53,7 @@ typedef struct cx_allocator cx_allocator;
  * @brief Allocate @p size bytes aligned to @p alignment.
  * @return The block, or nullptr on failure.
  */
-typedef void *(*cx_allocator_alloc_fn)(void *state, size_t size,
-                                       size_t alignment);
+typedef void* (*cx_allocator_alloc_fn)(void* state, size_t size, size_t alignment);
 
 /**
  * @brief Resize a block previously produced by @p state.
@@ -64,8 +62,7 @@ typedef void *(*cx_allocator_alloc_fn)(void *state, size_t size,
  *
  * @return The resized block, or nullptr on failure (original block intact).
  */
-typedef void *(*cx_allocator_realloc_fn)(void *state, void *ptr,
-                                         size_t old_size, size_t new_size,
+typedef void* (*cx_allocator_realloc_fn)(void* state, void* ptr, size_t old_size, size_t new_size,
                                          size_t alignment);
 
 /**
@@ -73,8 +70,7 @@ typedef void *(*cx_allocator_realloc_fn)(void *state, void *ptr,
  *
  * @p size and @p alignment are the ones used for the allocation.
  */
-typedef void (*cx_allocator_free_fn)(void *state, void *ptr, size_t size,
-                                     size_t alignment);
+typedef void (*cx_allocator_free_fn)(void* state, void* ptr, size_t size, size_t alignment);
 
 /**
  * @brief A source of memory.
@@ -83,7 +79,7 @@ typedef void (*cx_allocator_free_fn)(void *state, void *ptr, size_t size,
  */
 struct cx_allocator {
     /** Opaque implementation state; passed back to every callback. */
-    void *state;
+    void* state;
 
     /** Required. */
     cx_allocator_alloc_fn alloc;
@@ -101,14 +97,14 @@ struct cx_allocator {
  * The allocator forwards to the C runtime (`aligned_alloc`/`posix_memalign`
  * or `_aligned_malloc` on Windows). It is thread-safe.
  */
-[[nodiscard]] CX_API const cx_allocator *cx_allocator_default(void);
+[[nodiscard]] CX_API const cx_allocator* cx_allocator_default(void);
 
 /**
  * @brief Test whether an allocator pointer can be used for allocation.
  *
  * nullptr denotes the default allocator and is considered valid.
  */
-[[nodiscard]] CX_API bool cx_allocator_is_valid(const cx_allocator *allocator);
+[[nodiscard]] CX_API bool cx_allocator_is_valid(const cx_allocator* allocator);
 
 /**
  * @brief Allocate @p size bytes with @p alignment.
@@ -117,14 +113,14 @@ struct cx_allocator {
  * @return The block, or nullptr if @p size is zero, @p alignment is invalid, or
  *         the allocator is out of memory.
  */
-[[nodiscard]] CX_API void *cx_allocator_alloc(const cx_allocator *allocator,
-                                              size_t size, size_t alignment);
+[[nodiscard]] CX_API void* cx_allocator_alloc(const cx_allocator* allocator, size_t size,
+                                              size_t alignment);
 
 /**
  * @brief Allocate @p size zeroed bytes with @p alignment.
  */
-[[nodiscard]] CX_API void *cx_allocator_alloc_zeroed(
-    const cx_allocator *allocator, size_t size, size_t alignment);
+[[nodiscard]] CX_API void* cx_allocator_alloc_zeroed(const cx_allocator* allocator, size_t size,
+                                                     size_t alignment);
 
 /**
  * @brief Resize a block, falling back to allocate/copy/free when needed.
@@ -136,10 +132,8 @@ struct cx_allocator {
  * @return The resized block, or nullptr on failure. On failure @p ptr is still
  *         valid.
  */
-[[nodiscard]] CX_API void *cx_allocator_realloc(const cx_allocator *allocator,
-                                                void *ptr, size_t old_size,
-                                                size_t new_size,
-                                                size_t alignment);
+[[nodiscard]] CX_API void* cx_allocator_realloc(const cx_allocator* allocator, void* ptr,
+                                                size_t old_size, size_t new_size, size_t alignment);
 
 /**
  * @brief Release a block.
@@ -149,8 +143,8 @@ struct cx_allocator {
  * @param size Size passed at allocation time.
  * @param alignment Alignment passed at allocation time.
  */
-CX_API void cx_allocator_free(const cx_allocator *allocator, void *ptr,
-                              size_t size, size_t alignment);
+CX_API void cx_allocator_free(const cx_allocator* allocator, void* ptr, size_t size,
+                              size_t alignment);
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -1,5 +1,4 @@
 #include <cstdx/string.h>
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,11 +7,10 @@
 /**
  * Fuzz cx_string construction, copying, aliasing append, and erasure.
  */
-int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    cx_string *string = nullptr;
+int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
+    cx_string* string = nullptr;
 
-    if (cx_string_from_view(&string, (cx_string_view){(const char *)data, size},
-                            nullptr) != CX_OK) {
+    if (cx_string_from_view(&string, (cx_string_view){(const char*)data, size}, nullptr) != CX_OK) {
         return 0;
     }
 
@@ -28,7 +26,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         abort();
     }
 
-    cx_string *copy = nullptr;
+    cx_string* copy = nullptr;
 
     if (cx_string_copy(&copy, string) == CX_OK) {
         if (cx_string_compare(string, copy) != CX_STRING_EQUAL) {

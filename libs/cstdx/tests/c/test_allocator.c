@@ -1,5 +1,4 @@
 #include <cstdx/allocator.h>
-
 #include <stdint.h>
 #include <string.h>
 
@@ -10,8 +9,8 @@ typedef struct {
     size_t releases;
 } counters;
 
-static void *counting_alloc(void *state, size_t size, size_t alignment) {
-    auto counters_state = (counters *)state;
+static void* counting_alloc(void* state, size_t size, size_t alignment) {
+    auto counters_state = (counters*)state;
     auto block = cx_allocator_alloc(nullptr, size, alignment);
 
     if (block != nullptr) {
@@ -21,9 +20,8 @@ static void *counting_alloc(void *state, size_t size, size_t alignment) {
     return block;
 }
 
-static void counting_free(void *state, void *ptr, size_t size,
-                          size_t alignment) {
-    auto counters_state = (counters *)state;
+static void counting_free(void* state, void* ptr, size_t size, size_t alignment) {
+    auto counters_state = (counters*)state;
 
     if (ptr != nullptr) {
         counters_state->releases++;
@@ -39,7 +37,7 @@ static int test_default_allocator(void) {
     CX_CHECK(cx_allocator_is_valid(allocator));
     CX_CHECK(cx_allocator_is_valid(nullptr));
 
-    auto block = (unsigned char *)cx_allocator_alloc(allocator, 32, 0);
+    auto block = (unsigned char*)cx_allocator_alloc(allocator, 32, 0);
 
     CX_CHECK(block != nullptr);
     if (block != nullptr) {
@@ -57,8 +55,7 @@ static int test_default_allocator(void) {
     CX_CHECK(((uintptr_t)overaligned % 64) == 0);
     cx_allocator_free(allocator, overaligned, 64, 64);
 
-    auto zeroed =
-        (unsigned char *)cx_allocator_alloc_zeroed(allocator, 16, 0);
+    auto zeroed = (unsigned char*)cx_allocator_alloc_zeroed(allocator, 16, 0);
 
     CX_CHECK(zeroed != nullptr);
     if (zeroed != nullptr) {
@@ -79,7 +76,7 @@ static int test_default_allocator(void) {
 
 static int test_realloc(void) {
     auto allocator = cx_allocator_default();
-    auto block = (unsigned char *)cx_allocator_alloc(allocator, 8, 0);
+    auto block = (unsigned char*)cx_allocator_alloc(allocator, 8, 0);
 
     CX_CHECK(block != nullptr);
     if (block != nullptr) {

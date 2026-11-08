@@ -29,14 +29,10 @@ static int test_null_args(void) {
     ca_error err;
     ca_error_init(&err);
 
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_rwlock_rdlock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_rwlock_wrlock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_rwlock_unlock(nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_rwlock_create(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_rwlock_rdlock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_rwlock_wrlock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_rwlock_unlock(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_rwlock_create(nullptr, &err));
 
     return ca_test_finish("rwlock.null_args");
 }

@@ -1,20 +1,17 @@
 ﻿#include <caudio/types/record.h>
 #include <caudio/types/wire.h>
-
 #include <cstdx/allocator_counted.h>
 #include <cstdx/string.h>
 #include <cstdx/string_view.h>
-
 #include <string.h>
 
 #include "ca_test.h"
 
-static bool str_eq(const cx_string *value, const char *expected) {
+static bool str_eq(const cx_string* value, const char* expected) {
     if (!value) {
         return expected == nullptr || expected[0] == '\0';
     }
-    return cx_string_view_eq(cx_string_view_of(value),
-                             cx_string_view_from_cstr(expected));
+    return cx_string_view_eq(cx_string_view_of(value), cx_string_view_from_cstr(expected));
 }
 
 static void test_wire_names(void) {
@@ -36,58 +33,41 @@ static void test_wire_names(void) {
     CA_CHECK(strcmp(ca_playback_state_name(CA_PLAYBACK_READY), "Ready") == 0);
     CA_CHECK(strcmp(ca_playback_state_name(CA_PLAYBACK_PLAYING), "Playing") == 0);
     CA_CHECK(strcmp(ca_playback_state_name(CA_PLAYBACK_PAUSED), "Paused") == 0);
-    CA_CHECK(strcmp(ca_playback_state_name((ca_playback_state)99), "Unknown") ==
-             0);
+    CA_CHECK(strcmp(ca_playback_state_name((ca_playback_state)99), "Unknown") == 0);
 
     ca_playback_state state = CA_PLAYBACK_STOPPED;
-    CA_CHECK(ca_playback_state_parse("Stopped", &state) &&
-             state == CA_PLAYBACK_STOPPED);
-    CA_CHECK(ca_playback_state_parse("Ready", &state) &&
-             state == CA_PLAYBACK_READY);
-    CA_CHECK(ca_playback_state_parse("Playing", &state) &&
-             state == CA_PLAYBACK_PLAYING);
-    CA_CHECK(ca_playback_state_parse("Paused", &state) &&
-             state == CA_PLAYBACK_PAUSED);
+    CA_CHECK(ca_playback_state_parse("Stopped", &state) && state == CA_PLAYBACK_STOPPED);
+    CA_CHECK(ca_playback_state_parse("Ready", &state) && state == CA_PLAYBACK_READY);
+    CA_CHECK(ca_playback_state_parse("Playing", &state) && state == CA_PLAYBACK_PLAYING);
+    CA_CHECK(ca_playback_state_parse("Paused", &state) && state == CA_PLAYBACK_PAUSED);
     CA_CHECK(!ca_playback_state_parse("playing", &state));
 
     CA_CHECK(strcmp(ca_source_kind_name(CA_SOURCE_PATH), "path") == 0);
     CA_CHECK(strcmp(ca_source_kind_name(CA_SOURCE_EXTERNAL), "external") == 0);
     CA_CHECK(strcmp(ca_source_kind_name(CA_SOURCE_IMPORTED), "imported") == 0);
-    CA_CHECK(strcmp(ca_source_kind_name(CA_SOURCE_UNAVAILABLE), "unavailable") ==
-             0);
+    CA_CHECK(strcmp(ca_source_kind_name(CA_SOURCE_UNAVAILABLE), "unavailable") == 0);
     /* Unknown source kinds spell as the legacy default. */
     CA_CHECK(strcmp(ca_source_kind_name((ca_source_kind)99), "path") == 0);
 
     ca_source_kind kind = CA_SOURCE_PATH;
-    CA_CHECK(ca_source_kind_parse("external", &kind) &&
-             kind == CA_SOURCE_EXTERNAL);
-    CA_CHECK(ca_source_kind_parse("imported", &kind) &&
-             kind == CA_SOURCE_IMPORTED);
-    CA_CHECK(ca_source_kind_parse("unavailable", &kind) &&
-             kind == CA_SOURCE_UNAVAILABLE);
+    CA_CHECK(ca_source_kind_parse("external", &kind) && kind == CA_SOURCE_EXTERNAL);
+    CA_CHECK(ca_source_kind_parse("imported", &kind) && kind == CA_SOURCE_IMPORTED);
+    CA_CHECK(ca_source_kind_parse("unavailable", &kind) && kind == CA_SOURCE_UNAVAILABLE);
     CA_CHECK(!ca_source_kind_parse("Path", &kind));
     CA_CHECK(!ca_source_kind_parse("nope", &kind));
 
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_NONE), "None") ==
-             0);
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_TRACK_STARTED),
-                    "TrackStarted") == 0);
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_TRACK_ENDED),
-                    "TrackEnded") == 0);
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_QUEUE_CHANGED),
-                    "QueueChanged") == 0);
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_PROGRESS),
-                    "Progress") == 0);
-    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_ERROR), "Error") ==
-             0);
-    CA_CHECK(strcmp(ca_engine_event_type_name((ca_engine_event_type)99),
-                    "Unknown") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_NONE), "None") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_TRACK_STARTED), "TrackStarted") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_TRACK_ENDED), "TrackEnded") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_QUEUE_CHANGED), "QueueChanged") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_PROGRESS), "Progress") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name(CA_ENGINE_EVENT_ERROR), "Error") == 0);
+    CA_CHECK(strcmp(ca_engine_event_type_name((ca_engine_event_type)99), "Unknown") == 0);
 
     ca_engine_event_type type = CA_ENGINE_EVENT_NONE;
     CA_CHECK(ca_engine_event_type_parse("QueueChanged", &type) &&
              type == CA_ENGINE_EVENT_QUEUE_CHANGED);
-    CA_CHECK(ca_engine_event_type_parse("Progress", &type) &&
-             type == CA_ENGINE_EVENT_PROGRESS);
+    CA_CHECK(ca_engine_event_type_parse("Progress", &type) && type == CA_ENGINE_EVENT_PROGRESS);
     CA_CHECK(!ca_engine_event_type_parse("progress", &type));
 }
 
@@ -200,15 +180,13 @@ static void test_components(void) {
     CA_CHECK_EQ(CX_OK, cx_string_assign(device.id, "default"));
     CA_CHECK_EQ(CX_OK, cx_string_assign(device.name, "Speakers"));
     device.is_default = true;
-    CA_CHECK_EQ(CX_OK, cx_vector_push_copy(devices.devices, &device,
-                                           sizeof device));
+    CA_CHECK_EQ(CX_OK, cx_vector_push_copy(devices.devices, &device, sizeof device));
     ca_device_info_destroy(&device);
 
     ca_device_list devices_copy;
     CA_CHECK_EQ(CA_OK, ca_device_list_copy(&devices_copy, &devices, nullptr));
     CA_CHECK_EQ(1, cx_vector_length(devices_copy.devices));
-    const ca_device_info *copied =
-        (const ca_device_info *)cx_vector_ptr(devices_copy.devices, 0);
+    const ca_device_info* copied = (const ca_device_info*)cx_vector_ptr(devices_copy.devices, 0);
     CA_CHECK(copied != nullptr);
     CA_CHECK(str_eq(copied->id, "default"));
     CA_CHECK(copied->is_default);
@@ -227,13 +205,12 @@ static void test_components(void) {
     CA_CHECK(state.volume == 1.0f);
     CA_CHECK_EQ(1, state.active_queue_id);
     for (int64_t i = 0; i < 4; ++i) {
-        CA_CHECK_EQ(CX_OK,
-                    cx_vector_push_copy(state.shuffle_perm, &i, sizeof i));
+        CA_CHECK_EQ(CX_OK, cx_vector_push_copy(state.shuffle_perm, &i, sizeof i));
     }
     ca_engine_state state_copy;
     CA_CHECK_EQ(CA_OK, ca_engine_state_copy(&state_copy, &state, nullptr));
     CA_CHECK_EQ(4, cx_vector_length(state_copy.shuffle_perm));
-    CA_CHECK(*(const int64_t *)cx_vector_ptr(state_copy.shuffle_perm, 3) == 3);
+    CA_CHECK(*(const int64_t*)cx_vector_ptr(state_copy.shuffle_perm, 3) == 3);
     ca_engine_state_destroy(&state_copy);
     ca_engine_state_destroy(&state);
 
@@ -312,8 +289,7 @@ static void test_leak_free(void) {
     ca_engine_state state;
     CA_CHECK_EQ(CA_OK, ca_engine_state_init(&state, &alloc));
     for (int64_t i = 0; i < 3; ++i) {
-        CA_CHECK_EQ(CX_OK,
-                    cx_vector_push_copy(state.shuffle_perm, &i, sizeof i));
+        CA_CHECK_EQ(CX_OK, cx_vector_push_copy(state.shuffle_perm, &i, sizeof i));
     }
     ca_engine_state state_copy;
     CA_CHECK_EQ(CA_OK, ca_engine_state_copy(&state_copy, &state, &alloc));

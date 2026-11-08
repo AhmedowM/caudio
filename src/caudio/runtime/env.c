@@ -1,5 +1,4 @@
 ﻿#include <caudio/runtime/env.h>
-
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,7 +6,7 @@
 #include <string.h>
 
 #if defined(_WIN32)
-    #include <windows.h>
+#include <windows.h>
 #endif
 
 /**
@@ -15,25 +14,23 @@
  * @brief Process environment access, UTF-8 at the public boundary.
  */
 
-static bool env_name_valid(const char *name) {
+static bool env_name_valid(const char* name) {
     return name != nullptr && name[0] != '\0' && strchr(name, '=') == nullptr;
 }
 
 #if defined(_WIN32)
-static WCHAR *env_utf8_to_wide(const char *text) {
-    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1,
-                                  nullptr, 0);
+static WCHAR* env_utf8_to_wide(const char* text) {
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
     if (len <= 0) {
         return nullptr;
     }
 
-    WCHAR *wide = (WCHAR *)malloc((size_t)len * sizeof(WCHAR));
+    WCHAR* wide = (WCHAR*)malloc((size_t)len * sizeof(WCHAR));
     if (wide == nullptr) {
         return nullptr;
     }
 
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide,
-                            len) != len) {
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide, len) != len) {
         free(wide);
         return nullptr;
     }
@@ -41,13 +38,11 @@ static WCHAR *env_utf8_to_wide(const char *text) {
     return wide;
 }
 
-static ca_status env_lookup(const char *name, char **value, size_t *len,
-                            ca_error *err) {
-    WCHAR *wide_name = env_utf8_to_wide(name);
+static ca_status env_lookup(const char* name, char** value, size_t* len, ca_error* err) {
+    WCHAR* wide_name = env_utf8_to_wide(name);
     if (wide_name == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid UTF-8 environment variable name");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid UTF-8 environment variable name");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -63,11 +58,10 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
             return CA_NOT_FOUND;
         }
 
-        char *empty = (char *)malloc(1);
+        char* empty = (char*)malloc(1);
         if (empty == nullptr) {
             if (err) {
-                ca_error_set(err, CA_OUT_OF_MEMORY,
-                             "failed to allocate environment value");
+                ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
             }
             return CA_OUT_OF_MEMORY;
         }
@@ -77,12 +71,11 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
         return CA_OK;
     }
 
-    WCHAR *wide_value = (WCHAR *)malloc((size_t)size * sizeof(WCHAR));
+    WCHAR* wide_value = (WCHAR*)malloc((size_t)size * sizeof(WCHAR));
     if (wide_value == nullptr) {
         free(wide_name);
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate environment value");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -99,8 +92,7 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
     if (written >= size) {
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "environment value changed during read");
+            ca_error_set(err, CA_IO_ERROR, "environment value changed during read");
         }
         return CA_IO_ERROR;
     }
@@ -113,35 +105,31 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
         return CA_OVERFLOW;
     }
 
-    int needed = WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written,
-                                     nullptr, 0, nullptr, nullptr);
+    int needed =
+        WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written, nullptr, 0, nullptr, nullptr);
     if (needed <= 0 && written > 0) {
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "environment value is not valid UTF-16");
+            ca_error_set(err, CA_IO_ERROR, "environment value is not valid UTF-16");
         }
         return CA_IO_ERROR;
     }
 
-    char *utf8 = (char *)malloc((size_t)needed + 1);
+    char* utf8 = (char*)malloc((size_t)needed + 1);
     if (utf8 == nullptr) {
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate environment value");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
         }
         return CA_OUT_OF_MEMORY;
     }
 
-    if (needed > 0 &&
-        WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written, utf8, needed,
-                            nullptr, nullptr) != needed) {
+    if (needed > 0 && WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written, utf8, needed,
+                                          nullptr, nullptr) != needed) {
         free(utf8);
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "failed to convert environment value to UTF-8");
+            ca_error_set(err, CA_IO_ERROR, "failed to convert environment value to UTF-8");
         }
         return CA_IO_ERROR;
     }
@@ -154,19 +142,17 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
     return CA_OK;
 }
 #else
-static ca_status env_lookup(const char *name, char **value, size_t *len,
-                            ca_error *err) {
-    const char *found = getenv(name);
+static ca_status env_lookup(const char* name, char** value, size_t* len, ca_error* err) {
+    const char* found = getenv(name);
     if (found == nullptr) {
         return CA_NOT_FOUND;
     }
 
     size_t found_len = strlen(found);
-    char *copy = (char *)malloc(found_len + 1);
+    char* copy = (char*)malloc(found_len + 1);
     if (copy == nullptr) {
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate environment value");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -178,8 +164,7 @@ static ca_status env_lookup(const char *name, char **value, size_t *len,
 }
 #endif
 
-ca_status ca_env_get(const char *name, char *out, size_t out_size,
-                     size_t *out_len, ca_error *err) {
+ca_status ca_env_get(const char* name, char* out, size_t out_size, size_t* out_len, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -190,29 +175,26 @@ ca_status ca_env_get(const char *name, char *out, size_t out_size,
 
     if (!env_name_valid(name)) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid environment variable name");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid environment variable name");
         }
         return CA_INVALID_ARGUMENT;
     }
 
     if (out == nullptr && out_size != 0) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out_size must be 0 when out is nullptr");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out_size must be 0 when out is nullptr");
         }
         return CA_INVALID_ARGUMENT;
     }
 
     if (out != nullptr && out_size == 0) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "out_size must be nonzero when out is provided");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "out_size must be nonzero when out is provided");
         }
         return CA_INVALID_ARGUMENT;
     }
 
-    char *value = nullptr;
+    char* value = nullptr;
     size_t len = 0;
     ca_status status = env_lookup(name, &value, &len, err);
 
@@ -221,8 +203,7 @@ ca_status ca_env_get(const char *name, char *out, size_t out_size,
             out[0] = '\0';
         }
         if (status == CA_NOT_FOUND && err) {
-            ca_error_set(err, CA_NOT_FOUND,
-                         "environment variable is not set: %s", name);
+            ca_error_set(err, CA_NOT_FOUND, "environment variable is not set: %s", name);
         }
         return status;
     }
@@ -240,8 +221,7 @@ ca_status ca_env_get(const char *name, char *out, size_t out_size,
         out[0] = '\0';
         free(value);
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "environment value needs %zu bytes", len + 1);
+            ca_error_set(err, CA_OVERFLOW, "environment value needs %zu bytes", len + 1);
         }
         return CA_OVERFLOW;
     }
@@ -251,29 +231,26 @@ ca_status ca_env_get(const char *name, char *out, size_t out_size,
     return CA_OK;
 }
 
-ca_status ca_env_set(const char *name, const char *value, bool overwrite,
-                     ca_error *err) {
+ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (!env_name_valid(name) || value == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid environment name or value");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid environment name or value");
         }
         return CA_INVALID_ARGUMENT;
     }
 
 #if defined(_WIN32)
-    WCHAR *wide_name = env_utf8_to_wide(name);
-    WCHAR *wide_value = env_utf8_to_wide(value);
+    WCHAR* wide_name = env_utf8_to_wide(name);
+    WCHAR* wide_value = env_utf8_to_wide(value);
     if (wide_name == nullptr || wide_value == nullptr) {
         free(wide_name);
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid UTF-8 environment name or value");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid UTF-8 environment name or value");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -287,8 +264,8 @@ ca_status ca_env_set(const char *name, const char *value, bool overwrite,
             free(wide_name);
             free(wide_value);
             if (err) {
-                ca_error_set(err, CA_ALREADY_EXISTS,
-                             "environment variable already exists: %s", name);
+                ca_error_set(err, CA_ALREADY_EXISTS, "environment variable already exists: %s",
+                             name);
             }
             return CA_ALREADY_EXISTS;
         }
@@ -299,8 +276,7 @@ ca_status ca_env_set(const char *name, const char *value, bool overwrite,
         free(wide_name);
         free(wide_value);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "SetEnvironmentVariableW failed: %lu",
+            ca_error_set(err, CA_IO_ERROR, "SetEnvironmentVariableW failed: %lu",
                          (unsigned long)error);
         }
         return CA_IO_ERROR;
@@ -311,16 +287,14 @@ ca_status ca_env_set(const char *name, const char *value, bool overwrite,
 #else
     if (!overwrite && getenv(name) != nullptr) {
         if (err) {
-            ca_error_set(err, CA_ALREADY_EXISTS,
-                         "environment variable already exists: %s", name);
+            ca_error_set(err, CA_ALREADY_EXISTS, "environment variable already exists: %s", name);
         }
         return CA_ALREADY_EXISTS;
     }
 
     if (setenv(name, value, 1) != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "setenv failed: %s",
-                         strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "setenv failed: %s", strerror(errno));
         }
         return CA_IO_ERROR;
     }
@@ -329,25 +303,23 @@ ca_status ca_env_set(const char *name, const char *value, bool overwrite,
     return CA_OK;
 }
 
-ca_status ca_env_unset(const char *name, ca_error *err) {
+ca_status ca_env_unset(const char* name, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
 
     if (!env_name_valid(name)) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid environment variable name");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid environment variable name");
         }
         return CA_INVALID_ARGUMENT;
     }
 
 #if defined(_WIN32)
-    WCHAR *wide_name = env_utf8_to_wide(name);
+    WCHAR* wide_name = env_utf8_to_wide(name);
     if (wide_name == nullptr) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "invalid UTF-8 environment variable name");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "invalid UTF-8 environment variable name");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -356,8 +328,7 @@ ca_status ca_env_unset(const char *name, ca_error *err) {
         DWORD error = GetLastError();
         free(wide_name);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "SetEnvironmentVariableW failed: %lu",
+            ca_error_set(err, CA_IO_ERROR, "SetEnvironmentVariableW failed: %lu",
                          (unsigned long)error);
         }
         return CA_IO_ERROR;
@@ -367,8 +338,7 @@ ca_status ca_env_unset(const char *name, ca_error *err) {
 #else
     if (unsetenv(name) != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "unsetenv failed: %s",
-                         strerror(errno));
+            ca_error_set(err, CA_IO_ERROR, "unsetenv failed: %s", strerror(errno));
         }
         return CA_IO_ERROR;
     }

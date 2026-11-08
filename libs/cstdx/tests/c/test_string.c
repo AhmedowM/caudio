@@ -1,6 +1,5 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/string.h>
-
 #include <stdint.h>
 #include <string.h>
 
@@ -8,7 +7,7 @@
 #include "cx_test_allocators.h"
 
 static int test_lifecycle(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
 
     CX_CHECK(cx_string_init(&str, nullptr) == CX_OK);
     CX_CHECK(str != nullptr);
@@ -55,22 +54,21 @@ static int test_lifecycle(void) {
 }
 
 static int test_from_and_copy(void) {
-    cx_string *a = nullptr;
-    cx_string *b = nullptr;
+    cx_string* a = nullptr;
+    cx_string* b = nullptr;
 
     CX_CHECK(cx_string_from(&a, "alpha", nullptr) == CX_OK);
-    CX_CHECK(cx_string_from_view(&b, cx_string_view_from_cstr("beta"),
-                                 nullptr) == CX_OK);
+    CX_CHECK(cx_string_from_view(&b, cx_string_view_from_cstr("beta"), nullptr) == CX_OK);
     CX_CHECK(cx_string_equals_cstr(a, "alpha"));
     CX_CHECK(cx_string_equals_cstr(b, "beta"));
 
-    cx_string *copy = nullptr;
+    cx_string* copy = nullptr;
 
     CX_CHECK(cx_string_copy(&copy, a) == CX_OK);
     CX_CHECK(cx_string_equals(copy, a));
     CX_CHECK(cx_string_cstr(copy) != cx_string_cstr(a));
 
-    cx_string *moved = nullptr;
+    cx_string* moved = nullptr;
 
     CX_CHECK(cx_string_init(&moved, nullptr) == CX_OK);
     cx_string_move(moved, copy);
@@ -91,7 +89,7 @@ static int test_from_and_copy(void) {
 }
 
 static int test_mutation(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
 
     CX_CHECK(cx_string_from(&str, "foo", nullptr) == CX_OK);
     CX_CHECK(cx_string_append_cstr(str, "bar") == CX_OK);
@@ -129,35 +127,29 @@ static int test_mutation(void) {
 }
 
 static int test_insert_erase_replace(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
 
     CX_CHECK(cx_string_from(&str, "hello", nullptr) == CX_OK);
-    CX_CHECK(cx_string_insert(str, 5, cx_string_view_from_cstr(" world")) ==
-             CX_OK);
+    CX_CHECK(cx_string_insert(str, 5, cx_string_view_from_cstr(" world")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello world") == 0);
 
-    CX_CHECK(cx_string_insert(str, 0, cx_string_view_from_cstr(">> ")) ==
-             CX_OK);
+    CX_CHECK(cx_string_insert(str, 0, cx_string_view_from_cstr(">> ")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), ">> hello world") == 0);
 
     CX_CHECK(cx_string_erase(str, 0, 3) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello world") == 0);
 
-    CX_CHECK(cx_string_replace(str, 6, 5, cx_string_view_from_cstr("there")) ==
-             CX_OK);
+    CX_CHECK(cx_string_replace(str, 6, 5, cx_string_view_from_cstr("there")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello there") == 0);
 
-    CX_CHECK(cx_string_replace(str, 5, 0, cx_string_view_from_cstr(",")) ==
-             CX_OK);
+    CX_CHECK(cx_string_replace(str, 5, 0, cx_string_view_from_cstr(",")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello, there") == 0);
 
     CX_CHECK(cx_string_erase(str, 5, 100) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
-    CX_CHECK(cx_string_insert(str, 6, cx_string_view_from_cstr("x")) ==
-             CX_OUT_OF_RANGE);
+    CX_CHECK(cx_string_insert(str, 6, cx_string_view_from_cstr("x")) == CX_OUT_OF_RANGE);
     CX_CHECK(cx_string_erase(str, 6, 1) == CX_OUT_OF_RANGE);
-    CX_CHECK(cx_string_replace(str, 6, 0, cx_string_view_from_cstr("x")) ==
-             CX_OUT_OF_RANGE);
+    CX_CHECK(cx_string_replace(str, 6, 0, cx_string_view_from_cstr("x")) == CX_OUT_OF_RANGE);
 
     cx_string_destroy(&str);
 
@@ -165,7 +157,7 @@ static int test_insert_erase_replace(void) {
 }
 
 static int test_aliasing(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
 
     CX_CHECK(cx_string_from(&str, "hello world", nullptr) == CX_OK);
 
@@ -184,8 +176,7 @@ static int test_aliasing(void) {
 
     cx_string_view middle;
 
-    CX_CHECK(cx_string_view_sub(cx_string_view_of(str), 3, 6, &middle) ==
-             CX_OK);
+    CX_CHECK(cx_string_view_sub(cx_string_view_of(str), 3, 6, &middle) == CX_OK);
     CX_CHECK(cx_string_replace(str, 0, 3, middle) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "abcabcabcabcabc") == 0);
 
@@ -195,7 +186,7 @@ static int test_aliasing(void) {
 }
 
 static int test_search_and_compare(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
     size_t index = 0;
 
     CX_CHECK(cx_string_from(&str, "hello world", nullptr) == CX_OK);
@@ -211,7 +202,7 @@ static int test_search_and_compare(void) {
     CX_CHECK(cx_string_ends_with(str, cx_string_view_from_cstr("world")));
     CX_CHECK(!cx_string_ends_with(str, cx_string_view_from_cstr("hello")));
 
-    cx_string *other = nullptr;
+    cx_string* other = nullptr;
 
     CX_CHECK(cx_string_from(&other, "hello worle", nullptr) == CX_OK);
     CX_CHECK_EQ(CX_STRING_LESS, cx_string_compare(str, other));
@@ -232,8 +223,8 @@ static int test_counted_allocator(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_string *first = nullptr;
-    cx_string *second = nullptr;
+    cx_string* first = nullptr;
+    cx_string* second = nullptr;
 
     CX_CHECK(cx_string_from(&first, "counted", &allocator) == CX_OK);
     CX_CHECK(cx_string_copy(&second, first) == CX_OK);
@@ -253,7 +244,7 @@ static int test_counted_allocator(void) {
 }
 
 static int test_invalid_arguments(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
     cx_allocator invalid = {0};
     cx_string_view view = cx_string_view_from_cstr("x");
     size_t index = 0;
@@ -264,8 +255,7 @@ static int test_invalid_arguments(void) {
 
     CX_CHECK(cx_string_from(nullptr, "x", nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_from(&str, nullptr, nullptr) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_from_view(nullptr, view, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_from_view(nullptr, view, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_from_view(&str, (cx_string_view){nullptr, 1}, nullptr) ==
              CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_copy(nullptr, nullptr) == CX_INVALID_ARGUMENT);
@@ -276,23 +266,19 @@ static int test_invalid_arguments(void) {
     CX_CHECK(cx_string_assign(str, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_assign(nullptr, "x") == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_assign_view(nullptr, view) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_assign_view(str, (cx_string_view){nullptr, 1}) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_assign_view(str, (cx_string_view){nullptr, 1}) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_append(str, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_append_cstr(str, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_append(nullptr, str) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_append_view(nullptr, view) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_append_view(str, (cx_string_view){nullptr, 1}) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_append_view(str, (cx_string_view){nullptr, 1}) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_push_back(nullptr, 'x') == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_pop_back(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_insert(nullptr, 0, view) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_insert(str, 0, (cx_string_view){nullptr, 1}) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_insert(str, 0, (cx_string_view){nullptr, 1}) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_erase(nullptr, 0, 1) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_replace(nullptr, 0, 0, view) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_replace(str, 0, 0, (cx_string_view){nullptr, 1}) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_replace(str, 0, 0, (cx_string_view){nullptr, 1}) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_set(nullptr, 0, 'x') == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_resize(nullptr, 0) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_reserve(nullptr, 1) == CX_INVALID_ARGUMENT);
@@ -332,7 +318,7 @@ static int test_invalid_arguments(void) {
 }
 
 static int test_empty_operations(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
     cx_string_view empty = {nullptr, 0};
 
     CX_CHECK(cx_string_from(&str, "abcd", nullptr) == CX_OK);
@@ -341,13 +327,11 @@ static int test_empty_operations(void) {
     CX_CHECK(cx_string_insert(str, 2, empty) == CX_OK);
     CX_CHECK(cx_string_erase(str, 4, 0) == CX_OK);
     CX_CHECK(cx_string_replace(str, 4, 0, empty) == CX_OK);
-    CX_CHECK(cx_string_replace(str, 4, 0, cx_string_view_from_cstr("!")) ==
-             CX_OK);
+    CX_CHECK(cx_string_replace(str, 4, 0, cx_string_view_from_cstr("!")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "abcd!") == 0);
 
     /* A removal count past the end is clamped to the remaining length. */
-    CX_CHECK(cx_string_replace(str, 3, 99, cx_string_view_from_cstr("XY")) ==
-             CX_OK);
+    CX_CHECK(cx_string_replace(str, 3, 99, cx_string_view_from_cstr("XY")) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(str), "abcXY") == 0);
 
     cx_string_destroy(&str);
@@ -356,7 +340,7 @@ static int test_empty_operations(void) {
 }
 
 static int test_overflow(void) {
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
     cx_string_view huge = {.data = "x", .length = SIZE_MAX};
 
     CX_CHECK(cx_string_from(&str, "abc", nullptr) == CX_OK);
@@ -374,8 +358,8 @@ static int test_overflow(void) {
 }
 
 static int test_lifecycle_edges(void) {
-    cx_string *dst = nullptr;
-    cx_string *src = nullptr;
+    cx_string* dst = nullptr;
+    cx_string* src = nullptr;
 
     CX_CHECK(cx_string_from(&dst, "keep", nullptr) == CX_OK);
     CX_CHECK(cx_string_from(&src, "move", nullptr) == CX_OK);
@@ -405,7 +389,7 @@ static int test_allocation_failures(void) {
         .fail_all_after = false,
     };
     cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
-    cx_string *str = nullptr;
+    cx_string* str = nullptr;
 
     /* Handle allocation fails. */
     CX_CHECK(cx_string_init(&str, &allocator) == CX_OUT_OF_MEMORY);
@@ -414,15 +398,15 @@ static int test_allocation_failures(void) {
     /* The constructor reports a failed handle allocation. */
     failing.attempts = 0;
     failing.fail_at = 1;
-    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("x"),
-                                 &allocator) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("x"), &allocator) ==
+             CX_OUT_OF_MEMORY);
     CX_CHECK(str == nullptr);
 
     /* The constructor frees the handle when the assignment fails. */
     failing.attempts = 0;
     failing.fail_at = 2;
-    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("abcdef"),
-                                 &allocator) == CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_from_view(&str, cx_string_view_from_cstr("abcdef"), &allocator) ==
+             CX_OUT_OF_MEMORY);
     CX_CHECK(str == nullptr);
 
     failing.attempts = 0;
@@ -442,8 +426,7 @@ static int test_allocation_failures(void) {
 
     /* Aliased assignments stage a detached copy before growing. */
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_assign_view(str, cx_string_view_of(str)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_assign_view(str, cx_string_view_of(str)) == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
 
     failing.fail_at = failing.attempts + 1;
@@ -451,23 +434,19 @@ static int test_allocation_failures(void) {
     CX_CHECK_EQ(5, cx_string_length(str));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_append_view(str, cx_string_view_of(str)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_append_view(str, cx_string_view_of(str)) == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_insert(str, 0, cx_string_view_of(str)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_insert(str, 0, cx_string_view_of(str)) == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_replace(str, 0, 1, cx_string_view_of(str)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_replace(str, 0, 1, cx_string_view_of(str)) == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_append_cstr(str, "0123456789abcdef") ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_append_cstr(str, "0123456789abcdef") == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_cstr(str), "hello") == 0);
 
     CX_CHECK(cx_string_resize(str, 8) == CX_OK);
@@ -477,14 +456,12 @@ static int test_allocation_failures(void) {
     CX_CHECK_EQ(8, cx_string_length(str));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_insert(str, 0,
-                              cx_string_view_from_cstr("0123456789abcdef")) ==
+    CX_CHECK(cx_string_insert(str, 0, cx_string_view_from_cstr("0123456789abcdef")) ==
              CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(8, cx_string_length(str));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_string_replace(str, 0, 0,
-                               cx_string_view_from_cstr("0123456789abcdef")) ==
+    CX_CHECK(cx_string_replace(str, 0, 0, cx_string_view_from_cstr("0123456789abcdef")) ==
              CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(8, cx_string_length(str));
 

@@ -15,7 +15,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -41,8 +40,8 @@ extern "C" {
  * @return CA_OK on success, CA_NOT_FOUND if the variable is unset,
  *         CA_OVERFLOW if the buffer is too small, or another ca_status.
  */
-CAUDIO_API ca_status ca_env_get(const char *name, char *out, size_t out_size,
-                                size_t *out_len, ca_error *err);
+CAUDIO_API ca_status ca_env_get(const char* name, char* out, size_t out_size, size_t* out_len,
+                                ca_error* err);
 
 /**
  * @brief Set @p name to @p value.
@@ -54,8 +53,7 @@ CAUDIO_API ca_status ca_env_get(const char *name, char *out, size_t out_size,
  * @param err       Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_env_set(const char *name, const char *value,
-                                bool overwrite, ca_error *err);
+CAUDIO_API ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_error* err);
 
 /**
  * @brief Remove @p name from the environment.
@@ -64,7 +62,7 @@ CAUDIO_API ca_status ca_env_set(const char *name, const char *value,
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_env_unset(const char *name, ca_error *err);
+CAUDIO_API ca_status ca_env_unset(const char* name, ca_error* err);
 
 #ifdef __cplusplus
 }

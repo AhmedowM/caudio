@@ -11,7 +11,6 @@
  */
 
 #include <caudio/types/record.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/vector.h>
 
@@ -25,13 +24,13 @@ extern const cx_vector_ops ca_impl_track_vector_ops;
  * stash the allocator and the first failure here; the enclosing copy checks it
  * after each push.
  */
-extern thread_local const cx_allocator *ca_impl_copy_alloc;
+extern thread_local const cx_allocator* ca_impl_copy_alloc;
 extern thread_local ca_status ca_impl_copy_status;
 
 /**
  * @brief Start a copy operation and clear the error channel.
  */
-void ca_impl_copy_reset(const cx_allocator *alloc);
+void ca_impl_copy_reset(const cx_allocator* alloc);
 
 /**
  * @brief Record the first failure encountered by a vector copy callback.

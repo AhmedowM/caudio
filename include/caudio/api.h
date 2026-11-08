@@ -44,10 +44,10 @@
  * Expands to nothing on compilers without `__attribute__((format))`.
  */
 #if defined(__GNUC__) || defined(__clang__)
-    #define CA_PRINTF(format_index, first_argument) \
-        __attribute__((format(printf, format_index, first_argument)))
+#define CA_PRINTF(format_index, first_argument)                                                    \
+    __attribute__((format(printf, format_index, first_argument)))
 #else
-    #define CA_PRINTF(format_index, first_argument)
+#define CA_PRINTF(format_index, first_argument)
 #endif
 
 #endif /* CAUDIO_API_H */

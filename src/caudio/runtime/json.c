@@ -1,7 +1,5 @@
-﻿#include <caudio/runtime/json.h>
-
-#include <caudio/runtime/fs.h>
-
+﻿#include <caudio/runtime/fs.h>
+#include <caudio/runtime/json.h>
 #include <cstdx/allocator.h>
 #include <cstdx/string.h>
 #include <cstdx/string_builder.h>
@@ -12,14 +10,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include <yyjson.h>
 
 /* yyjson fails when the container depth reaches the configured limit, so the
  * public cap permits one fewer level. Keep the two in sync: this fails the
  * build rather than silently accepting deeper input. */
 #if YYJSON_READER_DEPTH_LIMIT != (CA_JSON_MAX_DEPTH + 1)
-    #error "YYJSON_READER_DEPTH_LIMIT must equal CA_JSON_MAX_DEPTH + 1"
+#error "YYJSON_READER_DEPTH_LIMIT must equal CA_JSON_MAX_DEPTH + 1"
 #endif
 
 /**
@@ -40,7 +37,7 @@
  * max_align_t, so the pointer returned to yyjson stays suitably aligned.
  */
 typedef struct ca_json_alloc_ctx {
-    const cx_allocator *alloc;
+    const cx_allocator* alloc;
 } ca_json_alloc_ctx;
 
 typedef union ca_json_block_hdr {
@@ -51,7 +48,7 @@ typedef union ca_json_block_hdr {
 } ca_json_block_hdr;
 
 struct ca_json {
-    yyjson_doc *doc;
+    yyjson_doc* doc;
 
     /* Copy of the caller's vtable. The copy, not the caller's possibly
      * stack-allocated object, is what yyjson refers to for the document's
@@ -64,8 +61,8 @@ struct ca_json {
     ca_json_alloc_ctx alc_ctx;
 };
 
-static void *ca_json_malloc(void *ctx, size_t size) {
-    ca_json_alloc_ctx *c = (ca_json_alloc_ctx *)ctx;
+static void* ca_json_malloc(void* ctx, size_t size) {
+    ca_json_alloc_ctx* c = (ca_json_alloc_ctx*)ctx;
 
     /* yyjson may ask for zero bytes; a valid, freeable pointer is simpler
      * than special-casing the result. */
@@ -77,8 +74,8 @@ static void *ca_json_malloc(void *ctx, size_t size) {
         return nullptr;
     }
 
-    ca_json_block_hdr *hdr = (ca_json_block_hdr *)cx_allocator_alloc(
-        c->alloc, sizeof(ca_json_block_hdr) + size, 0);
+    ca_json_block_hdr* hdr =
+        (ca_json_block_hdr*)cx_allocator_alloc(c->alloc, sizeof(ca_json_block_hdr) + size, 0);
     if (!hdr) {
         return nullptr;
     }
@@ -87,8 +84,7 @@ static void *ca_json_malloc(void *ctx, size_t size) {
     return hdr + 1;
 }
 
-static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
-                             size_t new_size) {
+static void* ca_json_realloc(void* ctx, void* ptr, size_t old_size, size_t new_size) {
     (void)old_size;
 
     if (!ptr) {
@@ -96,10 +92,9 @@ static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
     }
 
     if (new_size == 0) {
-        ca_json_alloc_ctx *c = (ca_json_alloc_ctx *)ctx;
-        ca_json_block_hdr *hdr = (ca_json_block_hdr *)ptr - 1;
-        cx_allocator_free(c->alloc, hdr,
-                          sizeof(ca_json_block_hdr) + hdr->info.size, 0);
+        ca_json_alloc_ctx* c = (ca_json_alloc_ctx*)ctx;
+        ca_json_block_hdr* hdr = (ca_json_block_hdr*)ptr - 1;
+        cx_allocator_free(c->alloc, hdr, sizeof(ca_json_block_hdr) + hdr->info.size, 0);
         return nullptr;
     }
 
@@ -107,13 +102,13 @@ static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
         return nullptr;
     }
 
-    ca_json_alloc_ctx *c = (ca_json_alloc_ctx *)ctx;
-    ca_json_block_hdr *hdr = (ca_json_block_hdr *)ptr - 1;
+    ca_json_alloc_ctx* c = (ca_json_alloc_ctx*)ctx;
+    ca_json_block_hdr* hdr = (ca_json_block_hdr*)ptr - 1;
     size_t old_block = sizeof(ca_json_block_hdr) + hdr->info.size;
     size_t new_block = sizeof(ca_json_block_hdr) + new_size;
 
-    ca_json_block_hdr *resized = (ca_json_block_hdr *)cx_allocator_realloc(
-        c->alloc, hdr, old_block, new_block, 0);
+    ca_json_block_hdr* resized =
+        (ca_json_block_hdr*)cx_allocator_realloc(c->alloc, hdr, old_block, new_block, 0);
     if (!resized) {
         return nullptr;
     }
@@ -122,18 +117,17 @@ static void *ca_json_realloc(void *ctx, void *ptr, size_t old_size,
     return resized + 1;
 }
 
-static void ca_json_free(void *ctx, void *ptr) {
+static void ca_json_free(void* ctx, void* ptr) {
     if (!ptr) {
         return;
     }
 
-    ca_json_alloc_ctx *c = (ca_json_alloc_ctx *)ctx;
-    ca_json_block_hdr *hdr = (ca_json_block_hdr *)ptr - 1;
-    cx_allocator_free(c->alloc, hdr,
-                      sizeof(ca_json_block_hdr) + hdr->info.size, 0);
+    ca_json_alloc_ctx* c = (ca_json_alloc_ctx*)ctx;
+    ca_json_block_hdr* hdr = (ca_json_block_hdr*)ptr - 1;
+    cx_allocator_free(c->alloc, hdr, sizeof(ca_json_block_hdr) + hdr->info.size, 0);
 }
 
-static yyjson_alc ca_json_make_alc(ca_json_alloc_ctx *ctx) {
+static yyjson_alc ca_json_make_alc(ca_json_alloc_ctx* ctx) {
     return (yyjson_alc){
         .malloc = ca_json_malloc,
         .realloc = ca_json_realloc,
@@ -149,8 +143,7 @@ static yyjson_alc ca_json_make_alc(ca_json_alloc_ctx *ctx) {
  * It still runs unconditionally: the public limits are part of the ca_json
  * contract and must not depend on a particular yyjson build configuration.
  */
-static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
-                                      ca_error *err) {
+static ca_status json_validate_limits(const yyjson_val* val, size_t depth, ca_error* err) {
     if (!val) {
         return CA_OK;
     }
@@ -163,18 +156,15 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
     size_t next_depth = depth + 1;
     if (next_depth > (size_t)CA_JSON_MAX_DEPTH) {
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
+            ca_error_set(err, CA_OVERFLOW, "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
         }
         return CA_OVERFLOW;
     }
 
-    size_t count = type == YYJSON_TYPE_ARR ? yyjson_arr_size(val)
-                                           : yyjson_obj_size(val);
+    size_t count = type == YYJSON_TYPE_ARR ? yyjson_arr_size(val) : yyjson_obj_size(val);
     if (count > (size_t)CA_JSON_MAX_CONTAINER) {
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "JSON container has %zu entries; limit is %d", count,
+            ca_error_set(err, CA_OVERFLOW, "JSON container has %zu entries; limit is %d", count,
                          CA_JSON_MAX_CONTAINER);
         }
         return CA_OVERFLOW;
@@ -182,7 +172,7 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
 
     if (type == YYJSON_TYPE_ARR) {
         yyjson_arr_iter iter = yyjson_arr_iter_with(val);
-        const yyjson_val *child = nullptr;
+        const yyjson_val* child = nullptr;
         while ((child = yyjson_arr_iter_next(&iter)) != nullptr) {
             ca_status status = json_validate_limits(child, next_depth, err);
             if (status != CA_OK) {
@@ -191,9 +181,9 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
         }
     } else {
         yyjson_obj_iter iter = yyjson_obj_iter_with(val);
-        yyjson_val *key = nullptr;
+        yyjson_val* key = nullptr;
         while ((key = yyjson_obj_iter_next(&iter)) != nullptr) {
-            const yyjson_val *child = yyjson_obj_iter_get_val(key);
+            const yyjson_val* child = yyjson_obj_iter_get_val(key);
             ca_status status = json_validate_limits(child, next_depth, err);
             if (status != CA_OK) {
                 return status;
@@ -204,8 +194,8 @@ static ca_status json_validate_limits(const yyjson_val *val, size_t depth,
     return CA_OK;
 }
 
-ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
-                        const cx_allocator *alloc, ca_error *err) {
+ca_status ca_json_parse(ca_json** out, const char* text, size_t len, const cx_allocator* alloc,
+                        ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -232,21 +222,18 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
 
     if (len > CA_JSON_MAX_BYTES) {
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "JSON input is %zu bytes; limit is %zu", len,
+            ca_error_set(err, CA_OVERFLOW, "JSON input is %zu bytes; limit is %zu", len,
                          CA_JSON_MAX_BYTES);
         }
         return CA_OVERFLOW;
     }
 
-    const cx_allocator *a = alloc ? alloc : cx_allocator_default();
+    const cx_allocator* a = alloc ? alloc : cx_allocator_default();
 
-    ca_json *json = (ca_json *)cx_allocator_alloc(a, sizeof(ca_json),
-                                                  alignof(ca_json));
+    ca_json* json = (ca_json*)cx_allocator_alloc(a, sizeof(ca_json), alignof(ca_json));
     if (!json) {
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate JSON handle");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON handle");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -257,7 +244,7 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
 
     yyjson_alc alc = ca_json_make_alc(&json->alc_ctx);
     yyjson_read_err rerr = {0};
-    yyjson_doc *doc = yyjson_read_opts((char *)text, len, 0, &alc, &rerr);
+    yyjson_doc* doc = yyjson_read_opts((char*)text, len, 0, &alc, &rerr);
 
     if (!doc) {
         ca_status status = CA_INVALID_ARGUMENT;
@@ -270,25 +257,20 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
 
         if (err) {
             if (status == CA_OVERFLOW) {
-                ca_error_set(err, status, "JSON nesting exceeds %d levels",
-                             CA_JSON_MAX_DEPTH);
+                ca_error_set(err, status, "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
             } else {
                 ca_error_set(err, status, "JSON parse error: %s at byte %lu",
-                             rerr.msg ? rerr.msg : "unknown",
-                             (unsigned long)rerr.pos);
+                             rerr.msg ? rerr.msg : "unknown", (unsigned long)rerr.pos);
             }
         }
-        cx_allocator_free(&json->alloc, json, sizeof(ca_json),
-                          alignof(ca_json));
+        cx_allocator_free(&json->alloc, json, sizeof(ca_json), alignof(ca_json));
         return status;
     }
 
-    ca_status limit_status =
-        json_validate_limits(yyjson_doc_get_root(doc), 0, err);
+    ca_status limit_status = json_validate_limits(yyjson_doc_get_root(doc), 0, err);
     if (limit_status != CA_OK) {
         yyjson_doc_free(doc);
-        cx_allocator_free(&json->alloc, json, sizeof(ca_json),
-                          alignof(ca_json));
+        cx_allocator_free(&json->alloc, json, sizeof(ca_json), alignof(ca_json));
         return limit_status;
     }
 
@@ -305,9 +287,8 @@ ca_status ca_json_parse(ca_json **out, const char *text, size_t len,
  *
  * @return CA_OK, CA_IO_ERROR, CA_OUT_OF_MEMORY, or CA_OVERFLOW.
  */
-static ca_status json_read_all(const char *path, const cx_allocator *alloc,
-                               char **out_text, size_t *out_len,
-                               size_t *out_capacity, ca_error *err) {
+static ca_status json_read_all(const char* path, const cx_allocator* alloc, char** out_text,
+                               size_t* out_len, size_t* out_capacity, ca_error* err) {
     *out_text = nullptr;
     *out_len = 0;
     *out_capacity = 0;
@@ -328,12 +309,11 @@ static ca_status json_read_all(const char *path, const cx_allocator *alloc,
         capacity = max_capacity;
     }
 
-    char *buffer = (char *)cx_allocator_alloc(alloc, capacity, 0);
+    char* buffer = (char*)cx_allocator_alloc(alloc, capacity, 0);
     if (!buffer) {
         ca_fs_close(file);
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate JSON read buffer");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON read buffer");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -348,13 +328,11 @@ static ca_status json_read_all(const char *path, const cx_allocator *alloc,
                 new_capacity = max_capacity;
             }
 
-            char *grown = (char *)cx_allocator_realloc(
-                alloc, buffer, capacity, new_capacity, 0);
+            char* grown = (char*)cx_allocator_realloc(alloc, buffer, capacity, new_capacity, 0);
             if (!grown) {
                 status = CA_OUT_OF_MEMORY;
                 if (err) {
-                    ca_error_set(err, CA_OUT_OF_MEMORY,
-                                 "failed to grow JSON read buffer");
+                    ca_error_set(err, CA_OUT_OF_MEMORY, "failed to grow JSON read buffer");
                 }
                 break;
             }
@@ -377,9 +355,7 @@ static ca_status json_read_all(const char *path, const cx_allocator *alloc,
         if (total > CA_JSON_MAX_BYTES) {
             status = CA_OVERFLOW;
             if (err) {
-                ca_error_set(err, CA_OVERFLOW,
-                             "JSON file exceeds %zu bytes",
-                             CA_JSON_MAX_BYTES);
+                ca_error_set(err, CA_OVERFLOW, "JSON file exceeds %zu bytes", CA_JSON_MAX_BYTES);
             }
             break;
         }
@@ -401,8 +377,8 @@ static ca_status json_read_all(const char *path, const cx_allocator *alloc,
     return CA_OK;
 }
 
-ca_status ca_json_parse_file(ca_json **out, const char *path,
-                             const cx_allocator *alloc, ca_error *err) {
+ca_status ca_json_parse_file(ca_json** out, const char* path, const cx_allocator* alloc,
+                             ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -423,9 +399,9 @@ ca_status ca_json_parse_file(ca_json **out, const char *path,
         return CA_INVALID_ARGUMENT;
     }
 
-    const cx_allocator *a = alloc ? alloc : cx_allocator_default();
+    const cx_allocator* a = alloc ? alloc : cx_allocator_default();
 
-    char *text = nullptr;
+    char* text = nullptr;
     size_t len = 0;
     size_t capacity = 0;
     ca_status status = json_read_all(path, a, &text, &len, &capacity, err);
@@ -438,12 +414,12 @@ ca_status ca_json_parse_file(ca_json **out, const char *path,
     return status;
 }
 
-void ca_json_destroy(ca_json **out) {
+void ca_json_destroy(ca_json** out) {
     if (!out || !*out) {
         return;
     }
 
-    ca_json *json = *out;
+    ca_json* json = *out;
     *out = nullptr;
 
     /* yyjson_doc_free() calls back through json->alc_ctx, so the handle must
@@ -452,12 +428,12 @@ void ca_json_destroy(ca_json **out) {
     cx_allocator_free(&json->alloc, json, sizeof(ca_json), alignof(ca_json));
 }
 
-ca_json_type ca_json_type_of(const ca_json_val *val) {
+ca_json_type ca_json_type_of(const ca_json_val* val) {
     if (!val) {
         return CA_JSON_NULL;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     yyjson_type t = yyjson_get_type(yv);
     yyjson_subtype s = yyjson_get_subtype(yv);
 
@@ -489,7 +465,7 @@ ca_json_type ca_json_type_of(const ca_json_val *val) {
     }
 }
 
-const char *ca_json_get_string(const ca_json_val *val, size_t *len) {
+const char* ca_json_get_string(const ca_json_val* val, size_t* len) {
     if (!val) {
         if (len) {
             *len = 0;
@@ -497,7 +473,7 @@ const char *ca_json_get_string(const ca_json_val *val, size_t *len) {
         return nullptr;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_STR) {
         if (len) {
             *len = 0;
@@ -505,61 +481,58 @@ const char *ca_json_get_string(const ca_json_val *val, size_t *len) {
         return nullptr;
     }
 
-    const char *str = yyjson_get_str(yv);
+    const char* str = yyjson_get_str(yv);
     if (len) {
         *len = yyjson_get_len(yv);
     }
     return str;
 }
 
-int64_t ca_json_get_int(const ca_json_val *val) {
+int64_t ca_json_get_int(const ca_json_val* val) {
     if (!val) {
         return 0;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
-    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM ||
-        yyjson_get_subtype(yv) != YYJSON_SUBTYPE_SINT) {
+    const yyjson_val* yv = (const yyjson_val*)val;
+    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM || yyjson_get_subtype(yv) != YYJSON_SUBTYPE_SINT) {
         return 0;
     }
 
     return yyjson_get_sint(yv);
 }
 
-uint64_t ca_json_get_uint(const ca_json_val *val) {
+uint64_t ca_json_get_uint(const ca_json_val* val) {
     if (!val) {
         return 0;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
-    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM ||
-        yyjson_get_subtype(yv) != YYJSON_SUBTYPE_UINT) {
+    const yyjson_val* yv = (const yyjson_val*)val;
+    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM || yyjson_get_subtype(yv) != YYJSON_SUBTYPE_UINT) {
         return 0;
     }
 
     return yyjson_get_uint(yv);
 }
 
-double ca_json_get_double(const ca_json_val *val) {
+double ca_json_get_double(const ca_json_val* val) {
     if (!val) {
         return 0.0;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
-    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM ||
-        yyjson_get_subtype(yv) != YYJSON_SUBTYPE_REAL) {
+    const yyjson_val* yv = (const yyjson_val*)val;
+    if (yyjson_get_type(yv) != YYJSON_TYPE_NUM || yyjson_get_subtype(yv) != YYJSON_SUBTYPE_REAL) {
         return 0.0;
     }
 
     return yyjson_get_real(yv);
 }
 
-size_t ca_json_array_size(const ca_json_val *val) {
+size_t ca_json_array_size(const ca_json_val* val) {
     if (!val) {
         return 0;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_ARR) {
         return 0;
     }
@@ -567,26 +540,26 @@ size_t ca_json_array_size(const ca_json_val *val) {
     return yyjson_arr_size(yv);
 }
 
-const ca_json_val *ca_json_array_get(const ca_json_val *val, size_t idx) {
+const ca_json_val* ca_json_array_get(const ca_json_val* val, size_t idx) {
     if (!val) {
         return nullptr;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_ARR) {
         return nullptr;
     }
 
-    const yyjson_val *item = yyjson_arr_get(yv, idx);
-    return (const ca_json_val *)item;
+    const yyjson_val* item = yyjson_arr_get(yv, idx);
+    return (const ca_json_val*)item;
 }
 
-size_t ca_json_object_size(const ca_json_val *val) {
+size_t ca_json_object_size(const ca_json_val* val) {
     if (!val) {
         return 0;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
         return 0;
     }
@@ -594,22 +567,21 @@ size_t ca_json_object_size(const ca_json_val *val) {
     return yyjson_obj_size(yv);
 }
 
-const ca_json_val *ca_json_object_get(const ca_json_val *val, const char *key) {
+const ca_json_val* ca_json_object_get(const ca_json_val* val, const char* key) {
     if (!val || !key) {
         return nullptr;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
         return nullptr;
     }
 
-    const yyjson_val *item = yyjson_obj_get(yv, key);
-    return (const ca_json_val *)item;
+    const yyjson_val* item = yyjson_obj_get(yv, key);
+    return (const ca_json_val*)item;
 }
 
-const char *ca_json_object_key(const ca_json_val *val, size_t idx,
-                               size_t *len) {
+const char* ca_json_object_key(const ca_json_val* val, size_t idx, size_t* len) {
     if (len) {
         *len = 0;
     }
@@ -617,7 +589,7 @@ const char *ca_json_object_key(const ca_json_val *val, size_t idx,
         return nullptr;
     }
 
-    const yyjson_val *yv = (const yyjson_val *)val;
+    const yyjson_val* yv = (const yyjson_val*)val;
     if (yyjson_get_type(yv) != YYJSON_TYPE_OBJ) {
         return nullptr;
     }
@@ -626,7 +598,7 @@ const char *ca_json_object_key(const ca_json_val *val, size_t idx,
     if (!yyjson_obj_iter_init(yv, &iter)) {
         return nullptr;
     }
-    yyjson_val *key = nullptr;
+    yyjson_val* key = nullptr;
     for (size_t i = 0; (key = yyjson_obj_iter_next(&iter)) != nullptr; ++i) {
         if (i == idx) {
             if (len) {
@@ -638,16 +610,16 @@ const char *ca_json_object_key(const ca_json_val *val, size_t idx,
     return nullptr;
 }
 
-const ca_json_val *ca_json_root(const ca_json *json) {
+const ca_json_val* ca_json_root(const ca_json* json) {
     if (!json) {
         return nullptr;
     }
 
-    return (const ca_json_val *)yyjson_doc_get_root(json->doc);
+    return (const ca_json_val*)yyjson_doc_get_root(json->doc);
 }
 
-char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
-                        const cx_allocator *alloc, ca_error *err) {
+char* ca_json_serialize(const ca_json* json, int pretty, size_t* len, const cx_allocator* alloc,
+                        ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -663,7 +635,7 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
         return nullptr;
     }
 
-    const cx_allocator *a = alloc ? alloc : cx_allocator_default();
+    const cx_allocator* a = alloc ? alloc : cx_allocator_default();
 
     /* The writer may allocate a buffer larger than the emitted document. Use
      * the tracked adapter for it, then copy into an exact-size block so the
@@ -674,12 +646,11 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
     yyjson_write_flag flg = pretty ? YYJSON_WRITE_PRETTY : YYJSON_WRITE_NOFLAG;
     yyjson_write_err werr = {0};
     size_t written = 0;
-    char *tmp = yyjson_write_opts(json->doc, flg, &yalc, &written, &werr);
+    char* tmp = yyjson_write_opts(json->doc, flg, &yalc, &written, &werr);
 
     if (!tmp) {
-        ca_status status = werr.code == YYJSON_WRITE_ERROR_MEMORY_ALLOCATION
-                               ? CA_OUT_OF_MEMORY
-                               : CA_INVALID_ARGUMENT;
+        ca_status status = werr.code == YYJSON_WRITE_ERROR_MEMORY_ALLOCATION ? CA_OUT_OF_MEMORY
+                                                                             : CA_INVALID_ARGUMENT;
         if (err) {
             ca_error_set(err, status, "failed to serialize JSON: %s",
                          werr.msg ? werr.msg : "unknown");
@@ -687,12 +658,11 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
         return nullptr;
     }
 
-    char *result = (char *)cx_allocator_alloc(a, written + 1, 0);
+    char* result = (char*)cx_allocator_alloc(a, written + 1, 0);
     if (!result) {
         ca_json_free(&ctx, tmp);
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate JSON output");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON output");
         }
         return nullptr;
     }
@@ -711,11 +681,7 @@ char *ca_json_serialize(const ca_json *json, int pretty, size_t *len,
 /* Incremental writer                                                        */
 /* ------------------------------------------------------------------------- */
 
-enum {
-    CA_JSON_FRAME_ROOT = 0,
-    CA_JSON_FRAME_OBJECT = 1,
-    CA_JSON_FRAME_ARRAY = 2
-};
+enum { CA_JSON_FRAME_ROOT = 0, CA_JSON_FRAME_OBJECT = 1, CA_JSON_FRAME_ARRAY = 2 };
 
 typedef struct ca_json_frame {
     uint8_t kind;
@@ -723,7 +689,7 @@ typedef struct ca_json_frame {
 } ca_json_frame;
 
 struct ca_json_writer {
-    cx_string_builder *builder;
+    cx_string_builder* builder;
     cx_allocator alloc;
     ca_json_frame frames[(size_t)CA_JSON_MAX_DEPTH + 1];
     size_t depth;
@@ -731,7 +697,7 @@ struct ca_json_writer {
     bool root_written;
 };
 
-static ca_status json_from_cx(cx_status status, ca_error *err) {
+static ca_status json_from_cx(cx_status status, ca_error* err) {
     switch (status) {
     case CX_OK:
         return CA_OK;
@@ -749,20 +715,15 @@ static ca_status json_from_cx(cx_status status, ca_error *err) {
     }
 }
 
-static ca_status json_append_cstr(ca_json_writer *writer, const char *text,
-                                  ca_error *err) {
-    return json_from_cx(cx_string_builder_append_cstr(writer->builder, text),
-                        err);
+static ca_status json_append_cstr(ca_json_writer* writer, const char* text, ca_error* err) {
+    return json_from_cx(cx_string_builder_append_cstr(writer->builder, text), err);
 }
 
-static ca_status json_append_char(ca_json_writer *writer, char value,
-                                  ca_error *err) {
-    return json_from_cx(cx_string_builder_append_char(writer->builder, value),
-                        err);
+static ca_status json_append_char(ca_json_writer* writer, char value, ca_error* err) {
+    return json_from_cx(cx_string_builder_append_char(writer->builder, value), err);
 }
 
-static ca_status json_append_indent(ca_json_writer *writer, size_t depth,
-                                    ca_error *err) {
+static ca_status json_append_indent(ca_json_writer* writer, size_t depth, ca_error* err) {
     ca_status status = json_append_char(writer, '\n', err);
     if (status != CA_OK) {
         return status;
@@ -776,8 +737,8 @@ static ca_status json_append_indent(ca_json_writer *writer, size_t depth,
     return CA_OK;
 }
 
-static ca_status json_append_escaped(ca_json_writer *writer, const char *data,
-                                     size_t length, ca_error *err) {
+static ca_status json_append_escaped(ca_json_writer* writer, const char* data, size_t length,
+                                     ca_error* err) {
     ca_status status = json_append_char(writer, '"', err);
     if (status != CA_OK) {
         return status;
@@ -830,15 +791,13 @@ static ca_status json_append_escaped(ca_json_writer *writer, const char *data,
  *
  * Marks the root as written so a second root value is rejected.
  */
-static ca_status json_writer_prefix(ca_json_writer *writer, const char *key,
-                                    ca_error *err) {
-    ca_json_frame *frame = &writer->frames[writer->depth];
+static ca_status json_writer_prefix(ca_json_writer* writer, const char* key, ca_error* err) {
+    ca_json_frame* frame = &writer->frames[writer->depth];
 
     if (frame->kind == CA_JSON_FRAME_ROOT) {
         if (writer->root_written) {
             if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "JSON writer root value already written");
+                ca_error_set(err, CA_INVALID_ARGUMENT, "JSON writer root value already written");
             }
             return CA_INVALID_ARGUMENT;
         }
@@ -849,15 +808,13 @@ static ca_status json_writer_prefix(ca_json_writer *writer, const char *key,
     if (frame->kind == CA_JSON_FRAME_OBJECT) {
         if (!key) {
             if (err) {
-                ca_error_set(err, CA_INVALID_ARGUMENT,
-                             "JSON object member requires a key");
+                ca_error_set(err, CA_INVALID_ARGUMENT, "JSON object member requires a key");
             }
             return CA_INVALID_ARGUMENT;
         }
     } else if (key) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "JSON array element must not have a key");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "JSON array element must not have a key");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -898,8 +855,8 @@ static ca_status json_writer_prefix(ca_json_writer *writer, const char *key,
     return CA_OK;
 }
 
-ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
-                              const cx_allocator *alloc, ca_error *err) {
+ca_status ca_json_writer_init(ca_json_writer** out, int pretty, const cx_allocator* alloc,
+                              ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -911,14 +868,12 @@ ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
     }
     *out = nullptr;
 
-    const cx_allocator *a = alloc ? alloc : cx_allocator_default();
-    ca_json_writer *writer =
-        (ca_json_writer *)cx_allocator_alloc(a, sizeof(ca_json_writer),
-                                             alignof(ca_json_writer));
+    const cx_allocator* a = alloc ? alloc : cx_allocator_default();
+    ca_json_writer* writer =
+        (ca_json_writer*)cx_allocator_alloc(a, sizeof(ca_json_writer), alignof(ca_json_writer));
     if (!writer) {
         if (err) {
-            ca_error_set(err, CA_OUT_OF_MEMORY,
-                         "failed to allocate JSON writer");
+            ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate JSON writer");
         }
         return CA_OUT_OF_MEMORY;
     }
@@ -933,8 +888,7 @@ ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
 
     cx_status status = cx_string_builder_init(&writer->builder, alloc);
     if (status != CX_OK) {
-        cx_allocator_free(a, writer, sizeof(ca_json_writer),
-                          alignof(ca_json_writer));
+        cx_allocator_free(a, writer, sizeof(ca_json_writer), alignof(ca_json_writer));
         return json_from_cx(status, err);
     }
 
@@ -942,22 +896,20 @@ ca_status ca_json_writer_init(ca_json_writer **out, int pretty,
     return CA_OK;
 }
 
-void ca_json_writer_destroy(ca_json_writer **out) {
+void ca_json_writer_destroy(ca_json_writer** out) {
     if (!out || !*out) {
         return;
     }
 
-    ca_json_writer *writer = *out;
+    ca_json_writer* writer = *out;
     *out = nullptr;
 
     cx_string_builder_destroy(&writer->builder);
-    cx_allocator_free(&writer->alloc, writer, sizeof(ca_json_writer),
-                      alignof(ca_json_writer));
+    cx_allocator_free(&writer->alloc, writer, sizeof(ca_json_writer), alignof(ca_json_writer));
 }
 
-static ca_status json_begin_container(ca_json_writer *writer, const char *key,
-                                      uint8_t kind, char open,
-                                      ca_error *err) {
+static ca_status json_begin_container(ca_json_writer* writer, const char* key, uint8_t kind,
+                                      char open, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -970,8 +922,7 @@ static ca_status json_begin_container(ca_json_writer *writer, const char *key,
 
     if (writer->depth >= (size_t)CA_JSON_MAX_DEPTH) {
         if (err) {
-            ca_error_set(err, CA_OVERFLOW,
-                         "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
+            ca_error_set(err, CA_OVERFLOW, "JSON nesting exceeds %d levels", CA_JSON_MAX_DEPTH);
         }
         return CA_OVERFLOW;
     }
@@ -992,18 +943,16 @@ static ca_status json_begin_container(ca_json_writer *writer, const char *key,
     return CA_OK;
 }
 
-ca_status ca_json_writer_begin_object(ca_json_writer *writer, const char *key,
-                                      ca_error *err) {
+ca_status ca_json_writer_begin_object(ca_json_writer* writer, const char* key, ca_error* err) {
     return json_begin_container(writer, key, CA_JSON_FRAME_OBJECT, '{', err);
 }
 
-ca_status ca_json_writer_begin_array(ca_json_writer *writer, const char *key,
-                                     ca_error *err) {
+ca_status ca_json_writer_begin_array(ca_json_writer* writer, const char* key, ca_error* err) {
     return json_begin_container(writer, key, CA_JSON_FRAME_ARRAY, '[', err);
 }
 
-static ca_status json_end_container(ca_json_writer *writer, uint8_t kind,
-                                    char close, ca_error *err) {
+static ca_status json_end_container(ca_json_writer* writer, uint8_t kind, char close,
+                                    ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1014,11 +963,10 @@ static ca_status json_end_container(ca_json_writer *writer, uint8_t kind,
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_json_frame *frame = &writer->frames[writer->depth];
+    ca_json_frame* frame = &writer->frames[writer->depth];
     if (writer->depth == 0 || frame->kind != kind) {
         if (err) {
-            ca_error_set(err, CA_JSON_ERROR,
-                         "JSON writer is not inside the expected container");
+            ca_error_set(err, CA_JSON_ERROR, "JSON writer is not inside the expected container");
         }
         return CA_JSON_ERROR;
     }
@@ -1040,16 +988,15 @@ static ca_status json_end_container(ca_json_writer *writer, uint8_t kind,
     return CA_OK;
 }
 
-ca_status ca_json_writer_end_object(ca_json_writer *writer, ca_error *err) {
+ca_status ca_json_writer_end_object(ca_json_writer* writer, ca_error* err) {
     return json_end_container(writer, CA_JSON_FRAME_OBJECT, '}', err);
 }
 
-ca_status ca_json_writer_end_array(ca_json_writer *writer, ca_error *err) {
+ca_status ca_json_writer_end_array(ca_json_writer* writer, ca_error* err) {
     return json_end_container(writer, CA_JSON_FRAME_ARRAY, ']', err);
 }
 
-ca_status ca_json_writer_add_null(ca_json_writer *writer, const char *key,
-                                  ca_error *err) {
+ca_status ca_json_writer_add_null(ca_json_writer* writer, const char* key, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1066,8 +1013,8 @@ ca_status ca_json_writer_add_null(ca_json_writer *writer, const char *key,
     return json_append_cstr(writer, "null", err);
 }
 
-ca_status ca_json_writer_add_bool(ca_json_writer *writer, const char *key,
-                                  bool value, ca_error *err) {
+ca_status ca_json_writer_add_bool(ca_json_writer* writer, const char* key, bool value,
+                                  ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1084,8 +1031,8 @@ ca_status ca_json_writer_add_bool(ca_json_writer *writer, const char *key,
     return json_append_cstr(writer, value ? "true" : "false", err);
 }
 
-ca_status ca_json_writer_add_int(ca_json_writer *writer, const char *key,
-                                 int64_t value, ca_error *err) {
+ca_status ca_json_writer_add_int(ca_json_writer* writer, const char* key, int64_t value,
+                                 ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1099,12 +1046,11 @@ ca_status ca_json_writer_add_int(ca_json_writer *writer, const char *key,
     if (status != CA_OK) {
         return status;
     }
-    return json_from_cx(
-        cx_string_builder_printf(writer->builder, "%" PRId64, value), err);
+    return json_from_cx(cx_string_builder_printf(writer->builder, "%" PRId64, value), err);
 }
 
-ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
-                                  uint64_t value, ca_error *err) {
+ca_status ca_json_writer_add_uint(ca_json_writer* writer, const char* key, uint64_t value,
+                                  ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1118,8 +1064,7 @@ ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
     if (status != CA_OK) {
         return status;
     }
-    return json_from_cx(
-        cx_string_builder_printf(writer->builder, "%" PRIu64, value), err);
+    return json_from_cx(cx_string_builder_printf(writer->builder, "%" PRIu64, value), err);
 }
 
 /**
@@ -1130,7 +1075,7 @@ ca_status ca_json_writer_add_uint(ca_json_writer *writer, const char *key,
  * @param value The double value to format.
  * @return false for non-finite values, which the caller writes as null.
  */
-static bool json_format_double(char *buffer, size_t size, double value) {
+static bool json_format_double(char* buffer, size_t size, double value) {
     if (!isfinite(value)) {
         return false;
     }
@@ -1140,7 +1085,7 @@ static bool json_format_double(char *buffer, size_t size, double value) {
         if (written < 0 || (size_t)written >= size) {
             return false;
         }
-        char *end = nullptr;
+        char* end = nullptr;
         double parsed = strtod(buffer, &end);
         if (end && *end == '\0' && parsed == value) {
             break;
@@ -1149,8 +1094,8 @@ static bool json_format_double(char *buffer, size_t size, double value) {
     return true;
 }
 
-ca_status ca_json_writer_add_double(ca_json_writer *writer, const char *key,
-                                    double value, ca_error *err) {
+ca_status ca_json_writer_add_double(ca_json_writer* writer, const char* key, double value,
+                                    ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1183,9 +1128,8 @@ ca_status ca_json_writer_add_double(ca_json_writer *writer, const char *key,
     return status;
 }
 
-ca_status ca_json_writer_add_string(ca_json_writer *writer, const char *key,
-                                    const char *value, size_t length,
-                                    ca_error *err) {
+ca_status ca_json_writer_add_string(ca_json_writer* writer, const char* key, const char* value,
+                                    size_t length, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1197,8 +1141,7 @@ ca_status ca_json_writer_add_string(ca_json_writer *writer, const char *key,
     }
     if (!value && length != 0) {
         if (err) {
-            ca_error_set(err, CA_INVALID_ARGUMENT,
-                         "string value is nullptr but length is nonzero");
+            ca_error_set(err, CA_INVALID_ARGUMENT, "string value is nullptr but length is nonzero");
         }
         return CA_INVALID_ARGUMENT;
     }
@@ -1210,14 +1153,13 @@ ca_status ca_json_writer_add_string(ca_json_writer *writer, const char *key,
     return json_append_escaped(writer, value ? value : "", length, err);
 }
 
-ca_status ca_json_writer_add_cstr(ca_json_writer *writer, const char *key,
-                                  const char *value, ca_error *err) {
-    return ca_json_writer_add_string(writer, key, value,
-                                     value ? strlen(value) : 0, err);
+ca_status ca_json_writer_add_cstr(ca_json_writer* writer, const char* key, const char* value,
+                                  ca_error* err) {
+    return ca_json_writer_add_string(writer, key, value, value ? strlen(value) : 0, err);
 }
 
-static ca_status json_write_value(ca_json_writer *writer, const char *key,
-                                  const ca_json_val *val, ca_error *err) {
+static ca_status json_write_value(ca_json_writer* writer, const char* key, const ca_json_val* val,
+                                  ca_error* err) {
     switch (ca_json_type_of(val)) {
     case CA_JSON_NULL:
         return ca_json_writer_add_null(writer, key, err);
@@ -1230,11 +1172,10 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
     case CA_JSON_UINT:
         return ca_json_writer_add_uint(writer, key, ca_json_get_uint(val), err);
     case CA_JSON_DOUBLE:
-        return ca_json_writer_add_double(writer, key, ca_json_get_double(val),
-                                         err);
+        return ca_json_writer_add_double(writer, key, ca_json_get_double(val), err);
     case CA_JSON_STRING: {
         size_t length = 0;
-        const char *text = ca_json_get_string(val, &length);
+        const char* text = ca_json_get_string(val, &length);
         return ca_json_writer_add_string(writer, key, text, length, err);
     }
     case CA_JSON_OBJECT: {
@@ -1244,12 +1185,11 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
         }
         size_t count = ca_json_object_size(val);
         for (size_t i = 0; i < count; ++i) {
-            const char *member = ca_json_object_key(val, i, nullptr);
+            const char* member = ca_json_object_key(val, i, nullptr);
             if (member == nullptr) {
                 continue;
             }
-            status = json_write_value(writer, member,
-                                      ca_json_object_get(val, member), err);
+            status = json_write_value(writer, member, ca_json_object_get(val, member), err);
             if (status != CA_OK) {
                 return status;
             }
@@ -1263,8 +1203,7 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
         }
         size_t count = ca_json_array_size(val);
         for (size_t i = 0; i < count; ++i) {
-            status = json_write_value(writer, nullptr, ca_json_array_get(val, i),
-                                      err);
+            status = json_write_value(writer, nullptr, ca_json_array_get(val, i), err);
             if (status != CA_OK) {
                 return status;
             }
@@ -1277,8 +1216,8 @@ static ca_status json_write_value(ca_json_writer *writer, const char *key,
     return ca_json_writer_add_null(writer, key, err);
 }
 
-ca_status ca_json_writer_add_value(ca_json_writer *writer, const char *key,
-                                   const ca_json_val *val, ca_error *err) {
+ca_status ca_json_writer_add_value(ca_json_writer* writer, const char* key, const ca_json_val* val,
+                                   ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1291,8 +1230,7 @@ ca_status ca_json_writer_add_value(ca_json_writer *writer, const char *key,
     return json_write_value(writer, key, val, err);
 }
 
-ca_status ca_json_writer_finish(ca_json_writer *writer, cx_string **out,
-                                ca_error *err) {
+ca_status ca_json_writer_finish(ca_json_writer* writer, cx_string** out, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -1307,8 +1245,7 @@ ca_status ca_json_writer_finish(ca_json_writer *writer, cx_string **out,
     }
     if (writer->depth != 0 || !writer->root_written) {
         if (err) {
-            ca_error_set(err, CA_JSON_ERROR,
-                         "JSON document is incomplete");
+            ca_error_set(err, CA_JSON_ERROR, "JSON document is incomplete");
         }
         return CA_JSON_ERROR;
     }

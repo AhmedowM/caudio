@@ -1,13 +1,13 @@
 ﻿#include <caudio/runtime/time.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <time.h>
-    #include <errno.h>
+#include <errno.h>
+#include <time.h>
 #endif
 
-ca_status ca_time_now(ca_time_us_t *out, ca_error *err) {
+ca_status ca_time_now(ca_time_us_t* out, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -25,8 +25,7 @@ ca_status ca_time_now(ca_time_us_t *out, ca_error *err) {
 
     if (!QueryPerformanceFrequency(&frequency)) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR,
-                         "QueryPerformanceFrequency failed");
+            ca_error_set(err, CA_IO_ERROR, "QueryPerformanceFrequency failed");
         }
         return CA_IO_ERROR;
     }
@@ -41,8 +40,7 @@ ca_status ca_time_now(ca_time_us_t *out, ca_error *err) {
     /* Microseconds = counter.QuadPart * 1,000,000 / frequency.QuadPart */
     /* Use unsigned __int64 math to avoid overflow on 32-bit builds. */
     unsigned __int64 usec =
-        (unsigned __int64)counter.QuadPart * 1000000ULL /
-        (unsigned __int64)frequency.QuadPart;
+        (unsigned __int64)counter.QuadPart * 1000000ULL / (unsigned __int64)frequency.QuadPart;
 
     *out = (ca_time_us_t)usec;
 #else
@@ -54,14 +52,13 @@ ca_status ca_time_now(ca_time_us_t *out, ca_error *err) {
         return CA_IO_ERROR;
     }
 
-    *out = (ca_time_us_t)ts.tv_sec * 1000000ULL +
-           (ca_time_us_t)ts.tv_nsec / 1000ULL;
+    *out = (ca_time_us_t)ts.tv_sec * 1000000ULL + (ca_time_us_t)ts.tv_nsec / 1000ULL;
 #endif
 
     return CA_OK;
 }
 
-ca_status ca_time_sleep_us(ca_time_us_t microseconds, ca_error *err) {
+ca_status ca_time_sleep_us(ca_time_us_t microseconds, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

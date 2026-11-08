@@ -9,12 +9,11 @@
  * merge sort, so elements that compare equal keep their relative order.
  */
 
-#include <stddef.h>
-
 #include <cstdx/allocator.h>
 #include <cstdx/api.h>
 #include <cstdx/status.h>
 #include <cstdx/vector.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +25,7 @@ extern "C" {
  * Return a negative value when @p left sorts before @p right, zero when they
  * are equivalent, and a positive value when @p left sorts after @p right.
  */
-typedef int (*cx_sort_compare_fn)(const void *left, const void *right);
+typedef int (*cx_sort_compare_fn)(const void* left, const void* right);
 
 /**
  * @brief Stably sort @p length elements in place.
@@ -43,9 +42,9 @@ typedef int (*cx_sort_compare_fn)(const void *left, const void *right);
  * allocation failure the array is left unchanged and `CX_OUT_OF_MEMORY` is
  * returned.
  */
-[[nodiscard]] CX_API cx_status cx_sort(
-    void *base, size_t length, size_t element_size, size_t element_align,
-    cx_sort_compare_fn compare, const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_sort(void* base, size_t length, size_t element_size,
+                                       size_t element_align, cx_sort_compare_fn compare,
+                                       const cx_allocator* allocator);
 
 /**
  * @brief Stably sort the live elements of a vector.
@@ -54,9 +53,8 @@ typedef int (*cx_sort_compare_fn)(const void *left, const void *right);
  * sorted in place; ownership of elements is unchanged because elements are
  * moved as raw bytes.
  */
-[[nodiscard]] CX_API cx_status cx_sort_vector(
-    cx_vector *vector, cx_sort_compare_fn compare,
-    const cx_allocator *allocator);
+[[nodiscard]] CX_API cx_status cx_sort_vector(cx_vector* vector, cx_sort_compare_fn compare,
+                                              const cx_allocator* allocator);
 
 /**
  * @brief Sort a typed array.
@@ -66,7 +64,7 @@ typedef int (*cx_sort_compare_fn)(const void *left, const void *right);
  * @param length Number of elements.
  * @param compare Comparison callback.
  */
-#define cx_sort_array(array, T, length, compare) \
+#define cx_sort_array(array, T, length, compare)                                                   \
     cx_sort((array), (length), sizeof(T), alignof(T), (compare), nullptr)
 
 #ifdef __cplusplus

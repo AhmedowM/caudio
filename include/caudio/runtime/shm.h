@@ -12,7 +12,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -22,9 +21,9 @@ extern "C" {
 /**
  * @brief Opaque shared memory segment handle.
  */
-typedef struct ca_shm *ca_shm_t;
+typedef struct ca_shm* ca_shm_t;
 
-#define CA_SHM_INVALID ((ca_shm_t)nullptr)
+#define CA_SHM_INVALID ((ca_shm_t) nullptr)
 
 /**
  * @brief Create or open a shared memory segment.
@@ -36,8 +35,7 @@ typedef struct ca_shm *ca_shm_t;
  * @param err     Optional error record.
  * @return New segment handle, or CA_SHM_INVALID on failure.
  */
-CAUDIO_API ca_shm_t ca_shm_open(const char *name, size_t size, int create,
-                                ca_error *err);
+CAUDIO_API ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err);
 
 /**
  * @brief Map the segment into the caller's address space.
@@ -47,15 +45,15 @@ CAUDIO_API ca_shm_t ca_shm_open(const char *name, size_t size, int create,
  * @param out     Receives the mapped address.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length,
-                                void **out, ca_error *err);
+CAUDIO_API ca_status ca_shm_map(ca_shm_t shm, size_t offset, size_t length, void** out,
+                                ca_error* err);
 
 /**
  * @brief Unmap a previously mapped region.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err);
+CAUDIO_API ca_status ca_shm_unmap(void* addr, size_t length, ca_error* err);
 
 /**
  * @brief Close the segment handle. The underlying memory persists until
@@ -63,7 +61,7 @@ CAUDIO_API ca_status ca_shm_unmap(void *addr, size_t length, ca_error *err);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_shm_close(ca_shm_t shm, ca_error *err);
+CAUDIO_API ca_status ca_shm_close(ca_shm_t shm, ca_error* err);
 
 /**
  * @brief Unlink (destroy) a named segment. The memory is freed once all
@@ -71,7 +69,7 @@ CAUDIO_API ca_status ca_shm_close(ca_shm_t shm, ca_error *err);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_shm_unlink(const char *name, ca_error *err);
+CAUDIO_API ca_status ca_shm_unlink(const char* name, ca_error* err);
 
 #ifdef __cplusplus
 }

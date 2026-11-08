@@ -1,6 +1,5 @@
 ﻿#include <caudio.h>
 #include <caudio/runtime/path.h>
-
 #include <string.h>
 
 #include "ca_test.h"

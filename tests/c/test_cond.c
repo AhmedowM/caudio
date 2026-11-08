@@ -69,8 +69,7 @@ static int test_null_args(void) {
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_cond_signal(nullptr, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_cond_broadcast(nullptr, &err));
     CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_cond_wait(nullptr, nullptr, &err));
-    CA_CHECK_EQ(CA_INVALID_ARGUMENT,
-                ca_cond_create(nullptr, &err));
+    CA_CHECK_EQ(CA_INVALID_ARGUMENT, ca_cond_create(nullptr, &err));
 
     return ca_test_finish("cond.null_args");
 }

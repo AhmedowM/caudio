@@ -14,7 +14,6 @@
 #include <caudio/runtime/error.h>
 #include <caudio/runtime/mutex.h>
 #include <caudio/runtime/time.h>
-
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -24,7 +23,7 @@ extern "C" {
 /**
  * @brief Opaque condition variable handle.
  */
-typedef struct ca_cond *ca_cond_t;
+typedef struct ca_cond* ca_cond_t;
 
 /**
  * @brief Create a condition variable.
@@ -33,7 +32,7 @@ typedef struct ca_cond *ca_cond_t;
  * @param err Optional error record.
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_cond_create(ca_cond_t *out, ca_error *err);
+CAUDIO_API ca_status ca_cond_create(ca_cond_t* out, ca_error* err);
 
 /**
  * @brief Destroy a condition variable. No threads may be waiting on it.
@@ -47,14 +46,14 @@ CAUDIO_API void ca_cond_destroy(ca_cond_t cond);
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_cond_signal(ca_cond_t cond, ca_error *err);
+CAUDIO_API ca_status ca_cond_signal(ca_cond_t cond, ca_error* err);
 
 /**
  * @brief Wake all waiting threads.
  *
  * @return CA_OK on success.
  */
-CAUDIO_API ca_status ca_cond_broadcast(ca_cond_t cond, ca_error *err);
+CAUDIO_API ca_status ca_cond_broadcast(ca_cond_t cond, ca_error* err);
 
 /**
  * @brief Wait on @p cond, atomically releasing @p mutex and re-acquiring it
@@ -62,8 +61,7 @@ CAUDIO_API ca_status ca_cond_broadcast(ca_cond_t cond, ca_error *err);
  *
  * @return CA_OK on success (spurious wakeups possible).
  */
-CAUDIO_API ca_status ca_cond_wait(ca_cond_t cond, ca_mutex_t mutex,
-                                  ca_error *err);
+CAUDIO_API ca_status ca_cond_wait(ca_cond_t cond, ca_mutex_t mutex, ca_error* err);
 
 /**
  * @brief Wait on @p cond with an absolute timeout (microseconds since
@@ -71,9 +69,8 @@ CAUDIO_API ca_status ca_cond_wait(ca_cond_t cond, ca_mutex_t mutex,
  *
  * @return CA_OK if woken, CA_TIMED_OUT if the timeout elapsed.
  */
-CAUDIO_API ca_status ca_cond_timedwait(ca_cond_t cond, ca_mutex_t mutex,
-                                       ca_time_us_t abstime_us,
-                                       ca_error *err);
+CAUDIO_API ca_status ca_cond_timedwait(ca_cond_t cond, ca_mutex_t mutex, ca_time_us_t abstime_us,
+                                       ca_error* err);
 
 #ifdef __cplusplus
 }

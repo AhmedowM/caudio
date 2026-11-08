@@ -1,26 +1,24 @@
 #include <cstdx/allocator.h>
-
+#include <cstdx/checked.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <cstdx/checked.h>
-
 #if defined(_WIN32) && !defined(__CYGWIN__)
-#  include <malloc.h>
-#  define CX_USE_WIN32_ALIGNED 1
+#include <malloc.h>
+#define CX_USE_WIN32_ALIGNED 1
 #else
-#  define CX_USE_WIN32_ALIGNED 0
+#define CX_USE_WIN32_ALIGNED 0
 #endif
 
 static constexpr size_t cx_default_alignment = alignof(max_align_t);
-static constexpr size_t cx_minimum_alignment = sizeof(void *);
+static constexpr size_t cx_minimum_alignment = sizeof(void*);
 
 /* ------------------------------------------------------------------------- */
 /* Platform allocation                                                       */
 /* ------------------------------------------------------------------------- */
 
-static void *os_alloc(size_t size, size_t alignment) {
+static void* os_alloc(size_t size, size_t alignment) {
 #if CX_USE_WIN32_ALIGNED
     return _aligned_malloc(size, alignment);
 #else
@@ -34,7 +32,7 @@ static void *os_alloc(size_t size, size_t alignment) {
 #endif
 }
 
-static void os_free(void *ptr) {
+static void os_free(void* ptr) {
 #if CX_USE_WIN32_ALIGNED
     _aligned_free(ptr);
 #else
@@ -42,8 +40,8 @@ static void os_free(void *ptr) {
 #endif
 }
 
-static void *os_realloc(void *ptr, [[maybe_unused]] size_t old_size,
-                        size_t new_size, size_t alignment) {
+static void* os_realloc(void* ptr, [[maybe_unused]] size_t old_size, size_t new_size,
+                        size_t alignment) {
 #if CX_USE_WIN32_ALIGNED
     return _aligned_realloc(ptr, new_size, alignment);
 #else
@@ -63,7 +61,7 @@ static void *os_realloc(void *ptr, [[maybe_unused]] size_t old_size,
 /* Default allocator                                                         */
 /* ------------------------------------------------------------------------- */
 
-static void *default_alloc(void *, size_t size, size_t alignment) {
+static void* default_alloc(void*, size_t size, size_t alignment) {
     if (size == 0) {
         return nullptr;
     }
@@ -71,12 +69,11 @@ static void *default_alloc(void *, size_t size, size_t alignment) {
     return os_alloc(size, alignment);
 }
 
-static void *default_realloc(void *, void *ptr, size_t old_size,
-                             size_t new_size, size_t alignment) {
+static void* default_realloc(void*, void* ptr, size_t old_size, size_t new_size, size_t alignment) {
     return os_realloc(ptr, old_size, new_size, alignment);
 }
 
-static void default_free(void *, void *ptr, size_t, size_t) {
+static void default_free(void*, void* ptr, size_t, size_t) {
     if (ptr != nullptr) {
         os_free(ptr);
     }
@@ -89,9 +86,7 @@ static const cx_allocator g_default_allocator = {
     .free = default_free,
 };
 
-const cx_allocator *cx_allocator_default(void) {
-    return &g_default_allocator;
-}
+const cx_allocator* cx_allocator_default(void) { return &g_default_allocator; }
 
 /* ------------------------------------------------------------------------- */
 /* Helpers                                                                   */
@@ -120,7 +115,7 @@ static size_t normalize_alignment(size_t alignment) {
     return alignment;
 }
 
-static const cx_allocator *resolve(const cx_allocator *allocator) {
+static const cx_allocator* resolve(const cx_allocator* allocator) {
     return allocator != nullptr ? allocator : cx_allocator_default();
 }
 
@@ -128,7 +123,7 @@ static const cx_allocator *resolve(const cx_allocator *allocator) {
 /* Public API                                                                */
 /* ------------------------------------------------------------------------- */
 
-bool cx_allocator_is_valid(const cx_allocator *allocator) {
+bool cx_allocator_is_valid(const cx_allocator* allocator) {
     if (allocator == nullptr) {
         return true;
     }
@@ -136,8 +131,7 @@ bool cx_allocator_is_valid(const cx_allocator *allocator) {
     return allocator->alloc != nullptr && allocator->free != nullptr;
 }
 
-void *cx_allocator_alloc(const cx_allocator *allocator, size_t size,
-                         size_t alignment) {
+void* cx_allocator_alloc(const cx_allocator* allocator, size_t size, size_t alignment) {
     auto resolved = resolve(allocator);
 
     if (size == 0 || resolved->alloc == nullptr) {
@@ -153,8 +147,7 @@ void *cx_allocator_alloc(const cx_allocator *allocator, size_t size,
     return resolved->alloc(resolved->state, size, normalized);
 }
 
-void *cx_allocator_alloc_zeroed(const cx_allocator *allocator, size_t size,
-                                size_t alignment) {
+void* cx_allocator_alloc_zeroed(const cx_allocator* allocator, size_t size, size_t alignment) {
     auto block = cx_allocator_alloc(allocator, size, alignment);
 
     if (block != nullptr) {
@@ -164,9 +157,8 @@ void *cx_allocator_alloc_zeroed(const cx_allocator *allocator, size_t size,
     return block;
 }
 
-void *cx_allocator_realloc(const cx_allocator *allocator, void *ptr,
-                           size_t old_size, size_t new_size,
-                           size_t alignment) {
+void* cx_allocator_realloc(const cx_allocator* allocator, void* ptr, size_t old_size,
+                           size_t new_size, size_t alignment) {
     auto resolved = resolve(allocator);
     auto normalized = normalize_alignment(alignment);
 
@@ -184,8 +176,7 @@ void *cx_allocator_realloc(const cx_allocator *allocator, void *ptr,
     }
 
     if (resolved->realloc != nullptr) {
-        return resolved->realloc(resolved->state, ptr, old_size, new_size,
-                                 normalized);
+        return resolved->realloc(resolved->state, ptr, old_size, new_size, normalized);
     }
 
     auto resized = cx_allocator_alloc(resolved, new_size, normalized);
@@ -199,8 +190,7 @@ void *cx_allocator_realloc(const cx_allocator *allocator, void *ptr,
     return resized;
 }
 
-void cx_allocator_free(const cx_allocator *allocator, void *ptr, size_t size,
-                       size_t alignment) {
+void cx_allocator_free(const cx_allocator* allocator, void* ptr, size_t size, size_t alignment) {
     if (ptr == nullptr) {
         return;
     }

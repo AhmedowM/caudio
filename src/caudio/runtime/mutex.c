@@ -1,12 +1,11 @@
 ﻿#include <caudio/runtime/mutex.h>
-
 #include <stdlib.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <pthread.h>
-    #include <errno.h>
+#include <errno.h>
+#include <pthread.h>
 #endif
 
 struct ca_mutex {
@@ -17,7 +16,7 @@ struct ca_mutex {
 #endif
 };
 
-ca_status ca_mutex_create(ca_mutex_t *out, ca_error *err) {
+ca_status ca_mutex_create(ca_mutex_t* out, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -44,8 +43,7 @@ ca_status ca_mutex_create(ca_mutex_t *out, ca_error *err) {
     if (rc != 0) {
         free(m);
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_init failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_init failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -67,7 +65,7 @@ void ca_mutex_destroy(ca_mutex_t mutex) {
     free(mutex);
 }
 
-ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error *err) {
+ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -85,8 +83,7 @@ ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error *err) {
     int rc = pthread_mutex_lock(&mutex->lock);
     if (rc != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_lock failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_lock failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -95,7 +92,7 @@ ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error *err) {
+ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -125,8 +122,7 @@ ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error *err) {
 
     if (rc != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_trylock failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_trylock failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -135,7 +131,7 @@ ca_status ca_mutex_trylock(ca_mutex_t mutex, ca_error *err) {
     return CA_OK;
 }
 
-ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err) {
+ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -153,8 +149,7 @@ ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err) {
     int rc = pthread_mutex_unlock(&mutex->lock);
     if (rc != 0) {
         if (err) {
-            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_unlock failed: %d",
-                         rc);
+            ca_error_set(err, CA_IO_ERROR, "pthread_mutex_unlock failed: %d", rc);
         }
         return CA_IO_ERROR;
     }
@@ -163,9 +158,9 @@ ca_status ca_mutex_unlock(ca_mutex_t mutex, ca_error *err) {
     return CA_OK;
 }
 
-void *ca_mutex_native_handle(ca_mutex_t mutex) {
+void* ca_mutex_native_handle(ca_mutex_t mutex) {
     if (mutex == nullptr) {
         return nullptr;
     }
-    return (void *)&mutex->lock;
+    return (void*)&mutex->lock;
 }

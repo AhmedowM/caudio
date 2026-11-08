@@ -1,17 +1,14 @@
-#include "bytes_internal.h"
-
+#include <cstdx/checked.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <cstdx/checked.h>
+#include "bytes_internal.h"
 
-static const cx_allocator *bytes_allocator(const cx_bytes *bytes) {
-    return bytes->allocator != nullptr ? bytes->allocator
-                                       : cx_allocator_default();
+static const cx_allocator* bytes_allocator(const cx_bytes* bytes) {
+    return bytes->allocator != nullptr ? bytes->allocator : cx_allocator_default();
 }
 
-static bool bytes_contains_range(const cx_bytes *bytes, const void *data,
-                                 size_t length) {
+static bool bytes_contains_range(const cx_bytes* bytes, const void* data, size_t length) {
     if (bytes->data == nullptr || data == nullptr) {
         return false;
     }
@@ -33,8 +30,8 @@ static bool bytes_contains_range(const cx_bytes *bytes, const void *data,
  * Growing the destination may move its buffer, so an aliased source must be
  * detached first.
  */
-static cx_status bytes_stage(cx_bytes *bytes, const void *data, size_t length,
-                             const void **source, void **staged) {
+static cx_status bytes_stage(cx_bytes* bytes, const void* data, size_t length, const void** source,
+                             void** staged) {
     *staged = nullptr;
     *source = data;
 
@@ -54,13 +51,13 @@ static cx_status bytes_stage(cx_bytes *bytes, const void *data, size_t length,
     return CX_OK;
 }
 
-static void bytes_unstage(cx_bytes *bytes, void *staged, size_t length) {
+static void bytes_unstage(cx_bytes* bytes, void* staged, size_t length) {
     if (staged != nullptr) {
         cx_allocator_free(bytes_allocator(bytes), staged, length, 1);
     }
 }
 
-static cx_status bytes_reserve_impl(cx_bytes *bytes, size_t min_capacity) {
+static cx_status bytes_reserve_impl(cx_bytes* bytes, size_t min_capacity) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -87,25 +84,24 @@ static cx_status bytes_reserve_impl(cx_bytes *bytes, size_t min_capacity) {
     }
 
     auto allocator = bytes_allocator(bytes);
-    void *data;
+    void* data;
 
     if (bytes->data == nullptr) {
         data = cx_allocator_alloc(allocator, capacity, 1);
     } else {
-        data = cx_allocator_realloc(allocator, bytes->data, bytes->capacity,
-                                    capacity, 1);
+        data = cx_allocator_realloc(allocator, bytes->data, bytes->capacity, capacity, 1);
     }
 
     if (data == nullptr) {
         return CX_OUT_OF_MEMORY;
     }
 
-    bytes->data = (uint8_t *)data;
+    bytes->data = (uint8_t*)data;
     bytes->capacity = capacity;
     return CX_OK;
 }
 
-cx_status cx_impl_bytes_init(cx_bytes *bytes, const cx_allocator *allocator) {
+cx_status cx_impl_bytes_init(cx_bytes* bytes, const cx_allocator* allocator) {
     if (bytes == nullptr || !cx_allocator_is_valid(allocator)) {
         return CX_INVALID_ARGUMENT;
     }
@@ -116,7 +112,7 @@ cx_status cx_impl_bytes_init(cx_bytes *bytes, const cx_allocator *allocator) {
     return CX_OK;
 }
 
-void cx_impl_bytes_destroy(cx_bytes *bytes) {
+void cx_impl_bytes_destroy(cx_bytes* bytes) {
     if (bytes == nullptr) {
         return;
     }
@@ -132,7 +128,7 @@ void cx_impl_bytes_destroy(cx_bytes *bytes) {
     };
 }
 
-cx_status cx_bytes_init(cx_bytes **out, const cx_allocator *allocator) {
+cx_status cx_bytes_init(cx_bytes** out, const cx_allocator* allocator) {
     if (out == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -147,8 +143,7 @@ cx_status cx_bytes_init(cx_bytes **out, const cx_allocator *allocator) {
     }
 
     auto resolved = bytes_allocator(&staging);
-    auto bytes = (cx_bytes *)cx_allocator_alloc(
-        resolved, sizeof(cx_bytes), alignof(cx_bytes));
+    auto bytes = (cx_bytes*)cx_allocator_alloc(resolved, sizeof(cx_bytes), alignof(cx_bytes));
 
     if (bytes == nullptr) {
         return CX_OUT_OF_MEMORY;
@@ -159,15 +154,15 @@ cx_status cx_bytes_init(cx_bytes **out, const cx_allocator *allocator) {
     return CX_OK;
 }
 
-cx_status cx_bytes_from(cx_bytes **out, const void *data, size_t length,
-                        const cx_allocator *allocator) {
+cx_status cx_bytes_from(cx_bytes** out, const void* data, size_t length,
+                        const cx_allocator* allocator) {
     if (out == nullptr || (data == nullptr && length != 0)) {
         return CX_INVALID_ARGUMENT;
     }
 
     *out = nullptr;
 
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
     auto status = cx_bytes_init(&bytes, allocator);
 
     if (status != CX_OK) {
@@ -185,12 +180,11 @@ cx_status cx_bytes_from(cx_bytes **out, const void *data, size_t length,
     return CX_OK;
 }
 
-cx_status cx_bytes_from_slice(cx_bytes **out, cx_slice slice,
-                              const cx_allocator *allocator) {
+cx_status cx_bytes_from_slice(cx_bytes** out, cx_slice slice, const cx_allocator* allocator) {
     return cx_bytes_from(out, slice.data, slice.length, allocator);
 }
 
-cx_status cx_bytes_copy(cx_bytes **out, const cx_bytes *src) {
+cx_status cx_bytes_copy(cx_bytes** out, const cx_bytes* src) {
     if (out == nullptr || src == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -199,7 +193,7 @@ cx_status cx_bytes_copy(cx_bytes **out, const cx_bytes *src) {
     return cx_bytes_from(out, src->data, src->length, src->allocator);
 }
 
-void cx_bytes_move(cx_bytes *dst, cx_bytes *src) {
+void cx_bytes_move(cx_bytes* dst, cx_bytes* src) {
     if (dst == nullptr || src == nullptr || dst == src) {
         return;
     }
@@ -216,7 +210,7 @@ void cx_bytes_move(cx_bytes *dst, cx_bytes *src) {
     };
 }
 
-void cx_bytes_destroy(cx_bytes **out) {
+void cx_bytes_destroy(cx_bytes** out) {
     if (out == nullptr || *out == nullptr) {
         return;
     }
@@ -230,7 +224,7 @@ void cx_bytes_destroy(cx_bytes **out) {
     cx_allocator_free(allocator, bytes, sizeof(cx_bytes), alignof(cx_bytes));
 }
 
-const uint8_t *cx_bytes_at(const cx_bytes *bytes, size_t index) {
+const uint8_t* cx_bytes_at(const cx_bytes* bytes, size_t index) {
     if (bytes == nullptr || bytes->data == nullptr || index >= bytes->length) {
         return nullptr;
     }
@@ -238,7 +232,7 @@ const uint8_t *cx_bytes_at(const cx_bytes *bytes, size_t index) {
     return bytes->data + index;
 }
 
-uint8_t *cx_bytes_at_mut(cx_bytes *bytes, size_t index) {
+uint8_t* cx_bytes_at_mut(cx_bytes* bytes, size_t index) {
     if (bytes == nullptr || bytes->data == nullptr || index >= bytes->length) {
         return nullptr;
     }
@@ -246,7 +240,7 @@ uint8_t *cx_bytes_at_mut(cx_bytes *bytes, size_t index) {
     return bytes->data + index;
 }
 
-cx_status cx_bytes_get(const cx_bytes *bytes, size_t index, uint8_t *value) {
+cx_status cx_bytes_get(const cx_bytes* bytes, size_t index, uint8_t* value) {
     if (bytes == nullptr || value == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -259,7 +253,7 @@ cx_status cx_bytes_get(const cx_bytes *bytes, size_t index, uint8_t *value) {
     return CX_OK;
 }
 
-cx_status cx_bytes_set(cx_bytes *bytes, size_t index, uint8_t value) {
+cx_status cx_bytes_set(cx_bytes* bytes, size_t index, uint8_t value) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -272,11 +266,11 @@ cx_status cx_bytes_set(cx_bytes *bytes, size_t index, uint8_t value) {
     return CX_OK;
 }
 
-cx_status cx_bytes_reserve(cx_bytes *bytes, size_t min_capacity) {
+cx_status cx_bytes_reserve(cx_bytes* bytes, size_t min_capacity) {
     return bytes_reserve_impl(bytes, min_capacity);
 }
 
-cx_status cx_bytes_resize(cx_bytes *bytes, size_t new_length) {
+cx_status cx_bytes_resize(cx_bytes* bytes, size_t new_length) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -295,13 +289,13 @@ cx_status cx_bytes_resize(cx_bytes *bytes, size_t new_length) {
     return CX_OK;
 }
 
-cx_status cx_bytes_assign(cx_bytes *bytes, const void *data, size_t length) {
+cx_status cx_bytes_assign(cx_bytes* bytes, const void* data, size_t length) {
     if (bytes == nullptr || (data == nullptr && length != 0)) {
         return CX_INVALID_ARGUMENT;
     }
 
-    const void *source;
-    void *staged;
+    const void* source;
+    void* staged;
     auto status = bytes_stage(bytes, data, length, &source, &staged);
 
     if (status != CX_OK) {
@@ -322,11 +316,11 @@ cx_status cx_bytes_assign(cx_bytes *bytes, const void *data, size_t length) {
     return status;
 }
 
-cx_status cx_bytes_assign_slice(cx_bytes *bytes, cx_slice slice) {
+cx_status cx_bytes_assign_slice(cx_bytes* bytes, cx_slice slice) {
     return cx_bytes_assign(bytes, slice.data, slice.length);
 }
 
-void cx_bytes_clear(cx_bytes *bytes) {
+void cx_bytes_clear(cx_bytes* bytes) {
     if (bytes == nullptr) {
         return;
     }
@@ -334,7 +328,7 @@ void cx_bytes_clear(cx_bytes *bytes) {
     bytes->length = 0;
 }
 
-cx_status cx_bytes_append(cx_bytes *bytes, const void *data, size_t length) {
+cx_status cx_bytes_append(cx_bytes* bytes, const void* data, size_t length) {
     if (bytes == nullptr || (data == nullptr && length != 0)) {
         return CX_INVALID_ARGUMENT;
     }
@@ -349,8 +343,8 @@ cx_status cx_bytes_append(cx_bytes *bytes, const void *data, size_t length) {
         return CX_OVERFLOW;
     }
 
-    const void *source;
-    void *staged;
+    const void* source;
+    void* staged;
     auto status = bytes_stage(bytes, data, length, &source, &staged);
 
     if (status != CX_OK) {
@@ -368,11 +362,11 @@ cx_status cx_bytes_append(cx_bytes *bytes, const void *data, size_t length) {
     return status;
 }
 
-cx_status cx_bytes_append_slice(cx_bytes *bytes, cx_slice slice) {
+cx_status cx_bytes_append_slice(cx_bytes* bytes, cx_slice slice) {
     return cx_bytes_append(bytes, slice.data, slice.length);
 }
 
-cx_status cx_bytes_push_back(cx_bytes *bytes, uint8_t value) {
+cx_status cx_bytes_push_back(cx_bytes* bytes, uint8_t value) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -394,7 +388,7 @@ cx_status cx_bytes_push_back(cx_bytes *bytes, uint8_t value) {
     return CX_OK;
 }
 
-cx_status cx_bytes_pop_back(cx_bytes *bytes, uint8_t *value) {
+cx_status cx_bytes_pop_back(cx_bytes* bytes, uint8_t* value) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -412,8 +406,7 @@ cx_status cx_bytes_pop_back(cx_bytes *bytes, uint8_t *value) {
     return CX_OK;
 }
 
-cx_status cx_bytes_insert(cx_bytes *bytes, size_t index, const void *data,
-                          size_t length) {
+cx_status cx_bytes_insert(cx_bytes* bytes, size_t index, const void* data, size_t length) {
     if (bytes == nullptr || (data == nullptr && length != 0)) {
         return CX_INVALID_ARGUMENT;
     }
@@ -432,8 +425,8 @@ cx_status cx_bytes_insert(cx_bytes *bytes, size_t index, const void *data,
         return CX_OVERFLOW;
     }
 
-    const void *source;
-    void *staged;
+    const void* source;
+    void* staged;
     auto status = bytes_stage(bytes, data, length, &source, &staged);
 
     if (status != CX_OK) {
@@ -443,8 +436,7 @@ cx_status cx_bytes_insert(cx_bytes *bytes, size_t index, const void *data,
     status = bytes_reserve_impl(bytes, new_length);
 
     if (status == CX_OK) {
-        memmove(bytes->data + index + length, bytes->data + index,
-                bytes->length - index);
+        memmove(bytes->data + index + length, bytes->data + index, bytes->length - index);
         memcpy(bytes->data + index, source, length);
         bytes->length = new_length;
     }
@@ -453,7 +445,7 @@ cx_status cx_bytes_insert(cx_bytes *bytes, size_t index, const void *data,
     return status;
 }
 
-cx_status cx_bytes_erase(cx_bytes *bytes, size_t index, size_t count) {
+cx_status cx_bytes_erase(cx_bytes* bytes, size_t index, size_t count) {
     if (bytes == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -472,14 +464,13 @@ cx_status cx_bytes_erase(cx_bytes *bytes, size_t index, size_t count) {
         return CX_OK;
     }
 
-    memmove(bytes->data + index, bytes->data + index + count,
-            bytes->length - index - count);
+    memmove(bytes->data + index, bytes->data + index + count, bytes->length - index - count);
     bytes->length -= count;
     return CX_OK;
 }
 
-cx_status cx_bytes_replace(cx_bytes *bytes, size_t index, size_t count,
-                           const void *data, size_t length) {
+cx_status cx_bytes_replace(cx_bytes* bytes, size_t index, size_t count, const void* data,
+                           size_t length) {
     if (bytes == nullptr || (data == nullptr && length != 0)) {
         return CX_INVALID_ARGUMENT;
     }
@@ -504,8 +495,8 @@ cx_status cx_bytes_replace(cx_bytes *bytes, size_t index, size_t count,
         return CX_OK;
     }
 
-    const void *source;
-    void *staged;
+    const void* source;
+    void* staged;
     auto status = bytes_stage(bytes, data, length, &source, &staged);
 
     if (status != CX_OK) {
@@ -516,8 +507,7 @@ cx_status cx_bytes_replace(cx_bytes *bytes, size_t index, size_t count,
 
     if (status == CX_OK) {
         if (length != count) {
-            memmove(bytes->data + index + length,
-                    bytes->data + index + count,
+            memmove(bytes->data + index + length, bytes->data + index + count,
                     bytes->length - index - count);
         }
 
@@ -532,7 +522,7 @@ cx_status cx_bytes_replace(cx_bytes *bytes, size_t index, size_t count,
     return status;
 }
 
-void cx_bytes_swap(cx_bytes *left, cx_bytes *right) {
+void cx_bytes_swap(cx_bytes* left, cx_bytes* right) {
     if (left == nullptr || right == nullptr || left == right) {
         return;
     }
@@ -542,27 +532,19 @@ void cx_bytes_swap(cx_bytes *left, cx_bytes *right) {
     *right = temporary;
 }
 
-size_t cx_bytes_length(const cx_bytes *bytes) {
-    return bytes != nullptr ? bytes->length : 0;
-}
+size_t cx_bytes_length(const cx_bytes* bytes) { return bytes != nullptr ? bytes->length : 0; }
 
-size_t cx_bytes_capacity(const cx_bytes *bytes) {
-    return bytes != nullptr ? bytes->capacity : 0;
-}
+size_t cx_bytes_capacity(const cx_bytes* bytes) { return bytes != nullptr ? bytes->capacity : 0; }
 
-const uint8_t *cx_bytes_data(const cx_bytes *bytes) {
+const uint8_t* cx_bytes_data(const cx_bytes* bytes) {
     return bytes != nullptr ? bytes->data : nullptr;
 }
 
-bool cx_bytes_empty(const cx_bytes *bytes) {
-    return bytes == nullptr || bytes->length == 0;
-}
+bool cx_bytes_empty(const cx_bytes* bytes) { return bytes == nullptr || bytes->length == 0; }
 
-bool cx_bytes_is_null(const cx_bytes *bytes) {
-    return bytes == nullptr || bytes->data == nullptr;
-}
+bool cx_bytes_is_null(const cx_bytes* bytes) { return bytes == nullptr || bytes->data == nullptr; }
 
-bool cx_bytes_equals(const cx_bytes *left, const cx_bytes *right) {
+bool cx_bytes_equals(const cx_bytes* left, const cx_bytes* right) {
     if (left == right) {
         return true;
     }
@@ -582,7 +564,7 @@ bool cx_bytes_equals(const cx_bytes *left, const cx_bytes *right) {
     return memcmp(left->data, right->data, left->length) == 0;
 }
 
-cx_slice cx_bytes_as_slice(const cx_bytes *bytes) {
+cx_slice cx_bytes_as_slice(const cx_bytes* bytes) {
     if (bytes == nullptr) {
         return (cx_slice){};
     }

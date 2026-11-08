@@ -1,5 +1,4 @@
 #include <cstdx/pool.h>
-
 #include <stdint.h>
 
 #include "cx_test.h"
@@ -16,7 +15,7 @@ static int test_basic(void) {
     CX_CHECK_EQ(0, cx_pool_live(&pool));
     CX_CHECK_EQ(0, cx_pool_capacity(&pool));
 
-    void *slots[pool_test_slot_count] = {};
+    void* slots[pool_test_slot_count] = {};
 
     for (size_t i = 0; i < pool_test_slot_count; ++i) {
         slots[i] = cx_pool_alloc(&pool);
@@ -67,7 +66,7 @@ static int test_slot_rounding(void) {
     cx_pool_destroy(&pool);
 
     CX_CHECK(cx_pool_init(&pool, 1, 1, 4, nullptr) == CX_OK);
-    CX_CHECK(cx_pool_slot_size(&pool) >= sizeof(void *));
+    CX_CHECK(cx_pool_slot_size(&pool) >= sizeof(void*));
     cx_pool_destroy(&pool);
 
     CX_CHECK(cx_pool_init(nullptr, 8, 8, 4, nullptr) == CX_INVALID_ARGUMENT);
@@ -81,11 +80,10 @@ static int test_static(void) {
     alignas(16) unsigned char buffer[pool_test_buffer_size];
     cx_pool pool;
 
-    CX_CHECK(cx_pool_init_static(&pool, buffer, sizeof(buffer), 32, 16) ==
-             CX_OK);
+    CX_CHECK(cx_pool_init_static(&pool, buffer, sizeof(buffer), 32, 16) == CX_OK);
     CX_CHECK_EQ(8, cx_pool_capacity(&pool));
 
-    void *slots[pool_test_slot_count] = {};
+    void* slots[pool_test_slot_count] = {};
 
     for (size_t i = 0; i < pool_test_slot_count; ++i) {
         slots[i] = cx_pool_alloc(&pool);
@@ -160,20 +158,15 @@ static int test_errors(void) {
     CX_CHECK_EQ(0, cx_pool_capacity(nullptr));
     CX_CHECK_EQ(0, cx_pool_slot_size(nullptr));
 
-    CX_CHECK(cx_pool_init_static(nullptr, buffer, sizeof(buffer), 8, 8) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_pool_init_static(&pool, nullptr, sizeof(buffer), 8, 8) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_pool_init_static(&pool, buffer, 0, 8, 8) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_pool_init_static(nullptr, buffer, sizeof(buffer), 8, 8) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_pool_init_static(&pool, nullptr, sizeof(buffer), 8, 8) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_pool_init_static(&pool, buffer, 0, 8, 8) == CX_INVALID_ARGUMENT);
 
     /* The aligned start lies past the end of the supplied buffer. */
-    CX_CHECK(cx_pool_init_static(&pool, buffer + 1, 1, 8, 16) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_pool_init_static(&pool, buffer + 1, 1, 8, 16) == CX_INVALID_ARGUMENT);
 
     /* The buffer is too small to hold even one slot. */
-    CX_CHECK(cx_pool_init_static(&pool, tiny, sizeof(tiny), 64, 8) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_pool_init_static(&pool, tiny, sizeof(tiny), 64, 8) == CX_INVALID_ARGUMENT);
 
     /* Reset before the first chunk was ever allocated. */
     CX_CHECK(cx_pool_init(&pool, 8, 8, 4, nullptr) == CX_OK);

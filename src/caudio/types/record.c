@@ -1,10 +1,9 @@
 ﻿#include <caudio/types/record.h>
-
-#include "internal.h"
-
 #include <cstdx/allocator.h>
 #include <cstdx/string_view.h>
 #include <string.h>
+
+#include "internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* Internal helpers                                                          */
@@ -33,10 +32,10 @@ static ca_status ca_from_cx(cx_status status) {
  * the enclosing copy checks it after every push. All copies in one call chain
  * share the same allocator.
  */
-thread_local const cx_allocator *ca_impl_copy_alloc;
+thread_local const cx_allocator* ca_impl_copy_alloc;
 thread_local ca_status ca_impl_copy_status;
 
-void ca_impl_copy_reset(const cx_allocator *alloc) {
+void ca_impl_copy_reset(const cx_allocator* alloc) {
     ca_impl_copy_alloc = alloc ? alloc : cx_allocator_default();
     ca_impl_copy_status = CA_OK;
 }
@@ -47,12 +46,11 @@ void ca_impl_copy_fail(ca_status status) {
     }
 }
 
-static ca_status ca_impl_str_init(cx_string **slot,
-                                  const cx_allocator *alloc) {
+static ca_status ca_impl_str_init(cx_string** slot, const cx_allocator* alloc) {
     return ca_from_cx(cx_string_init(slot, alloc));
 }
 
-static ca_status ca_impl_str_assign(cx_string *dst, const cx_string *src) {
+static ca_status ca_impl_str_assign(cx_string* dst, const cx_string* src) {
     if (!dst) {
         return CA_INVALID_ARGUMENT;
     }
@@ -62,23 +60,19 @@ static ca_status ca_impl_str_assign(cx_string *dst, const cx_string *src) {
     return ca_from_cx(cx_string_assign_view(dst, cx_string_view_of(src)));
 }
 
-static ca_status ca_impl_str_set(cx_string *dst, const char *text) {
-    return ca_from_cx(
-        cx_string_assign_view(dst, cx_string_view_from_cstr(text)));
+static ca_status ca_impl_str_set(cx_string* dst, const char* text) {
+    return ca_from_cx(cx_string_assign_view(dst, cx_string_view_from_cstr(text)));
 }
 
-static cx_string_view ca_impl_view(const cx_string *str) {
+static cx_string_view ca_impl_view(const cx_string* str) {
     return str ? cx_string_view_of(str) : cx_string_view_from_parts("", 0);
 }
 
-static ca_status ca_impl_vector_copy(cx_vector **dst, const cx_vector *src,
-                                     size_t element_size,
-                                     size_t element_align,
-                                     const cx_vector_ops *ops,
-                                     const cx_allocator *alloc) {
+static ca_status ca_impl_vector_copy(cx_vector** dst, const cx_vector* src, size_t element_size,
+                                     size_t element_align, const cx_vector_ops* ops,
+                                     const cx_allocator* alloc) {
     *dst = nullptr;
-    ca_status status = ca_from_cx(
-        cx_vector_init(dst, element_size, element_align, ops, alloc));
+    ca_status status = ca_from_cx(cx_vector_init(dst, element_size, element_align, ops, alloc));
     if (status != CA_OK) {
         return status;
     }
@@ -89,8 +83,7 @@ static ca_status ca_impl_vector_copy(cx_vector **dst, const cx_vector *src,
     ca_impl_copy_reset(alloc);
     size_t count = cx_vector_length(src);
     for (size_t i = 0; i < count; ++i) {
-        status = ca_from_cx(cx_vector_push_copy(
-            *dst, cx_vector_ptr(src, i), element_size));
+        status = ca_from_cx(cx_vector_push_copy(*dst, cx_vector_ptr(src, i), element_size));
         if (status == CA_OK && ca_impl_copy_status != CA_OK) {
             status = ca_impl_copy_status;
         }
@@ -106,7 +99,7 @@ static ca_status ca_impl_vector_copy(cx_vector **dst, const cx_vector *src,
 /* Source identity                                                           */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_source_ref_init(ca_source_ref *ref, const cx_allocator *alloc) {
+ca_status ca_source_ref_init(ca_source_ref* ref, const cx_allocator* alloc) {
     if (!ref) {
         return CA_INVALID_ARGUMENT;
     }
@@ -125,8 +118,7 @@ ca_status ca_source_ref_init(ca_source_ref *ref, const cx_allocator *alloc) {
     return CA_OK;
 }
 
-static ca_status ca_impl_source_ref_assign(ca_source_ref *dst,
-                                           const ca_source_ref *src) {
+static ca_status ca_impl_source_ref_assign(ca_source_ref* dst, const ca_source_ref* src) {
     dst->kind = src->kind;
     dst->available = src->available;
     ca_status status = ca_impl_str_assign(dst->key, src->key);
@@ -136,8 +128,8 @@ static ca_status ca_impl_source_ref_assign(ca_source_ref *dst,
     return status;
 }
 
-ca_status ca_source_ref_copy(ca_source_ref *dst, const ca_source_ref *src,
-                             const cx_allocator *alloc) {
+ca_status ca_source_ref_copy(ca_source_ref* dst, const ca_source_ref* src,
+                             const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -152,7 +144,7 @@ ca_status ca_source_ref_copy(ca_source_ref *dst, const ca_source_ref *src,
     return status;
 }
 
-void ca_source_ref_move(ca_source_ref *dst, ca_source_ref *src) {
+void ca_source_ref_move(ca_source_ref* dst, ca_source_ref* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -161,7 +153,7 @@ void ca_source_ref_move(ca_source_ref *dst, ca_source_ref *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_source_ref_destroy(ca_source_ref *ref) {
+void ca_source_ref_destroy(ca_source_ref* ref) {
     if (!ref) {
         return;
     }
@@ -174,17 +166,16 @@ void ca_source_ref_destroy(ca_source_ref *ref) {
 /* Track                                                                     */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_track_init(ca_track *track, const cx_allocator *alloc) {
+ca_status ca_track_init(ca_track* track, const cx_allocator* alloc) {
     if (!track) {
         return CA_INVALID_ARGUMENT;
     }
     memset(track, 0, sizeof *track);
     track->library_id = 1;
 
-    cx_string **const slots[] = {
-        &track->path,       &track->title, &track->artist,
-        &track->album,      &track->album_artist, &track->genre,
-        &track->cover_art_path,
+    cx_string** const slots[] = {
+        &track->path,         &track->title, &track->artist,         &track->album,
+        &track->album_artist, &track->genre, &track->cover_art_path,
     };
     ca_status status = CA_OK;
     for (size_t i = 0; i < sizeof slots / sizeof slots[0]; ++i) {
@@ -202,8 +193,7 @@ ca_status ca_track_init(ca_track *track, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_track_copy(ca_track *dst, const ca_track *src,
-                        const cx_allocator *alloc) {
+ca_status ca_track_copy(ca_track* dst, const ca_track* src, const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -261,7 +251,7 @@ ca_status ca_track_copy(ca_track *dst, const ca_track *src,
     return status;
 }
 
-void ca_track_move(ca_track *dst, ca_track *src) {
+void ca_track_move(ca_track* dst, ca_track* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -270,7 +260,7 @@ void ca_track_move(ca_track *dst, ca_track *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_track_destroy(ca_track *track) {
+void ca_track_destroy(ca_track* track) {
     if (!track) {
         return;
     }
@@ -285,9 +275,8 @@ void ca_track_destroy(ca_track *track) {
     memset(track, 0, sizeof *track);
 }
 
-ca_status ca_track_normalized_source(const ca_track *track,
-                                     ca_source_ref *out,
-                                     const cx_allocator *alloc) {
+ca_status ca_track_normalized_source(const ca_track* track, ca_source_ref* out,
+                                     const cx_allocator* alloc) {
     if (!track || !out) {
         return CA_INVALID_ARGUMENT;
     }
@@ -297,12 +286,11 @@ ca_status ca_track_normalized_source(const ca_track *track,
     }
     if (out->kind == CA_SOURCE_PATH) {
         if (cx_string_empty(out->key)) {
-            status = ca_from_cx(
-                cx_string_assign_view(out->key, ca_impl_view(track->path)));
+            status = ca_from_cx(cx_string_assign_view(out->key, ca_impl_view(track->path)));
         }
         if (status == CA_OK && cx_string_empty(out->display_name)) {
-            status = ca_from_cx(cx_string_assign_view(
-                out->display_name, ca_impl_view(track->path)));
+            status =
+                ca_from_cx(cx_string_assign_view(out->display_name, ca_impl_view(track->path)));
         }
     }
     if (status != CA_OK) {
@@ -315,7 +303,7 @@ ca_status ca_track_normalized_source(const ca_track *track,
 /* Playlist                                                                  */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_playlist_init(ca_playlist *playlist, const cx_allocator *alloc) {
+ca_status ca_playlist_init(ca_playlist* playlist, const cx_allocator* alloc) {
     if (!playlist) {
         return CA_INVALID_ARGUMENT;
     }
@@ -332,8 +320,7 @@ ca_status ca_playlist_init(ca_playlist *playlist, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_playlist_copy(ca_playlist *dst, const ca_playlist *src,
-                           const cx_allocator *alloc) {
+ca_status ca_playlist_copy(ca_playlist* dst, const ca_playlist* src, const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -357,7 +344,7 @@ ca_status ca_playlist_copy(ca_playlist *dst, const ca_playlist *src,
     return status;
 }
 
-void ca_playlist_move(ca_playlist *dst, ca_playlist *src) {
+void ca_playlist_move(ca_playlist* dst, ca_playlist* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -366,7 +353,7 @@ void ca_playlist_move(ca_playlist *dst, ca_playlist *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_playlist_destroy(ca_playlist *playlist) {
+void ca_playlist_destroy(ca_playlist* playlist) {
     if (!playlist) {
         return;
     }
@@ -379,7 +366,7 @@ void ca_playlist_destroy(ca_playlist *playlist) {
 /* Queue item                                                                */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_queue_item_init(ca_queue_item *item, const cx_allocator *alloc) {
+ca_status ca_queue_item_init(ca_queue_item* item, const cx_allocator* alloc) {
     (void)alloc;
     if (!item) {
         return CA_INVALID_ARGUMENT;
@@ -389,8 +376,8 @@ ca_status ca_queue_item_init(ca_queue_item *item, const cx_allocator *alloc) {
     return CA_OK;
 }
 
-ca_status ca_queue_item_copy(ca_queue_item *dst, const ca_queue_item *src,
-                             const cx_allocator *alloc) {
+ca_status ca_queue_item_copy(ca_queue_item* dst, const ca_queue_item* src,
+                             const cx_allocator* alloc) {
     (void)alloc;
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
@@ -399,7 +386,7 @@ ca_status ca_queue_item_copy(ca_queue_item *dst, const ca_queue_item *src,
     return CA_OK;
 }
 
-void ca_queue_item_move(ca_queue_item *dst, ca_queue_item *src) {
+void ca_queue_item_move(ca_queue_item* dst, ca_queue_item* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -407,7 +394,7 @@ void ca_queue_item_move(ca_queue_item *dst, ca_queue_item *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_queue_item_destroy(ca_queue_item *item) {
+void ca_queue_item_destroy(ca_queue_item* item) {
     if (item) {
         memset(item, 0, sizeof *item);
     }
@@ -417,8 +404,7 @@ void ca_queue_item_destroy(ca_queue_item *item) {
 /* History entry                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_history_entry_init(ca_history_entry *entry,
-                                const cx_allocator *alloc) {
+ca_status ca_history_entry_init(ca_history_entry* entry, const cx_allocator* alloc) {
     if (!entry) {
         return CA_INVALID_ARGUMENT;
     }
@@ -438,9 +424,8 @@ ca_status ca_history_entry_init(ca_history_entry *entry,
     return status;
 }
 
-ca_status ca_history_entry_copy(ca_history_entry *dst,
-                                const ca_history_entry *src,
-                                const cx_allocator *alloc) {
+ca_status ca_history_entry_copy(ca_history_entry* dst, const ca_history_entry* src,
+                                const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -470,7 +455,7 @@ ca_status ca_history_entry_copy(ca_history_entry *dst,
     return status;
 }
 
-void ca_history_entry_move(ca_history_entry *dst, ca_history_entry *src) {
+void ca_history_entry_move(ca_history_entry* dst, ca_history_entry* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -479,7 +464,7 @@ void ca_history_entry_move(ca_history_entry *dst, ca_history_entry *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_history_entry_destroy(ca_history_entry *entry) {
+void ca_history_entry_destroy(ca_history_entry* entry) {
     if (!entry) {
         return;
     }
@@ -493,7 +478,7 @@ void ca_history_entry_destroy(ca_history_entry *entry) {
 /* Bookmark                                                                  */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_bookmark_init(ca_bookmark *bookmark, const cx_allocator *alloc) {
+ca_status ca_bookmark_init(ca_bookmark* bookmark, const cx_allocator* alloc) {
     if (!bookmark) {
         return CA_INVALID_ARGUMENT;
     }
@@ -505,8 +490,7 @@ ca_status ca_bookmark_init(ca_bookmark *bookmark, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_bookmark_copy(ca_bookmark *dst, const ca_bookmark *src,
-                           const cx_allocator *alloc) {
+ca_status ca_bookmark_copy(ca_bookmark* dst, const ca_bookmark* src, const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -526,7 +510,7 @@ ca_status ca_bookmark_copy(ca_bookmark *dst, const ca_bookmark *src,
     return status;
 }
 
-void ca_bookmark_move(ca_bookmark *dst, ca_bookmark *src) {
+void ca_bookmark_move(ca_bookmark* dst, ca_bookmark* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -535,7 +519,7 @@ void ca_bookmark_move(ca_bookmark *dst, ca_bookmark *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_bookmark_destroy(ca_bookmark *bookmark) {
+void ca_bookmark_destroy(ca_bookmark* bookmark) {
     if (!bookmark) {
         return;
     }
@@ -547,8 +531,7 @@ void ca_bookmark_destroy(ca_bookmark *bookmark) {
 /* Device info / list                                                        */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_device_info_init(ca_device_info *device,
-                              const cx_allocator *alloc) {
+ca_status ca_device_info_init(ca_device_info* device, const cx_allocator* alloc) {
     if (!device) {
         return CA_INVALID_ARGUMENT;
     }
@@ -563,8 +546,8 @@ ca_status ca_device_info_init(ca_device_info *device,
     return status;
 }
 
-ca_status ca_device_info_copy(ca_device_info *dst, const ca_device_info *src,
-                              const cx_allocator *alloc) {
+ca_status ca_device_info_copy(ca_device_info* dst, const ca_device_info* src,
+                              const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -584,7 +567,7 @@ ca_status ca_device_info_copy(ca_device_info *dst, const ca_device_info *src,
     return status;
 }
 
-void ca_device_info_move(ca_device_info *dst, ca_device_info *src) {
+void ca_device_info_move(ca_device_info* dst, ca_device_info* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -593,7 +576,7 @@ void ca_device_info_move(ca_device_info *dst, ca_device_info *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_device_info_destroy(ca_device_info *device) {
+void ca_device_info_destroy(ca_device_info* device) {
     if (!device) {
         return;
     }
@@ -602,19 +585,18 @@ void ca_device_info_destroy(ca_device_info *device) {
     memset(device, 0, sizeof *device);
 }
 
-static void ca_device_info_vec_copy(void *dst, const void *src) {
-    ca_impl_copy_fail(ca_device_info_copy(
-        (ca_device_info *)dst, (const ca_device_info *)src,
-        ca_impl_copy_alloc));
+static void ca_device_info_vec_copy(void* dst, const void* src) {
+    ca_impl_copy_fail(
+        ca_device_info_copy((ca_device_info*)dst, (const ca_device_info*)src, ca_impl_copy_alloc));
 }
 
-static void ca_device_info_vec_move(void *dst, void *src) {
+static void ca_device_info_vec_move(void* dst, void* src) {
     memcpy(dst, src, sizeof(ca_device_info));
     memset(src, 0, sizeof(ca_device_info));
 }
 
-static void ca_device_info_vec_destroy(void *element) {
-    ca_device_info_destroy((ca_device_info *)element);
+static void ca_device_info_vec_destroy(void* element) {
+    ca_device_info_destroy((ca_device_info*)element);
 }
 
 const cx_vector_ops ca_impl_device_info_vector_ops = {
@@ -623,29 +605,27 @@ const cx_vector_ops ca_impl_device_info_vector_ops = {
     .destroy = ca_device_info_vec_destroy,
 };
 
-ca_status ca_device_list_init(ca_device_list *list, const cx_allocator *alloc) {
+ca_status ca_device_list_init(ca_device_list* list, const cx_allocator* alloc) {
     if (!list) {
         return CA_INVALID_ARGUMENT;
     }
     memset(list, 0, sizeof *list);
     return ca_from_cx(cx_vector_init(&list->devices, sizeof(ca_device_info),
-                                     alignof(ca_device_info),
-                                     &ca_impl_device_info_vector_ops, alloc));
+                                     alignof(ca_device_info), &ca_impl_device_info_vector_ops,
+                                     alloc));
 }
 
-ca_status ca_device_list_copy(ca_device_list *dst, const ca_device_list *src,
-                              const cx_allocator *alloc) {
+ca_status ca_device_list_copy(ca_device_list* dst, const ca_device_list* src,
+                              const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
     memset(dst, 0, sizeof *dst);
-    return ca_impl_vector_copy(&dst->devices, src->devices,
-                               sizeof(ca_device_info),
-                               alignof(ca_device_info), &ca_impl_device_info_vector_ops,
-                               alloc);
+    return ca_impl_vector_copy(&dst->devices, src->devices, sizeof(ca_device_info),
+                               alignof(ca_device_info), &ca_impl_device_info_vector_ops, alloc);
 }
 
-void ca_device_list_move(ca_device_list *dst, ca_device_list *src) {
+void ca_device_list_move(ca_device_list* dst, ca_device_list* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -654,7 +634,7 @@ void ca_device_list_move(ca_device_list *dst, ca_device_list *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_device_list_destroy(ca_device_list *list) {
+void ca_device_list_destroy(ca_device_list* list) {
     if (!list) {
         return;
     }
@@ -666,15 +646,14 @@ void ca_device_list_destroy(ca_device_list *list) {
 /* Track metadata                                                            */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_track_metadata_init(ca_track_metadata *metadata,
-                                 const cx_allocator *alloc) {
+ca_status ca_track_metadata_init(ca_track_metadata* metadata, const cx_allocator* alloc) {
     if (!metadata) {
         return CA_INVALID_ARGUMENT;
     }
     memset(metadata, 0, sizeof *metadata);
 
-    cx_string **const slots[] = {
-        &metadata->title, &metadata->artist, &metadata->album,
+    cx_string** const slots[] = {
+        &metadata->title,        &metadata->artist, &metadata->album,
         &metadata->album_artist, &metadata->genre,
     };
     ca_status status = CA_OK;
@@ -688,9 +667,8 @@ ca_status ca_track_metadata_init(ca_track_metadata *metadata,
     return CA_OK;
 }
 
-ca_status ca_track_metadata_copy(ca_track_metadata *dst,
-                                 const ca_track_metadata *src,
-                                 const cx_allocator *alloc) {
+ca_status ca_track_metadata_copy(ca_track_metadata* dst, const ca_track_metadata* src,
+                                 const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -725,8 +703,7 @@ ca_status ca_track_metadata_copy(ca_track_metadata *dst,
     return status;
 }
 
-void ca_track_metadata_move(ca_track_metadata *dst,
-                            ca_track_metadata *src) {
+void ca_track_metadata_move(ca_track_metadata* dst, ca_track_metadata* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -735,7 +712,7 @@ void ca_track_metadata_move(ca_track_metadata *dst,
     memset(src, 0, sizeof *src);
 }
 
-void ca_track_metadata_destroy(ca_track_metadata *metadata) {
+void ca_track_metadata_destroy(ca_track_metadata* metadata) {
     if (!metadata) {
         return;
     }
@@ -751,7 +728,7 @@ void ca_track_metadata_destroy(ca_track_metadata *metadata) {
 /* Top entity                                                                */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_top_entity_init(ca_top_entity *entity, const cx_allocator *alloc) {
+ca_status ca_top_entity_init(ca_top_entity* entity, const cx_allocator* alloc) {
     if (!entity) {
         return CA_INVALID_ARGUMENT;
     }
@@ -763,8 +740,8 @@ ca_status ca_top_entity_init(ca_top_entity *entity, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_top_entity_copy(ca_top_entity *dst, const ca_top_entity *src,
-                             const cx_allocator *alloc) {
+ca_status ca_top_entity_copy(ca_top_entity* dst, const ca_top_entity* src,
+                             const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -782,7 +759,7 @@ ca_status ca_top_entity_copy(ca_top_entity *dst, const ca_top_entity *src,
     return status;
 }
 
-void ca_top_entity_move(ca_top_entity *dst, ca_top_entity *src) {
+void ca_top_entity_move(ca_top_entity* dst, ca_top_entity* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -791,7 +768,7 @@ void ca_top_entity_move(ca_top_entity *dst, ca_top_entity *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_top_entity_destroy(ca_top_entity *entity) {
+void ca_top_entity_destroy(ca_top_entity* entity) {
     if (!entity) {
         return;
     }
@@ -799,19 +776,18 @@ void ca_top_entity_destroy(ca_top_entity *entity) {
     memset(entity, 0, sizeof *entity);
 }
 
-static void ca_top_entity_vec_copy(void *dst, const void *src) {
-    ca_impl_copy_fail(ca_top_entity_copy((ca_top_entity *)dst,
-                                         (const ca_top_entity *)src,
-                                         ca_impl_copy_alloc));
+static void ca_top_entity_vec_copy(void* dst, const void* src) {
+    ca_impl_copy_fail(
+        ca_top_entity_copy((ca_top_entity*)dst, (const ca_top_entity*)src, ca_impl_copy_alloc));
 }
 
-static void ca_top_entity_vec_move(void *dst, void *src) {
+static void ca_top_entity_vec_move(void* dst, void* src) {
     memcpy(dst, src, sizeof(ca_top_entity));
     memset(src, 0, sizeof(ca_top_entity));
 }
 
-static void ca_top_entity_vec_destroy(void *element) {
-    ca_top_entity_destroy((ca_top_entity *)element);
+static void ca_top_entity_vec_destroy(void* element) {
+    ca_top_entity_destroy((ca_top_entity*)element);
 }
 
 const cx_vector_ops ca_impl_top_entity_vector_ops = {
@@ -820,19 +796,16 @@ const cx_vector_ops ca_impl_top_entity_vector_ops = {
     .destroy = ca_top_entity_vec_destroy,
 };
 
-static void ca_track_vec_copy(void *dst, const void *src) {
-    ca_impl_copy_fail(ca_track_copy((ca_track *)dst, (const ca_track *)src,
-                                    ca_impl_copy_alloc));
+static void ca_track_vec_copy(void* dst, const void* src) {
+    ca_impl_copy_fail(ca_track_copy((ca_track*)dst, (const ca_track*)src, ca_impl_copy_alloc));
 }
 
-static void ca_track_vec_move(void *dst, void *src) {
+static void ca_track_vec_move(void* dst, void* src) {
     memcpy(dst, src, sizeof(ca_track));
     memset(src, 0, sizeof(ca_track));
 }
 
-static void ca_track_vec_destroy(void *element) {
-    ca_track_destroy((ca_track *)element);
-}
+static void ca_track_vec_destroy(void* element) { ca_track_destroy((ca_track*)element); }
 
 const cx_vector_ops ca_impl_track_vector_ops = {
     .copy = ca_track_vec_copy,
@@ -844,8 +817,7 @@ const cx_vector_ops ca_impl_track_vector_ops = {
 /* Library stats                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_library_stats_init(ca_library_stats *stats,
-                                const cx_allocator *alloc) {
+ca_status ca_library_stats_init(ca_library_stats* stats, const cx_allocator* alloc) {
     (void)alloc;
     if (!stats) {
         return CA_INVALID_ARGUMENT;
@@ -854,32 +826,28 @@ ca_status ca_library_stats_init(ca_library_stats *stats,
     return CA_OK;
 }
 
-static ca_status ca_impl_copy_track_list(bool present, cx_vector **dst,
-                                         const cx_vector *src,
-                                         const cx_allocator *alloc) {
+static ca_status ca_impl_copy_track_list(bool present, cx_vector** dst, const cx_vector* src,
+                                         const cx_allocator* alloc) {
     *dst = nullptr;
     if (!present) {
         return CA_OK;
     }
-    return ca_impl_vector_copy(dst, src, sizeof(ca_track),
-                               alignof(ca_track), &ca_impl_track_vector_ops, alloc);
+    return ca_impl_vector_copy(dst, src, sizeof(ca_track), alignof(ca_track),
+                               &ca_impl_track_vector_ops, alloc);
 }
 
-static ca_status ca_impl_copy_top_list(bool present, cx_vector **dst,
-                                       const cx_vector *src,
-                                       const cx_allocator *alloc) {
+static ca_status ca_impl_copy_top_list(bool present, cx_vector** dst, const cx_vector* src,
+                                       const cx_allocator* alloc) {
     *dst = nullptr;
     if (!present) {
         return CA_OK;
     }
-    return ca_impl_vector_copy(dst, src, sizeof(ca_top_entity),
-                               alignof(ca_top_entity), &ca_impl_top_entity_vector_ops,
-                               alloc);
+    return ca_impl_vector_copy(dst, src, sizeof(ca_top_entity), alignof(ca_top_entity),
+                               &ca_impl_top_entity_vector_ops, alloc);
 }
 
-ca_status ca_library_stats_copy(ca_library_stats *dst,
-                                const ca_library_stats *src,
-                                const cx_allocator *alloc) {
+ca_status ca_library_stats_copy(ca_library_stats* dst, const ca_library_stats* src,
+                                const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -895,19 +863,19 @@ ca_status ca_library_stats_copy(ca_library_stats *dst,
     dst->has_top_genres = src->has_top_genres;
     dst->has_top_artists = src->has_top_artists;
 
-    ca_status status = ca_impl_copy_track_list(
-        src->has_top_tracks, &dst->top_tracks, src->top_tracks, alloc);
+    ca_status status =
+        ca_impl_copy_track_list(src->has_top_tracks, &dst->top_tracks, src->top_tracks, alloc);
     if (status == CA_OK) {
-        status = ca_impl_copy_top_list(src->has_top_albums, &dst->top_albums,
-                                       src->top_albums, alloc);
+        status =
+            ca_impl_copy_top_list(src->has_top_albums, &dst->top_albums, src->top_albums, alloc);
     }
     if (status == CA_OK) {
-        status = ca_impl_copy_top_list(src->has_top_genres, &dst->top_genres,
-                                       src->top_genres, alloc);
+        status =
+            ca_impl_copy_top_list(src->has_top_genres, &dst->top_genres, src->top_genres, alloc);
     }
     if (status == CA_OK) {
-        status = ca_impl_copy_top_list(src->has_top_artists, &dst->top_artists,
-                                       src->top_artists, alloc);
+        status =
+            ca_impl_copy_top_list(src->has_top_artists, &dst->top_artists, src->top_artists, alloc);
     }
     if (status != CA_OK) {
         ca_library_stats_destroy(dst);
@@ -915,7 +883,7 @@ ca_status ca_library_stats_copy(ca_library_stats *dst,
     return status;
 }
 
-void ca_library_stats_move(ca_library_stats *dst, ca_library_stats *src) {
+void ca_library_stats_move(ca_library_stats* dst, ca_library_stats* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -924,7 +892,7 @@ void ca_library_stats_move(ca_library_stats *dst, ca_library_stats *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_library_stats_destroy(ca_library_stats *stats) {
+void ca_library_stats_destroy(ca_library_stats* stats) {
     if (!stats) {
         return;
     }
@@ -939,7 +907,7 @@ void ca_library_stats_destroy(ca_library_stats *stats) {
 /* Queue                                                                     */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_queue_init(ca_queue *queue, const cx_allocator *alloc) {
+ca_status ca_queue_init(ca_queue* queue, const cx_allocator* alloc) {
     if (!queue) {
         return CA_INVALID_ARGUMENT;
     }
@@ -952,8 +920,7 @@ ca_status ca_queue_init(ca_queue *queue, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_queue_copy(ca_queue *dst, const ca_queue *src,
-                        const cx_allocator *alloc) {
+ca_status ca_queue_copy(ca_queue* dst, const ca_queue* src, const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -973,7 +940,7 @@ ca_status ca_queue_copy(ca_queue *dst, const ca_queue *src,
     return status;
 }
 
-void ca_queue_move(ca_queue *dst, ca_queue *src) {
+void ca_queue_move(ca_queue* dst, ca_queue* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -982,7 +949,7 @@ void ca_queue_move(ca_queue *dst, ca_queue *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_queue_destroy(ca_queue *queue) {
+void ca_queue_destroy(ca_queue* queue) {
     if (!queue) {
         return;
     }
@@ -994,7 +961,7 @@ void ca_queue_destroy(ca_queue *queue) {
 /* Library                                                                   */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_library_init(ca_library *library, const cx_allocator *alloc) {
+ca_status ca_library_init(ca_library* library, const cx_allocator* alloc) {
     if (!library) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1018,8 +985,7 @@ ca_status ca_library_init(ca_library *library, const cx_allocator *alloc) {
     return status;
 }
 
-ca_status ca_library_copy(ca_library *dst, const ca_library *src,
-                          const cx_allocator *alloc) {
+ca_status ca_library_copy(ca_library* dst, const ca_library* src, const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1046,7 +1012,7 @@ ca_status ca_library_copy(ca_library *dst, const ca_library *src,
     return status;
 }
 
-void ca_library_move(ca_library *dst, ca_library *src) {
+void ca_library_move(ca_library* dst, ca_library* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1055,7 +1021,7 @@ void ca_library_move(ca_library *dst, ca_library *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_library_destroy(ca_library *library) {
+void ca_library_destroy(ca_library* library) {
     if (!library) {
         return;
     }
@@ -1069,8 +1035,7 @@ void ca_library_destroy(ca_library *library) {
 /* Playback stats                                                            */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_playback_stats_init(ca_playback_stats *stats,
-                                 const cx_allocator *alloc) {
+ca_status ca_playback_stats_init(ca_playback_stats* stats, const cx_allocator* alloc) {
     (void)alloc;
     if (!stats) {
         return CA_INVALID_ARGUMENT;
@@ -1079,9 +1044,8 @@ ca_status ca_playback_stats_init(ca_playback_stats *stats,
     return CA_OK;
 }
 
-ca_status ca_playback_stats_copy(ca_playback_stats *dst,
-                                 const ca_playback_stats *src,
-                                 const cx_allocator *alloc) {
+ca_status ca_playback_stats_copy(ca_playback_stats* dst, const ca_playback_stats* src,
+                                 const cx_allocator* alloc) {
     (void)alloc;
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
@@ -1090,7 +1054,7 @@ ca_status ca_playback_stats_copy(ca_playback_stats *dst,
     return CA_OK;
 }
 
-void ca_playback_stats_move(ca_playback_stats *dst, ca_playback_stats *src) {
+void ca_playback_stats_move(ca_playback_stats* dst, ca_playback_stats* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1098,7 +1062,7 @@ void ca_playback_stats_move(ca_playback_stats *dst, ca_playback_stats *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_playback_stats_destroy(ca_playback_stats *stats) {
+void ca_playback_stats_destroy(ca_playback_stats* stats) {
     if (stats) {
         memset(stats, 0, sizeof *stats);
     }
@@ -1108,16 +1072,14 @@ void ca_playback_stats_destroy(ca_playback_stats *stats) {
 /* Track query                                                               */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_track_query_init(ca_track_query *query,
-                              const cx_allocator *alloc) {
+ca_status ca_track_query_init(ca_track_query* query, const cx_allocator* alloc) {
     if (!query) {
         return CA_INVALID_ARGUMENT;
     }
     memset(query, 0, sizeof *query);
 
-    cx_string **const slots[] = {
-        &query->artist, &query->album, &query->genre,
-        &query->search, &query->sort, &query->order,
+    cx_string** const slots[] = {
+        &query->artist, &query->album, &query->genre, &query->search, &query->sort, &query->order,
     };
     ca_status status = CA_OK;
     for (size_t i = 0; i < sizeof slots / sizeof slots[0]; ++i) {
@@ -1130,8 +1092,8 @@ ca_status ca_track_query_init(ca_track_query *query,
     return CA_OK;
 }
 
-ca_status ca_track_query_copy(ca_track_query *dst, const ca_track_query *src,
-                              const cx_allocator *alloc) {
+ca_status ca_track_query_copy(ca_track_query* dst, const ca_track_query* src,
+                              const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1186,7 +1148,7 @@ ca_status ca_track_query_copy(ca_track_query *dst, const ca_track_query *src,
     return status;
 }
 
-void ca_track_query_move(ca_track_query *dst, ca_track_query *src) {
+void ca_track_query_move(ca_track_query* dst, ca_track_query* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1195,7 +1157,7 @@ void ca_track_query_move(ca_track_query *dst, ca_track_query *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_track_query_destroy(ca_track_query *query) {
+void ca_track_query_destroy(ca_track_query* query) {
     if (!query) {
         return;
     }
@@ -1212,8 +1174,7 @@ void ca_track_query_destroy(ca_track_query *query) {
 /* History query                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_history_query_init(ca_history_query *query,
-                                const cx_allocator *alloc) {
+ca_status ca_history_query_init(ca_history_query* query, const cx_allocator* alloc) {
     (void)alloc;
     if (!query) {
         return CA_INVALID_ARGUMENT;
@@ -1222,9 +1183,8 @@ ca_status ca_history_query_init(ca_history_query *query,
     return CA_OK;
 }
 
-ca_status ca_history_query_copy(ca_history_query *dst,
-                                const ca_history_query *src,
-                                const cx_allocator *alloc) {
+ca_status ca_history_query_copy(ca_history_query* dst, const ca_history_query* src,
+                                const cx_allocator* alloc) {
     (void)alloc;
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
@@ -1233,7 +1193,7 @@ ca_status ca_history_query_copy(ca_history_query *dst,
     return CA_OK;
 }
 
-void ca_history_query_move(ca_history_query *dst, ca_history_query *src) {
+void ca_history_query_move(ca_history_query* dst, ca_history_query* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1241,7 +1201,7 @@ void ca_history_query_move(ca_history_query *dst, ca_history_query *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_history_query_destroy(ca_history_query *query) {
+void ca_history_query_destroy(ca_history_query* query) {
     if (query) {
         memset(query, 0, sizeof *query);
     }
@@ -1251,8 +1211,7 @@ void ca_history_query_destroy(ca_history_query *query) {
 /* Engine event                                                              */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_engine_event_init(ca_engine_event *event,
-                               const cx_allocator *alloc) {
+ca_status ca_engine_event_init(ca_engine_event* event, const cx_allocator* alloc) {
     if (!event) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1266,9 +1225,8 @@ ca_status ca_engine_event_init(ca_engine_event *event,
     return status;
 }
 
-ca_status ca_engine_event_copy(ca_engine_event *dst,
-                               const ca_engine_event *src,
-                               const cx_allocator *alloc) {
+ca_status ca_engine_event_copy(ca_engine_event* dst, const ca_engine_event* src,
+                               const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1289,7 +1247,7 @@ ca_status ca_engine_event_copy(ca_engine_event *dst,
     return status;
 }
 
-void ca_engine_event_move(ca_engine_event *dst, ca_engine_event *src) {
+void ca_engine_event_move(ca_engine_event* dst, ca_engine_event* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1298,7 +1256,7 @@ void ca_engine_event_move(ca_engine_event *dst, ca_engine_event *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_engine_event_destroy(ca_engine_event *event) {
+void ca_engine_event_destroy(ca_engine_event* event) {
     if (!event) {
         return;
     }
@@ -1310,8 +1268,7 @@ void ca_engine_event_destroy(ca_engine_event *event) {
 /* Engine state                                                              */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_engine_state_init(ca_engine_state *state,
-                               const cx_allocator *alloc) {
+ca_status ca_engine_state_init(ca_engine_state* state, const cx_allocator* alloc) {
     if (!state) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1321,13 +1278,12 @@ ca_status ca_engine_state_init(ca_engine_state *state,
     state->active_queue_id = 1;
     state->pre_mute_volume = 0.5f;
 
-    return ca_from_cx(cx_vector_init(&state->shuffle_perm, sizeof(int64_t),
-                                     alignof(int64_t), nullptr, alloc));
+    return ca_from_cx(
+        cx_vector_init(&state->shuffle_perm, sizeof(int64_t), alignof(int64_t), nullptr, alloc));
 }
 
-ca_status ca_engine_state_copy(ca_engine_state *dst,
-                               const ca_engine_state *src,
-                               const cx_allocator *alloc) {
+ca_status ca_engine_state_copy(ca_engine_state* dst, const ca_engine_state* src,
+                               const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -1341,12 +1297,11 @@ ca_status ca_engine_state_copy(ca_engine_state *dst,
     dst->pre_mute_volume = src->pre_mute_volume;
     dst->position_ms = src->position_ms;
 
-    return ca_impl_vector_copy(&dst->shuffle_perm, src->shuffle_perm,
-                               sizeof(int64_t), alignof(int64_t), nullptr,
-                               alloc);
+    return ca_impl_vector_copy(&dst->shuffle_perm, src->shuffle_perm, sizeof(int64_t),
+                               alignof(int64_t), nullptr, alloc);
 }
 
-void ca_engine_state_move(ca_engine_state *dst, ca_engine_state *src) {
+void ca_engine_state_move(ca_engine_state* dst, ca_engine_state* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -1355,7 +1310,7 @@ void ca_engine_state_move(ca_engine_state *dst, ca_engine_state *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_engine_state_destroy(ca_engine_state *state) {
+void ca_engine_state_destroy(ca_engine_state* state) {
     if (!state) {
         return;
     }

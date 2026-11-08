@@ -21,7 +21,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -33,7 +32,7 @@ extern "C" {
  */
 typedef struct ca_endpoint ca_endpoint;
 
-#define CA_ENDPOINT_INVALID ((ca_endpoint *)nullptr)
+#define CA_ENDPOINT_INVALID ((ca_endpoint*)nullptr)
 
 /**
  * @brief Create a listening endpoint bound to @p name.
@@ -47,8 +46,8 @@ typedef struct ca_endpoint ca_endpoint;
  * @return CA_OK on success, CA_ALREADY_EXISTS if the path is in use, or
  *         another ca_status.
  */
-CAUDIO_API ca_status ca_endpoint_listen(ca_endpoint **out, const char *name,
-                                        int backlog, ca_error *err);
+CAUDIO_API ca_status ca_endpoint_listen(ca_endpoint** out, const char* name, int backlog,
+                                        ca_error* err);
 
 /**
  * @brief Accept a client connection on a listening endpoint.
@@ -61,8 +60,8 @@ CAUDIO_API ca_status ca_endpoint_listen(ca_endpoint **out, const char *name,
  * @return CA_OK on success, CA_TIMED_OUT if no client arrived in time, or
  *         another ca_status.
  */
-CAUDIO_API ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
-                                        ca_endpoint **out, ca_error *err);
+CAUDIO_API ca_status ca_endpoint_accept(ca_endpoint* server, int timeout_ms, ca_endpoint** out,
+                                        ca_error* err);
 
 /**
  * @brief Connect to a listening endpoint at @p name.
@@ -79,8 +78,8 @@ CAUDIO_API ca_status ca_endpoint_accept(ca_endpoint *server, int timeout_ms,
  * @return CA_OK on success, CA_TIMED_OUT if the deadline elapsed, or another
  *         ca_status.
  */
-CAUDIO_API ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
-                                         int timeout_ms, ca_error *err);
+CAUDIO_API ca_status ca_endpoint_connect(ca_endpoint** out, const char* name, int timeout_ms,
+                                         ca_error* err);
 
 /**
  * @brief Read up to @p size bytes.
@@ -88,8 +87,7 @@ CAUDIO_API ca_status ca_endpoint_connect(ca_endpoint **out, const char *name,
  * @return Bytes read (0 on orderly shutdown), or (size_t)-1 on error with
  *         @p err set.
  */
-CAUDIO_API size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer,
-                                   size_t size, ca_error *err);
+CAUDIO_API size_t ca_endpoint_read(ca_endpoint* endpoint, void* buffer, size_t size, ca_error* err);
 
 /**
  * @brief Write exactly @p size bytes.
@@ -99,8 +97,8 @@ CAUDIO_API size_t ca_endpoint_read(ca_endpoint *endpoint, void *buffer,
  *
  * @return @p size on success, or (size_t)-1 on error with @p err set.
  */
-CAUDIO_API size_t ca_endpoint_write(ca_endpoint *endpoint, const void *buffer,
-                                    size_t size, ca_error *err);
+CAUDIO_API size_t ca_endpoint_write(ca_endpoint* endpoint, const void* buffer, size_t size,
+                                    ca_error* err);
 
 /**
  * @brief Flush pending output.
@@ -108,7 +106,7 @@ CAUDIO_API size_t ca_endpoint_write(ca_endpoint *endpoint, const void *buffer,
  * UNIX-domain sockets have no user-space output buffer, so this is a
  * successful no-op. It exists so pipe-based backends can share the API.
  */
-CAUDIO_API ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err);
+CAUDIO_API ca_status ca_endpoint_flush(ca_endpoint* endpoint, ca_error* err);
 
 /**
  * @brief Close @p endpoint and set it to CA_ENDPOINT_INVALID.
@@ -116,17 +114,17 @@ CAUDIO_API ca_status ca_endpoint_flush(ca_endpoint *endpoint, ca_error *err);
  * A listening endpoint removes its socket path. nullptr and *endpoint == nullptr are
  * no-ops.
  */
-CAUDIO_API void ca_endpoint_close(ca_endpoint **endpoint);
+CAUDIO_API void ca_endpoint_close(ca_endpoint** endpoint);
 
 /**
  * @brief Return the endpoint's socket path, or nullptr for an accepted endpoint.
  */
-CAUDIO_API const char *ca_endpoint_name(const ca_endpoint *endpoint);
+CAUDIO_API const char* ca_endpoint_name(const ca_endpoint* endpoint);
 
 /**
  * @brief Return true if @p endpoint is a listening endpoint.
  */
-CAUDIO_API bool ca_endpoint_is_server(const ca_endpoint *endpoint);
+CAUDIO_API bool ca_endpoint_is_server(const ca_endpoint* endpoint);
 
 #ifdef __cplusplus
 }

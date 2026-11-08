@@ -20,10 +20,7 @@
  */
 typedef struct cx_expected {
     /** Internal state; use the query functions instead of inspecting it. */
-    enum {
-        CX_EXPECTED_VALUE,
-        CX_EXPECTED_ERROR
-    } state;
+    enum { CX_EXPECTED_VALUE, CX_EXPECTED_ERROR } state;
 
     union {
         /** Non-owning result pointer, valid when state is CX_EXPECTED_VALUE. */

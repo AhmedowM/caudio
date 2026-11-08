@@ -1,6 +1,5 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/bytes.h>
-
 #include <stdint.h>
 #include <string.h>
 
@@ -8,7 +7,7 @@
 #include "cx_test_allocators.h"
 
 static int test_lifecycle(void) {
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_init(&bytes, nullptr) == CX_OK);
     CX_CHECK(bytes != nullptr);
@@ -61,24 +60,23 @@ static int test_lifecycle(void) {
 
 static int test_from_and_copy(void) {
     uint8_t data[] = {4, 5, 6};
-    cx_bytes *a = nullptr;
-    cx_bytes *b = nullptr;
+    cx_bytes* a = nullptr;
+    cx_bytes* b = nullptr;
 
     CX_CHECK(cx_bytes_from(&a, data, sizeof(data), nullptr) == CX_OK);
-    CX_CHECK(cx_bytes_from_slice(&b, cx_slice_from_parts(data, 2), nullptr) ==
-             CX_OK);
+    CX_CHECK(cx_bytes_from_slice(&b, cx_slice_from_parts(data, 2), nullptr) == CX_OK);
     CX_CHECK_EQ(3, cx_bytes_length(a));
     CX_CHECK_EQ(2, cx_bytes_length(b));
     CX_CHECK_EQ(4, *cx_bytes_at(a, 0));
     CX_CHECK_EQ(5, *cx_bytes_at(b, 1));
 
-    cx_bytes *copy = nullptr;
+    cx_bytes* copy = nullptr;
 
     CX_CHECK(cx_bytes_copy(&copy, a) == CX_OK);
     CX_CHECK(cx_bytes_equals(copy, a));
     CX_CHECK(cx_bytes_data(copy) != cx_bytes_data(a));
 
-    cx_bytes *moved = nullptr;
+    cx_bytes* moved = nullptr;
 
     CX_CHECK(cx_bytes_init(&moved, nullptr) == CX_OK);
     cx_bytes_move(moved, copy);
@@ -100,7 +98,7 @@ static int test_from_and_copy(void) {
 static int test_mutation(void) {
     uint8_t seed[] = {1, 2};
     uint8_t tail[] = {3, 4};
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_from(&bytes, seed, sizeof(seed), nullptr) == CX_OK);
     CX_CHECK(cx_bytes_append(bytes, tail, sizeof(tail)) == CX_OK);
@@ -146,7 +144,7 @@ static int test_insert_erase_replace(void) {
     uint8_t prefix[] = {'>', '>', ' '};
     uint8_t there[] = {'t', 'h', 'e', 'r', 'e'};
     uint8_t comma[] = {','};
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_from(&bytes, hello, sizeof(hello), nullptr) == CX_OK);
     CX_CHECK(cx_bytes_insert(bytes, 5, world, sizeof(world)) == CX_OK);
@@ -182,7 +180,7 @@ static int test_insert_erase_replace(void) {
 
 static int test_aliasing(void) {
     uint8_t data[] = {1, 2, 3, 4, 5, 6};
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_from(&bytes, data, sizeof(data), nullptr) == CX_OK);
 
@@ -206,8 +204,7 @@ static int test_aliasing(void) {
     CX_CHECK(memcmp(cx_bytes_data(bytes), "abcabcabc", 9) == 0);
 
     CX_CHECK(cx_bytes_assign(bytes, abc, sizeof(abc)) == CX_OK);
-    CX_CHECK(cx_bytes_replace(bytes, 0, 1, cx_bytes_data(bytes) + 1, 2) ==
-             CX_OK);
+    CX_CHECK(cx_bytes_replace(bytes, 0, 1, cx_bytes_data(bytes) + 1, 2) == CX_OK);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
     CX_CHECK(memcmp(cx_bytes_data(bytes), "bcbc", 4) == 0);
 
@@ -219,7 +216,7 @@ static int test_aliasing(void) {
 static int test_slice_interop(void) {
     uint8_t data[] = {10, 20, 30, 40};
     auto slice = cx_slice_from_parts(data, sizeof(data));
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_from_slice(&bytes, slice, nullptr) == CX_OK);
 
@@ -244,8 +241,8 @@ static int test_counted_allocator(void) {
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
     uint8_t data[] = {1, 2, 3, 4};
-    cx_bytes *first = nullptr;
-    cx_bytes *second = nullptr;
+    cx_bytes* first = nullptr;
+    cx_bytes* second = nullptr;
 
     CX_CHECK(cx_bytes_from(&first, data, sizeof(data), &allocator) == CX_OK);
     CX_CHECK(cx_bytes_copy(&second, first) == CX_OK);
@@ -265,17 +262,15 @@ static int test_counted_allocator(void) {
 }
 
 static int test_invalid_arguments(void) {
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
     cx_allocator invalid = {0};
 
     CX_CHECK(cx_bytes_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_init(&bytes, &invalid) == CX_INVALID_ARGUMENT);
     CX_CHECK(bytes == nullptr);
 
-    CX_CHECK(cx_bytes_from(nullptr, "x", 1, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_bytes_from(&bytes, nullptr, 1, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_bytes_from(nullptr, "x", 1, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_bytes_from(&bytes, nullptr, 1, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_copy(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_copy(&bytes, nullptr) == CX_INVALID_ARGUMENT);
 
@@ -285,8 +280,7 @@ static int test_invalid_arguments(void) {
     CX_CHECK(cx_bytes_pop_back(nullptr, nullptr) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_insert(nullptr, 0, "x", 1) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_erase(nullptr, 0, 1) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_bytes_replace(nullptr, 0, 0, "x", 1) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_bytes_replace(nullptr, 0, 0, "x", 1) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_resize(nullptr, 1) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_reserve(nullptr, 1) == CX_INVALID_ARGUMENT);
     CX_CHECK(cx_bytes_set(nullptr, 0, 0) == CX_INVALID_ARGUMENT);
@@ -304,7 +298,7 @@ static int test_invalid_arguments(void) {
 }
 
 static int test_empty_operations(void) {
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_init(&bytes, nullptr) == CX_OK);
 
@@ -338,7 +332,7 @@ static int test_allocation_failures(void) {
         .fail_all_after = false,
     };
     cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_init(&bytes, &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(bytes == nullptr);
@@ -363,15 +357,13 @@ static int test_allocation_failures(void) {
 
     /* Appending an aliased range stages a copy first; that copy fails. */
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_append(bytes, cx_bytes_data(bytes), 2) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_append(bytes, cx_bytes_data(bytes), 2) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
 
     uint8_t large[64] = {0};
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_assign(bytes, large, sizeof(large)) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_assign(bytes, large, sizeof(large)) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
 
     failing.fail_at = failing.attempts + 1;
@@ -389,29 +381,26 @@ static int test_allocation_failures(void) {
     CX_CHECK_EQ(16, cx_bytes_length(bytes));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_replace(bytes, 0, 0, large, 32) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_replace(bytes, 0, 0, large, 32) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(16, cx_bytes_length(bytes));
 
     /* cx_bytes_from reports the handle allocation failure directly. */
     failing.fail_at = failing.attempts + 1;
 
-    cx_bytes *from = nullptr;
+    cx_bytes* from = nullptr;
 
-    CX_CHECK(cx_bytes_from(&from, data, sizeof(data), &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_from(&from, data, sizeof(data), &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(from == nullptr);
 
     /* It also frees the handle when the assignment that follows fails. */
     failing.fail_at = failing.attempts + 2;
 
-    CX_CHECK(cx_bytes_from(&from, large, 32, &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_from(&from, large, 32, &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(from == nullptr);
 
     failing.fail_at = 0;
 
-    cx_bytes *copy = nullptr;
+    cx_bytes* copy = nullptr;
 
     CX_CHECK(cx_bytes_copy(&copy, bytes) == CX_OK);
     CX_CHECK_EQ(16, cx_bytes_length(copy));
@@ -423,8 +412,8 @@ static int test_allocation_failures(void) {
 }
 
 static int test_move(void) {
-    cx_bytes *left = nullptr;
-    cx_bytes *right = nullptr;
+    cx_bytes* left = nullptr;
+    cx_bytes* right = nullptr;
     uint8_t data[] = {1, 2, 3};
 
     CX_CHECK(cx_bytes_init(&left, nullptr) == CX_OK);
@@ -448,9 +437,9 @@ static int test_move(void) {
 }
 
 static int test_equality_edges(void) {
-    cx_bytes *empty = nullptr;
-    cx_bytes *other_empty = nullptr;
-    cx_bytes *three = nullptr;
+    cx_bytes* empty = nullptr;
+    cx_bytes* other_empty = nullptr;
+    cx_bytes* three = nullptr;
     uint8_t abc[] = {1, 2, 3};
 
     CX_CHECK(cx_bytes_init(&empty, nullptr) == CX_OK);
@@ -473,7 +462,7 @@ static int test_equality_edges(void) {
 }
 
 static int test_reserve_overflow(void) {
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_init(&bytes, nullptr) == CX_OK);
 
@@ -495,26 +484,23 @@ static int test_staged_failures(void) {
     };
     cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
     uint8_t data[] = {1, 2, 3, 4};
-    cx_bytes *bytes = nullptr;
+    cx_bytes* bytes = nullptr;
 
     CX_CHECK(cx_bytes_from(&bytes, data, sizeof(data), &allocator) == CX_OK);
 
     /* Assigning an aliased range stages a detached copy, which fails here. */
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_assign(bytes, cx_bytes_data(bytes), 2) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_assign(bytes, cx_bytes_data(bytes), 2) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
     CX_CHECK(memcmp(cx_bytes_data(bytes), data, sizeof(data)) == 0);
 
     /* The same staging step fails for insert and replace. */
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_insert(bytes, 0, cx_bytes_data(bytes), 2) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_insert(bytes, 0, cx_bytes_data(bytes), 2) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
 
     failing.fail_at = failing.attempts + 1;
-    CX_CHECK(cx_bytes_replace(bytes, 0, 1, cx_bytes_data(bytes), 2) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_bytes_replace(bytes, 0, 1, cx_bytes_data(bytes), 2) == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(4, cx_bytes_length(bytes));
     CX_CHECK(memcmp(cx_bytes_data(bytes), data, sizeof(data)) == 0);
 

@@ -8,7 +8,6 @@
 
 #include <caudio/api.h>
 #include <caudio/runtime/error.h>
-
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -26,15 +25,14 @@ typedef uint64_t ca_time_us_t;
  *
  * @return CA_OK on success, or an error status with @p err set.
  */
-CAUDIO_API ca_status ca_time_now(ca_time_us_t *out, ca_error *err);
+CAUDIO_API ca_status ca_time_now(ca_time_us_t* out, ca_error* err);
 
 /**
  * @brief Sleep for at least @p microseconds. May sleep longer.
  *
  * @return CA_OK on success, or an error status with @p err set.
  */
-CAUDIO_API ca_status ca_time_sleep_us(ca_time_us_t microseconds,
-                                      ca_error *err);
+CAUDIO_API ca_status ca_time_sleep_us(ca_time_us_t microseconds, ca_error* err);
 
 #ifdef __cplusplus
 }

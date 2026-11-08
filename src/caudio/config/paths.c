@@ -1,13 +1,10 @@
 ﻿#include <caudio/config/paths.h>
-
 #include <caudio/runtime/env.h>
 #include <caudio/runtime/fs.h>
 #include <caudio/runtime/path.h>
-
 #include <cstdx/string_view.h>
-
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------------- */
@@ -31,17 +28,16 @@ static ca_status ca_from_cx(cx_status status) {
     }
 }
 
-static ca_status text_assign(cx_string *str, const char *text) {
-    return ca_from_cx(cx_string_assign_view(
-        str, cx_string_view_from_cstr(text ? text : "")));
+static ca_status text_assign(cx_string* str, const char* text) {
+    return ca_from_cx(cx_string_assign_view(str, cx_string_view_from_cstr(text ? text : "")));
 }
 
-static ca_status text_append(cx_string *str, const char *text) {
+static ca_status text_append(cx_string* str, const char* text) {
     return ca_from_cx(cx_string_append_cstr(str, text ? text : ""));
 }
 
 /* Copy a non-empty environment variable into @p out. */
-static bool env_nonempty_to_string(const char *name, cx_string *out) {
+static bool env_nonempty_to_string(const char* name, cx_string* out) {
     size_t length = 0;
     ca_error err;
     if (ca_env_get(name, nullptr, 0, &length, &err) != CA_OK || length == 0) {
@@ -50,15 +46,14 @@ static bool env_nonempty_to_string(const char *name, cx_string *out) {
     if (cx_string_resize(out, length) != CX_OK) {
         return false;
     }
-    if (ca_env_get(name, cx_string_at_mut(out, 0), length + 1, &length, &err) !=
-        CA_OK) {
+    if (ca_env_get(name, cx_string_at_mut(out, 0), length + 1, &length, &err) != CA_OK) {
         return false;
     }
     return true;
 }
 
 /* Remove trailing separators, but keep a lone root separator. */
-static void strip_trailing_separators(cx_string *str) {
+static void strip_trailing_separators(cx_string* str) {
     size_t length = cx_string_length(str);
     while (length > 1) {
         char last = *cx_string_at(str, length - 1);
@@ -70,7 +65,7 @@ static void strip_trailing_separators(cx_string *str) {
     }
 }
 
-static ca_status join_child(cx_string *str, const char *child) {
+static ca_status join_child(cx_string* str, const char* child) {
     strip_trailing_separators(str);
     size_t length = cx_string_length(str);
     if (length > 0 && !(length == 1 && *cx_string_at(str, 0) == '/')) {
@@ -82,7 +77,7 @@ static ca_status join_child(cx_string *str, const char *child) {
     return text_append(str, child);
 }
 
-static ca_status temp_dir_to_string(cx_string *out) {
+static ca_status temp_dir_to_string(cx_string* out) {
     size_t length = 0;
     ca_error err;
     ca_status status = ca_path_temp_dir(nullptr, 0, &length, &err);
@@ -96,12 +91,11 @@ static ca_status temp_dir_to_string(cx_string *out) {
     if (cx_string_resize(out, length) != CX_OK) {
         return CA_OUT_OF_MEMORY;
     }
-    return ca_path_temp_dir(cx_string_at_mut(out, 0), length + 1, &length,
-                            &err);
+    return ca_path_temp_dir(cx_string_at_mut(out, 0), length + 1, &length, &err);
 }
 
 /* Append the platform's per-user application directory to @p out. */
-static ca_status data_base(cx_string *out) {
+static ca_status data_base(cx_string* out) {
 #if defined(_WIN32) || defined(__CYGWIN__)
     if (env_nonempty_to_string("LOCALAPPDATA", out)) {
         return join_child(out, "caudio");
@@ -110,8 +104,7 @@ static ca_status data_base(cx_string *out) {
     if (env_nonempty_to_string("XDG_DATA_HOME", out)) {
         return join_child(out, "caudio");
     }
-    if (env_nonempty_to_string("HOME", out) ||
-        env_nonempty_to_string("USERPROFILE", out)) {
+    if (env_nonempty_to_string("HOME", out) || env_nonempty_to_string("USERPROFILE", out)) {
         ca_status status = join_child(out, ".local");
         if (status == CA_OK) {
             status = join_child(out, "share");
@@ -131,7 +124,7 @@ static ca_status data_base(cx_string *out) {
     return join_child(out, "caudio");
 }
 
-static ca_status config_base(cx_string *out) {
+static ca_status config_base(cx_string* out) {
 #if defined(_WIN32) || defined(__CYGWIN__)
     if (env_nonempty_to_string("LOCALAPPDATA", out)) {
         return join_child(out, "caudio");
@@ -140,8 +133,7 @@ static ca_status config_base(cx_string *out) {
     if (env_nonempty_to_string("XDG_CONFIG_HOME", out)) {
         return join_child(out, "caudio");
     }
-    if (env_nonempty_to_string("HOME", out) ||
-        env_nonempty_to_string("USERPROFILE", out)) {
+    if (env_nonempty_to_string("HOME", out) || env_nonempty_to_string("USERPROFILE", out)) {
         ca_status status = join_child(out, ".config");
         if (status == CA_OK) {
             status = join_child(out, "caudio");
@@ -158,7 +150,7 @@ static ca_status config_base(cx_string *out) {
     return join_child(out, "caudio");
 }
 
-static ca_status socket_base(cx_string *out) {
+static ca_status socket_base(cx_string* out) {
 #if defined(_WIN32) || defined(__CYGWIN__)
     if (env_nonempty_to_string("LOCALAPPDATA", out)) {
         return join_child(out, "caudio");
@@ -170,8 +162,7 @@ static ca_status socket_base(cx_string *out) {
     if (env_nonempty_to_string("XDG_DATA_HOME", out)) {
         return join_child(out, "caudio");
     }
-    if (env_nonempty_to_string("HOME", out) ||
-        env_nonempty_to_string("USERPROFILE", out)) {
+    if (env_nonempty_to_string("HOME", out) || env_nonempty_to_string("USERPROFILE", out)) {
         ca_status status = join_child(out, ".local");
         if (status == CA_OK) {
             status = join_child(out, "share");
@@ -192,7 +183,7 @@ static ca_status socket_base(cx_string *out) {
 }
 
 /* Begin an output string, ready to be filled by a base builder. */
-static ca_status output_begin(cx_string **out, const cx_allocator *alloc) {
+static ca_status output_begin(cx_string** out, const cx_allocator* alloc) {
     if (!out) {
         return CA_INVALID_ARGUMENT;
     }
@@ -200,15 +191,15 @@ static ca_status output_begin(cx_string **out, const cx_allocator *alloc) {
     return ca_from_cx(cx_string_init(out, alloc));
 }
 
-static ca_status output_fail(cx_string **out, ca_status status) {
+static ca_status output_fail(cx_string** out, ca_status status) {
     cx_string_destroy(out);
     return status;
 }
 
 /* Split off the parent directory of @p path into @p out. */
-static ca_status parent_path_to_string(const char *path, cx_string *out) {
-    const char *last = nullptr;
-    for (const char *p = path; *p != '\0'; ++p) {
+static ca_status parent_path_to_string(const char* path, cx_string* out) {
+    const char* last = nullptr;
+    for (const char* p = path; *p != '\0'; ++p) {
         if (*p == '/' || *p == '\\') {
             last = p;
         }
@@ -227,11 +218,10 @@ static ca_status parent_path_to_string(const char *path, cx_string *out) {
         /* Windows drive root: "C:" -> "C:/". */
         length = 3;
     }
-    return ca_from_cx(
-        cx_string_assign_view(out, cx_string_view_from_parts(path, length)));
+    return ca_from_cx(cx_string_assign_view(out, cx_string_view_from_parts(path, length)));
 }
 
-static ca_status mkdirs(const char *path, ca_error *err) {
+static ca_status mkdirs(const char* path, ca_error* err) {
     if (path == nullptr || path[0] == '\0') {
         return CA_OK;
     }
@@ -242,8 +232,7 @@ static ca_status mkdirs(const char *path, ca_error *err) {
 /* RuntimePaths                                                              */
 /* ------------------------------------------------------------------------- */
 
-static ca_status paths_str_copy(cx_string **dst, const cx_string *src,
-                                const cx_allocator *alloc) {
+static ca_status paths_str_copy(cx_string** dst, const cx_string* src, const cx_allocator* alloc) {
     *dst = nullptr;
     if (src == nullptr) {
         return CA_OK;
@@ -251,8 +240,7 @@ static ca_status paths_str_copy(cx_string **dst, const cx_string *src,
     return ca_from_cx(cx_string_from_view(dst, cx_string_view_of(src), alloc));
 }
 
-ca_status ca_runtime_paths_init(ca_runtime_paths *paths,
-                                const cx_allocator *alloc) {
+ca_status ca_runtime_paths_init(ca_runtime_paths* paths, const cx_allocator* alloc) {
     (void)alloc;
     if (!paths) {
         return CA_INVALID_ARGUMENT;
@@ -261,9 +249,8 @@ ca_status ca_runtime_paths_init(ca_runtime_paths *paths,
     return CA_OK;
 }
 
-ca_status ca_runtime_paths_copy(ca_runtime_paths *dst,
-                                const ca_runtime_paths *src,
-                                const cx_allocator *alloc) {
+ca_status ca_runtime_paths_copy(ca_runtime_paths* dst, const ca_runtime_paths* src,
+                                const cx_allocator* alloc) {
     if (!dst || !src) {
         return CA_INVALID_ARGUMENT;
     }
@@ -280,8 +267,7 @@ ca_status ca_runtime_paths_copy(ca_runtime_paths *dst,
         status = paths_str_copy(&dst->cache, src->cache, alloc);
     }
     if (status == CA_OK) {
-        status = paths_str_copy(&dst->imported_media, src->imported_media,
-                                alloc);
+        status = paths_str_copy(&dst->imported_media, src->imported_media, alloc);
     }
     if (status == CA_OK) {
         status = paths_str_copy(&dst->socket, src->socket, alloc);
@@ -292,7 +278,7 @@ ca_status ca_runtime_paths_copy(ca_runtime_paths *dst,
     return status;
 }
 
-void ca_runtime_paths_move(ca_runtime_paths *dst, ca_runtime_paths *src) {
+void ca_runtime_paths_move(ca_runtime_paths* dst, ca_runtime_paths* src) {
     if (!dst || !src || dst == src) {
         return;
     }
@@ -301,7 +287,7 @@ void ca_runtime_paths_move(ca_runtime_paths *dst, ca_runtime_paths *src) {
     memset(src, 0, sizeof *src);
 }
 
-void ca_runtime_paths_destroy(ca_runtime_paths *paths) {
+void ca_runtime_paths_destroy(ca_runtime_paths* paths) {
     if (!paths) {
         return;
     }
@@ -314,27 +300,25 @@ void ca_runtime_paths_destroy(ca_runtime_paths *paths) {
     memset(paths, 0, sizeof *paths);
 }
 
-static bool path_is_empty(const cx_string *str) {
+static bool path_is_empty(const cx_string* str) {
     return str == nullptr || cx_string_length(str) == 0;
 }
 
-bool ca_runtime_paths_empty(const ca_runtime_paths *paths) {
+bool ca_runtime_paths_empty(const ca_runtime_paths* paths) {
     if (!paths) {
         return true;
     }
-    return path_is_empty(paths->database) &&
-           path_is_empty(paths->configuration) && path_is_empty(paths->logs) &&
-           path_is_empty(paths->cache) &&
-           path_is_empty(paths->imported_media) &&
-           path_is_empty(paths->socket);
+    return path_is_empty(paths->database) && path_is_empty(paths->configuration) &&
+           path_is_empty(paths->logs) && path_is_empty(paths->cache) &&
+           path_is_empty(paths->imported_media) && path_is_empty(paths->socket);
 }
 
-static ca_status ensure_path_parent(const cx_string *path, ca_error *err) {
+static ca_status ensure_path_parent(const cx_string* path, ca_error* err) {
     if (path_is_empty(path)) {
         return CA_OK;
     }
 
-    cx_string *parent = nullptr;
+    cx_string* parent = nullptr;
     ca_status status = ca_from_cx(cx_string_init(&parent, nullptr));
     if (status != CA_OK) {
         return status;
@@ -347,15 +331,14 @@ static ca_status ensure_path_parent(const cx_string *path, ca_error *err) {
     return status;
 }
 
-static ca_status ensure_path_dir(const cx_string *path, ca_error *err) {
+static ca_status ensure_path_dir(const cx_string* path, ca_error* err) {
     if (path_is_empty(path)) {
         return CA_OK;
     }
     return mkdirs(cx_string_cstr(path), err);
 }
 
-ca_status ca_runtime_paths_ensure_directories(const ca_runtime_paths *paths,
-                                              ca_error *err) {
+ca_status ca_runtime_paths_ensure_directories(const ca_runtime_paths* paths, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -383,8 +366,7 @@ ca_status ca_runtime_paths_ensure_directories(const ca_runtime_paths *paths,
 /* Default paths                                                             */
 /* ------------------------------------------------------------------------- */
 
-ca_status ca_paths_default_db_path(cx_string **out, const cx_allocator *alloc,
-                                   ca_error *err) {
+ca_status ca_paths_default_db_path(cx_string** out, const cx_allocator* alloc, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -402,9 +384,7 @@ ca_status ca_paths_default_db_path(cx_string **out, const cx_allocator *alloc,
     return CA_OK;
 }
 
-ca_status ca_paths_default_config_path(cx_string **out,
-                                       const cx_allocator *alloc,
-                                       ca_error *err) {
+ca_status ca_paths_default_config_path(cx_string** out, const cx_allocator* alloc, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -422,8 +402,7 @@ ca_status ca_paths_default_config_path(cx_string **out,
     return CA_OK;
 }
 
-ca_status ca_paths_legacy_config_path(cx_string **out,
-                                      const cx_allocator *alloc) {
+ca_status ca_paths_legacy_config_path(cx_string** out, const cx_allocator* alloc) {
     ca_status status = output_begin(out, alloc);
     if (status != CA_OK) {
         return status;
@@ -470,13 +449,12 @@ static unsigned char identity_byte(unsigned char c) {
     return c;
 }
 
-void ca_paths_hex8_for_db(const char *db_path, char out[9]) {
+void ca_paths_hex8_for_db(const char* db_path, char out[9]) {
     if (out == nullptr) {
         return;
     }
     uint64_t hash = UINT64_C(14695981039346656037);
-    const unsigned char *p =
-        (const unsigned char *)(db_path ? db_path : "");
+    const unsigned char* p = (const unsigned char*)(db_path ? db_path : "");
     for (; *p != '\0'; ++p) {
         hash ^= identity_byte(*p);
         hash *= UINT64_C(1099511628211);
@@ -487,9 +465,8 @@ void ca_paths_hex8_for_db(const char *db_path, char out[9]) {
     (void)snprintf(out, 9, "%08x", (unsigned)folded);
 }
 
-static ca_status derived_path(const char *db_path, const char *suffix,
-                              cx_string **out, const cx_allocator *alloc,
-                              ca_error *err) {
+static ca_status derived_path(const char* db_path, const char* suffix, cx_string** out,
+                              const cx_allocator* alloc, ca_error* err) {
     if (err) {
         ca_error_init(err);
     }
@@ -518,8 +495,8 @@ static ca_status derived_path(const char *db_path, const char *suffix,
     return CA_OK;
 }
 
-ca_status ca_paths_socket_for(const char *db_path, cx_string **out,
-                              const cx_allocator *alloc, ca_error *err) {
+ca_status ca_paths_socket_for(const char* db_path, cx_string** out, const cx_allocator* alloc,
+                              ca_error* err) {
     char hex[9];
     ca_paths_hex8_for_db(db_path, hex);
 
@@ -555,18 +532,18 @@ ca_status ca_paths_socket_for(const char *db_path, cx_string **out,
     return CA_OK;
 }
 
-ca_status ca_paths_pid_for(const char *db_path, cx_string **out,
-                           const cx_allocator *alloc, ca_error *err) {
+ca_status ca_paths_pid_for(const char* db_path, cx_string** out, const cx_allocator* alloc,
+                           ca_error* err) {
     return derived_path(db_path, ".pid", out, alloc, err);
 }
 
-ca_status ca_paths_lock_for(const char *db_path, cx_string **out,
-                            const cx_allocator *alloc, ca_error *err) {
+ca_status ca_paths_lock_for(const char* db_path, cx_string** out, const cx_allocator* alloc,
+                            ca_error* err) {
     return derived_path(db_path, ".lock", out, alloc, err);
 }
 
-ca_status ca_paths_log_for(const char *db_path, cx_string **out,
-                           const cx_allocator *alloc, ca_error *err) {
+ca_status ca_paths_log_for(const char* db_path, cx_string** out, const cx_allocator* alloc,
+                           ca_error* err) {
     if (err) {
         ca_error_init(err);
     }

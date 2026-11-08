@@ -12,10 +12,10 @@
 #include <cstdx/string.h>
 
 struct cx_string {
-    char *data;
+    char* data;
     size_t length;
     size_t capacity;
-    const cx_allocator *allocator;
+    const cx_allocator* allocator;
 };
 
 /**
@@ -23,7 +23,7 @@ struct cx_string {
  *
  * Used by cx_string_builder for its embedded string.
  */
-cx_status cx_impl_string_init(cx_string *str, const cx_allocator *allocator);
+cx_status cx_impl_string_init(cx_string* str, const cx_allocator* allocator);
 
 /**
  * @brief Release the buffer and reset the caller-owned storage.
@@ -31,6 +31,6 @@ cx_status cx_impl_string_init(cx_string *str, const cx_allocator *allocator);
  * Does not free @p str itself. The allocator is preserved so the storage can
  * be reused.
  */
-void cx_impl_string_destroy(cx_string *str);
+void cx_impl_string_destroy(cx_string* str);
 
 #endif /* CSTDX_STRING_INTERNAL_H */

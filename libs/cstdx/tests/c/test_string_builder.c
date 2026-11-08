@@ -1,22 +1,19 @@
 #include <cstdx/allocator_counted.h>
 #include <cstdx/string_builder.h>
-
 #include <string.h>
 
 #include "cx_test.h"
 #include "cx_test_allocators.h"
 
 static int test_append(void) {
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
 
     CX_CHECK(cx_string_builder_init(&builder, nullptr) == CX_OK);
     CX_CHECK(builder != nullptr);
     CX_CHECK_EQ(0, cx_string_builder_length(builder));
     CX_CHECK(strcmp(cx_string_builder_cstr(builder), "") == 0);
 
-    CX_CHECK(cx_string_builder_append(builder,
-                                      cx_string_view_from_cstr("hello")) ==
-             CX_OK);
+    CX_CHECK(cx_string_builder_append(builder, cx_string_view_from_cstr("hello")) == CX_OK);
     CX_CHECK(cx_string_builder_append_char(builder, ' ') == CX_OK);
     CX_CHECK(cx_string_builder_append_cstr(builder, "world") == CX_OK);
     CX_CHECK(strcmp(cx_string_builder_cstr(builder), "hello world") == 0);
@@ -34,7 +31,7 @@ static int test_append(void) {
 }
 
 static int test_printf(void) {
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
 
     CX_CHECK(cx_string_builder_init(&builder, nullptr) == CX_OK);
     CX_CHECK(cx_string_builder_printf(builder, "%s %d", "value", 42) == CX_OK);
@@ -62,12 +59,12 @@ static int test_printf(void) {
 }
 
 static int test_finish(void) {
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
 
     CX_CHECK(cx_string_builder_init(&builder, nullptr) == CX_OK);
     CX_CHECK(cx_string_builder_append_cstr(builder, "finished") == CX_OK);
 
-    cx_string *out = nullptr;
+    cx_string* out = nullptr;
 
     CX_CHECK(cx_string_builder_finish(builder, &out) == CX_OK);
     CX_CHECK(strcmp(cx_string_cstr(out), "finished") == 0);
@@ -91,7 +88,7 @@ static int test_counted_allocator(void) {
     CX_CHECK(cx_allocator_counted_init(&counted, nullptr) == CX_OK);
 
     auto allocator = cx_allocator_counted_as_allocator(&counted);
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
 
     CX_CHECK(cx_string_builder_init(&builder, &allocator) == CX_OK);
 
@@ -99,7 +96,7 @@ static int test_counted_allocator(void) {
         CX_CHECK(cx_string_builder_printf(builder, "[%d]", i) == CX_OK);
     }
 
-    cx_string *out = nullptr;
+    cx_string* out = nullptr;
 
     CX_CHECK(cx_string_builder_finish(builder, &out) == CX_OK);
     CX_CHECK_EQ(10 * 3 + 90 * 4, cx_string_length(out));
@@ -114,13 +111,12 @@ static int test_counted_allocator(void) {
 }
 
 static int test_invalid_arguments(void) {
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
     cx_string_view view = cx_string_view_from_cstr("x");
     cx_allocator invalid = {0};
 
     CX_CHECK(cx_string_builder_init(nullptr, nullptr) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_init(&builder, &invalid) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_init(&builder, &invalid) == CX_INVALID_ARGUMENT);
     CX_CHECK(builder == nullptr);
 
     cx_string_builder_destroy(nullptr);
@@ -128,23 +124,16 @@ static int test_invalid_arguments(void) {
     CX_CHECK(builder == nullptr);
 
     CX_CHECK(cx_string_builder_append(nullptr, view) == CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_append_cstr(nullptr, "x") ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_append_char(nullptr, 'x') ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_printf(nullptr, "%s", "x") ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_append_cstr(nullptr, "x") == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_append_char(nullptr, 'x') == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_printf(nullptr, "%s", "x") == CX_INVALID_ARGUMENT);
 
     CX_CHECK(cx_string_builder_init(&builder, nullptr) == CX_OK);
-    CX_CHECK(cx_string_builder_append_cstr(builder, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_printf(builder, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_append_cstr(builder, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_printf(builder, nullptr) == CX_INVALID_ARGUMENT);
 
-    CX_CHECK(cx_string_builder_finish(nullptr, nullptr) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK(cx_string_builder_finish(builder, nullptr) ==
-             CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_finish(nullptr, nullptr) == CX_INVALID_ARGUMENT);
+    CX_CHECK(cx_string_builder_finish(builder, nullptr) == CX_INVALID_ARGUMENT);
 
     CX_CHECK(cx_string_builder_view(nullptr).data == nullptr);
     CX_CHECK_EQ(0, cx_string_builder_view(nullptr).length);
@@ -162,10 +151,9 @@ static int test_allocation_failures(void) {
         .fail_all_after = false,
     };
     cx_allocator allocator = cx_allocator_failing_as_allocator(&failing);
-    cx_string_builder *builder = nullptr;
+    cx_string_builder* builder = nullptr;
 
-    CX_CHECK(cx_string_builder_init(&builder, &allocator) ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_builder_init(&builder, &allocator) == CX_OUT_OF_MEMORY);
     CX_CHECK(builder == nullptr);
     CX_CHECK_EQ(1, failing.attempts);
 
@@ -176,8 +164,7 @@ static int test_allocation_failures(void) {
     CX_CHECK(builder != nullptr);
 
     /* The append has to grow the string, and that allocation fails. */
-    CX_CHECK(cx_string_builder_append_cstr(builder, "hello") ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_builder_append_cstr(builder, "hello") == CX_OUT_OF_MEMORY);
     CX_CHECK_EQ(0, cx_string_builder_length(builder));
     CX_CHECK_EQ(2, failing.attempts);
 
@@ -187,13 +174,12 @@ static int test_allocation_failures(void) {
 
     failing.fail_at = failing.attempts + 1;
 
-    CX_CHECK(cx_string_builder_printf(builder, "%s", "0123456789abcdef") ==
-             CX_OUT_OF_MEMORY);
+    CX_CHECK(cx_string_builder_printf(builder, "%s", "0123456789abcdef") == CX_OUT_OF_MEMORY);
     CX_CHECK(strcmp(cx_string_builder_cstr(builder), "ok") == 0);
 
     failing.fail_at = failing.attempts + 1;
 
-    cx_string *out = nullptr;
+    cx_string* out = nullptr;
 
     CX_CHECK(cx_string_builder_finish(builder, &out) == CX_OUT_OF_MEMORY);
     CX_CHECK(out == nullptr);

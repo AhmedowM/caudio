@@ -1,10 +1,8 @@
+#include <cstdx/checked.h>
 #include <cstdx/string_view.h>
-
 #include <string.h>
 
-#include <cstdx/checked.h>
-
-cx_string_view cx_string_view_from_cstr(const char *cstr) {
+cx_string_view cx_string_view_from_cstr(const char* cstr) {
     if (cstr == nullptr) {
         return (cx_string_view){};
     }
@@ -15,7 +13,7 @@ cx_string_view cx_string_view_from_cstr(const char *cstr) {
     };
 }
 
-cx_string_view cx_string_view_from_parts(const char *data, size_t length) {
+cx_string_view cx_string_view_from_parts(const char* data, size_t length) {
     if (data == nullptr) {
         length = 0;
     }
@@ -27,7 +25,7 @@ cx_string_view cx_string_view_from_parts(const char *data, size_t length) {
 }
 
 cx_status cx_string_view_sub(cx_string_view view, size_t start, size_t length,
-                             cx_string_view *out) {
+                             cx_string_view* out) {
     if (out == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -60,8 +58,7 @@ bool cx_string_view_eq(cx_string_view left, cx_string_view right) {
     return memcmp(left.data, right.data, left.length) == 0;
 }
 
-cx_string_compare_result cx_string_view_compare(cx_string_view left,
-                                                cx_string_view right) {
+cx_string_compare_result cx_string_view_compare(cx_string_view left, cx_string_view right) {
     auto common = left.length < right.length ? left.length : right.length;
 
     if (common != 0) {
@@ -87,8 +84,7 @@ cx_string_compare_result cx_string_view_compare(cx_string_view left,
     return CX_STRING_EQUAL;
 }
 
-cx_status cx_string_view_find(cx_string_view haystack, cx_string_view needle,
-                              size_t *out) {
+cx_status cx_string_view_find(cx_string_view haystack, cx_string_view needle, size_t* out) {
     if (out == nullptr) {
         return CX_INVALID_ARGUMENT;
     }
@@ -98,8 +94,7 @@ cx_status cx_string_view_find(cx_string_view haystack, cx_string_view needle,
         return CX_OK;
     }
 
-    if (needle.length > haystack.length || haystack.data == nullptr ||
-        needle.data == nullptr) {
+    if (needle.length > haystack.length || haystack.data == nullptr || needle.data == nullptr) {
         return CX_NOT_FOUND;
     }
 
@@ -145,12 +140,10 @@ bool cx_string_view_ends_with(cx_string_view view, cx_string_view suffix) {
         return false;
     }
 
-    return memcmp(view.data + view.length - suffix.length, suffix.data,
-                  suffix.length) == 0;
+    return memcmp(view.data + view.length - suffix.length, suffix.data, suffix.length) == 0;
 }
 
-void cx_string_view_split_init(cx_string_view_split *split,
-                               cx_string_view input,
+void cx_string_view_split_init(cx_string_view_split* split, cx_string_view input,
                                cx_string_view delimiter) {
     if (split == nullptr) {
         return;
@@ -164,8 +157,7 @@ void cx_string_view_split_init(cx_string_view_split *split,
     };
 }
 
-bool cx_string_view_split_next(cx_string_view_split *split,
-                               cx_string_view *out) {
+bool cx_string_view_split_next(cx_string_view_split* split, cx_string_view* out) {
     if (split == nullptr || out == nullptr || split->done) {
         return false;
     }
@@ -173,15 +165,13 @@ bool cx_string_view_split_next(cx_string_view_split *split,
     if (split->delimiter.length == 0) {
         split->done = true;
         *out = cx_string_view_from_parts(
-            split->input.data != nullptr ? split->input.data + split->offset
-                                         : nullptr,
+            split->input.data != nullptr ? split->input.data + split->offset : nullptr,
             split->input.length - split->offset);
         return true;
     }
 
     auto remaining = cx_string_view_from_parts(
-        split->input.data != nullptr ? split->input.data + split->offset
-                                     : nullptr,
+        split->input.data != nullptr ? split->input.data + split->offset : nullptr,
         split->input.length - split->offset);
     size_t index = 0;
 
