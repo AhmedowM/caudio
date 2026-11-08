@@ -1,0 +1,44 @@
+# .clang-tidy for caudio — C23 (ISO/IEC 9899:2024)
+#
+# Mirrors kanariv's clang-tidy setup but targets C23 C instead of C++23.
+# C++-only checks (modernize-use-override, modernize-use-equals-delete,
+# readability-simplify-boolean-expr with static_cast fixes, etc.) are
+# either dropped or avoided. C23-specific behavior:
+#   - bool/true/false are keywords (readability-implicit-bool-conversion
+#     uses C-style casts, not static_cast).
+#   - nullptr is a keyword; modernize-use-nullptr applies to NULL macros.
+#   - <stdbool.h> is deprecated; modernize-deprecated-headers flags it.
+#   - static_assert is a keyword; no <assert.h> macro needed.
+#
+# Checks are deliberately wide by default; use scripts/tidy_all.py --fix
+# with the curated safe subset.
+
+Checks: '-*,clang-analyzer-*,bugprone-*,concurrency-*,cppcoreguidelines-*,performance-*,readability-*'
+WarningsAsErrors: ''
+HeaderFilterRegex: '(src|include|tests)/.*'
+CheckOptions:
+  - key: modernize-use-auto
+    value: 0
+  - key: modernize-use-trailing-return-type
+    value: 0
+  - key: cppcoreguidelines-avoid-magic-numbers
+    value: 0
+  - key: cppcoreguidelines-avoid-do-while
+    value: 0
+  - key: cppcoreguidelines-pro-bounds-pointer-arithmetic
+    value: 0
+  - key: cppcoreguidelines-pro-bounds-array-to-pointer-decay
+    value: 0
+  - key: readability-braces-around-statements
+    value: 0
+  - key: readability-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;4;8;16;32;64;100;1000;1024;4096;8192;65536'
+  - key: bugprone-easily-swappable-parameters.MinimumLength
+    value: 3
+  - key: concurrency-mt-unsafe.FunctionSet
+    value: 'any'
+  # C23: nullptr is a keyword; modernize-use-nullptr converts NULL macros.
+  - key: modernize-use-nullptr.NullMacro
+    value: 'NULL'
+  # Known accepted warnings (do not fix upstream):
+  # - yyjson TU-local template false positives -- vendored header, suppressed via HeaderFilterRegex
