@@ -17,6 +17,11 @@ on:
       - 'CMakeLists.txt'
       - '.github/workflows/cstdx.yml'
   workflow_dispatch:
+    inputs:
+      long_fuzz:
+        description: 'Run the 1-hour libFuzzer soak (opt-in, not part of PRs)'
+        type: boolean
+        default: false
 
 concurrency:
   group: cstdx-${{ github.workflow }}-${{ github.ref }}
@@ -141,8 +146,90 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
   # -------------------------------------------------------------------------
-  # libFuzzer smoke run. Long runs are nightly; CI does a short bounded run
-  # so a regression is caught without blocking PRs for minutes.
+  # Source-based coverage with llvm-cov. Reports line and branch coverage for
+  # the cstdx library (test-side code is excluded) and uploads the summary.
+  # COVERAGE_MIN_LINES / COVERAGE_MIN_BRANCHES act as ratchets: 0 reports only.
+  # -------------------------------------------------------------------------
+  coverage:
+    name: llvm-cov coverage (Clang)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COVERAGE_MIN_LINES: '0'
+      COVERAGE_MIN_BRANCHES: '0'
+      LLVM_COV: llvm-cov-19
+      LLVM_PROFDATA: llvm-profdata-19
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-19 llvm-19 llvm-19-tools ninja-build cmake libclang-rt-19-dev
+
+      - name: Configure
+        working-directory: libs/cstdx
+        env:
+          CC: clang-19
+          CXX: clang++-19
+        run: cmake --preset coverage
+
+      - name: Build
+        working-directory: libs/cstdx
+        run: cmake --build --preset coverage --parallel
+
+      - name: Test with coverage
+        working-directory: libs/cstdx
+        env:
+          LLVM_PROFILE_FILE: ${{ github.workspace }}/coverage/profiles/%p-%m.profraw
+        run: |
+          mkdir -p "${{ github.workspace }}/coverage/profiles"
+          ctest --preset coverage
+
+      - name: Report coverage
+        working-directory: libs/cstdx
+        run: |
+          report="${{ github.workspace }}/coverage/report"
+          mkdir -p "$report"
+          "$LLVM_PROFDATA" merge -sparse \
+            "${{ github.workspace }}"/coverage/profiles/*.profraw \
+            -o "${{ github.workspace }}/coverage/cstdx.profdata"
+          library=$(find build/coverage -name 'libcstdx.so' -print -quit)
+          "$LLVM_COV" report "$library" \
+            -instr-profile="${{ github.workspace }}/coverage/cstdx.profdata" \
+            -ignore-filename-regex='(^|/)tests/' | tee "$report/summary.txt"
+          "$LLVM_COV" export "$library" \
+            -instr-profile="${{ github.workspace }}/coverage/cstdx.profdata" \
+            -ignore-filename-regex='(^|/)tests/' > "$report/coverage.json"
+          python3 - "$report/coverage.json" <<'PY'
+          import json, os, sys
+          totals = json.load(open(sys.argv[1]))["data"][0]["totals"]
+          checks = (("lines", "COVERAGE_MIN_LINES"),
+                    ("branches", "COVERAGE_MIN_BRANCHES"))
+          failed = False
+          for key, env in checks:
+              pct = float(totals[key]["percent"])
+              minimum = float(os.environ.get(env, "0"))
+              print(f"{key}: {pct:.2f}% (minimum {minimum:.2f}%)")
+              if minimum > 0 and pct < minimum:
+                  failed = True
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cstdx-coverage
+          path: |
+            coverage/report/summary.txt
+            coverage/report/coverage.json
+
+  # -------------------------------------------------------------------------
+  # libFuzzer smoke run. Long runs are opt-in from the Actions tab; CI does a
+  # short bounded run so a regression is caught without blocking PRs for
+  # minutes.
   # -------------------------------------------------------------------------
   fuzz-smoke:
     name: libFuzzer smoke (Clang)
@@ -173,6 +260,56 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: ctest --test-dir build -L fuzz --output-on-failure
+
+  # -------------------------------------------------------------------------
+  # Opt-in 1-hour libFuzzer soak. Trigger it from the Actions tab by enabling
+  # the "long_fuzz" workflow_dispatch input; push/PR runs never include it.
+  # Each target gets 20 minutes (3 x 20 = 60 minutes total).
+  # -------------------------------------------------------------------------
+  fuzz-long:
+    name: libFuzzer 1-hour soak (Clang, opt-in)
+    if: github.event_name == 'workflow_dispatch' && inputs.long_fuzz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-19 ninja-build cmake libclang-rt-19-dev clang-tools-19 libasan8 libubsan1
+
+      - name: Configure
+        run: |
+          cmake -S libs/cstdx -B build -G Ninja \
+            -DCMAKE_C_COMPILER=clang-19 \
+            -DCMAKE_CXX_COMPILER=clang++-19 \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCSTDX_BUILD_FUZZ=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Fuzz for one hour total
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          mkdir -p fuzz-artifacts
+          for target in base64 string vector; do
+            ./build/bin/fuzz_${target} fuzz-artifacts/corpus-${target} \
+              -max_total_time=1200 -print_final_stats=1 \
+              -artifact_prefix=fuzz-artifacts/${target}-
+          done
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cstdx-fuzz-artifacts
+          path: fuzz-artifacts
+          if-no-files-found: ignore
 
   # -------------------------------------------------------------------------
   # macOS, AppleClang 16+ (Xcode 16 on macos-15). Debug and Release.

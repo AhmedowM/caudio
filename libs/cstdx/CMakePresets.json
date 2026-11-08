@@ -103,6 +103,14 @@
       "cacheVariables": {
         "CSTDX_SANITIZERS": "memory"
       }
+    },
+    {
+      "name": "coverage",
+      "displayName": "Debug with Clang source-based coverage (llvm-cov)",
+      "inherits": "dev",
+      "cacheVariables": {
+        "CSTDX_ENABLE_COVERAGE": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -149,6 +157,10 @@
     {
       "name": "msan",
       "configurePreset": "msan"
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage"
     }
   ],
   "testPresets": [
@@ -243,6 +255,13 @@
       },
       "environment": {
         "MSAN_OPTIONS": "halt_on_error=1"
+      }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": {
+        "outputOnFailure": true
       }
     }
   ]

@@ -5,6 +5,20 @@ option(CSTDX_BUILD_CPP_TESTS "Build C++ differential/property tests" OFF)
 option(CSTDX_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
 option(CSTDX_BUILD_SHARED "Build cstdx as a shared library" ON)
 option(CSTDX_BUILD_BENCHMARKS "Build cstdx benchmarks" OFF)
+option(CSTDX_ENABLE_COVERAGE
+    "Instrument with Clang source-based coverage for llvm-cov (Clang only)" OFF)
+
+if(CSTDX_ENABLE_COVERAGE)
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR
+        "CSTDX_ENABLE_COVERAGE=ON requires Clang for -fprofile-instr-generate "
+        "and -fcoverage-mapping; CMAKE_C_COMPILER_ID is "
+        "'${CMAKE_C_COMPILER_ID}'. Configure with CC=clang (or clang-19).")
+  endif()
+  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+  add_link_options(-fprofile-instr-generate)
+  message(STATUS "cstdx coverage instrumentation: llvm-cov")
+endif()
 
 set(CSTDX_SANITIZERS "" CACHE STRING
     "Sanitizers to enable, comma-separated: address,undefined,thread,memory,leak \
