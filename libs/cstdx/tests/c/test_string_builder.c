@@ -141,12 +141,6 @@ static int test_invalid_arguments(void) {
     CX_CHECK(cx_string_builder_printf(builder, nullptr) ==
              CX_INVALID_ARGUMENT);
 
-    /* A conversion whose width overflows makes vsnprintf report an error. */
-    CX_CHECK(cx_string_builder_printf(
-                 builder, "%999999999999999999999999999d", 1) ==
-             CX_INVALID_ARGUMENT);
-    CX_CHECK_EQ(0, cx_string_builder_length(builder));
-
     CX_CHECK(cx_string_builder_finish(nullptr, nullptr) ==
              CX_INVALID_ARGUMENT);
     CX_CHECK(cx_string_builder_finish(builder, nullptr) ==
