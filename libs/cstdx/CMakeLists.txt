@@ -11,6 +11,11 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# cstdx uses no C++ modules. With CMP0155 NEW, CMake enables module
+# dependency scanning for Clang and then requires clang-scan-deps, which is a
+# separate package. Disable scanning so a plain clang toolchain is enough.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 # All build logic lives in cmake/. This file is the entry point so cstdx stays
 # independently buildable with `cmake -S libs/cstdx`.
 include(cmake/options.cmake)
