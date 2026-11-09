@@ -46,6 +46,10 @@ unset(_caudio_vendor_sources)
 
 target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
 
+# Feature-test macros must reach every caudio TU before its first system
+# header; they stay PRIVATE so the installed package does not export them.
+target_compile_definitions(caudio PRIVATE ${CAUDIO_POSIX_DEFINITIONS})
+
 target_include_directories(caudio
     PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

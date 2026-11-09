@@ -77,6 +77,30 @@ static void scan_close(struct dir_scan* scan) {
         scan->hFind = INVALID_HANDLE_VALUE;
     }
 }
+#else
+struct dir_scan {
+    DIR* dir;
+    struct dirent* ent;
+};
+
+static bool scan_open(struct dir_scan* scan, const char* dir) {
+    scan->dir = opendir(dir);
+    scan->ent = nullptr;
+    return scan->dir != nullptr;
+}
+
+static bool scan_next(struct dir_scan* scan) {
+    scan->ent = readdir(scan->dir);
+    return scan->ent != nullptr;
+}
+
+static const char* scan_name(struct dir_scan* scan) {
+    return scan->ent ? scan->ent->d_name : nullptr;
+}
+
+static void scan_close(struct dir_scan* scan) {
+    if (scan->dir) closedir(scan->dir);
+}
 #endif
 
 /* ---------------------------------------------------------- */
