@@ -10,16 +10,21 @@
 file(GLOB _caudio_domain_sources CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/src/caudio/types/*.c"
     "${PROJECT_SOURCE_DIR}/src/caudio/config/*.c"
+    "${PROJECT_SOURCE_DIR}/src/caudio/utils/*.c"
+    "${PROJECT_SOURCE_DIR}/src/caudio/media/*.c"
 )
-file(GLOB _caudio_domain_headers CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/include/caudio/types/*.h"
-    "${PROJECT_SOURCE_DIR}/include/caudio/config/*.h"
+# Vendored BLAKE3 (see vendor/README.md for provenance). Built STATIC so the
+# umbrella has exactly one copy; portable-only build per kanariv.
+file(GLOB _caudio_vendor_sources CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/vendor/blake3.c"
+    "${PROJECT_SOURCE_DIR}/vendor/blake3_portable.c"
 )
 
 if(CAUDIO_BUILD_SHARED)
   add_library(caudio SHARED
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
       ${_caudio_domain_sources}
+      ${_caudio_vendor_sources}
       ${_caudio_domain_headers}
   )
   target_compile_definitions(caudio
@@ -30,12 +35,14 @@ else()
   add_library(caudio STATIC
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
       ${_caudio_domain_sources}
+      ${_caudio_vendor_sources}
       ${_caudio_domain_headers}
   )
 endif()
 
 unset(_caudio_domain_sources)
 unset(_caudio_domain_headers)
+unset(_caudio_vendor_sources)
 
 target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
 
@@ -44,6 +51,8 @@ target_include_directories(caudio
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/vendor>
 )
 
 target_compile_features(caudio PUBLIC c_std_23)
@@ -54,6 +63,11 @@ set_target_properties(caudio PROPERTIES
     POSITION_INDEPENDENT_CODE ON
     SOVERSION ${PROJECT_VERSION_MAJOR}
     VERSION ${PROJECT_VERSION}
+)
+
+# BLAKE3 is built portable-only (matches kanariv): no AVX512/AVX2/SSE41/SSE2/NEON.
+target_compile_definitions(caudio PRIVATE
+    BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0
 )
 
 if(MSVC)
