@@ -240,14 +240,14 @@ ca_status ca_player_create(ca_player** out, const ca_player_options* opts, ca_er
 
     ca_status st = ca_mutex_create(&self->open_mutex, err);
     if (st != CA_OK) {
-        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(*self));
+        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(ca_player));
         *out = NULL;
         return st;
     }
     st = ca_cond_create(&self->cv, err);
     if (st != CA_OK) {
         ca_mutex_destroy(self->open_mutex);
-        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(*self));
+        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(ca_player));
         *out = NULL;
         return st;
     }
@@ -257,7 +257,7 @@ ca_status ca_player_create(ca_player** out, const ca_player_options* opts, ca_er
     if (st != CA_OK) {
         ca_cond_destroy(self->cv);
         ca_mutex_destroy(self->open_mutex);
-        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(*self));
+        cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(ca_player));
         *out = NULL;
         return st;
     }
@@ -293,7 +293,7 @@ void ca_player_destroy(ca_player* self) {
     ca_cond_destroy(self->cv);
     ca_mutex_destroy(self->open_mutex);
 
-    cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(*self));
+    cx_allocator_free(cx_allocator_default(), self, sizeof(*self), alignof(ca_player));
 }
 
 ca_status ca_player_open(ca_player* self, const char* path, ca_error* err) {

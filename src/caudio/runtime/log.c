@@ -48,7 +48,7 @@ struct ca_logger {
 
 static log_sink_ref* log_sink_ref_new(ca_log_sink sink) {
     const cx_allocator* alloc = cx_allocator_default();
-    log_sink_ref* ref = (log_sink_ref*)cx_allocator_alloc(alloc, sizeof(*ref), alignof(*ref));
+    log_sink_ref* ref = (log_sink_ref*)cx_allocator_alloc(alloc, sizeof(*ref), alignof(log_sink_ref));
     if (ref == nullptr) {
         return nullptr;
     }
@@ -72,7 +72,7 @@ static void log_sink_ref_release(log_sink_ref* ref) {
             ref->sink.destroy(ref->sink.ctx);
         }
         const cx_allocator* alloc = cx_allocator_default();
-        cx_allocator_free(alloc, ref, sizeof(*ref), alignof(*ref));
+        cx_allocator_free(alloc, ref, sizeof(*ref), alignof(log_sink_ref));
     }
 }
 
@@ -155,7 +155,7 @@ ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_erro
     }
 
     const cx_allocator* alloc = cx_allocator_default();
-    ca_logger* logger = (ca_logger*)cx_allocator_alloc(alloc, sizeof(*logger), alignof(*logger));
+    ca_logger* logger = (ca_logger*)cx_allocator_alloc(alloc, sizeof(*logger), alignof(ca_logger));
     if (logger == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate logger");
@@ -166,7 +166,7 @@ ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_erro
 
     ca_status status = ca_mutex_create(&logger->mutex, err);
     if (status != CA_OK) {
-        cx_allocator_free(alloc, logger, sizeof(*logger), alignof(*logger));
+        cx_allocator_free(alloc, logger, sizeof(*logger), alignof(ca_logger));
         return status;
     }
 
@@ -174,7 +174,7 @@ ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_erro
         logger->sink = log_sink_ref_new(sink);
         if (logger->sink == nullptr) {
             ca_mutex_destroy(logger->mutex);
-            cx_allocator_free(alloc, logger, sizeof(*logger), alignof(*logger));
+            cx_allocator_free(alloc, logger, sizeof(*logger), alignof(ca_logger));
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log sink");
             }
@@ -205,7 +205,7 @@ void ca_logger_destroy(ca_logger** logger) {
     log_sink_ref_release(sink);
 
     const cx_allocator* alloc = cx_allocator_default();
-    cx_allocator_free(alloc, l, sizeof(*l), alignof(*l));
+    cx_allocator_free(alloc, l, sizeof(*l), alignof(ca_logger));
 }
 
 void ca_logger_set_level(ca_logger* logger, ca_log_level level) {
@@ -258,7 +258,7 @@ ca_status ca_logger_set_sink(ca_logger* logger, const ca_log_sink* sink, ca_erro
     if (status != CA_OK) {
         /* Ownership was not transferred; the caller still owns the sink. */
         const cx_allocator* alloc = cx_allocator_default();
-        cx_allocator_free(alloc, next, sizeof(*next), alignof(*next));
+        cx_allocator_free(alloc, next, sizeof(*next), alignof(log_sink_ref));
         return status;
     }
 
@@ -474,7 +474,7 @@ static void log_file_free(ca_log_file* file) {
 
     ca_mutex_destroy(file->mutex);
     cx_allocator_free(alloc, file->path, file->path ? strlen(file->path) + 1 : 1, 1);
-    cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
+    cx_allocator_free(alloc, file, sizeof(*file), alignof(ca_log_file));
 }
 
 static bool log_file_open_stream(ca_log_file* file, bool append) {
@@ -655,7 +655,7 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
     }
 
     const cx_allocator* alloc = cx_allocator_default();
-    ca_log_file* file = (ca_log_file*)cx_allocator_alloc(alloc, sizeof(*file), alignof(*file));
+    ca_log_file* file = (ca_log_file*)cx_allocator_alloc(alloc, sizeof(*file), alignof(ca_log_file));
     if (file == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log file sink");
@@ -666,7 +666,7 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
     size_t path_len = strlen(path);
     file->path = (char*)cx_allocator_alloc(alloc, path_len + 1, 1);
     if (file->path == nullptr) {
-        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(ca_log_file));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to copy log path");
         }
@@ -677,7 +677,7 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
     ca_status status = ca_mutex_create(&file->mutex, err);
     if (status != CA_OK) {
         cx_allocator_free(alloc, file->path, path_len + 1, 1);
-        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(ca_log_file));
         return status;
     }
 
@@ -692,7 +692,7 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
         }
         ca_mutex_destroy(file->mutex);
         cx_allocator_free(alloc, file->path, path_len + 1, 1);
-        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(ca_log_file));
         return CA_IO_ERROR;
     }
 

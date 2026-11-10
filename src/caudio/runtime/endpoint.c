@@ -33,7 +33,7 @@ static ca_status endpoint_error_code(const ca_error* err, ca_status fallback) {
 static ca_status endpoint_wrap(ca_endpoint** out, ca_socket_t socket, const char* name, bool server,
                                ca_error* err) {
     const cx_allocator* alloc = cx_allocator_default();
-    ca_endpoint* endpoint = (ca_endpoint*)cx_allocator_alloc(alloc, sizeof(*endpoint), alignof(*endpoint));
+    ca_endpoint* endpoint = (ca_endpoint*)cx_allocator_alloc(alloc, sizeof(*endpoint), alignof(ca_endpoint));
     if (endpoint == nullptr) {
         ca_socket_close(socket);
         if (err) {
@@ -51,7 +51,7 @@ static ca_status endpoint_wrap(ca_endpoint** out, ca_socket_t socket, const char
         endpoint->name = (char*)cx_allocator_alloc(alloc, len + 1, 1);
         if (endpoint->name == nullptr) {
             ca_socket_close(socket);
-            cx_allocator_free(alloc, endpoint, sizeof(*endpoint), alignof(*endpoint));
+            cx_allocator_free(alloc, endpoint, sizeof(*endpoint), alignof(ca_endpoint));
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to copy endpoint name");
             }
@@ -330,7 +330,7 @@ void ca_endpoint_close(ca_endpoint** endpoint) {
 
     const cx_allocator* alloc = cx_allocator_default();
     cx_allocator_free(alloc, ep->name, ep->name ? strlen(ep->name) + 1 : 0, 1);
-    cx_allocator_free(alloc, ep, sizeof(*ep), alignof(*ep));
+    cx_allocator_free(alloc, ep, sizeof(*ep), alignof(ca_endpoint));
 }
 
 const char* ca_endpoint_name(const ca_endpoint* endpoint) {
