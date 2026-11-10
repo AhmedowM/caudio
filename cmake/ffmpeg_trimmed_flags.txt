@@ -27,13 +27,12 @@
 --enable-decoder=wmav2
 --enable-decoder=atrac3
 --enable-decoder=atrac3p
---enable-parser=all
---enable-demuxer=all
+--enable-parsers
+--enable-demuxers
 --enable-protocol=file
---enable-bsf=all
+--enable-bsfs
 --enable-filter=aresample
 --disable-avdevice
 --disable-swscale
---disable-postproc
 --disable-avfilter
 --enable-swresample

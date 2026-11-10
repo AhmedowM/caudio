@@ -48,6 +48,15 @@ unset(_caudio_domain_sources)
 unset(_caudio_domain_headers)
 unset(_caudio_vendor_sources)
 
+# Vendored BLAKE3 compiles with relaxed warnings: upstream blake3.c has unused
+# variable warnings (e.g. num_cvs) under -Werror on some toolchains/macros.
+set_source_files_properties(
+    ${PROJECT_SOURCE_DIR}/libs/third_party/blake3.c
+    ${PROJECT_SOURCE_DIR}/libs/third_party/blake3_portable.c
+    PROPERTIES
+    COMPILE_FLAGS "-Wno-unused-variable -Wno-unused-but-set-variable"
+)
+
 target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
 
 # Feature-test macros must reach every caudio TU before its first system
