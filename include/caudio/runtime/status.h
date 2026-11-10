@@ -39,6 +39,9 @@ typedef enum ca_status : uint8_t {
     CA_NOT_SUPPORTED = 10,
     CA_BUSY = 11,
     CA_CANCELLED = 12,
+    CA_STATE = 13,
+    CA_DEVICE = 14,
+    CA_INTERNAL = 15,
 
     /* ca_runtime specific errors (64..127). */
     CA_RUNTIME_BASE = 64,

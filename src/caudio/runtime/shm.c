@@ -1,6 +1,7 @@
 ﻿#include <caudio/runtime/shm.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -43,7 +44,8 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     (void)create;
     return CA_SHM_INVALID;
 #elif defined(_WIN32) || defined(__CYGWIN__)
-    ca_shm_t shm = (ca_shm_t)calloc(1, sizeof(struct ca_shm));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_shm_t shm = (ca_shm_t)cx_allocator_alloc(alloc, sizeof(struct ca_shm), alignof(struct ca_shm));
     if (shm == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate shm");
@@ -57,7 +59,7 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     shm->handle =
         CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, flProtect, 0, (DWORD)size, nullptr);
     if (shm->handle == nullptr) {
-        free(shm);
+        cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "CreateFileMapping failed");
         }
@@ -70,7 +72,8 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
 
     return shm;
 #else
-    ca_shm_t shm = (ca_shm_t)calloc(1, sizeof(struct ca_shm));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_shm_t shm = (ca_shm_t)cx_allocator_alloc(alloc, sizeof(struct ca_shm), alignof(struct ca_shm));
     if (shm == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate shm");
@@ -89,9 +92,9 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     const char* shm_name = name;
     if (name[0] != '/') {
         /* Build "/name". */
-        char* full = (char*)malloc(strlen(name) + 2);
+        char* full = (char*)cx_allocator_alloc(alloc, strlen(name) + 2, 1);
         if (full == nullptr) {
-            free(shm);
+            cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate name");
             }
@@ -105,11 +108,11 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     shm->fd = shm_open(shm_name, flags, mode);
 
     if (name[0] != '/') {
-        free((void*)shm_name);
+        cx_allocator_free(alloc, (void*)shm_name, strlen(name) + 2, 1);
     }
 
     if (shm->fd < 0) {
-        free(shm);
+        cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "shm_open failed: %d", errno);
         }
@@ -119,7 +122,7 @@ ca_shm_t ca_shm_open(const char* name, size_t size, int create, ca_error* err) {
     if (create && size > 0) {
         if (ftruncate(shm->fd, (off_t)size) != 0) {
             close(shm->fd);
-            free(shm);
+            cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
             if (err) {
                 ca_error_set(err, CA_IO_ERROR, "ftruncate failed: %d", errno);
             }
@@ -253,14 +256,16 @@ ca_status ca_shm_close(ca_shm_t shm, ca_error* err) {
     }
 
 #if defined(__ANDROID__)
-    free(shm);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
 #elif defined(_WIN32) || defined(__CYGWIN__)
     CloseHandle(shm->handle);
 #else
     close(shm->fd);
 #endif
 
-    free(shm);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
     return CA_OK;
 }
 
@@ -290,8 +295,9 @@ ca_status ca_shm_unlink(const char* name, ca_error* err) {
     /* Build "/name" if needed. */
     const char* shm_name = name;
     char* full = nullptr;
+    const cx_allocator* alloc = cx_allocator_default();
     if (name[0] != '/') {
-        full = (char*)malloc(strlen(name) + 2);
+        full = (char*)cx_allocator_alloc(alloc, strlen(name) + 2, 1);
         if (full == nullptr) {
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate name");
@@ -304,7 +310,7 @@ ca_status ca_shm_unlink(const char* name, ca_error* err) {
     }
 
     int rc = shm_unlink(shm_name);
-    free(full);
+    cx_allocator_free(alloc, full, full ? strlen(full) + 1 : 0, 1);
 
     if (rc != 0) {
         if (err) {

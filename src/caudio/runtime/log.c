@@ -5,9 +5,10 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -46,7 +47,8 @@ struct ca_logger {
 };
 
 static log_sink_ref* log_sink_ref_new(ca_log_sink sink) {
-    log_sink_ref* ref = (log_sink_ref*)malloc(sizeof(*ref));
+    const cx_allocator* alloc = cx_allocator_default();
+    log_sink_ref* ref = (log_sink_ref*)cx_allocator_alloc(alloc, sizeof(*ref), alignof(*ref));
     if (ref == nullptr) {
         return nullptr;
     }
@@ -69,7 +71,8 @@ static void log_sink_ref_release(log_sink_ref* ref) {
         if (ref->sink.destroy) {
             ref->sink.destroy(ref->sink.ctx);
         }
-        free(ref);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, ref, sizeof(*ref), alignof(*ref));
     }
 }
 
@@ -151,17 +154,19 @@ ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_erro
         }
     }
 
-    ca_logger* logger = (ca_logger*)calloc(1, sizeof(*logger));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_logger* logger = (ca_logger*)cx_allocator_alloc(alloc, sizeof(*logger), alignof(*logger));
     if (logger == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate logger");
         }
         return CA_OUT_OF_MEMORY;
     }
+    logger->sink = nullptr;
 
     ca_status status = ca_mutex_create(&logger->mutex, err);
     if (status != CA_OK) {
-        free(logger);
+        cx_allocator_free(alloc, logger, sizeof(*logger), alignof(*logger));
         return status;
     }
 
@@ -169,7 +174,7 @@ ca_status ca_logger_create(ca_logger** out, const ca_log_config* config, ca_erro
         logger->sink = log_sink_ref_new(sink);
         if (logger->sink == nullptr) {
             ca_mutex_destroy(logger->mutex);
-            free(logger);
+            cx_allocator_free(alloc, logger, sizeof(*logger), alignof(*logger));
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log sink");
             }
@@ -199,7 +204,8 @@ void ca_logger_destroy(ca_logger** logger) {
     ca_mutex_destroy(l->mutex);
     log_sink_ref_release(sink);
 
-    free(l);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, l, sizeof(*l), alignof(*l));
 }
 
 void ca_logger_set_level(ca_logger* logger, ca_log_level level) {
@@ -251,7 +257,8 @@ ca_status ca_logger_set_sink(ca_logger* logger, const ca_log_sink* sink, ca_erro
     ca_status status = ca_mutex_lock(logger->mutex, err);
     if (status != CA_OK) {
         /* Ownership was not transferred; the caller still owns the sink. */
-        free(next);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, next, sizeof(*next), alignof(*next));
         return status;
     }
 
@@ -315,7 +322,8 @@ void ca_logger_vlog(ca_logger* logger, ca_log_level level, const char* fmt, va_l
         return;
     }
 
-    char* heap_buffer = (char*)malloc((size_t)needed + 1);
+    const cx_allocator* alloc = cx_allocator_default();
+    char* heap_buffer = (char*)cx_allocator_alloc(alloc, (size_t)needed + 1, 1);
     if (heap_buffer == nullptr) {
         /* Allocation failure must not lose the record entirely. The stack
          * buffer still holds a truncated, NUL-terminated version. */
@@ -328,7 +336,7 @@ void ca_logger_vlog(ca_logger* logger, ca_log_level level, const char* fmt, va_l
     va_end(copy);
 
     ca_logger_write(logger, level, heap_buffer, (size_t)needed);
-    free(heap_buffer);
+    cx_allocator_free(alloc, heap_buffer, (size_t)needed + 1, 1);
 }
 
 void ca_logger_log(ca_logger* logger, ca_log_level level, const char* fmt, ...) {
@@ -353,18 +361,19 @@ struct ca_log_file {
 
 #if defined(_WIN32)
 static WCHAR* log_utf8_to_wide(const char* text) {
+    const cx_allocator* alloc = cx_allocator_default();
     int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0);
     if (len <= 0) {
         return nullptr;
     }
 
-    WCHAR* wide = (WCHAR*)malloc((size_t)len * sizeof(WCHAR));
+    WCHAR* wide = (WCHAR*)cx_allocator_alloc(alloc, (size_t)len * sizeof(WCHAR), alignof(WCHAR));
     if (wide == nullptr) {
         return nullptr;
     }
 
     if (MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len) != len) {
-        free(wide);
+        cx_allocator_free(alloc, wide, (size_t)len * sizeof(WCHAR), alignof(WCHAR));
         return nullptr;
     }
 
@@ -378,7 +387,8 @@ static FILE* log_fopen(const char* path, bool append) {
     }
 
     FILE* fp = _wfopen(wide, append ? L"ab" : L"wb");
-    free(wide);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, wide, 0, alignof(WCHAR));
     return fp;
 }
 
@@ -386,7 +396,8 @@ static void log_remove_file(const char* path) {
     WCHAR* wide = log_utf8_to_wide(path);
     if (wide) {
         (void)_wremove(wide);
-        free(wide);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, wide, 0, alignof(WCHAR));
     }
 }
 
@@ -399,8 +410,9 @@ static bool log_rename_file(const char* from, const char* to) {
         ok = MoveFileExW(wide_from, wide_to, MOVEFILE_REPLACE_EXISTING) != 0;
     }
 
-    free(wide_from);
-    free(wide_to);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, wide_from, 0, alignof(WCHAR));
+    cx_allocator_free(alloc, wide_to, 0, alignof(WCHAR));
     return ok;
 }
 
@@ -425,8 +437,8 @@ static void log_utc_timestamp(char* buf, size_t size) {
     GetSystemTime(&st);
 
     (void)snprintf(buf, size, "%04u-%02u-%02uT%02u:%02u:%02u.%03uZ", (unsigned)st.wYear,
-                   (unsigned)st.wMonth, (unsigned)st.wDay, (unsigned)st.wHour, (unsigned)st.wMinute,
-                   (unsigned)st.wSecond, (unsigned)st.wMilliseconds);
+                   (unsigned)st.wMonth, (unsigned)st.wDay, (unsigned)st.wHour,
+                   (unsigned)st.wMinute, (unsigned)st.wSecond, (unsigned)st.wMilliseconds);
 #else
     struct timespec ts;
 
@@ -454,13 +466,15 @@ static void log_file_free(ca_log_file* file) {
         return;
     }
 
+    const cx_allocator* alloc = cx_allocator_default();
+
     if (file->fp) {
         (void)fclose(file->fp);
     }
 
     ca_mutex_destroy(file->mutex);
-    free(file->path);
-    free(file);
+    cx_allocator_free(alloc, file->path, file->path ? strlen(file->path) + 1 : 1, 1);
+    cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
 }
 
 static bool log_file_open_stream(ca_log_file* file, bool append) {
@@ -499,7 +513,8 @@ static char* log_rotated_path(const char* path, unsigned index) {
         return nullptr;
     }
 
-    char* result = (char*)malloc((size_t)needed + 1);
+    const cx_allocator* alloc = cx_allocator_default();
+    char* result = (char*)cx_allocator_alloc(alloc, (size_t)needed + 1, 1);
     if (result == nullptr) {
         return nullptr;
     }
@@ -518,20 +533,21 @@ static void log_rotate_files(ca_log_file* file) {
         return;
     }
     log_remove_file(oldest);
-    free(oldest);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, oldest, (strlen(oldest) + 1), 1);
 
     for (unsigned i = file->max_files; i > 1; --i) {
         char* from = log_rotated_path(file->path, i - 1);
         char* to = log_rotated_path(file->path, i);
         if (from == nullptr || to == nullptr) {
-            free(from);
-            free(to);
+            cx_allocator_free(alloc, from, from ? strlen(from) + 1 : 1, 1);
+            cx_allocator_free(alloc, to, to ? strlen(to) + 1 : 1, 1);
             return;
         }
 
         (void)log_rename_file(from, to);
-        free(from);
-        free(to);
+        cx_allocator_free(alloc, from, strlen(from) + 1, 1);
+        cx_allocator_free(alloc, to, strlen(to) + 1, 1);
     }
 
     char* first = log_rotated_path(file->path, 1);
@@ -539,7 +555,7 @@ static void log_rotate_files(ca_log_file* file) {
         return;
     }
     (void)log_rename_file(file->path, first);
-    free(first);
+    cx_allocator_free(alloc, first, strlen(first) + 1, 1);
 }
 
 static void log_rotate_locked(ca_log_file* file) {
@@ -638,7 +654,8 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_log_file* file = (ca_log_file*)calloc(1, sizeof(*file));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_log_file* file = (ca_log_file*)cx_allocator_alloc(alloc, sizeof(*file), alignof(*file));
     if (file == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate log file sink");
@@ -647,9 +664,9 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
     }
 
     size_t path_len = strlen(path);
-    file->path = (char*)malloc(path_len + 1);
+    file->path = (char*)cx_allocator_alloc(alloc, path_len + 1, 1);
     if (file->path == nullptr) {
-        free(file);
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to copy log path");
         }
@@ -659,21 +676,23 @@ ca_status ca_log_file_open(ca_log_file** out, const char* path, size_t max_bytes
 
     ca_status status = ca_mutex_create(&file->mutex, err);
     if (status != CA_OK) {
-        free(file->path);
-        free(file);
+        cx_allocator_free(alloc, file->path, path_len + 1, 1);
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
         return status;
     }
 
     file->max_bytes = max_bytes;
     file->max_files = max_files;
+    file->fp = nullptr;
+    file->size = 0;
 
     if (!log_file_open_stream(file, true)) {
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "failed to open log file: %s", path);
         }
         ca_mutex_destroy(file->mutex);
-        free(file->path);
-        free(file);
+        cx_allocator_free(alloc, file->path, path_len + 1, 1);
+        cx_allocator_free(alloc, file, sizeof(*file), alignof(*file));
         return CA_IO_ERROR;
     }
 

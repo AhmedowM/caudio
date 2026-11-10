@@ -1,5 +1,6 @@
 ﻿#include <caudio/runtime/rwlock.h>
-#include <stdlib.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -28,7 +29,8 @@ ca_status ca_rwlock_create(ca_rwlock_t* out, ca_error* err) {
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_rwlock_t rw = (ca_rwlock_t)calloc(1, sizeof(struct ca_rwlock));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_rwlock_t rw = (ca_rwlock_t)cx_allocator_alloc(alloc, sizeof(struct ca_rwlock), alignof(struct ca_rwlock));
     if (rw == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate rwlock");
@@ -41,7 +43,7 @@ ca_status ca_rwlock_create(ca_rwlock_t* out, ca_error* err) {
 #else
     int rc = pthread_rwlock_init(&rw->lock, nullptr);
     if (rc != 0) {
-        free(rw);
+        cx_allocator_free(alloc, rw, sizeof(struct ca_rwlock), alignof(struct ca_rwlock));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_rwlock_init failed: %d", rc);
         }
@@ -62,7 +64,8 @@ void ca_rwlock_destroy(ca_rwlock_t rwlock) {
     pthread_rwlock_destroy(&rwlock->lock);
 #endif
 
-    free(rwlock);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, rwlock, sizeof(struct ca_rwlock), alignof(struct ca_rwlock));
 }
 
 ca_status ca_rwlock_rdlock(ca_rwlock_t rwlock, ca_error* err) {

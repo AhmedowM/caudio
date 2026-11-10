@@ -12,6 +12,10 @@ file(GLOB _caudio_domain_sources CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/src/caudio/config/*.c"
     "${PROJECT_SOURCE_DIR}/src/caudio/utils/*.c"
     "${PROJECT_SOURCE_DIR}/src/caudio/media/*.c"
+    "${PROJECT_SOURCE_DIR}/src/caudio/player/*.c"
+)
+file(GLOB _caudio_domain_headers CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/include/caudio/player/*.h"
 )
 # Vendored BLAKE3 (see libs/third_party/README.md for provenance). Built STATIC
 # so the umbrella has exactly one copy; portable-only build per kanariv.
@@ -74,7 +78,13 @@ target_compile_definitions(caudio PRIVATE
     BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0
 )
 
-# FFmpeg setup: find system FFmpeg or use trimmed build from build-ffmpeg.py
+# FFmpeg setup: system FFmpeg first, then a trimmed build produced by
+# scripts/build-ffmpeg.py (consumed via KANARIV_TRIMMED_ROOT / FFmpeg_ROOT).
+# Map KANARIV_TRIMMED_ROOT onto FFmpeg_ROOT so FindFFmpeg consumes it.
+if(KANARIV_TRIMMED_ROOT AND NOT FFmpeg_ROOT)
+  set(FFmpeg_ROOT "${KANARIV_TRIMMED_ROOT}")
+endif()
+
 include(${CMAKE_CURRENT_LIST_DIR}/FindFFmpeg.cmake)
 
 if(NOT FFmpeg_FOUND)

@@ -1,6 +1,7 @@
 ﻿#include <caudio/runtime/process.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <stdio.h>
@@ -35,7 +36,8 @@ ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const en
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_process_t p = (ca_process_t)calloc(1, sizeof(struct ca_process));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_process_t p = (ca_process_t)cx_allocator_alloc(alloc, sizeof(struct ca_process), alignof(struct ca_process));
     if (p == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate process");
@@ -52,9 +54,9 @@ ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const en
         cmd_len += strlen(argv[i]) + 1; /* arg + space/separator */
     }
 
-    char* cmdline = (char*)malloc(cmd_len + 1);
+    char* cmdline = (char*)cx_allocator_alloc(alloc, cmd_len + 1, 1);
     if (cmdline == nullptr) {
-        free(p);
+        cx_allocator_free(alloc, p, sizeof(struct ca_process), alignof(struct ca_process));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate cmdline");
         }
@@ -77,18 +79,18 @@ ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const en
        lpCommandLine to be a mutable buffer, so we pass cmdline directly. */
     int wlen = MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, nullptr, 0);
     if (wlen <= 0) {
-        free(cmdline);
-        free(p);
+        cx_allocator_free(alloc, cmdline, cmd_len + 1, 1);
+        cx_allocator_free(alloc, p, sizeof(struct ca_process), alignof(struct ca_process));
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT, "invalid UTF-8 cmdline");
         }
         return CA_INVALID_ARGUMENT;
     }
 
-    LPWSTR wcmd = (LPWSTR)malloc((size_t)wlen * sizeof(WCHAR));
+    LPWSTR wcmd = (LPWSTR)cx_allocator_alloc(alloc, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
     if (wcmd == nullptr) {
-        free(cmdline);
-        free(p);
+        cx_allocator_free(alloc, cmdline, cmd_len + 1, 1);
+        cx_allocator_free(alloc, p, sizeof(struct ca_process), alignof(struct ca_process));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate cmdline");
         }
@@ -96,13 +98,13 @@ ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const en
     }
 
     MultiByteToWideChar(CP_UTF8, 0, cmdline, -1, wcmd, wlen);
-    free(cmdline);
+    cx_allocator_free(alloc, cmdline, cmd_len + 1, 1);
 
     BOOL ok = CreateProcessW(nullptr, wcmd, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
-    free(wcmd);
+    cx_allocator_free(alloc, wcmd, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
 
     if (!ok) {
-        free(p);
+        cx_allocator_free(alloc, p, sizeof(struct ca_process), alignof(struct ca_process));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "CreateProcess failed");
         }
@@ -115,7 +117,7 @@ ca_status ca_process_spawn(ca_process_t* out, char* const argv[], char* const en
 #else
     int rc = posix_spawnp(&p->pid, argv[0], nullptr, nullptr, argv, env);
     if (rc != 0) {
-        free(p);
+        cx_allocator_free(alloc, p, sizeof(struct ca_process), alignof(struct ca_process));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "posix_spawnp failed: %d", rc);
         }
@@ -185,7 +187,8 @@ ca_status ca_process_wait(ca_process_t process, ca_process_status* status, ca_er
     }
 #endif
 
-    free(process);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, process, sizeof(struct ca_process), alignof(struct ca_process));
     return CA_OK;
 }
 
@@ -238,7 +241,8 @@ ca_status ca_process_release(ca_process_t process, ca_error* err) {
     /* On POSIX, detaching means the child will be reparented to init. */
 #endif
 
-    free(process);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, process, sizeof(struct ca_process), alignof(struct ca_process));
     return CA_OK;
 }
 

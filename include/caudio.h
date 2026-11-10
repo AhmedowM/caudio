@@ -15,6 +15,8 @@
  */
 
 #include <caudio/api.h>
+#include <caudio/player/player.h>
+#include <caudio/player/output.h>
 #include <caudio/runtime/cond.h>
 #include <caudio/runtime/endpoint.h>
 #include <caudio/runtime/env.h>

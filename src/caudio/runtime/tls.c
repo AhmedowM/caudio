@@ -1,5 +1,6 @@
 ﻿#include <caudio/runtime/tls.h>
-#include <stdlib.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -29,7 +30,8 @@ ca_status ca_tls_key_create(ca_tls_key_t* out, ca_tls_destructor dest, ca_error*
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_tls_key_t key = (ca_tls_key_t)calloc(1, sizeof(struct ca_tls_key));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_tls_key_t key = (ca_tls_key_t)cx_allocator_alloc(alloc, sizeof(struct ca_tls_key), alignof(struct ca_tls_key));
     if (key == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate tls key");
@@ -44,7 +46,7 @@ ca_status ca_tls_key_create(ca_tls_key_t* out, ca_tls_destructor dest, ca_error*
        stored but only honored on POSIX. */
     DWORD index = TlsAlloc();
     if (index == TLS_OUT_OF_INDEXES) {
-        free(key);
+        cx_allocator_free(alloc, key, sizeof(struct ca_tls_key), alignof(struct ca_tls_key));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "TlsAlloc failed");
         }
@@ -54,7 +56,7 @@ ca_status ca_tls_key_create(ca_tls_key_t* out, ca_tls_destructor dest, ca_error*
 #else
     int rc = pthread_key_create(&key->key, dest);
     if (rc != 0) {
-        free(key);
+        cx_allocator_free(alloc, key, sizeof(struct ca_tls_key), alignof(struct ca_tls_key));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_key_create failed: %d", rc);
         }
@@ -77,7 +79,8 @@ void ca_tls_key_destroy(ca_tls_key_t key) {
     pthread_key_delete(key->key);
 #endif
 
-    free(key);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, key, sizeof(struct ca_tls_key), alignof(struct ca_tls_key));
 }
 
 ca_status ca_tls_set(ca_tls_key_t key, void* value, ca_error* err) {

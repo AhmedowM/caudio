@@ -5,7 +5,6 @@
 #include <cstdx/allocator.h>
 
 #include <math.h>
-#include <stdlib.h>
 #include <string.h>
 
 static constexpr double CA_M_PI = 3.14159265358979323846;
@@ -148,7 +147,8 @@ ca_status ca_fft_execute_r2c(const ca_fft_plan* plan,
     }
 
     /* Pack real input into full complex array, run FFT, keep first n/2+1 bins. */
-    ca_complex_f* z = (ca_complex_f*)malloc(plan->length * sizeof(ca_complex_f));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_complex_f* z = (ca_complex_f*)cx_allocator_alloc(alloc, plan->length * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (!z) {
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         return CA_OUT_OF_MEMORY;
@@ -163,7 +163,7 @@ ca_status ca_fft_execute_r2c(const ca_fft_plan* plan,
     for (size_t i = 0; i < plan->output_bins; ++i) {
         output[i] = z[i];
     }
-    free(z);
+    cx_allocator_free(alloc, z, plan->length * sizeof(ca_complex_f), alignof(ca_complex_f));
     return CA_OK;
 }
 
@@ -178,7 +178,8 @@ ca_status ca_fft_execute_c2c(const ca_fft_plan* plan,
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_complex_f* z = (ca_complex_f*)malloc(plan->length * sizeof(ca_complex_f));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_complex_f* z = (ca_complex_f*)cx_allocator_alloc(alloc, plan->length * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (!z) {
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         return CA_OUT_OF_MEMORY;
@@ -196,7 +197,7 @@ ca_status ca_fft_execute_c2c(const ca_fft_plan* plan,
     }
 
     memcpy(output, z, plan->length * sizeof(ca_complex_f));
-    free(z);
+    cx_allocator_free(alloc, z, plan->length * sizeof(ca_complex_f), alignof(ca_complex_f));
     return CA_OK;
 }
 
@@ -271,7 +272,8 @@ ca_status ca_fft_real(const float* samples,
     ca_status st = ca_fft_plan_create_r2c(&plan, n, err);
     if (st != CA_OK) return st;
 
-    ca_complex_f* out = (ca_complex_f*)malloc(plan->output_bins * sizeof(ca_complex_f));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_complex_f* out = (ca_complex_f*)cx_allocator_alloc(alloc, plan->output_bins * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (!out) {
         ca_fft_plan_destroy(plan);
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
@@ -282,7 +284,7 @@ ca_status ca_fft_real(const float* samples,
     size_t out_bins = plan->output_bins;
     ca_fft_plan_destroy(plan);
     if (st != CA_OK) {
-        free(out);
+        cx_allocator_free(alloc, out, out_bins * sizeof(ca_complex_f), alignof(ca_complex_f));
         return st;
     }
 
@@ -313,8 +315,9 @@ ca_status ca_fft_ifft_real(const ca_complex_f* bins,
     ca_status st = ca_fft_plan_create_c2c(&plan, n, err);
     if (st != CA_OK) return st;
 
+    const cx_allocator* alloc = cx_allocator_default();
     /* Reconstruct conjugate-symmetric spectrum. */
-    ca_complex_f* spectrum = (ca_complex_f*)malloc(n * sizeof(ca_complex_f));
+    ca_complex_f* spectrum = (ca_complex_f*)cx_allocator_alloc(alloc, n * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (!spectrum) {
         ca_fft_plan_destroy(plan);
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
@@ -326,9 +329,9 @@ ca_status ca_fft_ifft_real(const ca_complex_f* bins,
         spectrum[i].im = -bins[n - i].im;
     }
 
-    ca_complex_f* out_c = (ca_complex_f*)malloc(n * sizeof(ca_complex_f));
+    ca_complex_f* out_c = (ca_complex_f*)cx_allocator_alloc(alloc, n * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (!out_c) {
-        free(spectrum);
+        cx_allocator_free(alloc, spectrum, n * sizeof(ca_complex_f), alignof(ca_complex_f));
         ca_fft_plan_destroy(plan);
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         return CA_OUT_OF_MEMORY;
@@ -336,20 +339,20 @@ ca_status ca_fft_ifft_real(const ca_complex_f* bins,
 
     st = ca_fft_execute_c2c(plan, spectrum, out_c, true, err);
     ca_fft_plan_destroy(plan);
-    free(spectrum);
+    cx_allocator_free(alloc, spectrum, n * sizeof(ca_complex_f), alignof(ca_complex_f));
     if (st != CA_OK) {
-        free(out_c);
+        cx_allocator_free(alloc, out_c, n * sizeof(ca_complex_f), alignof(ca_complex_f));
         return st;
     }
 
-    float* out = (float*)malloc(n * sizeof(float));
+    float* out = (float*)cx_allocator_alloc(alloc, n * sizeof(float), alignof(float));
     if (!out) {
-        free(out_c);
+        cx_allocator_free(alloc, out_c, n * sizeof(ca_complex_f), alignof(ca_complex_f));
         if (err) ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         return CA_OUT_OF_MEMORY;
     }
     for (size_t i = 0; i < n; ++i) out[i] = out_c[i].re;
-    free(out_c);
+    cx_allocator_free(alloc, out_c, n * sizeof(ca_complex_f), alignof(ca_complex_f));
 
     *samples = out;
     *samples_count = n;

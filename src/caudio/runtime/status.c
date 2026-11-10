@@ -30,6 +30,12 @@ const char* ca_status_name(ca_status status) {
         return "CA_BUSY";
     case CA_CANCELLED:
         return "CA_CANCELLED";
+    case CA_STATE:
+        return "CA_STATE";
+    case CA_DEVICE:
+        return "CA_DEVICE";
+    case CA_INTERNAL:
+        return "CA_INTERNAL";
     case CA_JSON_ERROR:
         return "CA_JSON_ERROR";
     case CA_PATH_ERROR:

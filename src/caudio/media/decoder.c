@@ -426,6 +426,18 @@ ca_status ca_decoder_open(ca_decoder** out,
 /* ca_decoder_decode                                          */
 /* ---------------------------------------------------------- */
 
+[[nodiscard]] CAUDIO_API uint32_t ca_decoder_sample_rate(const ca_decoder* self) {
+    if (!self)
+        return 0;
+    return self->sample_rate;
+}
+
+[[nodiscard]] CAUDIO_API uint32_t ca_decoder_channels(const ca_decoder* self) {
+    if (!self)
+        return 0;
+    return self->channels;
+}
+
 size_t ca_decoder_decode(ca_decoder* self,
                          float* out,
                          size_t out_length) {

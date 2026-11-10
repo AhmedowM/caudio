@@ -2,8 +2,9 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -20,18 +21,19 @@ static bool env_name_valid(const char* name) {
 
 #if defined(_WIN32)
 static WCHAR* env_utf8_to_wide(const char* text) {
+    const cx_allocator* alloc = cx_allocator_default();
     int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, nullptr, 0);
     if (len <= 0) {
         return nullptr;
     }
 
-    WCHAR* wide = (WCHAR*)malloc((size_t)len * sizeof(WCHAR));
+    WCHAR* wide = (WCHAR*)cx_allocator_alloc(alloc, (size_t)len * sizeof(WCHAR), alignof(WCHAR));
     if (wide == nullptr) {
         return nullptr;
     }
 
     if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, wide, len) != len) {
-        free(wide);
+        cx_allocator_free(alloc, wide, (size_t)len * sizeof(WCHAR), alignof(WCHAR));
         return nullptr;
     }
 
@@ -47,18 +49,19 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
         return CA_INVALID_ARGUMENT;
     }
 
+    const cx_allocator* alloc = cx_allocator_default();
     SetLastError(ERROR_SUCCESS);
     DWORD size = GetEnvironmentVariableW(wide_name, nullptr, 0);
     DWORD query_error = GetLastError();
 
     if (size == 0) {
-        free(wide_name);
+        cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
 
         if (query_error == ERROR_ENVVAR_NOT_FOUND) {
             return CA_NOT_FOUND;
         }
 
-        char* empty = (char*)malloc(1);
+        char* empty = (char*)cx_allocator_alloc(alloc, 1, 1);
         if (empty == nullptr) {
             if (err) {
                 ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
@@ -71,9 +74,9 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
         return CA_OK;
     }
 
-    WCHAR* wide_value = (WCHAR*)malloc((size_t)size * sizeof(WCHAR));
+    WCHAR* wide_value = (WCHAR*)cx_allocator_alloc(alloc, (size_t)size * sizeof(WCHAR), alignof(WCHAR));
     if (wide_value == nullptr) {
-        free(wide_name);
+        cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
         }
@@ -82,15 +85,15 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
 
     DWORD written = GetEnvironmentVariableW(wide_name, wide_value, size);
     DWORD read_error = GetLastError();
-    free(wide_name);
+    cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
 
     if (written == 0 && read_error == ERROR_ENVVAR_NOT_FOUND) {
-        free(wide_value);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         return CA_NOT_FOUND;
     }
 
     if (written >= size) {
-        free(wide_value);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "environment value changed during read");
         }
@@ -98,7 +101,7 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
     }
 
     if (written > (DWORD)INT32_MAX) {
-        free(wide_value);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_OVERFLOW, "environment value is too large");
         }
@@ -108,16 +111,16 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
     int needed =
         WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written, nullptr, 0, nullptr, nullptr);
     if (needed <= 0 && written > 0) {
-        free(wide_value);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "environment value is not valid UTF-16");
         }
         return CA_IO_ERROR;
     }
 
-    char* utf8 = (char*)malloc((size_t)needed + 1);
+    char* utf8 = (char*)cx_allocator_alloc(alloc, (size_t)needed + 1, 1);
     if (utf8 == nullptr) {
-        free(wide_value);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
         }
@@ -126,8 +129,8 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
 
     if (needed > 0 && WideCharToMultiByte(CP_UTF8, 0, wide_value, (int)written, utf8, needed,
                                           nullptr, nullptr) != needed) {
-        free(utf8);
-        free(wide_value);
+        cx_allocator_free(alloc, utf8, (size_t)needed + 1, 1);
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "failed to convert environment value to UTF-8");
         }
@@ -135,7 +138,7 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
     }
 
     utf8[needed] = '\0';
-    free(wide_value);
+    cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
 
     *value = utf8;
     *len = (size_t)needed;
@@ -149,7 +152,8 @@ static ca_status env_lookup(const char* name, char** value, size_t* len, ca_erro
     }
 
     size_t found_len = strlen(found);
-    char* copy = (char*)malloc(found_len + 1);
+    const cx_allocator* alloc = cx_allocator_default();
+    char* copy = (char*)cx_allocator_alloc(alloc, found_len + 1, 1);
     if (copy == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate environment value");
@@ -213,13 +217,15 @@ ca_status ca_env_get(const char* name, char* out, size_t out_size, size_t* out_l
     }
 
     if (out == nullptr) {
-        free(value);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, value, len + 1, 1);
         return CA_OK;
     }
 
     if (len >= out_size) {
         out[0] = '\0';
-        free(value);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, value, len + 1, 1);
         if (err) {
             ca_error_set(err, CA_OVERFLOW, "environment value needs %zu bytes", len + 1);
         }
@@ -227,7 +233,8 @@ ca_status ca_env_get(const char* name, char* out, size_t out_size, size_t* out_l
     }
 
     memcpy(out, value, len + 1);
-    free(value);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, value, len + 1, 1);
     return CA_OK;
 }
 
@@ -247,8 +254,9 @@ ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_err
     WCHAR* wide_name = env_utf8_to_wide(name);
     WCHAR* wide_value = env_utf8_to_wide(value);
     if (wide_name == nullptr || wide_value == nullptr) {
-        free(wide_name);
-        free(wide_value);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_INVALID_ARGUMENT, "invalid UTF-8 environment name or value");
         }
@@ -261,8 +269,9 @@ ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_err
         DWORD query_error = GetLastError();
 
         if (size > 0 || query_error != ERROR_ENVVAR_NOT_FOUND) {
-            free(wide_name);
-            free(wide_value);
+            const cx_allocator* alloc = cx_allocator_default();
+            cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
+            cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
             if (err) {
                 ca_error_set(err, CA_ALREADY_EXISTS, "environment variable already exists: %s",
                              name);
@@ -273,8 +282,9 @@ ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_err
 
     if (!SetEnvironmentVariableW(wide_name, wide_value)) {
         DWORD error = GetLastError();
-        free(wide_name);
-        free(wide_value);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
+        cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "SetEnvironmentVariableW failed: %lu",
                          (unsigned long)error);
@@ -282,8 +292,9 @@ ca_status ca_env_set(const char* name, const char* value, bool overwrite, ca_err
         return CA_IO_ERROR;
     }
 
-    free(wide_name);
-    free(wide_value);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
+    cx_allocator_free(alloc, wide_value, 0, alignof(WCHAR));
 #else
     if (!overwrite && getenv(name) != nullptr) {
         if (err) {
@@ -326,7 +337,8 @@ ca_status ca_env_unset(const char* name, ca_error* err) {
 
     if (!SetEnvironmentVariableW(wide_name, nullptr)) {
         DWORD error = GetLastError();
-        free(wide_name);
+        const cx_allocator* alloc = cx_allocator_default();
+        cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "SetEnvironmentVariableW failed: %lu",
                          (unsigned long)error);
@@ -334,7 +346,8 @@ ca_status ca_env_unset(const char* name, ca_error* err) {
         return CA_IO_ERROR;
     }
 
-    free(wide_name);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, wide_name, 0, alignof(WCHAR));
 #else
     if (unsetenv(name) != 0) {
         if (err) {

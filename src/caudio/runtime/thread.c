@@ -1,5 +1,7 @@
 ﻿#include <caudio/runtime/thread.h>
 
+#include <cstdx/allocator.h>
+
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <process.h>
 #include <windows.h>
@@ -8,8 +10,6 @@
 #include <pthread.h>
 #include <sched.h>
 #endif
-
-#include <stdlib.h>
 
 struct ca_thread {
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -44,7 +44,8 @@ ca_status ca_thread_create(ca_thread_t* out, ca_thread_fn fn, void* arg, ca_erro
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_thread_t t = (ca_thread_t)calloc(1, sizeof(struct ca_thread));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_thread_t t = (ca_thread_t)cx_allocator_alloc(alloc, sizeof(struct ca_thread), alignof(struct ca_thread));
     if (t == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate thread");
@@ -58,7 +59,7 @@ ca_status ca_thread_create(ca_thread_t* out, ca_thread_fn fn, void* arg, ca_erro
 #if defined(_WIN32) || defined(__CYGWIN__)
     t->handle = CreateThread(nullptr, 0, thread_proc, t, 0, &t->id);
     if (t->handle == nullptr) {
-        free(t);
+        cx_allocator_free(alloc, t, sizeof(struct ca_thread), alignof(struct ca_thread));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "CreateThread failed");
         }
@@ -67,7 +68,7 @@ ca_status ca_thread_create(ca_thread_t* out, ca_thread_fn fn, void* arg, ca_erro
 #else
     int rc = pthread_create(&t->handle, nullptr, fn, arg);
     if (rc != 0) {
-        free(t);
+        cx_allocator_free(alloc, t, sizeof(struct ca_thread), alignof(struct ca_thread));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_create failed: %d", rc);
         }
@@ -120,7 +121,8 @@ ca_status ca_thread_join(ca_thread_t thread, void** out_ret, ca_error* err) {
     }
 #endif
 
-    free(thread);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, thread, sizeof(struct ca_thread), alignof(struct ca_thread));
     return CA_OK;
 }
 
@@ -155,7 +157,8 @@ ca_status ca_thread_detach(ca_thread_t thread, ca_error* err) {
     }
 #endif
 
-    free(thread);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, thread, sizeof(struct ca_thread), alignof(struct ca_thread));
     return CA_OK;
 }
 

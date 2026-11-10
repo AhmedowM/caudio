@@ -1,5 +1,6 @@
 ﻿#include <caudio/runtime/mutex.h>
-#include <stdlib.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -28,7 +29,8 @@ ca_status ca_mutex_create(ca_mutex_t* out, ca_error* err) {
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_mutex_t m = (ca_mutex_t)calloc(1, sizeof(struct ca_mutex));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_mutex_t m = (ca_mutex_t)cx_allocator_alloc(alloc, sizeof(struct ca_mutex), alignof(struct ca_mutex));
     if (m == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate mutex");
@@ -41,7 +43,7 @@ ca_status ca_mutex_create(ca_mutex_t* out, ca_error* err) {
 #else
     int rc = pthread_mutex_init(&m->lock, nullptr);
     if (rc != 0) {
-        free(m);
+        cx_allocator_free(alloc, m, sizeof(struct ca_mutex), alignof(struct ca_mutex));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_mutex_init failed: %d", rc);
         }
@@ -62,7 +64,8 @@ void ca_mutex_destroy(ca_mutex_t mutex) {
     pthread_mutex_destroy(&mutex->lock);
 #endif
 
-    free(mutex);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, mutex, sizeof(struct ca_mutex), alignof(struct ca_mutex));
 }
 
 ca_status ca_mutex_lock(ca_mutex_t mutex, ca_error* err) {

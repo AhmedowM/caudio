@@ -1,6 +1,7 @@
 ﻿#include <caudio/runtime/socket.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <winsock2.h>
@@ -192,7 +193,8 @@ ca_socket_t ca_socket_create(ca_socket_domain domain, ca_socket_type type, ca_er
     }
 #endif
 
-    ca_socket_t sock = (ca_socket_t)calloc(1, sizeof(struct ca_socket));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_socket_t sock = (ca_socket_t)cx_allocator_alloc(alloc, sizeof(struct ca_socket), alignof(struct ca_socket));
     if (sock == nullptr) {
 #if defined(_WIN32) || defined(__CYGWIN__)
         closesocket(handle);
@@ -345,7 +347,8 @@ ca_socket_t ca_socket_accept(ca_socket_t sock, ca_socket_addr_t* out_addr, ca_er
     }
 #endif
 
-    ca_socket_t new_sock = (ca_socket_t)calloc(1, sizeof(struct ca_socket));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_socket_t new_sock = (ca_socket_t)cx_allocator_alloc(alloc, sizeof(struct ca_socket), alignof(struct ca_socket));
     if (new_sock == nullptr) {
 #if defined(_WIN32) || defined(__CYGWIN__)
         closesocket(handle);
@@ -444,7 +447,8 @@ void ca_socket_close(ca_socket_t sock) {
     close(sock->fd);
 #endif
 
-    free(sock);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, sock, sizeof(struct ca_socket), alignof(struct ca_socket));
 }
 
 ca_status ca_socket_setblocking(ca_socket_t sock, int blocking, ca_error* err) {

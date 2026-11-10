@@ -1,8 +1,9 @@
 ﻿#include <caudio/runtime/fs.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <io.h>
@@ -84,7 +85,8 @@ ca_file_t ca_fs_open(const char* path, uint32_t flags, ca_error* err) {
         return CA_FS_INVALID;
     }
 
-    LPWSTR wpath = (LPWSTR)malloc((size_t)wlen * sizeof(WCHAR));
+    const cx_allocator* alloc = cx_allocator_default();
+    LPWSTR wpath = (LPWSTR)cx_allocator_alloc(alloc, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
     if (wpath == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
@@ -128,7 +130,7 @@ ca_file_t ca_fs_open(const char* path, uint32_t flags, ca_error* err) {
 
     HANDLE h = CreateFileW(wpath, dwDesiredAccess, dwShareMode, nullptr, dwCreationDisposition,
                            flagsAndAttributes, nullptr);
-    free(wpath);
+    cx_allocator_free(alloc, wpath, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
 
     if (h == INVALID_HANDLE_VALUE) {
         if (err) {
@@ -137,7 +139,7 @@ ca_file_t ca_fs_open(const char* path, uint32_t flags, ca_error* err) {
         return CA_FS_INVALID;
     }
 
-    ca_file_t file = (ca_file_t)calloc(1, sizeof(struct ca_file));
+    ca_file_t file = (ca_file_t)cx_allocator_alloc(alloc, sizeof(struct ca_file), alignof(struct ca_file));
     if (file == nullptr) {
         CloseHandle(h);
         if (err) {
@@ -167,7 +169,8 @@ ca_file_t ca_fs_open(const char* path, uint32_t flags, ca_error* err) {
         return CA_FS_INVALID;
     }
 
-    ca_file_t file = (ca_file_t)calloc(1, sizeof(struct ca_file));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_file_t file = (ca_file_t)cx_allocator_alloc(alloc, sizeof(struct ca_file), alignof(struct ca_file));
     if (file == nullptr) {
         fclose(fp);
         if (err) {
@@ -266,7 +269,8 @@ void ca_fs_close(ca_file_t file) {
     }
 #endif
 
-    free(file);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, file, sizeof(struct ca_file), alignof(struct ca_file));
 }
 
 uint64_t ca_fs_size(ca_file_t file, ca_error* err) {
@@ -316,7 +320,8 @@ bool ca_fs_exists(const char* path, ca_error* err) {
         return false;
     }
 
-    LPWSTR wpath = (LPWSTR)malloc((size_t)wlen * sizeof(WCHAR));
+    const cx_allocator* alloc = cx_allocator_default();
+    LPWSTR wpath = (LPWSTR)cx_allocator_alloc(alloc, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
     if (wpath == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
@@ -326,7 +331,7 @@ bool ca_fs_exists(const char* path, ca_error* err) {
 
     MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
     DWORD attrs = GetFileAttributesW(wpath);
-    free(wpath);
+    cx_allocator_free(alloc, wpath, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
 
     if (attrs == INVALID_FILE_ATTRIBUTES) {
         return false;
@@ -355,7 +360,8 @@ ca_status ca_fs_mkdirs(const char* path, ca_error* err) {
 
     /* Build the path component by component. */
     size_t len = strlen(path);
-    char* buf = (char*)malloc(len + 1);
+    const cx_allocator* alloc = cx_allocator_default();
+    char* buf = (char*)cx_allocator_alloc(alloc, len + 1, 1);
     if (buf == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
@@ -408,7 +414,7 @@ ca_status ca_fs_mkdirs(const char* path, ca_error* err) {
             break;
         }
 
-        LPWSTR wbuf = (LPWSTR)malloc((size_t)wlen * sizeof(WCHAR));
+        LPWSTR wbuf = (LPWSTR)cx_allocator_alloc(alloc, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
         if (wbuf == nullptr) {
             status = CA_OUT_OF_MEMORY;
             if (err) {
@@ -426,11 +432,11 @@ ca_status ca_fs_mkdirs(const char* path, ca_error* err) {
                 if (err) {
                     ca_error_set(err, CA_IO_ERROR, "CreateDirectoryW failed for %s", buf);
                 }
-                free(wbuf);
+                cx_allocator_free(alloc, wbuf, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
                 break;
             }
         }
-        free(wbuf);
+        cx_allocator_free(alloc, wbuf, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
 #else
         if (mkdir(buf, 0755) != 0) {
             if (errno != EEXIST) {
@@ -450,7 +456,7 @@ ca_status ca_fs_mkdirs(const char* path, ca_error* err) {
         i = j + 1;
     }
 
-    free(buf);
+    cx_allocator_free(alloc, buf, len + 1, 1);
     return status;
 }
 
@@ -473,7 +479,8 @@ static ca_status remove_dir_contents(const char* path, ca_error* err) {
         }
 
         size_t child_len = strlen(path) + 1 + strlen(entry->d_name) + 1;
-        char* child = (char*)malloc(child_len);
+        const cx_allocator* alloc = cx_allocator_default();
+        char* child = (char*)cx_allocator_alloc(alloc, child_len, 1);
         if (!child) {
             closedir(dir);
             if (err) {
@@ -486,7 +493,7 @@ static ca_status remove_dir_contents(const char* path, ca_error* err) {
 
         struct stat st;
         if (stat(child, &st) != 0) {
-            free(child);
+            cx_allocator_free(alloc, child, child_len, 1);
             continue;
         }
 
@@ -510,7 +517,7 @@ static ca_status remove_dir_contents(const char* path, ca_error* err) {
             }
         }
 
-        free(child);
+        cx_allocator_free(alloc, child, child_len, 1);
         if (status != CA_OK) {
             closedir(dir);
             return status;
@@ -543,7 +550,8 @@ ca_status ca_fs_remove(const char* path, ca_error* err) {
         return CA_INVALID_ARGUMENT;
     }
 
-    LPWSTR wpath = (LPWSTR)malloc((size_t)wlen * sizeof(WCHAR));
+    const cx_allocator* alloc = cx_allocator_default();
+    LPWSTR wpath = (LPWSTR)cx_allocator_alloc(alloc, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
     if (wpath == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate path");
@@ -558,7 +566,7 @@ ca_status ca_fs_remove(const char* path, ca_error* err) {
         /* Try as a directory (must be empty). */
         ok = RemoveDirectoryW(wpath);
     }
-    free(wpath);
+    cx_allocator_free(alloc, wpath, (size_t)wlen * sizeof(WCHAR), alignof(WCHAR));
 
     if (!ok) {
         if (err) {

@@ -11,6 +11,12 @@
 
 #include "ca_test.h"
 
+static void ca_fft_free(void* ptr, size_t count, size_t elem_size) {
+    if (ptr) {
+        cx_allocator_free(cx_allocator_default(), ptr, count * elem_size, alignof(ca_complex_f));
+    }
+}
+
 static void test_fft_r2c(void) {
     ca_error err;
     ca_error_init(&err);
@@ -81,7 +87,7 @@ static void test_fft_one_shot(void) {
     CA_CHECK(bins != nullptr);
     CA_CHECK_EQ(3, bins_count);
     CA_CHECK(fabs(bins[0].re - 1.0f) < 0.001f);
-    free(bins);
+    ca_fft_free(bins, bins_count, sizeof(ca_complex_f));
 
     /* IFFT */
     ca_complex_f bins2[3] = {{1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.0f}};
@@ -92,7 +98,7 @@ static void test_fft_one_shot(void) {
     CA_CHECK_EQ(4, samples_count);
     CA_CHECK(fabs(samples[0] - 1.0f) < 0.001f);
     CA_CHECK(fabs(samples[1]) < 0.001f);
-    free(samples);
+    ca_fft_free(samples, samples_count, sizeof(float));
 }
 
 static void test_fft_windows(void) {

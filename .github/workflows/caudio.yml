@@ -70,6 +70,12 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             gcc-14 g++-14 ninja-build cmake libasan8 libubsan1
 
+      - name: Install FFmpeg (system dev packages)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev
+
       - name: Configure
         env:
           CFLAGS: ${{ matrix.c_flags }}
@@ -101,6 +107,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             clang-19 lld-19 ninja-build cmake libclang-rt-19-dev clang-tools-19 libasan8 libubsan1
+
+      - name: Install FFmpeg (system dev packages)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg libavcodec-dev libavformat-dev libavutil-dev libswresample-dev
 
       - name: Configure
         run: |
@@ -137,6 +149,10 @@ jobs:
         run: |
           cmake --version
           clang --version
+
+      - name: Install FFmpeg
+        run: |
+          brew install ffmpeg
 
       - name: Configure
         run: |
@@ -207,6 +223,10 @@ jobs:
             ${{ matrix.package_prefix }}-${{ matrix.cc_package }}
             ${{ matrix.package_prefix }}-${{ matrix.cxx_package }}
 
+      - name: Install FFmpeg
+        run: |
+          pacman -S --needed --noconfirm ${{ matrix.package_prefix }}-ffmpeg
+
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
@@ -219,7 +239,7 @@ jobs:
 
       - name: Test
         run: |
-          export PATH="$PWD/build/bin:$PATH"
+          export PATH="$PWD/build/bin:$MINGW_PREFIX/bin:$PATH"
           ctest --test-dir build --output-on-failure
 
   # -------------------------------------------------------------------------
@@ -245,6 +265,14 @@ jobs:
           unzip -q android-ndk-r30-linux.zip
           echo "NDK_ROOT=$PWD/android-ndk-r30" >> $GITHUB_ENV
 
+      - name: Build trimmed FFmpeg for Android
+        run: |
+          python3 scripts/build-ffmpeg.py \
+            --android-ndk "$NDK_ROOT" \
+            --android-abi arm64-v8a \
+            --android-api 28 \
+            --prefix ./build/ffmpeg-android
+
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
@@ -256,6 +284,7 @@ jobs:
             -DCMAKE_C_FLAGS="-Werror" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSROOT=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot \
+            -DKANARIV_TRIMMED_ROOT=$PWD/build/ffmpeg-android \
             -DCAUDIO_BUILD_TESTS=OFF \
             -DCAUDIO_BUILD_SHARED=ON \
             -DCA_RUNTIME_BUILD_SHARED=ON

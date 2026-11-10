@@ -1,6 +1,7 @@
 ﻿#include <caudio/runtime/cond.h>
 #include <caudio/runtime/mutex.h>
-#include <stdlib.h>
+
+#include <cstdx/allocator.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
@@ -30,7 +31,8 @@ ca_status ca_cond_create(ca_cond_t* out, ca_error* err) {
         return CA_INVALID_ARGUMENT;
     }
 
-    ca_cond_t c = (ca_cond_t)calloc(1, sizeof(struct ca_cond));
+    const cx_allocator* alloc = cx_allocator_default();
+    ca_cond_t c = (ca_cond_t)cx_allocator_alloc(alloc, sizeof(struct ca_cond), alignof(struct ca_cond));
     if (c == nullptr) {
         if (err) {
             ca_error_set(err, CA_OUT_OF_MEMORY, "failed to allocate cond");
@@ -43,7 +45,7 @@ ca_status ca_cond_create(ca_cond_t* out, ca_error* err) {
 #else
     int rc = pthread_cond_init(&c->cond, nullptr);
     if (rc != 0) {
-        free(c);
+        cx_allocator_free(alloc, c, sizeof(struct ca_cond), alignof(struct ca_cond));
         if (err) {
             ca_error_set(err, CA_IO_ERROR, "pthread_cond_init failed: %d", rc);
         }
@@ -64,7 +66,8 @@ void ca_cond_destroy(ca_cond_t cond) {
     pthread_cond_destroy(&cond->cond);
 #endif
 
-    free(cond);
+    const cx_allocator* alloc = cx_allocator_default();
+    cx_allocator_free(alloc, cond, sizeof(struct ca_cond), alignof(struct ca_cond));
 }
 
 ca_status ca_cond_signal(ca_cond_t cond, ca_error* err) {
