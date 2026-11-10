@@ -255,10 +255,7 @@ ca_status ca_shm_close(ca_shm_t shm, ca_error* err) {
         return CA_OK;
     }
 
-#if defined(__ANDROID__)
-    const cx_allocator* alloc = cx_allocator_default();
-    cx_allocator_free(alloc, shm, sizeof(struct ca_shm), alignof(struct ca_shm));
-#elif defined(_WIN32) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__CYGWIN__)
     CloseHandle(shm->handle);
 #else
     close(shm->fd);
