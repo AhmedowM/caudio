@@ -13,11 +13,11 @@ file(GLOB _caudio_domain_sources CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/src/caudio/utils/*.c"
     "${PROJECT_SOURCE_DIR}/src/caudio/media/*.c"
 )
-# Vendored BLAKE3 (see vendor/README.md for provenance). Built STATIC so the
-# umbrella has exactly one copy; portable-only build per kanariv.
+# Vendored BLAKE3 (see libs/third_party/README.md for provenance). Built STATIC
+# so the umbrella has exactly one copy; portable-only build per kanariv.
 file(GLOB _caudio_vendor_sources CONFIGURE_DEPENDS
-    "${PROJECT_SOURCE_DIR}/vendor/blake3.c"
-    "${PROJECT_SOURCE_DIR}/vendor/blake3_portable.c"
+    "${PROJECT_SOURCE_DIR}/libs/third_party/blake3.c"
+    "${PROJECT_SOURCE_DIR}/libs/third_party/blake3_portable.c"
 )
 
 if(CAUDIO_BUILD_SHARED)
@@ -56,7 +56,7 @@ target_include_directories(caudio
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/vendor>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/libs/third_party>
 )
 
 target_compile_features(caudio PUBLIC c_std_23)
@@ -78,6 +78,12 @@ if(MSVC)
   target_compile_options(caudio PRIVATE /W4)
 else()
   target_compile_options(caudio PRIVATE -Wall -Wextra -Werror)
+  # Vendored blake3.c triggers -Wunused-variable on portable builds; suppress
+  # just for that translation unit instead of editing third-party source.
+  target_compile_options(caudio PRIVATE
+      $<$<COMPILE_LANGUAGE:C>:-Wno-unused-variable>
+  )
+  target_link_libraries(caudio PRIVATE m)
 endif()
 
 add_library(caudio::caudio ALIAS caudio)

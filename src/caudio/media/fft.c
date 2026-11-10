@@ -281,6 +281,7 @@ ca_status ca_fft_real(const float* samples,
     }
 
     st = ca_fft_execute_r2c(plan, samples, out, err);
+    size_t out_bins = plan->output_bins;
     ca_fft_plan_destroy(plan);
     if (st != CA_OK) {
         free(out);
@@ -288,7 +289,7 @@ ca_status ca_fft_real(const float* samples,
     }
 
     *bins = out;
-    *bins_count = plan->output_bins;
+    *bins_count = out_bins;
     return CA_OK;
 }
 
