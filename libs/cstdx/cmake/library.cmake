@@ -64,6 +64,11 @@ set_target_properties(cstdx PROPERTIES
 
 if(MSVC)
   target_compile_options(cstdx PRIVATE /W4)
-else()
+elseif(PROJECT_IS_TOP_LEVEL)
   target_compile_options(cstdx PRIVATE -Wall -Wextra -Werror)
+else()
+  # Built as a subdirectory (e.g. from caudio): cstdx is third-party code.
+  # Warnings on, but never fatal (-Werror excluded) so 3rd party code
+  # does not block clean builds.
+  target_compile_options(cstdx PRIVATE -Wall -Wextra)
 endif()

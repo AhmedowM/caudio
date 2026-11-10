@@ -22,13 +22,36 @@ file(GLOB _caudio_domain_headers CONFIGURE_DEPENDS
 file(GLOB _caudio_vendor_sources CONFIGURE_DEPENDS
     "${PROJECT_SOURCE_DIR}/libs/third_party/blake3.c"
     "${PROJECT_SOURCE_DIR}/libs/third_party/blake3_portable.c"
+    "${PROJECT_SOURCE_DIR}/libs/third_party/miniaudio_impl.c"
+)
+
+# Third-party vendor library: warnings on, but never fatal (-Werror excluded).
+# 3rd party code must not block clean builds.
+add_library(caudio_vendor STATIC ${_caudio_vendor_sources})
+target_include_directories(caudio_vendor
+    PUBLIC ${PROJECT_SOURCE_DIR}/libs/third_party
+)
+if(MSVC)
+  target_compile_options(caudio_vendor PRIVATE /W3)
+else()
+  target_compile_options(caudio_vendor PRIVATE -Wall -Wextra)
+endif()
+target_compile_features(caudio_vendor PRIVATE c_std_23)
+set_target_properties(caudio_vendor PROPERTIES
+    C_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
+# BLAKE3 is built portable-only (matches kanariv): no AVX512/AVX2/SSE41/SSE2/NEON.
+target_compile_definitions(caudio_vendor PRIVATE
+    BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0
 )
 
 if(CAUDIO_BUILD_SHARED)
   add_library(caudio SHARED
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
       ${_caudio_domain_sources}
-      ${_caudio_vendor_sources}
       ${_caudio_domain_headers}
   )
   target_compile_definitions(caudio
@@ -39,7 +62,6 @@ else()
   add_library(caudio STATIC
       ${PROJECT_SOURCE_DIR}/src/caudio/umbrella.c
       ${_caudio_domain_sources}
-      ${_caudio_vendor_sources}
       ${_caudio_domain_headers}
   )
 endif()
@@ -48,16 +70,8 @@ unset(_caudio_domain_sources)
 unset(_caudio_domain_headers)
 unset(_caudio_vendor_sources)
 
-# Vendored BLAKE3 compiles with relaxed warnings: upstream blake3.c has unused
-# variable warnings (e.g. num_cvs) under -Werror on some toolchains/macros.
-set_source_files_properties(
-    ${PROJECT_SOURCE_DIR}/libs/third_party/blake3.c
-    ${PROJECT_SOURCE_DIR}/libs/third_party/blake3_portable.c
-    PROPERTIES
-    COMPILE_FLAGS "-Wno-unused-variable -Wno-unused-but-set-variable"
-)
-
 target_link_libraries(caudio PUBLIC ca_runtime::ca_runtime)
+target_link_libraries(caudio PRIVATE caudio_vendor)
 
 # Feature-test macros must reach every caudio TU before its first system
 # header; they stay PRIVATE so the installed package does not export them.

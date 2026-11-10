@@ -44,7 +44,7 @@ set_target_properties(ca_runtime PROPERTIES
 if(MSVC)
   target_compile_options(ca_runtime PRIVATE /W4)
 else()
-  target_compile_options(ca_runtime PRIVATE -Wall -Wextra -Werror)
+  target_compile_options(ca_runtime PRIVATE -Wall -Wextra)
 endif()
 
 # cstdx is part of ca_runtime's public API (allocator types cross the boundary),

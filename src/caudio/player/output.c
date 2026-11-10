@@ -11,7 +11,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
 
 /* --------------------------------------------------------------- */
