@@ -25,8 +25,13 @@
 /* FFmpeg decoder implementation                              */
 /* ---------------------------------------------------------- */
 
-#define AUDIO_IO_BUFFER_SIZE 8192
-#define CONVERT_FRAMES 4096
+static constexpr size_t AUDIO_IO_BUFFER_SIZE = 8192;
+    static constexpr size_t CONVERT_FRAMES = 4096;
+
+static_assert(AUDIO_IO_BUFFER_SIZE > 0, "AUDIO_IO_BUFFER_SIZE must be positive");
+static_assert(CONVERT_FRAMES > 0, "CONVERT_FRAMES must be positive");
+static_assert((CONVERT_FRAMES & (CONVERT_FRAMES - 1)) == 0,
+              "CONVERT_FRAMES must be a power of two");
 
 struct ca_decoder {
     ca_reader* reader;
@@ -163,7 +168,7 @@ static int drain_resampler(ca_decoder* self) {
     while ((n = swr_convert(self->swr_ctx,
                             out_ptrs,
                             (int)CONVERT_FRAMES,
-                            NULL,
+                            nullptr,
                             0)) > 0) {
         size_t spill_needed = self->spill_size + (size_t)n * self->channels * sizeof(float);
         float* new_spill = (float*)cx_allocator_realloc(
@@ -206,7 +211,7 @@ static size_t serve_spill(ca_decoder* self,
                           self->spill_buf,
                           self->spill_size,
                           alignof(float));
-        self->spill_buf = NULL;
+        self->spill_buf = nullptr;
         self->spill_size = 0;
         self->spill_pos = 0;
     }
@@ -248,13 +253,13 @@ ca_status ca_decoder_open(ca_decoder** out,
     memset(self, 0, sizeof(ca_decoder));
     self->reader = reader;
     self->logger = logger;
-    self->io_buffer = NULL;
+    self->io_buffer = nullptr;
     self->io_buffer_size = 0;
-    self->pkt = NULL;
-    self->frame = NULL;
-    self->convert_buf = NULL;
+    self->pkt = nullptr;
+    self->frame = nullptr;
+    self->convert_buf = nullptr;
     self->convert_buf_size = 0;
-    self->spill_buf = NULL;
+    self->spill_buf = nullptr;
     self->spill_size = 0;
     self->spill_pos = 0;
 
@@ -263,7 +268,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!self->io_buffer) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
     self->io_buffer_size = AUDIO_IO_BUFFER_SIZE;
@@ -274,14 +279,14 @@ ca_status ca_decoder_open(ca_decoder** out,
                                         0,   /* write_flag = 0 (read only) */
                                         self,   /* opaque */
                                         decoder_read_cb,
-                                        NULL,   /* write_cb */
-                                        self->reader->ops->seekable(self->reader) ? decoder_seek_cb : NULL);
+                                        nullptr,   /* write_cb */
+                                        self->reader->ops->seekable(self->reader) ? decoder_seek_cb : nullptr);
     if (!self->avio_ctx) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         av_free(self->io_buffer);
-        self->io_buffer = NULL;
+        self->io_buffer = nullptr;
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
 
@@ -290,7 +295,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!self->fmt_ctx) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
 
@@ -301,10 +306,10 @@ ca_status ca_decoder_open(ca_decoder** out,
     self->avio_ctx->seekable = self->reader->ops->seekable(self->reader) ? 1 : 0;
 
     /* Open input */
-    if (avformat_open_input(&self->fmt_ctx, NULL, NULL, NULL) < 0) {
+    if (avformat_open_input(&self->fmt_ctx, nullptr, nullptr, nullptr) < 0) {
         ca_error_set(err, CA_NOT_SUPPORTED, "avformat_open_input failed");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_NOT_SUPPORTED;
     }
 
@@ -312,21 +317,21 @@ ca_status ca_decoder_open(ca_decoder** out,
     self->fmt_ctx->probesize = 1048576;
     self->fmt_ctx->max_analyze_duration = 500000;
 
-    if (avformat_find_stream_info(self->fmt_ctx, NULL) < 0) {
+    if (avformat_find_stream_info(self->fmt_ctx, nullptr) < 0) {
         ca_error_set(err, CA_IO_ERROR, "avformat_find_stream_info failed");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_IO_ERROR;
     }
 
     /* Find audio stream */
     self->audio_stream_idx = av_find_best_stream(self->fmt_ctx,
                                                   AVMEDIA_TYPE_AUDIO,
-                                                  -1, -1, NULL, 0);
+                                                  -1, -1, nullptr, 0);
     if (self->audio_stream_idx < 0) {
         ca_error_set(err, CA_NOT_SUPPORTED, "no audio stream found");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_NOT_SUPPORTED;
     }
 
@@ -335,7 +340,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!codec) {
         ca_error_set(err, CA_NOT_SUPPORTED, "no decoder found");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_NOT_SUPPORTED;
     }
 
@@ -343,21 +348,21 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!self->dec_ctx) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
 
     if (avcodec_parameters_to_context(self->dec_ctx, stream->codecpar) < 0) {
         ca_error_set(err, CA_IO_ERROR, "avcodec_parameters_to_context failed");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_IO_ERROR;
     }
 
-    if (avcodec_open2(self->dec_ctx, codec, NULL) < 0) {
+    if (avcodec_open2(self->dec_ctx, codec, nullptr) < 0) {
         ca_error_set(err, CA_IO_ERROR, "avcodec_open2 failed");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_IO_ERROR;
     }
 
@@ -366,7 +371,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!self->swr_ctx) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
 
@@ -387,7 +392,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (swr_init(self->swr_ctx) < 0) {
         ca_error_set(err, CA_IO_ERROR, "swr_init failed");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_IO_ERROR;
     }
 
@@ -397,7 +402,7 @@ ca_status ca_decoder_open(ca_decoder** out,
     if (!self->pkt || !self->frame) {
         ca_error_set(err, CA_OUT_OF_MEMORY, "out of memory");
         ca_decoder_destroy(self);
-        *out = NULL;
+        *out = nullptr;
         return CA_OUT_OF_MEMORY;
     }
 
@@ -456,7 +461,7 @@ size_t ca_decoder_decode(ca_decoder* self,
         int ret = av_read_frame(self->fmt_ctx, pkt);
         if (ret < 0) {
             if (ret == AVERROR_EOF || ret < 0) {
-                (void)avcodec_send_packet(self->dec_ctx, NULL);
+                (void)avcodec_send_packet(self->dec_ctx, nullptr);
                 for (;;) {
                     av_frame_unref(frame);
                     ret = avcodec_receive_frame(self->dec_ctx, frame);
@@ -511,7 +516,7 @@ ca_status ca_decoder_seek(ca_decoder* self,
                           ca_error* err) {
     if (err) ca_error_init(err);
     if (!self) {
-        if (err) ca_error_set(err, CA_INVALID_ARGUMENT, "decoder is NULL");
+        if (err) ca_error_set(err, CA_INVALID_ARGUMENT, "decoder is nullptr");
         return CA_INVALID_ARGUMENT;
     }
     if (!isfinite(seconds) || seconds < 0.0) {
@@ -565,7 +570,7 @@ ca_status ca_decoder_seek(ca_decoder* self,
     swr_init(self->swr_ctx);
     self->spill_size = 0;
     self->spill_pos = 0;
-    self->spill_buf = NULL;
+    self->spill_buf = nullptr;
     self->total_frames = (uint64_t)(seconds * self->sample_rate);
     return CA_OK;
 }
@@ -587,9 +592,9 @@ void ca_decoder_destroy(ca_decoder* self) {
     if (self->dec_ctx)
         avcodec_free_context(&self->dec_ctx);
     if (self->fmt_ctx) {
-        self->fmt_ctx->pb = NULL;
+        self->fmt_ctx->pb = nullptr;
         avformat_close_input(&self->fmt_ctx);
-        self->fmt_ctx = NULL;
+        self->fmt_ctx = nullptr;
     }
     if (self->avio_ctx)
         avio_context_free(&self->avio_ctx);
@@ -643,13 +648,13 @@ ca_status ca_decoder_extract_metadata(const char* path,
                                       ca_error* err) {
     if (err) ca_error_init(err);
     if (!path) {
-        if (err) ca_error_set(err, CA_INVALID_ARGUMENT, "path is NULL");
+        if (err) ca_error_set(err, CA_INVALID_ARGUMENT, "path is nullptr");
         return CA_INVALID_ARGUMENT;
     }
-    if (title) *title = NULL;
-    if (artist) *artist = NULL;
-    if (album) *album = NULL;
-    if (genre) *genre = NULL;
+    if (title) *title = nullptr;
+    if (artist) *artist = nullptr;
+    if (album) *album = nullptr;
+    if (genre) *genre = nullptr;
     if (duration) *duration = 0.0;
     if (sample_rate) *sample_rate = 0;
     if (channels) *channels = 0;
@@ -661,7 +666,7 @@ ca_status ca_decoder_extract_metadata(const char* path,
         return CA_OUT_OF_MEMORY;
     }
 
-    if (avformat_open_input(&fmt, path, NULL, NULL) < 0) {
+    if (avformat_open_input(&fmt, path, nullptr, nullptr) < 0) {
         avformat_free_context(fmt);
         if (err) ca_error_set(err, CA_IO_ERROR, "avformat_open_input failed");
         return CA_IO_ERROR;
@@ -670,56 +675,56 @@ ca_status ca_decoder_extract_metadata(const char* path,
     fmt->probesize = 1048576;
     fmt->max_analyze_duration = 500000;
 
-    if (avformat_find_stream_info(fmt, NULL) < 0) {
+    if (avformat_find_stream_info(fmt, nullptr) < 0) {
         avformat_close_input(&fmt);
         if (err) ca_error_set(err, CA_IO_ERROR, "avformat_find_stream_info failed");
         return CA_IO_ERROR;
     }
 
-    int audio_stream_idx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+    int audio_stream_idx = av_find_best_stream(fmt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
     AVDictionary* stream_meta = (audio_stream_idx >= 0)
         ? fmt->streams[audio_stream_idx]->metadata
-        : NULL;
+        : nullptr;
 
     if (title) {
-        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "title", NULL, 0);
+        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "title", nullptr, 0);
         if (!e || !e->value || !*e->value)
-            e = av_dict_get(stream_meta, "title", NULL, 0);
+            e = av_dict_get(stream_meta, "title", nullptr, 0);
         if (e && e->value && *e->value) {
-            *title = NULL;
+            *title = nullptr;
             cx_status cst = cx_string_init(title, cx_allocator_default());
             if (cst == CX_OK)
                 ca_from_cx(cx_string_assign_view(*title, cx_string_view_from_cstr(e->value)));
         }
     }
     if (artist) {
-        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "artist", NULL, 0);
+        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "artist", nullptr, 0);
         if (!e || !e->value || !*e->value)
-            e = av_dict_get(stream_meta, "artist", NULL, 0);
+            e = av_dict_get(stream_meta, "artist", nullptr, 0);
         if (e && e->value && *e->value) {
-            *artist = NULL;
+            *artist = nullptr;
             cx_status cst = cx_string_init(artist, cx_allocator_default());
             if (cst == CX_OK)
                 ca_from_cx(cx_string_assign_view(*artist, cx_string_view_from_cstr(e->value)));
         }
     }
     if (album) {
-        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "album", NULL, 0);
+        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "album", nullptr, 0);
         if (!e || !e->value || !*e->value)
-            e = av_dict_get(stream_meta, "album", NULL, 0);
+            e = av_dict_get(stream_meta, "album", nullptr, 0);
         if (e && e->value && *e->value) {
-            *album = NULL;
+            *album = nullptr;
             cx_status cst = cx_string_init(album, cx_allocator_default());
             if (cst == CX_OK)
                 ca_from_cx(cx_string_assign_view(*album, cx_string_view_from_cstr(e->value)));
         }
     }
     if (genre) {
-        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "genre", NULL, 0);
+        AVDictionaryEntry* e = av_dict_get(fmt->metadata, "genre", nullptr, 0);
         if (!e || !e->value || !*e->value)
-            e = av_dict_get(stream_meta, "genre", NULL, 0);
+            e = av_dict_get(stream_meta, "genre", nullptr, 0);
         if (e && e->value && *e->value) {
-            *genre = NULL;
+            *genre = nullptr;
             cx_status cst = cx_string_init(genre, cx_allocator_default());
             if (cst == CX_OK)
                 ca_from_cx(cx_string_assign_view(*genre, cx_string_view_from_cstr(e->value)));

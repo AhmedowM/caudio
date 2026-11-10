@@ -8,9 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+static constexpr double CA_M_PI = 3.14159265358979323846;
 
 /* ---------------------------------------------------------- */
 /* FFT plan implementation                                    */
@@ -59,7 +57,7 @@ static void fft_radix2(ca_complex_f* z, size_t n, bool inverse) {
     /* Butterflies. */
     for (size_t len = 2; len <= n; len <<= 1) {
         float sign = inverse ? 1.0f : -1.0f;
-        float ang = sign * 2.0f * (float)M_PI / (float)len;
+        float ang = sign * 2.0f * (float)CA_M_PI / (float)len;
         ca_complex_f wlen = { cosf(ang), sinf(ang) };
         for (size_t i = 0; i < n; i += len) {
             ca_complex_f w = { 1.0f, 0.0f };
@@ -228,7 +226,7 @@ ca_status ca_fft_window_hann(float* out, size_t n) {
     }
     float denom = (float)(n - 1);
     for (size_t i = 0; i < n; ++i) {
-        out[i] = 0.5f * (1.0f - cosf(2.0f * (float)M_PI * (float)i / denom));
+        out[i] = 0.5f * (1.0f - cosf(2.0f * (float)CA_M_PI * (float)i / denom));
     }
     return CA_OK;
 }
@@ -241,7 +239,7 @@ ca_status ca_fft_window_hamming(float* out, size_t n) {
     }
     float denom = (float)(n - 1);
     for (size_t i = 0; i < n; ++i) {
-        out[i] = 0.54f - 0.46f * cosf(2.0f * (float)M_PI * (float)i / denom);
+        out[i] = 0.54f - 0.46f * cosf(2.0f * (float)CA_M_PI * (float)i / denom);
     }
     return CA_OK;
 }

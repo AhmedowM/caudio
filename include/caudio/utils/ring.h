@@ -24,7 +24,11 @@ extern "C" {
 #endif
 
 /** Cache-line size used to pad atomics against false sharing. */
-#define CA_RING_CACHE_LINE 64U
+static constexpr size_t CA_RING_CACHE_LINE = 64U;
+
+static_assert(CA_RING_CACHE_LINE > 0, "CA_RING_CACHE_LINE must be positive");
+static_assert((CA_RING_CACHE_LINE & (CA_RING_CACHE_LINE - 1)) == 0,
+              "CA_RING_CACHE_LINE must be a power of two");
 
 /**
  * @brief Opaque ring buffer handle.

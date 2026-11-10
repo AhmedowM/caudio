@@ -30,7 +30,9 @@ typedef struct cx_string cx_string;
  * Applies to both ca_json_parse() and ca_json_parse_file(). Larger inputs are
  * rejected with CA_OVERFLOW before any parsing work is done.
  */
-constexpr size_t CA_JSON_MAX_BYTES = 16 * 1024 * 1024;
+static constexpr size_t CA_JSON_MAX_BYTES = 16 * 1024 * 1024;
+
+static_assert(CA_JSON_MAX_BYTES > 0, "CA_JSON_MAX_BYTES must be positive");
 
 /**
  * @brief Maximum nesting depth of arrays and objects.
@@ -41,6 +43,8 @@ constexpr size_t CA_JSON_MAX_BYTES = 16 * 1024 * 1024;
  * Kept as a macro because it is used in a preprocessor #if guard in json.c.
  */
 #define CA_JSON_MAX_DEPTH 128
+
+static_assert(CA_JSON_MAX_DEPTH > 0, "CA_JSON_MAX_DEPTH must be positive");
 
 /**
  * @brief Maximum number of elements in a single array or key/value pairs in a

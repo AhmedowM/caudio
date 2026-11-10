@@ -17,7 +17,11 @@
 /* the entire file sequentially. Both produce a 32-byte digest. */
 /* ---------------------------------------------------------- */
 
-#define BLAKE3_SAMPLE 65536
+static constexpr size_t BLAKE3_SAMPLE = 65536;
+
+static_assert(BLAKE3_SAMPLE > 0, "BLAKE3_SAMPLE must be positive");
+static_assert((BLAKE3_SAMPLE & (BLAKE3_SAMPLE - 1)) == 0,
+              "BLAKE3_SAMPLE must be a power of two");
 
 ca_status ca_media_fingerprint_compute(const char* path,
                                        uint8_t out[32],
