@@ -4,6 +4,13 @@
 # No trailing spaces; each line is a single configure argument.
 
 --disable-all
+--disable-autodetect
+--enable-avcodec
+--enable-avformat
+--enable-avutil
+--enable-shared
+--disable-static
+--enable-pic
 --enable-small
 --disable-programs
 --disable-doc

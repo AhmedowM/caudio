@@ -284,7 +284,7 @@ jobs:
             -DCMAKE_C_FLAGS="-Werror" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSROOT=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/sysroot \
-            -DKANARIV_TRIMMED_ROOT=$PWD/build/ffmpeg-android \
+            -DFFmpeg_ROOT=$PWD/build/ffmpeg-android \
             -DCAUDIO_BUILD_TESTS=OFF \
             -DCAUDIO_BUILD_SHARED=ON \
             -DCA_RUNTIME_BUILD_SHARED=ON
