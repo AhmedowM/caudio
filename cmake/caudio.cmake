@@ -74,15 +74,31 @@ target_compile_definitions(caudio PRIVATE
     BLAKE3_NO_AVX512 BLAKE3_NO_AVX2 BLAKE3_NO_SSE41 BLAKE3_NO_SSE2 BLAKE3_USE_NEON=0
 )
 
+# FFmpeg setup: find system FFmpeg or use trimmed build from build-ffmpeg.py
+include(${CMAKE_CURRENT_LIST_DIR}/FindFFmpeg.cmake)
+
+if(NOT FFmpeg_FOUND)
+  include(${CMAKE_CURRENT_LIST_DIR}/SetupFFmpeg.cmake)
+  kanariv_setup_ffmpeg()
+endif()
+
+if(FFmpeg_FOUND)
+  target_link_libraries(caudio PRIVATE
+      FFmpeg::avcodec
+      FFmpeg::avformat
+      FFmpeg::avutil
+      FFmpeg::swresample)
+  target_include_directories(caudio PRIVATE
+      ${FFmpeg_AVCODEC_INCLUDE_DIR}
+      ${FFmpeg_AVFORMAT_INCLUDE_DIR}
+      ${FFmpeg_AVUTIL_INCLUDE_DIR}
+      ${FFmpeg_SWRESAMPLE_INCLUDE_DIR})
+endif()
+
 if(MSVC)
   target_compile_options(caudio PRIVATE /W4)
 else()
   target_compile_options(caudio PRIVATE -Wall -Wextra -Werror)
-  # Vendored blake3.c triggers -Wunused-variable on portable builds; suppress
-  # just for that translation unit instead of editing third-party source.
-  target_compile_options(caudio PRIVATE
-      $<$<COMPILE_LANGUAGE:C>:-Wno-unused-variable>
-  )
   target_link_libraries(caudio PRIVATE m)
 endif()
 
