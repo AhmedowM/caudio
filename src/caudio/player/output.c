@@ -9,6 +9,7 @@
 #include <math.h>
 #include <stdatomic.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <miniaudio.h>
